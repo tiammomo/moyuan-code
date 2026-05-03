@@ -79,57 +79,112 @@ function collectDocsContext() {
 
 function buildDiagramSpec() {
   return `
-图名：Moyuan Code Multi-Agent SDLC Technical Map
-目标：用中文说明、英文专有名词原样保留、图标和节点辅助表达的方式，展示当前项目从 User Request、Repository Onboarding、Project Comprehension、Issue Graph、Subagent 并发执行、Quality Gate、Git Merge、Release/Deployment 到 Memory/Logs 反馈的完整技术流程。
+图名：Moyuan Code Multi-Agent SDLC 调用逻辑
+目标：生成一张横版 2K 技术信息流图，用编号层级、主流程箭头、辅助流程虚线、数据/工作空间沉淀层和底部治理层，精炼展示 Moyuan Code 的核心调用逻辑。参考用户给出的优秀横版流程图风格：顶部强标题、分层编号模块、深蓝标题条、浅色卡片、数据库圆柱、右上图例、底部调度/控制层。不要照搬参考图的业务内容，只参考版式组织方式。
 受众：技术负责人、架构师、后端/前端/测试/运维 Agent 配置人员、后续实现工程师。
 
 画面布局：
-请生成一张横向技术可视化地图，不要做纯文本表格。采用“主流程从左到右 + 底部反馈环”的结构。每个主模块用大号中文标题、英文专有名词、小型流程节点、图标和短标签表达。技术密度要高于普通信息图，但比纯文本架构图更好看。
+请生成一张横版 2K 宽屏技术流程图，不是竖版海报。整体结构必须像工程调用逻辑图：
 
-主流程 7 个大模块：
+顶部：大标题居中
+- 标题：Moyuan Code Multi-Agent SDLC 调用逻辑
+- 右上角图例：实线 = Main Flow，虚线 = Control / Feedback，圆柱 = Workspace / Data Store，圆角框 = Processing Module
 
-1. 入口与权限
-   - 图标建议：用户头像、终端窗口、API 插头、盾牌、审批勾选
-   - 必须出现的术语：Platform User、CLI/API、Auth Context、RBAC、Approval、Audit、Secret Ref
+第一行：从左到右 7 个主流程层，每层一个编号卡片，卡片顶部使用深蓝标题条。
 
-2. 仓库接入与项目理解
-   - 图标建议：代码仓库、Git 分支、云端仓库、放大镜、项目地图
-   - 必须出现的术语：Local Path、GitHub/Gitee、Generic Git、Git Adapter、.moyuan Workspace、Project Comprehension、Project Profile、Module Map
+1. 输入与权限层
+   - Platform User / CLI/API
+   - Auth Context / RBAC
+   - Approval / Audit
+   - Secret Ref
 
-3. 需求规划与 Issue Graph
-   - 图标建议：便签需求、问号气泡、DAG 节点图、队列看板
-   - 必须出现的术语：Requirement Refiner、Clarification Gate、Issue Planner、Dependency Planner、Scheduler、Issue Graph、ready_queue、blocked_queue
+2. 仓库接入层
+   - Local Path / GitHub / Gitee
+   - Git Adapter
+   - clone / fetch / branch
+   - .moyuan init
 
-4. Multi-Agent 执行
-   - 图标建议：多个 Agent 节点、工具箱、技能拼图、Claude/Codex 运行器、模型云
-   - 必须出现的术语：Agent Roles、Subagent Manager、Skills Registry、find-skills、Skill Binding、Runtime Adapter、Claude CLI、Codex CLI、Model Routing、GPT/Claude/GLM/MiniMax
+3. 项目理解层
+   - Project Comprehension
+   - Project Profile
+   - Module Map
+   - Commands / Risk Files
 
-5. 质量门禁与合入
-   - 图标建议：代码文件、测试烧杯、仪表盘、锁门、合并箭头
-   - 必须出现的术语：Issue Branch、Worktree、Build/Lint/Test、Coverage、Duplication、Complexity、Security Scan、Quality Gate、Review、Epic Integration Branch
+4. 需求规划层
+   - Requirement Refiner
+   - Clarification Gate
+   - Issue Planner
+   - Issue Graph
+   - Scheduler
 
-6. 发布与服务器
-   - 图标建议：版本标签、GitHub/Gitee 云、服务器机柜、火箭/部署箭头、监控波形、回滚按钮
-   - 必须出现的术语：Release Suggestion、Release Branch、Tag、PR/MR、GitHub/Gitee Push、test_dev、production、Deployment、Smoke Test、Monitor、Rollback
+5. Multi-Agent 执行层
+   - Subagent Manager
+   - Skills Registry / find-skills
+   - Claude CLI / Codex CLI
+   - Model Routing
 
-7. 反馈与长期治理
-   - 图标建议：环形箭头、大脑/记忆库、日志卷轴、Bug 修复扳手、文档书本
-   - 必须出现的术语：Runtime Signals、Bug Candidate、Repair Attempt、Improvement Record、Agent Memory、Memory Compact、Unified Logs、Contracts、Config Schema、Failure Recovery
+6. 质量合入层
+   - Issue Worktree
+   - Build / Lint / Test
+   - Quality Gate
+   - Review
+   - Epic Integration Branch
 
-底部反馈环：
-从 Runtime Signals / Logs / Quality Findings / User Feedback 流向 Bug Candidate -> Repair Attempt -> Improvement Record -> Memory Compact -> Policy/Skills/Docs Update，再虚线回到 Requirement Planning 和 Multi-Agent Execution。
+7. 发布投产层
+   - Release Branch / Tag
+   - GitHub/Gitee Push
+   - Deployment
+   - Smoke / Monitor
+   - Rollback
+
+第二行：Workspace / Data Store 沉淀层，用一条虚线边框包起来，放 6 个数据库圆柱或文件库图标，从左到右：
+- repository.yaml / project.yaml
+- comprehension/
+- lifecycle/issue-graphs/
+- agents/subagents/
+- memory/
+- logs/
+
+中部横向总结条：
+- “规划层决定做什么 = 第 1-4 层”
+- “执行层决定怎么做 = 第 5-7 层”
+- “Workspace 记录配置、状态、证据和审计”
+
+右侧竖向补充层：
+8. Server Resources
+   - test_dev / production
+   - cloud metadata / expires_at
+   - healthcheck / owner
+9. Provider & Runtime
+   - GPT / Claude / GLM / MiniMax
+   - Third-party API policy
+   - Runtime Adapter
+
+底部：治理与反馈层，横向时间线，使用浅棕或深蓝标题条：
+10. Runtime Signals
+    - error / test failure / smoke failure
+11. Self Repair
+    - Bug Candidate -> Repair Attempt
+12. Agent Memory
+    - Record Gate / Retrieve / Memory Compact
+13. Documentation & Contracts
+    - Config Schema / Failure Recovery / Audit Logs
+
+箭头规则：
+- 主流程用粗实线从 1 -> 7。
+- 数据沉淀用向下虚线连到 Workspace / Data Store。
+- 反馈层用虚线从 10-13 回到 4 需求规划层和 5 Multi-Agent 执行层。
 
 视觉要求：
-- 中文用于模块标题和说明性短语；英文专有名词必须原样使用，不能翻译成中文。必须保留：Auth Context、Git Adapter、Project Comprehension、Issue Graph、Subagent、Skills Registry、Runtime Adapter、Claude CLI、Codex CLI、Model Routing、Quality Gate、Review、Release Branch、Deployment、Agent Memory、Memory Compact、Unified Logs。
-- 必须使用合适的图标、简化设备图、节点图、箭头和小型可视化元素，不要纯文本框堆叠。
-- 生成清晰的工程技术流程图，不要营销风格，不要卡通人物，不要 3D，不要抽象插画。
-- 白底或极浅灰底，深灰文字，蓝/绿/橙/紫/青作为模块区分色。
-- 每个模块允许 6-9 个短标签或小节点，以提高技术密度，但不能变成说明段落。
-- 标题必须大、粗、清晰；小字不能密集。
-- 用实线箭头表示主流程，用虚线箭头表示反馈闭环和治理回路。
-- 画面中必须能看出“User Request -> Issue Graph -> Subagent Parallel Runs -> Quality Gate -> Git Merge -> Release/Deployment -> Memory/Logs/Self Repair Feedback”的主流程。
-- 右下角放一个小型图例：实线 = Main Flow，虚线 = Feedback Loop。
-- 整体要比普通架构图更好看，但仍然是技术向，不要变成宣传海报。
+- 版式参考用户提供的横版调用逻辑图：编号模块、深蓝标题条、浅色内容区、箭头清晰、数据存储圆柱、底部调度/治理层、右上图例。
+- 不要出现人物肖像，不要出现参考图里的股票、交易、时间、业务名或任何无关内容。
+- 中文用于说明，英文专有名词必须保留：Repository Onboarding、Project Comprehension、Issue Graph、Subagent、Skills Registry、Model Routing、Quality Gate、Release Pipeline、Deployment、Agent Memory、Memory Compact。
+- 每个卡片只保留 3-5 个核心技术点，不要大段文字。
+- 横版宽屏布局，信息密度适中但不拥挤。
+- 使用白底、浅灰卡片、深色文字，模块标题条以深蓝为主，少量绿、橙、青区分分区。
+- 图标风格统一，使用线性或半扁平图标：仓库、DAG、Agent、拼图、测试瓶、服务器、监控、数据库、扳手、日志、盾牌。
+- 文字必须清晰可读，不要密集小字。
+- 整体是技术调用逻辑图，不是宣传海报，不要夸张视觉效果。
 - 不要出现任何 API Key、token、私网 IP、真实账号或密码。
 `;
 }
@@ -137,7 +192,7 @@ function buildDiagramSpec() {
 function buildPrompt() {
   const docsContext = collectDocsContext();
   return `
-你是资深软件架构图设计师和技术信息图设计师。请根据下面的设计规格，生成一张适合技术评审会议展示的技术可视化流程图。
+你是资深软件架构图设计师和技术信息图设计师。请根据下面的设计规格，生成一张适合技术评审会议展示的横版 2K 技术调用逻辑图。
 
 ${buildDiagramSpec()}
 
@@ -145,10 +200,11 @@ ${buildDiagramSpec()}
 ${docsContext}
 
 输出要求：
-- 只生成一张完整架构流程图。
-- 图片中不要出现说明性段落，必须用图标、节点、箭头和短标签表达。
+- 只生成一张完整横版技术调用逻辑图。
+- 图片中不要出现说明性长段落，必须用编号模块、箭头、数据存储层、图标和短要点表达。
 - 中文用于模块标题和说明性短语；英文专有名词必须原样保留，不要翻译成中文。
 - 不要把规格里的长句原样放进图里。
+- 每个主题只放核心技术点，详细设计保留在配套讲解文档中。
 - 图需要让工程师一眼看懂当前 Moyuan Code 项目的端到端执行链路、并发编排、质量控制、发布投产和长期反馈闭环。
 `;
 }
