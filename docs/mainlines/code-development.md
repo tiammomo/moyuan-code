@@ -2,30 +2,29 @@
 
 ## 1. 目标
 
-代码开发主线负责把用户提出的开发需求转为可执行 Issue Graph，并调度多个 Agent 完成开发、测试、质量复核和返工。
+代码开发主线负责消费已经通过规划的 ready issues，调度 Claude CLI、Codex CLI 和相关 Agent 完成代码实现、测试、质量复核和返工。
+
+需求完善、意图澄清、Issue Graph 和并发计划由 [需求规划与 Issue 编排主线](./requirement-planning.md) 负责。代码开发主线不重新拆分需求，只执行已经进入 `ready_queue` 的 issue。
 
 默认分工：
 
 - 前端开发优先使用 `frontend` role 和 `claude_cli`。
 - 后端开发优先使用 `backend` role 和 `codex_cli`。
 - 后端调优优先使用 `backend_tuning` role 和 `codex_cli`。
-- 复杂契约、架构方案和跨端依赖先由 planner/architect 产出设计。
+- 复杂契约、架构方案和跨端依赖必须在进入本主线前形成 design/contract issue 或 accepted contract。
 
 ## 2. 输入与输出
 
 输入：
 
-- 用户原始开发需求。
+- ready issue。
+- issue graph 和 schedule。
 - 最新项目画像、模块地图和历史决策。
 - 当前 Git 状态、分支策略和写入权限。
 - Agent role、team、runtime、provider routing 和 skills。
 
 输出：
 
-- clarified requirement。
-- clarification decision。
-- issue graph。
-- schedule。
 - issue worktrees。
 - code diff。
 - test report。
@@ -36,16 +35,14 @@
 ## 3. 端到端流程
 
 ```text
-user request
-  -> requirement refiner
-  -> clarification gate
-  -> issue planner
-  -> dependency planner
-  -> scheduler
-  -> user-visible issue graph
-  -> dispatch ready issues
+ready issue
+  -> load issue spec and accepted contracts
+  -> load project context and scoped memory
+  -> select role, team, runtime and provider
+  -> prepare issue branch/worktree
   -> run Claude/Codex agents
   -> collect diff and command results
+  -> run local checks
   -> quality gates
   -> independent review
   -> rework or accepted
@@ -60,29 +57,23 @@ user request
 - [质量与合入策略](../policies/quality-merge-policy.md)
 - [Provider 路由策略](../policies/provider-routing-policy.md)
 - [Memory 决策策略](../policies/memory-decision-policy.md)
+- [Git 分支策略](../policies/git-branch-policy.md)
 
 核心决策：
 
-- 是否需要向用户澄清。
-- 如何拆分 issues。
-- 哪些 issue 可以并发，哪些必须等待。
 - 当前 issue 应使用 Claude CLI、Codex CLI 还是普通模型 API。
+- 当前 issue 是否满足启动条件。
+- Agent 生成的 diff 是否可接受。
 - 质量失败后返工几轮，什么时候升级人工处理。
 - 代码是否允许进入合入门禁。
 
-## 5. 调度队列
+## 5. 启动条件
 
-```text
-blocked_queue
-ready_queue
-running_queue
-review_queue
-```
-
-Issue 进入 `ready_queue` 的条件：
+Issue 进入代码开发主线前必须满足：
 
 - 上游 hard dependency 已 accepted 或 merged。
 - API/schema/UI 契约已 accepted。
+- Issue 已进入 `ready_queue`。
 - 写入范围不与 running issue 冲突。
 - Runtime 健康且有可用 slot。
 - worktree、预算、权限和模型路由满足要求。
@@ -118,10 +109,7 @@ Issue 进入 `ready_queue` 的条件：
 
 ```text
 .moyuan/lifecycle/
-  epics/
   issues/
-  issue-graphs/
-  schedules/
   quality/
   reviews/
   runs/
@@ -132,9 +120,7 @@ Issue 进入 `ready_queue` 的条件：
 必须记录：
 
 - clarified requirement。
-- clarification decision。
-- issue graph 版本。
-- schedule 和 blocked reason。
+- issue id 和 issue spec 版本。
 - assigned role/runtime/provider。
 - worktree path 和 branch。
 - changed files。
@@ -155,10 +141,9 @@ Issue 进入 `ready_queue` 的条件：
 
 ## 10. 验收标准
 
-- 用户需求可以自动变成可见 Issue Graph。
-- 系统能自行判断并发度。
-- 依赖未满足的 issue 不会启动。
-- 前后端可以在契约 accepted 后并发。
+- 只执行 `ready_queue` 中的 issue。
+- 依赖未满足的 issue 不会进入本主线。
+- 前后端实现都基于 accepted contract。
 - 每个代码 issue 都经过质量门禁和独立 review。
 - 复核未通过不会合入。
 - 失败会生成 rework 或 replan，而不是继续推进下游。

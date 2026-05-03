@@ -1,6 +1,15 @@
 # 主线文档
 
-主线文档按真实项目生命周期组织，帮助读者从一个被管理项目的接入、开发、代码管理、服务器资源到发布投产完整走通。
+主线文档按真实项目生命周期组织，帮助读者从一个被管理项目的接入、需求规划、开发、代码管理、服务器资源到发布投产完整走通。
+
+主线不是按模块名划分，而是按专家判定标准划分。满足以下条件越多，越应该成为主线：
+
+- 有明确生命周期阶段，不只是工具或配置项。
+- 有独立输入、输出和持久化产物。
+- 有会阻断后续流程的关键决策点。
+- 有独立责任角色或 owner。
+- 会被多个横切能力引用。
+- 出错后需要独立失败恢复路径。
 
 主线文档不重复对象字段、完整配置和策略细节，只回答：
 
@@ -16,7 +25,8 @@
 | 主线 | 文档 | 目标 |
 | --- | --- | --- |
 | 项目接入与阅读理解 | [project-comprehension.md](./project-comprehension.md) | 接入本地/远程仓库，建立项目画像、模块地图和理解快照 |
-| 代码开发 | [code-development.md](./code-development.md) | 从用户需求到 Issue Graph，再到多 Agent 开发、质量复核和返工 |
+| 需求规划与 Issue 编排 | [requirement-planning.md](./requirement-planning.md) | 将用户需求完善、澄清、拆分为 Issue Graph 和可执行 schedule |
+| 代码开发 | [code-development.md](./code-development.md) | 消费 ready issue，完成多 Agent 实现、测试、质量复核和返工 |
 | 代码管理 | [code-management.md](./code-management.md) | 管理任务分支、worktree、integration branch、PR/MR 和用户改动保护 |
 | 服务器资源管理 | [server-resource-management.md](./server-resource-management.md) | 统一维护测试开发机、生产机、云资产、到期、巡检和资源组 |
 | DevOps 发布投产 | [devops-release-deployment.md](./devops-release-deployment.md) | 管理 release branch、tag、部署、线上冒烟、监控、回滚和复盘 |
@@ -37,9 +47,15 @@
 
 主线描述流程，策略描述决策。
 
-例如代码开发主线会调用：
+例如需求规划主线会调用：
 
 - [Issue 调度策略](../policies/issue-scheduling-policy.md)
+- [项目阅读理解策略](../policies/project-comprehension-policy.md)
+- [Provider 路由策略](../policies/provider-routing-policy.md)
+- [Memory 决策策略](../policies/memory-decision-policy.md)
+
+代码开发主线会调用：
+
 - [质量与合入策略](../policies/quality-merge-policy.md)
 - [Provider 路由策略](../policies/provider-routing-policy.md)
 - [Memory 决策策略](../policies/memory-decision-policy.md)

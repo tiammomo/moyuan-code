@@ -12,7 +12,7 @@
 
 2. [参考架构](./reference-architecture.md)：理解系统分层、核心模块、运行链路、上下文装配和安全边界。
 
-3. [主线文档](./mainlines/README.md)：按项目接入、代码开发、代码管理、服务器资源和 DevOps 发布投产 5 条主线理解真实执行流程。
+3. [主线文档](./mainlines/README.md)：按项目接入、需求规划、代码开发、代码管理、服务器资源和 DevOps 发布投产 6 条主线理解真实执行流程。
 
 4. [策略决策树](./policies/README.md)：理解澄清、阅读理解、并发调度、质量合入、Git、服务器、发布、Provider 和 Memory 的判断规则。
 
@@ -28,7 +28,7 @@
 | --- | --- |
 | [lifecycle-roadmap.md](./lifecycle-roadmap.md) | 产品定位、生命周期、CLI、Phase 和路线图 |
 | [reference-architecture.md](./reference-architecture.md) | 系统架构、模块职责、状态机和上下文链路 |
-| [mainlines/](./mainlines/README.md) | 按真实生命周期组织的 5 条主线流程 |
+| [mainlines/](./mainlines/README.md) | 按真实生命周期组织的 6 条主线流程 |
 | [policies/](./policies/README.md) | 可实现为规则引擎或状态机的策略决策树 |
 | [project-workspace-spec.md](./project-workspace-spec.md) | `.moyuan/` 工作空间目录和 schema 索引 |
 | [configuration-guide.md](./configuration-guide.md) | 配置总览、关键配置组合和最小/投产闭环 |
@@ -40,7 +40,8 @@
 | 主线 | 文档 | 作用 |
 | --- | --- | --- |
 | 项目接入与阅读理解 | [mainlines/project-comprehension.md](./mainlines/project-comprehension.md) | 本地/远程仓库接入、full/incremental/diff comprehension、项目画像和 memory candidates |
-| 代码开发 | [mainlines/code-development.md](./mainlines/code-development.md) | 需求完善、Issue Graph、多 Agent 开发、质量复核和返工 |
+| 需求规划与 Issue 编排 | [mainlines/requirement-planning.md](./mainlines/requirement-planning.md) | 需求完善、澄清判断、Issue Graph、依赖、schedule 和 ready/blocked 队列 |
+| 代码开发 | [mainlines/code-development.md](./mainlines/code-development.md) | 消费 ready issue，完成多 Agent 开发、测试、质量复核和返工 |
 | 代码管理 | [mainlines/code-management.md](./mainlines/code-management.md) | branch、worktree、integration branch、PR/MR 和用户改动保护 |
 | 服务器资源管理 | [mainlines/server-resource-management.md](./mainlines/server-resource-management.md) | 测试开发机、生产机、云资产、到期、巡检和资源组 |
 | DevOps 发布投产 | [mainlines/devops-release-deployment.md](./mainlines/devops-release-deployment.md) | release branch、tag、部署、线上冒烟、监控、回滚和复盘 |
