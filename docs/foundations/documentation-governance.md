@@ -48,19 +48,20 @@ Moyuan Code 文档分为八层：
 | 策略决策树 | `policies/` | 主线文档只引用策略，不展开所有判断分支 |
 | 实现契约 | `contracts/` | 主线和策略只引用契约，不重复接口结构 |
 | Workspace 目录和 schema 索引 | `project-workspace-spec.md` | 不展开完整配置 |
-| 配置组合示例 | `configuration-guide.md` | 其他文档只给局部片段或引用 |
+| 配置分层、闭环和关键片段 | `configuration-guide.md` | 其他文档只给局部片段或引用 |
 | 配置字段规则 | `configuration-schema-spec.md` | 其他文档不重复 required/nullable 表 |
-| 仓库、Git、项目理解 | `repository-onboarding-git-management.md` | 不在路线图重复流程细节 |
+| 仓库接入与 Git Adapter | `repository-onboarding-git-management.md` | 项目理解细节回到主线和策略 |
+| 项目阅读理解 | `mainlines/project-comprehension.md`、`policies/project-comprehension-policy.md` | Git Adapter 只说明触发点 |
 | Issue 编排和并发调度 | `issue-orchestration.md` | Agent 文档不重复 issue graph |
 | 工程流程规范 | `engineering-process-standards.md` | Git、Issue、质量、发布文档只引用规则，不重复阈值 |
 | 质量门禁 | `code-lifecycle-quality-gates.md` | Issue 文档只引用 gate 结果 |
 | 运行反馈与自我修复 | `mainlines/runtime-feedback-self-repair.md`、`policies/bug-detection-self-repair-policy.md`、`contracts/self-repair-contract.md` | 质量门禁只引用修复后的 gate 结果 |
-| Agent Role、Team、Memory Scope | `agent-skills-memory.md` | 不展开 Subagent 和 Skill Registry 细节 |
+| Agent Role、Team、Memory Scope | `agent-roles-overview.md` | 不展开 Subagent 和 Skill Registry 细节 |
 | Subagent 与 Skills | `subagents-skills-system.md`、`contracts/subagent-skill-contract.md` | Agent 文档只引用概要 |
 | Agent Memory | `agent-memory-system.md` | 其他文档只说明如何调用 |
-| 模型、Runtime、Adapter | `model-tool-adapters.md` | 配置细节回到 configuration guide |
+| 模型、Runtime、Adapter | `model-tool-adapters.md` | 配置片段回到 configuration guide |
 | 术语 | `foundations/glossary.md` | 其他文档使用术语，不重新定义 |
-| 核心数据对象 | `foundations/core-data-objects.md` | 配置文档不重复对象生命周期 |
+| 核心数据对象索引 | `foundations/core-data-objects.md` | 详细字段回到契约/schema，状态回到状态机 |
 | 用户与鉴权 | `mainlines/platform-user-access.md`、`policies/auth-access-policy.md`、`contracts/auth-session-contract.md` | 权限模型只承接资源和动作边界 |
 | 权限模型 | `foundations/permission-model.md` | 配置文档只保留 YAML 示例 |
 | 失败恢复 | `foundations/failure-recovery.md` | 状态机文档只保留状态定义 |
@@ -194,7 +195,7 @@ docs/assets/moyuan-code-architecture-<timestamp>.explanation.md
 
 ## 配置示例规则
 
-- 配置组合示例只在 `configuration-guide.md`。
+- 配置分层、闭环和关键片段只在 `configuration-guide.md`。
 - `project-workspace-spec.md` 只维护目录和 schema 索引。
 - 专题文档可以放局部片段，但不能成为完整配置来源。
 - 示例字段变化时，优先更新 `configuration-guide.md`。

@@ -36,6 +36,7 @@
 | [project-workspace-spec.md](./project-workspace-spec.md) | `.moyuan/` 工作空间目录和 schema 索引 |
 | [configuration-guide.md](./configuration-guide.md) | 配置总览、关键配置组合和最小/投产闭环 |
 | [configuration-schema-spec.md](./configuration-schema-spec.md) | 配置字段规则、必填/可空/必须为空约束 |
+| [agent-roles-overview.md](./agent-roles-overview.md) | Agent role、team、默认 Runtime 和 memory scope 概览 |
 | [subagents-skills-system.md](./subagents-skills-system.md) | Subagent 生命周期、Skill Registry、推荐、绑定和效果反馈 |
 | [agent-memory-system.md](./agent-memory-system.md) | Agent Memory 唯一详细方案 |
 
@@ -85,9 +86,9 @@
 
 | 文档 | 作用 |
 | --- | --- |
-| [repository-onboarding-git-management.md](./repository-onboarding-git-management.md) | 本地/远程仓库接入、Git 分支、远程拉取后的项目阅读理解 |
+| [repository-onboarding-git-management.md](./repository-onboarding-git-management.md) | 本地/远程仓库接入、Git Provider Adapter 和远程同步触发 |
 | [github-integration.md](./github-integration.md) | GitHub 连接、认证、token 权限、必填和可空字段 |
-| [agent-skills-memory.md](./agent-skills-memory.md) | Agent role、team、memory scope 和输出契约概要 |
+| [agent-roles-overview.md](./agent-roles-overview.md) | Agent role、team、memory scope 和输出契约概要 |
 | [subagents-skills-system.md](./subagents-skills-system.md) | Subagent 和 skills 的唯一详细方案 |
 | [engineering-process-standards.md](./engineering-process-standards.md) | commit、issue、回退后 fix、发版和测试覆盖率规范 |
 | [model-tool-adapters.md](./model-tool-adapters.md) | Claude CLI、Codex CLI、GPT、Claude、GLM、MiniMax、第三方 API、gpt-image-2 和工具适配 |

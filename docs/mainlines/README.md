@@ -38,14 +38,14 @@
 以下能力不是主线，但会被每条主线引用：
 
 - Agent Runtime 和模型 Provider：[模型与工具适配规划](../model-tool-adapters.md)
-- Agent role、team 和 skills：[Agent、Skills 与编排](../agent-skills-memory.md)
+- Agent role、team 和 skills：[Agent 角色与团队概览](../agent-roles-overview.md)
 - Subagent 与 Skills：[Subagent 与 Skills 系统方案](../subagents-skills-system.md)
 - Memory：[Agent Memory 系统方案](../agent-memory-system.md)
 - 自我修复：[Bug 判断与自我修复策略](../policies/bug-detection-self-repair-policy.md)
 - 鉴权：[鉴权与访问控制策略](../policies/auth-access-policy.md)
 - 权限：[权限模型](../foundations/permission-model.md)
 - 失败恢复：[失败恢复设计](../foundations/failure-recovery.md)
-- 配置：[完整配置方案](../configuration-guide.md) 和 [配置 Schema 规则](../configuration-schema-spec.md)
+- 配置：[配置方案](../configuration-guide.md) 和 [配置 Schema 规则](../configuration-schema-spec.md)
 - 核心对象：[核心数据对象](../foundations/core-data-objects.md)
 
 ## 主线与策略关系

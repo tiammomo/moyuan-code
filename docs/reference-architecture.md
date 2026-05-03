@@ -354,4 +354,4 @@ MVP：
 - 核心日志：OpenTelemetry、Loki、Elasticsearch 或 ClickHouse。
 - 审计日志：不可变追加日志，长期保留。
 
-日志配置见 [完整配置方案](./configuration-guide.md) 的 `policies/logging.yaml`。生产应用自身日志、指标和健康检查见 `policies/environments.yaml`。
+日志配置见 [配置方案](./configuration-guide.md) 的 `policies/logging.yaml`。生产应用自身日志、指标和健康检查见 `policies/environments.yaml`。

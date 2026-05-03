@@ -1,6 +1,6 @@
 # 配置 Schema 规则
 
-本文定义 `.moyuan/` 配置文件的字段必填、可选、可为空和必须为空规则。完整 YAML 示例由 [完整配置方案](./configuration-guide.md) 维护；本文只维护 schema 约束。
+本文定义 `.moyuan/` 配置文件的字段必填、可选、可为空和必须为空规则。配置分层、闭环和关键片段由 [配置方案](./configuration-guide.md) 维护；本文只维护 schema 约束。
 
 ## 1. 规则定义
 
