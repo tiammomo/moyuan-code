@@ -26,12 +26,12 @@
 | 文档 | 必须回答的问题 | 通过标准 |
 | --- | --- | --- |
 | [README](./README.md) | 读者如何进入文档体系 | 文档索引完整，核心原则明确 |
-| [基础规范](./foundations/README.md) | 术语、对象、权限、失败恢复是否统一 | 五份基础规范存在且互相不冲突 |
+| [基础规范](./foundations/README.md) | 术语、对象、用户鉴权、权限、失败恢复是否统一 | 基础规范存在且互相不冲突 |
 | [总体规划与生命周期路线图](./lifecycle-roadmap.md) | MVP、Phase、CLI 是否清楚 | CLI 只在此维护，Phase 验收可执行 |
 | [参考架构](./reference-architecture.md) | 系统模块和状态机是否清楚 | 模块职责、状态、上下文链路明确 |
-| [主线文档](./mainlines/README.md) | 端到端流程是否按真实生命周期组织 | 6 条主线覆盖接入、需求规划、开发、代码管理、服务器资源和发布投产 |
+| [主线文档](./mainlines/README.md) | 端到端流程是否按真实生命周期组织 | 7 条主线覆盖平台用户与访问控制、接入、需求规划、开发、代码管理、服务器资源和发布投产 |
 | [策略决策树](./policies/README.md) | 关键判断是否可转成实现策略 | 决策树、阻断条件、人工确认和日志要求明确 |
-| [契约文档](./contracts/README.md) | 实现接口、错误、日志和迁移契约是否明确 | schema、runtime、logging、workspace migration 契约存在 |
+| [契约文档](./contracts/README.md) | 实现接口、错误、日志和迁移契约是否明确 | auth、schema、runtime、logging、workspace migration 契约存在 |
 | [项目工作空间规范](./project-workspace-spec.md) | `.moyuan/` 目录和 schema 索引是否清楚 | 每个目录都有职责和权威文档 |
 | [完整配置方案](./configuration-guide.md) | 项目运行需要哪些配置 | 核心 YAML 都有示例和校验清单 |
 | [配置 Schema 规则](./configuration-schema-spec.md) | 配置字段哪些必填、可选、可为空、必须为空 | 核心 YAML 字段规则明确 |
@@ -48,6 +48,7 @@
 
 必须明确：
 
+- 平台用户与访问控制主线。
 - 项目接入与阅读理解主线。
 - 需求规划与 Issue 编排主线。
 - 代码开发主线。
@@ -56,13 +57,31 @@
 - DevOps 发布投产主线。
 - 每条主线引用的策略决策树。
 - 策略的输入事实、决策结果、阻断条件和人工确认条件。
-- 契约文档覆盖 schema、runtime、logging 和 workspace migration。
+- 契约文档覆盖 auth、schema、runtime、logging 和 workspace migration。
 
 通过标准：
 
 - 可以从主线文档直接拆出端到端实现 issue。
 - 可以从策略文档直接实现规则引擎、状态机或 runtime validator。
 - 可以从契约文档直接定义 TypeScript interface、JSON Schema、日志事件和测试用例。
+
+### 0.1 用户与鉴权链路
+
+必须明确：
+
+- local_single_user 和 team_server 两种运行模式。
+- User、Organization、Membership、Service Account、API Token、Auth Session 和 Approval 对象。
+- 任意命令如何生成 `auth_context`。
+- 会话、Token、成员关系和项目角色如何参与鉴权。
+- 高风险操作什么时候 `REQUIRE_APPROVAL`。
+- 审批、拒绝、过期和取消如何写入审计。
+- Token 和 Secret 明文不进入配置、日志、Memory 或图像 prompt。
+
+通过标准：
+
+- 任意主线执行前都能先判断 actor 是否有效。
+- 用户禁用、会话过期、Token 撤销后不能继续执行写入、Git、服务器、发布或部署操作。
+- 高风险操作不能绕过审批直接执行。
 
 ### 1. 项目接入链路
 
@@ -108,10 +127,11 @@
 - 普通模型 API Provider。
 - Runtime 会话、输出、diff、失败降级。
 - 权限继承。
+- `auth_context`。
 
 通过标准：
 
-- 一个 issue 能被分配到明确 Agent 和 Runtime，并受权限和质量门禁控制。
+- 一个 issue 能被分配到明确 Agent 和 Runtime，并受鉴权、权限和质量门禁控制。
 
 ### 4. 代码质量链路
 
@@ -243,6 +263,7 @@
 
 必须满足：
 
+- 身份认证、会话、API Token 和项目成员关系明确。
 - 权限主体、资源、动作、决策明确。
 - ALLOW / DENY / REQUIRE_APPROVAL 语义明确。
 - 第三方 API、Native Runtime、生产服务器有单独边界。
@@ -277,12 +298,14 @@
 5. 每个 MVP 能力是否有配置入口？
 6. 每个 MVP 能力是否有失败恢复路径？
 7. 每个高风险操作是否有权限和审计规则？
-8. Claude CLI / Codex CLI 的执行边界是否清楚？
-9. 第三方 API 的数据边界是否清楚？
-10. 生产部署是否可以被完整追踪和回滚？
-11. Memory 是否有防膨胀和防污染机制？
-12. AI 生成代码失败后如何返工？
-13. 文档是否存在重复权威来源？
+8. 每个主线是否能先建立 `auth_context` 再执行？
+9. 用户禁用、会话过期、Token 撤销后如何阻断任务？
+10. Claude CLI / Codex CLI 的执行边界是否清楚？
+11. 第三方 API 的数据边界是否清楚？
+12. 生产部署是否可以被完整追踪和回滚？
+13. Memory 是否有防膨胀和防污染机制？
+14. AI 生成代码失败后如何返工？
+15. 文档是否存在重复权威来源？
 
 ## 设计债务记录
 
@@ -303,6 +326,7 @@ design_debt:
 设计债务不得用于绕过：
 
 - 权限模型。
+- 身份会话契约。
 - 质量门禁。
 - 密钥和敏感信息保护。
 - 生产部署审批。
@@ -315,9 +339,11 @@ design_debt:
 - 核心术语未定义。
 - 核心数据对象缺失。
 - 没有权限模型。
+- 没有身份、会话、API Token 或审批模型。
 - 没有失败恢复路径。
 - Claude CLI / Codex CLI 可以绕过质量门禁。
 - 第三方 API 数据边界不清楚。
+- 高风险操作可以绕过鉴权或审批。
 - 生产部署没有回滚和审批策略。
 - `.moyuan/` 目录职责不清楚。
 - 配置字段缺少必填、可为空或必须为空规则。
@@ -332,4 +358,5 @@ design_debt:
 - 为 Git Adapter、Model Provider 补充更细的 adapter contract。
 - 为 GitHub 之外的 Gitee、GitLab、generic git 补充独立接入字段表。
 - 为配置项补充统一的 required/optional/nullable 机器可读标记。
+- 为用户、组织、成员、Token 和审批补充配置/数据库迁移细则。
 - 对配置示例做一次冗余和敏感信息审计。

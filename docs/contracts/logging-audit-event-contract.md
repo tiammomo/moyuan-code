@@ -21,8 +21,12 @@ interface LogEvent {
     | "audit"
     | "error";
   timestamp: string;
-  project_id: string;
+  project_id?: string;
+  organization_id?: string;
   trace_id: string;
+  actor_id?: string;
+  actor_type?: "user" | "service_account" | "system";
+  auth_method?: "local_identity" | "session" | "api_token" | "service_account";
   run_id?: string;
   epic_id?: string;
   issue_id?: string;
@@ -57,6 +61,11 @@ interface StateChangedEvent extends LogEvent {
 
 必须进入 `audit`：
 
+- login/logout/session revoked。
+- api token created/revoked/rotated。
+- membership changed。
+- role changed。
+- auth decision allow/deny/require approval。
 - approval requested/granted/rejected。
 - protected path access denied。
 - secret access requested/granted/denied。
@@ -99,6 +108,7 @@ interface StateChangedEvent extends LogEvent {
 
 | 主线 | 必填事件 |
 | --- | --- |
+| 平台用户与访问控制 | auth.login、auth.logout、auth.token.created、auth.token.revoked、auth.decision.deny、auth.approval.created |
 | 项目接入与阅读理解 | project_added、repository_cloned、comprehension_started、comprehension_completed |
 | 需求规划与 Issue 编排 | requirement_refined、clarification_decided、issue_graph_created、schedule_created |
 | 代码开发 | runtime_started、runtime_completed、quality_started、review_completed |
@@ -126,6 +136,7 @@ interface ErrorEvent extends LogEvent {
 ## 8. 验收用例
 
 - 任意 run 可以通过 `trace_id` 找到 agent、model、git、quality 和 error 事件。
+- 任意写入、Git、服务器、发布和部署操作可以通过 `actor_id` 找到触发身份。
 - 生产部署必须有 approval audit event。
 - secret 访问必须有 audit event。
 - 日志中出现明文 API key 时校验失败。

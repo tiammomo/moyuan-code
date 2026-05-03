@@ -13,7 +13,7 @@
 
 ## 文档分层
 
-Moyuan Code 文档分为七层：
+Moyuan Code 文档分为八层：
 
 | 层级 | 目录/文档 | 作用 |
 | --- | --- | --- |
@@ -58,6 +58,7 @@ Moyuan Code 文档分为七层：
 | 模型、Runtime、Adapter | `model-tool-adapters.md` | 配置细节回到 configuration guide |
 | 术语 | `foundations/glossary.md` | 其他文档使用术语，不重新定义 |
 | 核心数据对象 | `foundations/core-data-objects.md` | 配置文档不重复对象生命周期 |
+| 用户与鉴权 | `mainlines/platform-user-access.md`、`policies/auth-access-policy.md`、`contracts/auth-session-contract.md` | 权限模型只承接资源和动作边界 |
 | 权限模型 | `foundations/permission-model.md` | 配置文档只保留 YAML 示例 |
 | 失败恢复 | `foundations/failure-recovery.md` | 状态机文档只保留状态定义 |
 | 文档维护规则 | `foundations/documentation-governance.md` | 本文为准 |
@@ -75,6 +76,7 @@ Moyuan Code 文档分为七层：
 | 主线 | product_owner + architect + domain_owner | 控制端到端流程和产物边界 |
 | 策略 | architect + domain_owner | 控制决策树、阻断条件和人工确认规则 |
 | 契约 | core_engineer + architect | 控制实现接口、事件、错误和迁移 |
+| 用户与鉴权 | identity_owner + architect | 控制用户、会话、Token、角色、审批和审计 |
 | 配置方案 | core_engineer | 控制 schema 和默认值 |
 | Issue 编排 | orchestrator_owner | 控制任务拆分和调度规则 |
 | Memory | memory_owner | 控制记录、检索、compact |
@@ -305,9 +307,9 @@ prompt 管理规则：
 - 权威来源表是否准确。
 - CLI 是否只在路线图出现。
 - 配置是否只在配置方案完整展开。
-- 主线是否覆盖项目接入、需求规划、代码开发、代码管理、服务器资源和发布投产。
+- 主线是否覆盖平台用户与访问控制、项目接入、需求规划、代码开发、代码管理、服务器资源和发布投产。
 - 策略是否覆盖关键决策点和人工确认条件。
-- 契约是否覆盖 schema、runtime、logging 和 workspace migration。
+- 契约是否覆盖 auth、schema、runtime、logging 和 workspace migration。
 - 核心对象是否和配置一致。
 - 权限和失败恢复是否覆盖新增能力。
 - 图片、讲解和需要保留的 prompt 是否仍然准确。
@@ -438,6 +440,7 @@ prompt 管理规则：
 - 新对象先改核心数据对象。
 - 新 CLI 只改路线图。
 - 新配置完整示例只改配置方案。
+- 新鉴权边界先改平台用户与访问控制主线、鉴权策略和身份会话契约。
 - 新权限边界改权限模型。
 - 新失败场景改失败恢复。
 - 新文档必须接入 README 或 foundations README。

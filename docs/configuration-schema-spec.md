@@ -88,7 +88,29 @@ GitHub 字段规则：
 - 由 [GitHub 接入配置](./github-integration.md) 维护。
 - `repository.github` 只有在 `repository.source.provider = github` 时允许出现。
 
-## 4. models/providers.yaml
+## 4. policies/access.yaml
+
+`policies/access.yaml` 只保存项目级访问策略和角色映射，不保存用户密码、API Token 明文、session secret 或云凭证明文。用户、组织、会话、Token 和成员关系的控制面对象见 [平台用户与访问控制主线](./mainlines/platform-user-access.md)。
+
+| 字段 | 规则 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `schema_version` | required | 无 | MVP 固定为 `1` |
+| `access.mode` | required | `local_single_user` | `local_single_user` 或 `team_server` |
+| `access.local_owner_id` | conditional_required | null | `local_single_user` 必填 |
+| `access.organization_id` | conditional_required | null | `team_server` 必填 |
+| `access.project_roles` | required | 无 | 项目角色到能力的映射 |
+| `access.approval_policy` | required | 无 | 高风险操作审批入口 |
+| `access.audit.enabled` | required | `true` | 必须启用 |
+
+必须为空：
+
+| 条件 | 字段 | 规则 |
+| --- | --- | --- |
+| `access.mode = local_single_user` | `access.organization_id` | must_be_null_when |
+| `access.mode = team_server` | `access.local_owner_id` | must_be_null_when |
+| 任意条件 | `password`、`api_token`、`session_secret` | must_be_null_when |
+
+## 5. models/providers.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -140,7 +162,7 @@ Provider 字段：
 | `type = claude-code` | `models` | must_be_empty_when |
 | `type = image-generation-api` | `capabilities.code_edit` | must_be_null_when |
 
-## 5. models/routing.yaml
+## 6. models/routing.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -156,7 +178,7 @@ Provider 字段：
 - 第三方安全文本策略中 `allow_code_context` 必须为 `false`。
 - 第三方安全文本策略中 `allow_project_memory` 必须为 `false`。
 
-## 6. visuals/architecture-visuals.yaml
+## 7. visuals/architecture-visuals.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -176,7 +198,7 @@ Provider 字段：
 - `gpt_image_2.prompt_template` 不允许为空字符串；可省略或填路径。
 - 图像 prompt 中必须不包含 secret、私网 IP、token、`.env` 明文。
 
-## 7. runtimes/agent-runtimes.yaml
+## 8. runtimes/agent-runtimes.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -219,7 +241,7 @@ Runtime 字段：
 | `provider = claude_code` | `invocation.ask` | must_be_null_when |
 | `provider = codex` | `invocation.one_shot` | must_be_null_when |
 
-## 8. agents/roles.yaml
+## 9. agents/roles.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -235,7 +257,7 @@ Runtime 字段：
 - `tools` 不允许为空数组。
 - `default_model_policy` 不允许为空字符串。
 
-## 9. agents/teams.yaml
+## 10. agents/teams.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -250,7 +272,7 @@ Runtime 字段：
 - 一个可执行 team 不能同时让 `planners`、`implementers`、`verifiers` 都为空。
 - release team 可以让 `implementers` 为空，但 `verifiers` 不应为空。
 
-## 10. policies/permissions.yaml
+## 11. policies/permissions.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -268,7 +290,7 @@ Runtime 字段：
 - 生产部署启用时，`commands.require_approval` 不能为空。
 - secret 访问不能出现在 `commands.allow` 中。
 
-## 11. policies/secrets.yaml
+## 12. policies/secrets.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -284,7 +306,7 @@ Runtime 字段：
 - `usage` 不允许为空数组。
 - 不需要投产、远程私有仓库、registry、第三方 API 时，`secrets` 可以为空对象。
 
-## 12. policies/orchestration.yaml
+## 13. policies/orchestration.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -305,7 +327,7 @@ Runtime 字段：
 - `waiting_policy.frontend_runtime` 必须引用 `claude_cli`。
 - `waiting_policy.backend_runtime` 必须引用 `codex_cli`。
 
-## 13. policies/code-quality.yaml
+## 14. policies/code-quality.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -321,7 +343,7 @@ Runtime 字段：
 - `gates.test_gap` 不允许为空。
 - `quality.max_rework_rounds` 不能为 null。
 
-## 14. policies/comprehension.yaml
+## 15. policies/comprehension.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -337,7 +359,7 @@ Runtime 字段：
 - `mode.initial` 不允许为空。
 - `mode.after_pull` 不允许为空。
 
-## 15. policies/memory.yaml
+## 16. policies/memory.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -356,7 +378,7 @@ Runtime 字段：
 - `retrieval.top_k` 不能为 null。
 - `compact.triggers` 不能为空对象。
 
-## 16. policies/logging.yaml
+## 17. policies/logging.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -373,7 +395,7 @@ Runtime 字段：
 - `streams.audit` 不允许为空。
 - `streams.error` 不允许为空。
 
-## 17. policies/server-resources.yaml
+## 18. policies/server-resources.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -392,7 +414,7 @@ Runtime 字段：
 - `category = production` 的 host 不能缺少 `owner`、`auth_ref`、`lifecycle.expires_at`。
 - `cloud.enabled = false` 时，`cloud.account`、`cloud.instance_id` 可以为 null。
 
-## 18. policies/environments.yaml
+## 19. policies/environments.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -412,7 +434,7 @@ Runtime 字段：
 - `production.approval_required` 必须为 true。
 - `production.rollback` 不允许为空。
 
-## 19. policies/release.yaml
+## 20. policies/release.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -430,7 +452,7 @@ Runtime 字段：
 - `mode = branch_only` 时，`release.deployment.enabled` 必须为 false 或 `release.deployment` 为 null。
 - `mode = deploy_to_environment` 时，`release.deployment` 不能为 null。
 
-## 20. policies/budget.yaml
+## 21. policies/budget.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -445,7 +467,7 @@ Runtime 字段：
 
 - 无预算限制时，`max_daily_model_cost_usd` 必须为 null，不使用 0 表示无限制。
 
-## 21. skills/enabled.yaml
+## 22. skills/enabled.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -459,7 +481,7 @@ Runtime 字段：
 
 - `sources.remote.enabled = false` 时，`sources.remote.urls` 必须为空数组或 null。
 
-## 22. 配置校验顺序
+## 23. 配置校验顺序
 
 系统校验配置时按以下顺序：
 
@@ -473,7 +495,7 @@ Runtime 字段：
 8. 权限和敏感信息规则。
 9. provider/runtime/secret/resource 可用性。
 
-## 23. MVP 最小配置
+## 24. MVP 最小配置
 
 必须存在且通过 schema 校验：
 
@@ -484,6 +506,7 @@ Runtime 字段：
 - `runtimes/agent-runtimes.yaml`
 - `agents/roles.yaml`
 - `agents/teams.yaml`
+- `policies/access.yaml`
 - `policies/permissions.yaml`
 - `policies/code-quality.yaml`
 - `policies/orchestration.yaml`
@@ -497,7 +520,7 @@ Runtime 字段：
 - `policies/environments.yaml`，不启用部署时可为空对象。
 - `skills/enabled.yaml`，skills 未启用时可为空数组。
 
-## 24. 进入实现前必须补的机器校验
+## 25. 进入实现前必须补的机器校验
 
 本文是人类可读 schema 规则。进入实现前必须转换为：
 

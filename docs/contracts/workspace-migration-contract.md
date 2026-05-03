@@ -68,6 +68,7 @@ migration failed
 - 不允许无备份迁移。
 - 不允许迁移时改源码目录。
 - 不允许迁移时删除用户自定义配置。
+- 不允许把密码、API Token、session secret 或云凭证明文写入迁移备份。
 - 不允许静默修复无法识别字段。
 - 不允许跨多个 major schema version 自动跳迁，除非有明确迁移链。
 

@@ -33,6 +33,7 @@
   skills/
     enabled.yaml
   policies/
+    access.yaml
     permissions.yaml
     orchestration.yaml
     code-quality.yaml
@@ -57,6 +58,7 @@
 | `runtimes/agent-runtimes.yaml` | Claude CLI、Codex CLI 原生 Agent Runtime | [模型与工具适配规划](./model-tool-adapters.md) |
 | `visuals/architecture-visuals.yaml` | `gpt-image-2` 架构图和流程图生成 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `agents/roles.yaml`、`agents/teams.yaml` | Agent role、team、skills、memory scope | [Agent、Skills 与编排](./agent-skills-memory.md) |
+| `policies/access.yaml` | 项目级访问边界、角色映射和审批入口；不保存用户密码或 Token 明文 | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |
 | `policies/orchestration.yaml` | Issue Graph、并发调度、等待队列、合入门禁 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | `policies/code-quality.yaml` | 可运行性、测试、重复度、复杂度、review 门禁 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) |
 | `policies/memory.yaml` | Memory record、retrieve、compact、维护策略入口 | [Agent Memory 系统方案](./agent-memory-system.md) |
@@ -75,6 +77,7 @@
 - `runtimes/agent-runtimes.yaml`
 - `agents/roles.yaml`
 - `agents/teams.yaml`
+- `policies/access.yaml`
 - `policies/permissions.yaml`
 - `policies/orchestration.yaml`
 - `policies/code-quality.yaml`
@@ -475,7 +478,37 @@ memory:
     merge_duplicates: true
 ```
 
-## 9. 日志与权限
+## 9. 访问控制、日志与权限
+
+访问控制配置只定义项目级角色、审批入口和审计开关。用户、会话、API Token 和服务账号是 Moyuan 控制面对象，不在 `.moyuan/` 保存密码、Token 明文或 session secret。
+
+```yaml
+schema_version: 1
+access:
+  mode: local_single_user
+  local_owner_id: local-owner
+  organization_id: null
+  project_roles:
+    project_owner:
+      can_manage_members: true
+      can_approve_release: true
+    maintainer:
+      can_run_issues: true
+      can_merge_to_integration: true
+    developer:
+      can_run_issues: true
+      can_modify_policies: false
+  approval_policy:
+    disallow_self_approval: false
+    require_for:
+      - git.push
+      - git.tag
+      - release.publish
+      - deployment.production
+      - policy.auth_change
+  audit:
+    enabled: true
+```
 
 权限配置只定义执行边界；完整权限模型见 [权限模型](./foundations/permission-model.md)。
 
@@ -752,6 +785,7 @@ collect project context
 开发闭环：
 
 - 项目、仓库、模型、Runtime、Agent team、权限、编排、质量、阅读理解和日志配置存在。
+- `policies/access.yaml` 存在，且不包含密码、API Token 明文或 session secret。
 - 前端默认 Runtime 为 `claude_cli`，后端和后端调优默认 Runtime 为 `codex_cli`。
 - Issue Graph、等待队列、合入门禁和质量门禁已启用。
 - Memory 自动 compact 已启用，但详细策略以 [Agent Memory 系统方案](./agent-memory-system.md) 为准。

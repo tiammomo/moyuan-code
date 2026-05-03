@@ -101,6 +101,7 @@
     deployments/
     retrospectives/
   policies/
+    access.yaml
     permissions.yaml
     secrets.yaml
     budget.yaml
@@ -144,6 +145,7 @@
 | `lifecycle/` | 需求、设计、run、quality、review、release、retro | [总体规划与生命周期路线图](./lifecycle-roadmap.md) |
 | `lifecycle/deployments/` | 投产记录、服务器部署结果、冒烟和监控报告 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | `policies/orchestration.yaml` | issue graph、自动并发、冲突保护、replan 策略 | [Issues 编排与并发调度](./issue-orchestration.md) |
+| `policies/access.yaml` | 项目级角色、成员访问边界和审批入口；不保存身份凭证明文 | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |
 | `policies/permissions.yaml` | 文件、命令、网络、密钥权限 | [参考架构](./reference-architecture.md) |
 | `policies/code-quality.yaml` | 质量门禁策略 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) |
 | `policies/comprehension.yaml` | 项目理解触发策略 | [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md) |

@@ -24,6 +24,13 @@ interface RuntimeInvocation {
   run_id: string;
   project_id: string;
   issue_id: string;
+  auth_context: {
+    actor_id: string;
+    actor_type: "user" | "service_account" | "system";
+    auth_method: "local_identity" | "session" | "api_token" | "service_account";
+    roles: string[];
+    trace_id: string;
+  };
   role: string;
   runtime_id: string;
   mode: "ask" | "code" | "review" | "test" | "plan";
@@ -81,6 +88,7 @@ interface RuntimeResult {
 Runtime 必须：
 
 - 在 issue worktree 内执行。
+- 继承 Orchestrator 下发的 `auth_context`，不能自行提升身份或角色。
 - 执行前记录 git diff。
 - 执行后记录 git diff。
 - 不能写 protected paths。

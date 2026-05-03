@@ -7,6 +7,7 @@
 核心目标：
 
 - 调用 Claude Code、Codex 和多种国产大模型 API。
+- 管理平台用户、组织、会话、API Token、角色、审批和审计。
 - 以项目为单位隔离配置、任务、memory、skills、模型策略和审计记录。
 - 支持本地路径和远程 Git 仓库接入。
 - 每次项目接入和远程分支同步后自动执行项目阅读理解。
@@ -17,8 +18,9 @@
 
 | 能力 | 说明 | 权威文档 |
 | --- | --- | --- |
-| 主线流程 | 项目接入、需求规划、代码开发、代码管理、服务器资源、DevOps 发布投产 | [主线文档](./mainlines/README.md) |
-| 策略决策树 | 阅读理解、调度、质量、Git、服务器、发布、Provider、Memory 决策 | [策略决策树](./policies/README.md) |
+| 主线流程 | 平台用户与访问控制、项目接入、需求规划、代码开发、代码管理、服务器资源、DevOps 发布投产 | [主线文档](./mainlines/README.md) |
+| 策略决策树 | 鉴权、阅读理解、调度、质量、Git、服务器、发布、Provider、Memory 决策 | [策略决策树](./policies/README.md) |
+| 用户与鉴权 | 用户、组织、会话、API Token、角色、审批、审计 | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |
 | 多 Agent 编排 | role、team、handoff、输出契约 | [Agent、Skills 与编排](./agent-skills-memory.md) |
 | Issues 编排 | 自动拆分 issues、依赖图、并发调度、ready queue | [Issues 编排与并发调度](./issue-orchestration.md) |
 | 仓库接入与理解 | 本地/远程仓库、Git 分支、项目阅读理解 | [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md) |
@@ -30,10 +32,11 @@
 
 ## 2.1 主线映射
 
-未来开发按 6 条主线推进。主线不是模块清单，而是真实生命周期中的端到端流程。
+未来开发按 7 条主线推进。主线不是模块清单，而是真实生命周期中的端到端流程。
 
 | 主线 | 负责范围 | 主要阶段 | 权威文档 |
 | --- | --- | --- | --- |
+| 平台用户与访问控制 | 用户、组织、会话、API Token、角色、审批、审计 | ACCESS_CONTROL / AUDIT | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |
 | 项目接入与阅读理解 | 本地/远程仓库接入、full/incremental/diff comprehension、项目画像、模块地图 | DISCOVERY | [项目接入与阅读理解主线](./mainlines/project-comprehension.md) |
 | 需求规划与 Issue 编排 | 需求完善、澄清判断、Issue Graph、依赖、schedule、ready/blocked queue | PLANNING / DESIGN | [需求规划与 Issue 编排主线](./mainlines/requirement-planning.md) |
 | 代码开发 | 消费 ready issue，执行 Claude/Codex 开发、测试、复核和返工 | IMPLEMENTATION / QUALITY_CHECK / REVIEW | [代码开发主线](./mainlines/code-development.md) |
@@ -55,6 +58,7 @@
 
 | 策略 | 主要调用主线 | 权威文档 |
 | --- | --- | --- |
+| 鉴权与访问控制策略 | 所有主线 | [auth-access-policy.md](./policies/auth-access-policy.md) |
 | 项目阅读理解策略 | 项目接入与阅读理解 | [project-comprehension-policy.md](./policies/project-comprehension-policy.md) |
 | Issue 调度策略 | 需求规划与 Issue 编排、代码开发 | [issue-scheduling-policy.md](./policies/issue-scheduling-policy.md) |
 | 质量与合入策略 | 代码开发、代码管理、DevOps 发布投产 | [quality-merge-policy.md](./policies/quality-merge-policy.md) |
@@ -67,6 +71,12 @@
 ## 3. 关键抽象
 
 - Project：被管理的软件项目，对应一个仓库或多仓集合。
+- User：使用 Moyuan 的平台用户，不等同于被管理项目的业务用户。
+- Organization：用户、项目、策略和审计的租户边界。
+- Service Account：CI、发布、部署或外部系统调用的非人类 actor。
+- Auth Session：用户登录或本地身份解析后的短期访问状态。
+- API Token：代表用户或服务账号调用 Moyuan API 的受限凭证引用。
+- Approval：高风险操作的结构化人工确认记录。
 - Workspace：项目内 `.moyuan/` 控制区，保存配置、状态、记忆和产物。
 - Agent：角色、工具权限、memory 范围、skills、模型策略和输出契约的组合。
 - Epic：用户提出的原始开发目标，会被拆成多个 issues。
@@ -81,7 +91,9 @@
 ## 4. 端到端流程
 
 ```text
-添加项目
+建立 auth_context
+  -> 鉴权与必要审批
+  -> 添加项目
   -> 绑定/克隆仓库
   -> 初始化 .moyuan 工作空间
   -> Full Project Comprehension
@@ -210,6 +222,8 @@ DISCOVERY
 moyuan project add --local <path>
 moyuan project add --remote <git-url>
 moyuan project list
+moyuan auth init-owner
+moyuan auth whoami
 moyuan init <project>
 moyuan inspect
 moyuan comprehend
@@ -231,6 +245,9 @@ moyuan quality check <task-id>
 moyuan quality report <run-id>
 moyuan logs tail
 moyuan logs query --run <run-id>
+moyuan approval list
+moyuan approval approve <approval-id>
+moyuan approval reject <approval-id>
 moyuan memory add
 moyuan memory search
 moyuan skills recommend
@@ -256,6 +273,8 @@ moyuan runtime list
 moyuan runtime health check
 moyuan runtime session list
 moyuan runtime session resume <session-id>
+moyuan auth session list
+moyuan auth session revoke <session-id>
 moyuan lifecycle next
 moyuan issue run-ready <epic-id>
 moyuan issue replan <epic-id>
@@ -291,7 +310,16 @@ moyuan workspace doctor
 
 ```text
 moyuan server start
+moyuan user invite
+moyuan user list
+moyuan user disable <user-id>
+moyuan org create
+moyuan org member add
+moyuan org member remove
 moyuan api-token create
+moyuan api-token revoke <token-id>
+moyuan api-token rotate <token-id>
+moyuan service-account create
 moyuan team sync
 moyuan policy audit
 moyuan logs export
@@ -311,10 +339,11 @@ moyuan repo pr create <task-id>
 
 - 明确核心抽象。
 - 明确 `.moyuan/` schema。
-- 明确 6 条主线和 8 类策略决策树。
+- 明确 7 条主线和 9 类策略决策树。
+- 明确用户、组织、会话、API Token、角色、审批和鉴权审计。
 - 明确仓库接入、项目理解、质量门禁、Memory、日志和审计策略。
 - 明确首批 Adapter 和 Runtime contract。
-- 明确进入实现前的契约层，包括 schema、runtime、logging 和 workspace migration。
+- 明确进入实现前的契约层，包括 auth、schema、runtime、logging 和 workspace migration。
 
 验收：
 
@@ -329,6 +358,7 @@ moyuan repo pr create <task-id>
 目标：
 
 - 支持本地路径接入。
+- 支持 local owner identity 和 `auth_context`。
 - 支持远程 Git URL clone。
 - 初始化项目工作空间。
 - 添加项目后自动执行 full project comprehension。
@@ -342,6 +372,7 @@ moyuan repo pr create <task-id>
 - 创建和执行任务。
 - 每次代码生成后自动执行质量门禁。
 - 支持 Reviewer Agent 独立审核 diff 和 quality report。
+- 支持高风险操作审批记录。
 - 保存 run 记录。
 - 支持基础 memory。
 - 支持 Claude Code/Codex 命令适配的最小闭环。
@@ -349,6 +380,7 @@ moyuan repo pr create <task-id>
 验收：
 
 - 一个真实本地项目和一个远程 Git 项目可跑通“接入 -> 理解 -> 计划 -> 修改 -> 质量 -> 测试 -> review -> 报告”。
+- 每个操作都带有 actor 和 trace，Git push、tag、部署等高风险操作需要审批。
 - 一个复杂开发目标可自动拆分为多个 issues，并能按依赖关系串行/并发执行。
 - 每个 issue 复核通过后才可合入 epic integration branch。
 - 能基于累计 accepted issues、风险和变更范围给出 release/deploy 建议。
@@ -400,6 +432,7 @@ moyuan repo pr create <task-id>
 目标：
 
 - 增加 API server。
+- 支持用户、组织、成员、会话、API Token 和 service account。
 - 支持多人共享配置。
 - 支持审计日志。
 - 支持统一核心日志查询、导出和脱敏。
@@ -411,6 +444,7 @@ moyuan repo pr create <task-id>
 验收：
 
 - 团队能复用 roles、models、skills 和 memory。
+- 用户、角色、会话、API Token 和 service account 变更可审计。
 - 高风险操作有审计和确认。
 - run、agent、model、Git、质量、发布部署和错误日志可按 trace/run/issue 查询。
 - 测试开发机和生产机能被统一登记、查看、巡检、续费提醒、退役，并被 deploy pipeline 引用。
@@ -430,6 +464,7 @@ moyuan repo pr create <task-id>
 - 多项目生命周期状态可视化。
 - 可查看 task/run/review/release 全链路。
 - 支持组织统一模型和权限治理。
+- 支持企业 SSO、细粒度 RBAC 和组织级审计治理。
 
 ## 8. 技术选型建议
 
@@ -453,14 +488,15 @@ Adapter 路线：
 
 优先级：
 
-1. 同步路线图、README、设计门禁和文档治理，使 6 条主线和策略层成为正式结构。
-2. 补充术语表中的 Mainline、Policy、Decision Tree、Ready Issue、Blocked Reason、Contract 等概念。
-3. 新增状态机总表，统一 Project、Epic、Issue、Run、Release、Deployment、Memory、Server Resource 的状态来源。
-4. 新增契约层文档，至少包含 schema validation、runtime adapter、logging audit event 和 workspace migration。
-5. 补充 Gitee、GitLab、generic Git 的独立接入字段表。
-6. 补充安全威胁模型，覆盖 prompt injection、模型外发、仓库恶意文件、远程命令、密钥泄露和生产误操作。
-7. 补充 Moyuan 框架自身测试策略，覆盖 fixture repos、mock runtime、Git sandbox、schema golden tests 和 E2E。
-8. 完成一次文档就绪巡检，再决定是否进入实现 issue 拆分。
+1. 同步路线图、README、设计门禁和文档治理，使 7 条主线和策略层成为正式结构。
+2. 补充用户与鉴权设计，使平台用户、组织、会话、API Token、角色、审批和审计有唯一权威入口。
+3. 补充术语表中的 Mainline、Policy、Decision Tree、Ready Issue、Blocked Reason、Contract 等概念。
+4. 新增状态机总表，统一 User、Project、Epic、Issue、Run、Release、Deployment、Memory、Server Resource 的状态来源。
+5. 新增契约层文档，至少包含 auth session、schema validation、runtime adapter、logging audit event 和 workspace migration。
+6. 补充 Gitee、GitLab、generic Git 的独立接入字段表。
+7. 补充安全威胁模型，覆盖 prompt injection、模型外发、仓库恶意文件、远程命令、密钥泄露、账号接管和生产误操作。
+8. 补充 Moyuan 框架自身测试策略，覆盖 fixture repos、mock runtime、Git sandbox、schema golden tests、auth tests 和 E2E。
+9. 完成一次文档就绪巡检，再决定是否进入实现 issue 拆分。
 
 进入实现拆分前必须满足：
 

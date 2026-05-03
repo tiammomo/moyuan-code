@@ -7,6 +7,15 @@
 | 术语 | 英文 | 定义 | 不是 | 权威文档 |
 | --- | --- | --- | --- | --- |
 | Moyuan | Moyuan Code | 多 Agent 代码开发框架本体 | 不是被管理项目 | [总体规划](../lifecycle-roadmap.md) |
+| 平台用户 | Platform User | 使用 Moyuan 本体的人类用户 | 不是被管理项目的业务用户 | [平台用户与访问控制主线](../mainlines/platform-user-access.md) |
+| 组织 | Organization | Moyuan 内管理用户、项目、策略和审计的租户边界 | 不是 Agent Team | [平台用户与访问控制主线](../mainlines/platform-user-access.md) |
+| 成员关系 | Membership | 用户或服务账号在组织或项目中的角色绑定 | 不是一次性审批 | [平台用户与访问控制主线](../mainlines/platform-user-access.md) |
+| 服务账号 | Service Account | 用于 CI、发布、部署等自动化调用的非人类 actor | 不是普通模型 Provider | [平台用户与访问控制主线](../mainlines/platform-user-access.md) |
+| API Token | API Token | 代表用户或服务账号调用 Moyuan API 的受限凭证 | 不是应写入配置的明文密钥 | [身份会话契约](../contracts/auth-session-contract.md) |
+| 身份会话 | Auth Session | 用户登录或本地身份解析后的短期访问状态 | 不是长期 Memory | [身份会话契约](../contracts/auth-session-contract.md) |
+| 身份上下文 | Auth Context | 一次操作的 actor、auth method、角色、组织、项目和 trace 信息 | 不是权限策略本身 | [身份会话契约](../contracts/auth-session-contract.md) |
+| 鉴权 | Authentication / Authorization | 判断身份是否有效以及是否允许操作资源 | 不是业务登录功能 | [鉴权与访问控制策略](../policies/auth-access-policy.md) |
+| 审批 | Approval | 对高风险操作的结构化人工确认记录 | 不是聊天确认文本 | [鉴权与访问控制策略](../policies/auth-access-policy.md) |
 | 被管理项目 | Project | Moyuan 接入和管理的软件项目 | 不是 Moyuan 自身仓库 | [项目工作空间规范](../project-workspace-spec.md) |
 | 工作空间 | Workspace | 每个项目独立的 `.moyuan/` 配置、状态和产物目录 | 不是源代码目录本身 | [项目工作空间规范](../project-workspace-spec.md) |
 | 仓库 | Repository | 被管理项目的 Git 仓库，可以来自本地路径或远程 URL | 不等同于 Workspace | [仓库接入、Git 与项目理解](../repository-onboarding-git-management.md) |

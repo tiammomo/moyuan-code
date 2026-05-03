@@ -14,6 +14,11 @@
 
 | 对象 | 状态 owner | 主要文档 | 日志流 |
 | --- | --- | --- | --- |
+| User | Identity Manager | [平台用户与访问控制主线](../mainlines/platform-user-access.md) | `audit` |
+| Membership | Identity Manager | [平台用户与访问控制主线](../mainlines/platform-user-access.md) | `audit` |
+| API Token | Identity Manager | [身份会话契约](../contracts/auth-session-contract.md) | `audit` |
+| Auth Session | Identity Manager | [身份会话契约](../contracts/auth-session-contract.md) | `audit`、`error` |
+| Approval | Orchestrator | [鉴权与访问控制策略](../policies/auth-access-policy.md) | `audit` |
 | Project | Project Workspace Manager | [项目工作空间规范](../project-workspace-spec.md) | `run`、`audit` |
 | Project Comprehension | Project Workspace Manager | [项目接入与阅读理解主线](../mainlines/project-comprehension.md) | `run`、`git`、`memory` |
 | Epic | Orchestrator | [需求规划与 Issue 编排主线](../mainlines/requirement-planning.md) | `run`、`agent` |
@@ -27,7 +32,63 @@
 | Release | Release Manager | [发布投产策略](../policies/release-deployment-policy.md) | `release`、`git` |
 | Deployment | Deployment Runner | [DevOps 发布投产主线](../mainlines/devops-release-deployment.md) | `release`、`audit`、`error` |
 
-## 3. Project 状态
+## 3. User 状态
+
+```text
+invited -> active -> suspended -> disabled -> archived
+```
+
+说明：
+
+- `suspended` 表示临时停用，可恢复。
+- `disabled` 表示不可继续执行新操作。
+
+## 4. Membership 状态
+
+```text
+invited -> active -> suspended -> removed
+```
+
+## 5. API Token 状态
+
+```text
+created -> active -> rotated -> revoked
+```
+
+终止状态：
+
+```text
+expired
+```
+
+## 6. Auth Session 状态
+
+```text
+created -> active -> idle -> expired
+```
+
+终止状态：
+
+```text
+revoked
+invalid
+```
+
+## 7. Approval 状态
+
+```text
+requested -> approved -> consumed -> archived
+```
+
+失败或终止状态：
+
+```text
+rejected
+expired
+cancelled
+```
+
+## 8. Project 状态
 
 ```text
 created -> onboarding -> comprehending -> ready -> active -> archived
@@ -47,7 +108,7 @@ comprehension_failed
 - full comprehension 已完成。
 - 基础配置通过 schema 校验。
 
-## 4. Project Comprehension 状态
+## 9. Project Comprehension 状态
 
 ```text
 requested -> scanning -> analyzing -> writing_outputs -> completed
@@ -66,7 +127,7 @@ stale
 - `partial` 表示部分目录或文件无法读取，但不影响核心项目画像。
 - `stale` 表示远程分支更新后理解结果已过期。
 
-## 5. Epic 状态
+## 10. Epic 状态
 
 ```text
 created -> refining -> planning -> scheduled -> running -> completed -> released -> archived
@@ -81,7 +142,7 @@ cancelled
 failed
 ```
 
-## 6. Issue 状态
+## 11. Issue 状态
 
 ```text
 created
@@ -113,7 +174,7 @@ cancelled
 - Runtime、worktree、预算和权限满足要求。
 - 无待处理用户澄清或审批。
 
-## 7. Run 状态
+## 12. Run 状态
 
 ```text
 created -> context_assembling -> dispatched -> running -> collecting_outputs -> completed
@@ -128,7 +189,7 @@ cancelled
 needs_user_input
 ```
 
-## 8. Quality Report 状态
+## 13. Quality Report 状态
 
 ```text
 requested -> running_gates -> completed -> accepted
@@ -142,7 +203,7 @@ needs_rework
 blocked
 ```
 
-## 9. Runtime Session 状态
+## 14. Runtime Session 状态
 
 ```text
 created -> active -> idle -> resumable -> closed
@@ -156,7 +217,7 @@ lost
 expired
 ```
 
-## 10. Memory Record 状态
+## 15. Memory Record 状态
 
 ```text
 candidate -> staged -> committed -> indexed -> active
@@ -172,7 +233,7 @@ conflict_review_required
 archived
 ```
 
-## 11. Server Resource 状态
+## 16. Server Resource 状态
 
 ```text
 registered -> checking -> active -> maintenance_required -> retired
@@ -187,7 +248,7 @@ expired
 blocked_for_production
 ```
 
-## 12. Release 状态
+## 17. Release 状态
 
 ```text
 suggested -> planned -> branch_created -> regression_running -> ready_to_publish -> published -> completed
@@ -202,7 +263,7 @@ rollback_required
 cancelled
 ```
 
-## 13. Deployment 状态
+## 18. Deployment 状态
 
 ```text
 created -> precheck_running -> deploying -> smoke_testing -> monitoring -> healthy -> completed
@@ -220,7 +281,7 @@ rolled_back
 manual_intervention_required
 ```
 
-## 14. 状态变更记录要求
+## 19. 状态变更记录要求
 
 每次状态变化必须记录：
 

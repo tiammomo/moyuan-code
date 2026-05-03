@@ -15,6 +15,7 @@
 - `.moyuan/runtimes/agent-runtimes.yaml`
 - `.moyuan/agents/roles.yaml`
 - `.moyuan/agents/teams.yaml`
+- `.moyuan/policies/access.yaml`
 - `.moyuan/policies/*.yaml`
 - `.moyuan/skills/enabled.yaml`
 
@@ -77,6 +78,7 @@ read yaml
 
 - 明文 API key。
 - 明文 token。
+- 明文 session secret。
 - 明文 SSH private key。
 - 明文 password。
 - `.env` 内容复制到 YAML。
@@ -95,6 +97,7 @@ read yaml
 - routing 引用的 provider 和 model alias 存在。
 - role 引用的 model policy 存在。
 - team 引用的 role 存在。
+- access policy 引用的 project role 存在。
 - environment 引用的 resource group 存在。
 - resource group 引用的 host id 存在。
 - release 引用的 remote provider 已配置。

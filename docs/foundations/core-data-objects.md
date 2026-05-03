@@ -18,6 +18,8 @@
 
 - `id`
 - `name`
+- `organization_id`
+- `owner_user_id`
 - `root`
 - `type`
 - `description`
@@ -38,10 +40,274 @@ created -> onboarded -> comprehended -> active -> archived
 关联对象：
 
 - Repository
+- Organization
+- User
 - Workspace
 - Project Comprehension
 - Epic
 - Memory Record
+
+## User
+
+职责：表示使用 Moyuan 平台的人类用户。
+
+关键字段：
+
+- `id`
+- `username`
+- `email`
+- `display_name`
+- `status`
+- `auth_methods`
+- `created_at`
+- `updated_at`
+
+生命周期：
+
+```text
+invited -> active -> suspended -> disabled -> archived
+```
+
+落盘位置：
+
+- local_single_user：本地身份文件和本地审计日志。
+- team_server：控制面数据库。
+
+关联对象：
+
+- Organization
+- Membership
+- Auth Session
+- API Token
+- Approval
+
+## Organization
+
+职责：表示 Moyuan 平台内的团队、租户或组织边界。
+
+关键字段：
+
+- `id`
+- `name`
+- `status`
+- `owner_user_id`
+- `policy_refs`
+- `created_at`
+- `updated_at`
+
+生命周期：
+
+```text
+created -> active -> suspended -> archived
+```
+
+落盘位置：
+
+- team_server：控制面数据库。
+
+关联对象：
+
+- User
+- Membership
+- Project
+- Service Account
+- Audit Log
+
+## Membership
+
+职责：表示 User 或 Service Account 在组织或项目中的角色绑定。
+
+关键字段：
+
+- `id`
+- `subject_type`
+- `subject_id`
+- `organization_id`
+- `project_id`
+- `roles`
+- `status`
+- `created_at`
+- `updated_at`
+
+生命周期：
+
+```text
+invited -> active -> suspended -> removed
+```
+
+落盘位置：
+
+- team_server：控制面数据库。
+- 项目级角色策略可有 `.moyuan/policies/access.yaml` 引用，但不保存凭证明文。
+
+关联对象：
+
+- User
+- Service Account
+- Organization
+- Project
+
+## Service Account
+
+职责：表示 CI、发布、部署或外部系统使用的非人类 actor。
+
+关键字段：
+
+- `id`
+- `name`
+- `status`
+- `owner_user_id`
+- `organization_id`
+- `project_id`
+- `roles`
+- `token_refs`
+- `created_at`
+- `updated_at`
+
+生命周期：
+
+```text
+created -> active -> disabled -> revoked -> archived
+```
+
+落盘位置：
+
+- team_server：控制面数据库。
+
+关联对象：
+
+- Membership
+- API Token
+- Run
+- Release
+- Deployment
+
+## API Token
+
+职责：表示调用 Moyuan API 或自动化任务的受限凭证引用。
+
+关键字段：
+
+- `id`
+- `owner_type`
+- `owner_id`
+- `status`
+- `scopes`
+- `token_hash_ref`
+- `token_prefix`
+- `token_suffix`
+- `expires_at`
+- `last_used_at`
+
+生命周期：
+
+```text
+created -> active -> rotated -> revoked
+```
+
+终止状态：
+
+```text
+expired
+```
+
+落盘位置：
+
+- team_server：控制面数据库或密钥管理系统引用。
+- 不允许落入 `.moyuan/` 明文配置。
+
+关联对象：
+
+- User
+- Service Account
+- Auth Session
+- Audit Log
+
+## Auth Session
+
+职责：表示一次用户登录、本地身份或 API 会话的短期访问状态。
+
+关键字段：
+
+- `id`
+- `user_id`
+- `status`
+- `created_at`
+- `expires_at`
+- `last_seen_at`
+- `client`
+
+生命周期：
+
+```text
+created -> active -> idle -> expired
+```
+
+失败或终止状态：
+
+```text
+revoked
+invalid
+```
+
+落盘位置：
+
+- local_single_user：本地会话状态或进程上下文。
+- team_server：控制面数据库或会话存储。
+
+关联对象：
+
+- User
+- API Token
+- Audit Log
+
+## Approval
+
+职责：表示高风险操作的人工确认、拒绝、过期或取消记录。
+
+关键字段：
+
+- `id`
+- `requester_id`
+- `approver_id`
+- `operation`
+- `resource_type`
+- `resource_id`
+- `risk_level`
+- `decision`
+- `reason`
+- `expires_at`
+- `decided_at`
+
+生命周期：
+
+```text
+requested -> approved -> consumed -> archived
+```
+
+失败或终止状态：
+
+```text
+rejected
+expired
+cancelled
+```
+
+落盘位置：
+
+- `.moyuan/logs/audit/`
+- `.moyuan/lifecycle/releases/`，如果与发布相关。
+- `.moyuan/lifecycle/deployments/`，如果与部署相关。
+- team_server：控制面数据库。
+
+关联对象：
+
+- User
+- Run
+- Issue
+- Release
+- Deployment
+- Audit Log
 
 ## Repository
 

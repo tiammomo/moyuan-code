@@ -1,6 +1,6 @@
 # 主线文档
 
-主线文档按真实项目生命周期组织，帮助读者从一个被管理项目的接入、需求规划、开发、代码管理、服务器资源到发布投产完整走通。
+主线文档按真实项目生命周期和平台治理流程组织，帮助读者从平台用户与访问控制、被管理项目接入、需求规划、开发、代码管理、服务器资源到发布投产完整走通。
 
 主线不是按模块名划分，而是按专家判定标准划分。满足以下条件越多，越应该成为主线：
 
@@ -24,6 +24,7 @@
 
 | 主线 | 文档 | 目标 |
 | --- | --- | --- |
+| 平台用户与访问控制 | [platform-user-access.md](./platform-user-access.md) | 管理用户、组织、会话、API Token、角色、审批和审计 |
 | 项目接入与阅读理解 | [project-comprehension.md](./project-comprehension.md) | 接入本地/远程仓库，建立项目画像、模块地图和理解快照 |
 | 需求规划与 Issue 编排 | [requirement-planning.md](./requirement-planning.md) | 将用户需求完善、澄清、拆分为 Issue Graph 和可执行 schedule |
 | 代码开发 | [code-development.md](./code-development.md) | 消费 ready issue，完成多 Agent 实现、测试、质量复核和返工 |
@@ -38,6 +39,7 @@
 - Agent Runtime 和模型 Provider：[模型与工具适配规划](../model-tool-adapters.md)
 - Agent role、team 和 skills：[Agent、Skills 与编排](../agent-skills-memory.md)
 - Memory：[Agent Memory 系统方案](../agent-memory-system.md)
+- 鉴权：[鉴权与访问控制策略](../policies/auth-access-policy.md)
 - 权限：[权限模型](../foundations/permission-model.md)
 - 失败恢复：[失败恢复设计](../foundations/failure-recovery.md)
 - 配置：[完整配置方案](../configuration-guide.md) 和 [配置 Schema 规则](../configuration-schema-spec.md)
@@ -49,6 +51,7 @@
 
 例如需求规划主线会调用：
 
+- [鉴权与访问控制策略](../policies/auth-access-policy.md)
 - [Issue 调度策略](../policies/issue-scheduling-policy.md)
 - [项目阅读理解策略](../policies/project-comprehension-policy.md)
 - [Provider 路由策略](../policies/provider-routing-policy.md)
@@ -56,6 +59,7 @@
 
 代码开发主线会调用：
 
+- [鉴权与访问控制策略](../policies/auth-access-policy.md)
 - [质量与合入策略](../policies/quality-merge-policy.md)
 - [Provider 路由策略](../policies/provider-routing-policy.md)
 - [Memory 决策策略](../policies/memory-decision-policy.md)

@@ -14,6 +14,7 @@
 
 | 契约 | 文档 | 作用 |
 | --- | --- | --- |
+| 身份会话契约 | [auth-session-contract.md](./auth-session-contract.md) | 统一用户身份、会话、API Token、服务账号和鉴权决策接口 |
 | Schema 校验契约 | [schema-validation-contract.md](./schema-validation-contract.md) | 将配置规则转成机器可校验 schema 和 runtime validator |
 | Runtime Adapter 契约 | [runtime-adapter-contract.md](./runtime-adapter-contract.md) | 统一 Claude CLI、Codex CLI 和其他 Agent Runtime 的调用边界 |
 | 日志与审计事件契约 | [logging-audit-event-contract.md](./logging-audit-event-contract.md) | 定义核心日志、审计事件、状态变更和 trace 关联 |
@@ -23,9 +24,10 @@
 
 后续实现顺序建议：
 
-1. Schema 校验契约。
-2. 日志与审计事件契约。
-3. Runtime Adapter 契约。
-4. Workspace 迁移契约。
+1. 身份会话契约。
+2. Schema 校验契约。
+3. 日志与审计事件契约。
+4. Runtime Adapter 契约。
+5. Workspace 迁移契约。
 
-原因：配置校验和日志是所有主线的基础，Runtime Adapter 是代码开发闭环的基础，Workspace 迁移可在 Phase 1 MVP 稳定后逐步完善。
+原因：身份会话决定谁能执行操作，配置校验和日志是所有主线的基础，Runtime Adapter 是代码开发闭环的基础，Workspace 迁移可在 Phase 1 MVP 稳定后逐步完善。
