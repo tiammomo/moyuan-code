@@ -79,56 +79,56 @@ function collectDocsContext() {
 
 function buildDiagramSpec() {
   return `
-图名：Moyuan Code 多 Agent 研发全生命周期可视化地图
-目标：用中文为主、图标为主、少量短标签的方式，展示当前项目从用户需求、仓库接入、项目理解、Issue Graph、Subagent 并发执行、质量复核、Git 合入、发布投产到 Memory/日志反馈的完整技术流程。
+图名：Moyuan Code Multi-Agent SDLC Technical Map
+目标：用中文说明、英文专有名词原样保留、图标和节点辅助表达的方式，展示当前项目从 User Request、Repository Onboarding、Project Comprehension、Issue Graph、Subagent 并发执行、Quality Gate、Git Merge、Release/Deployment 到 Memory/Logs 反馈的完整技术流程。
 受众：技术负责人、架构师、后端/前端/测试/运维 Agent 配置人员、后续实现工程师。
 
 画面布局：
-请生成一张横向技术可视化地图，不要做纯文本表格。采用“主流程从左到右 + 底部反馈环”的结构。每个主模块用大号中文标题、图标、小型流程节点和少量短标签表达。
+请生成一张横向技术可视化地图，不要做纯文本表格。采用“主流程从左到右 + 底部反馈环”的结构。每个主模块用大号中文标题、英文专有名词、小型流程节点、图标和短标签表达。技术密度要高于普通信息图，但比纯文本架构图更好看。
 
 主流程 7 个大模块：
 
 1. 入口与权限
    - 图标建议：用户头像、终端窗口、API 插头、盾牌、审批勾选
-   - 短标签：用户入口、CLI/API、身份上下文、RBAC、审批审计
+   - 必须出现的术语：Platform User、CLI/API、Auth Context、RBAC、Approval、Audit、Secret Ref
 
 2. 仓库接入与项目理解
    - 图标建议：代码仓库、Git 分支、云端仓库、放大镜、项目地图
-   - 短标签：本地/GitHub/Gitee、Git Adapter、初始化 .moyuan、项目画像、模块地图
+   - 必须出现的术语：Local Path、GitHub/Gitee、Generic Git、Git Adapter、.moyuan Workspace、Project Comprehension、Project Profile、Module Map
 
-3. 需求规划与 Issue 图
+3. 需求规划与 Issue Graph
    - 图标建议：便签需求、问号气泡、DAG 节点图、队列看板
-   - 短标签：需求完善、澄清判断、Issue 拆分、依赖图、调度队列
+   - 必须出现的术语：Requirement Refiner、Clarification Gate、Issue Planner、Dependency Planner、Scheduler、Issue Graph、ready_queue、blocked_queue
 
-4. 多 Agent 执行
+4. Multi-Agent 执行
    - 图标建议：多个 Agent 节点、工具箱、技能拼图、Claude/Codex 运行器、模型云
-   - 短标签：Subagent、Skills、Claude CLI、Codex CLI、模型路由
+   - 必须出现的术语：Agent Roles、Subagent Manager、Skills Registry、find-skills、Skill Binding、Runtime Adapter、Claude CLI、Codex CLI、Model Routing、GPT/Claude/GLM/MiniMax
 
 5. 质量门禁与合入
    - 图标建议：代码文件、测试烧杯、仪表盘、锁门、合并箭头
-   - 短标签：构建测试、覆盖率、重复复杂度、安全扫描、Review、集成分支
+   - 必须出现的术语：Issue Branch、Worktree、Build/Lint/Test、Coverage、Duplication、Complexity、Security Scan、Quality Gate、Review、Epic Integration Branch
 
 6. 发布与服务器
    - 图标建议：版本标签、GitHub/Gitee 云、服务器机柜、火箭/部署箭头、监控波形、回滚按钮
-   - 短标签：版本分支、Tag、PR/MR、测试机、生产机、冒烟监控、回滚
+   - 必须出现的术语：Release Suggestion、Release Branch、Tag、PR/MR、GitHub/Gitee Push、test_dev、production、Deployment、Smoke Test、Monitor、Rollback
 
 7. 反馈与长期治理
    - 图标建议：环形箭头、大脑/记忆库、日志卷轴、Bug 修复扳手、文档书本
-   - 短标签：运行信号、Bug 判断、自动修复、Memory 压缩、统一日志、文档治理
+   - 必须出现的术语：Runtime Signals、Bug Candidate、Repair Attempt、Improvement Record、Agent Memory、Memory Compact、Unified Logs、Contracts、Config Schema、Failure Recovery
 
 底部反馈环：
-从“运行信号/日志/质量问题/用户反馈”流向“Bug 候选 -> 修复尝试 -> 改进记录 -> Memory compact -> 策略/技能/文档更新”，再虚线回到“需求规划”和“多 Agent 执行”。
+从 Runtime Signals / Logs / Quality Findings / User Feedback 流向 Bug Candidate -> Repair Attempt -> Improvement Record -> Memory Compact -> Policy/Skills/Docs Update，再虚线回到 Requirement Planning 和 Multi-Agent Execution。
 
 视觉要求：
-- 中文优先。图片内 90% 以上文字用中文；英文只保留必要技术名：Claude CLI、Codex CLI、Issue Graph、Memory、Logs、PR/MR、Tag。
+- 中文用于模块标题和说明性短语；英文专有名词必须原样使用，不能翻译成中文。必须保留：Auth Context、Git Adapter、Project Comprehension、Issue Graph、Subagent、Skills Registry、Runtime Adapter、Claude CLI、Codex CLI、Model Routing、Quality Gate、Review、Release Branch、Deployment、Agent Memory、Memory Compact、Unified Logs。
 - 必须使用合适的图标、简化设备图、节点图、箭头和小型可视化元素，不要纯文本框堆叠。
 - 生成清晰的工程技术流程图，不要营销风格，不要卡通人物，不要 3D，不要抽象插画。
 - 白底或极浅灰底，深灰文字，蓝/绿/橙/紫/青作为模块区分色。
-- 每个模块最多 5 个短标签；每个标签尽量 2-6 个汉字。
+- 每个模块允许 6-9 个短标签或小节点，以提高技术密度，但不能变成说明段落。
 - 标题必须大、粗、清晰；小字不能密集。
 - 用实线箭头表示主流程，用虚线箭头表示反馈闭环和治理回路。
-- 画面中必须能看出“需求 -> Issue Graph -> Subagent 并发执行 -> 质量门禁 -> Git 合入 -> 发布部署 -> Memory/Logs/自我修复反馈”的主流程。
-- 右下角放一个小型图例：实线=主流程，虚线=反馈。
+- 画面中必须能看出“User Request -> Issue Graph -> Subagent Parallel Runs -> Quality Gate -> Git Merge -> Release/Deployment -> Memory/Logs/Self Repair Feedback”的主流程。
+- 右下角放一个小型图例：实线 = Main Flow，虚线 = Feedback Loop。
 - 整体要比普通架构图更好看，但仍然是技术向，不要变成宣传海报。
 - 不要出现任何 API Key、token、私网 IP、真实账号或密码。
 `;
@@ -137,7 +137,7 @@ function buildDiagramSpec() {
 function buildPrompt() {
   const docsContext = collectDocsContext();
   return `
-你是资深软件架构图设计师和技术信息图设计师。请根据下面的设计规格，生成一张适合技术评审会议展示的中文技术可视化流程图。
+你是资深软件架构图设计师和技术信息图设计师。请根据下面的设计规格，生成一张适合技术评审会议展示的技术可视化流程图。
 
 ${buildDiagramSpec()}
 
@@ -146,8 +146,8 @@ ${docsContext}
 
 输出要求：
 - 只生成一张完整架构流程图。
-- 图片中不要出现说明性段落，必须用图标、节点、箭头和少量短中文标签表达。
-- 中文优先，英文只保留必要技术名，例如 Claude CLI、Codex CLI、Issue Graph、Memory、Logs。
+- 图片中不要出现说明性段落，必须用图标、节点、箭头和短标签表达。
+- 中文用于模块标题和说明性短语；英文专有名词必须原样保留，不要翻译成中文。
 - 不要把规格里的长句原样放进图里。
 - 图需要让工程师一眼看懂当前 Moyuan Code 项目的端到端执行链路、并发编排、质量控制、发布投产和长期反馈闭环。
 `;
