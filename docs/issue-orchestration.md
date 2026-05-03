@@ -4,6 +4,8 @@
 
 用户提出一个开发任务后，系统需要自动拆分为多个可执行 issues，并根据依赖关系、代码写入范围、风险、资源和质量门禁决定哪些 issues 可以并发执行，哪些必须串行等待。
 
+Issue 字段、命名、粒度、ready/accepted 条件由 [工程流程规范](./engineering-process-standards.md) 维护。
+
 核心目标：
 
 - 自动丰富任务需求描述，补齐背景、范围、约束、验收标准和风险。
@@ -47,6 +49,7 @@
 - quality gate。
 - style constraints。
 - subagent plan。
+- rollback_or_fix_plan。
 
 ### Issue Graph
 

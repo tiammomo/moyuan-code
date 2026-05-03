@@ -82,6 +82,10 @@ Git 策略：
 | `git.branch_policy.allow_auto_commit` | optional | `false` | 默认不自动 commit |
 | `git.branch_policy.allow_auto_push` | optional | `false` | 默认不自动 push |
 | `git.branch_policy.allow_auto_pr` | optional | `false` | 默认不自动 PR |
+| `git.commit_policy.enabled` | required | `true` | 是否启用 commit 规范 |
+| `git.commit_policy.format` | required | `conventional_commits` | MVP 固定 |
+| `git.commit_policy.require_issue_ref` | required | `true` | 必须关联 issue |
+| `git.commit_policy.require_quality_ref` | required | `true` | 必须关联质量报告 |
 
 GitHub 字段规则：
 
@@ -373,6 +377,7 @@ Skill Binding 字段：
 | `orchestration.concurrency_guards` | required | 无 | 并发保护 |
 | `orchestration.waiting_policy` | required | 无 | 编排等待策略 |
 | `orchestration.merge_gate` | required | 无 | 合入门禁 |
+| `orchestration.issue_spec.required_fields` | required | 无 | Issue 必填字段 |
 
 必须为空：
 
@@ -382,6 +387,7 @@ Skill Binding 字段：
 - `waiting_policy.queues` 不能缺少 `blocked_queue`、`ready_queue`、`running_queue`、`review_queue`。
 - `waiting_policy.frontend_runtime` 必须引用 `claude_cli`。
 - `waiting_policy.backend_runtime` 必须引用 `codex_cli`。
+- `issue_spec.required_fields` 不能缺少 `acceptance_criteria`、`test_plan`、`write_scopes`、`rollback_or_fix_plan`。
 
 ## 16. policies/code-quality.yaml
 
@@ -391,7 +397,12 @@ Skill Binding 字段：
 | `quality.enabled` | required | `true` | 是否启用 |
 | `quality.required_for_all_code_tasks` | required | `true` | 必须为 true |
 | `quality.max_rework_rounds` | required | `3` | 返工上限 |
-| `gates` | required | 无 | 至少包含 runnable、test_gap |
+| `gates` | required | 无 | 至少包含 runnable、test_gap、coverage |
+| `gates.coverage.enabled` | required | `true` | 是否启用覆盖率门禁 |
+| `gates.coverage.thresholds.line` | required | `80` | 行覆盖率 |
+| `gates.coverage.thresholds.branch` | required | `70` | 分支覆盖率 |
+| `gates.coverage.thresholds.changed_files` | required | `85` | 变更文件覆盖率 |
+| `coverage.exemptions` | optional | `[]` | 覆盖率豁免，必须可审计 |
 | `self_repair.enabled` | required | `true` | 是否启用运行反馈和自我修复 |
 | `self_repair.mode` | required | `candidate_only` | observe_only、candidate_only、issue_only、auto_repair_low_risk |
 | `self_repair.max_attempts_per_bug` | required | `2` | 单个 bug 自动修复上限 |
@@ -402,9 +413,11 @@ Skill Binding 字段：
 
 - `gates.runnable` 不允许为空。
 - `gates.test_gap` 不允许为空。
+- `gates.coverage` 不允许为空。
 - `quality.max_rework_rounds` 不能为 null。
 - `self_repair.mode` 不能为 null。
 - `self_repair.require_approval_for` 不能为空数组。
+- 覆盖率低于阈值时，`coverage.exemptions.*.approval_id` 条件必填。
 
 ## 17. policies/comprehension.yaml
 
@@ -507,6 +520,9 @@ Skill Binding 字段：
 | `release.remote_providers` | required | 无 | 至少一个远程 provider |
 | `release.default_batch` | required | 无 | 发布批次建议 |
 | `release.gates` | required | 无 | 发布门禁 |
+| `release.gates.require_release_note` | required | `true` | 必须为 true |
+| `release.gates.require_coverage_passed` | required | `true` | 必须为 true |
+| `release.gates.require_rollback_plan` | required | `true` | 必须为 true |
 | `release.git` | required | 无 | release branch 和 tag 策略 |
 | `release.deployment` | conditional_required | null | `deploy_to_environment` 时必填 |
 
@@ -514,6 +530,7 @@ Skill Binding 字段：
 
 - `mode = branch_only` 时，`release.deployment.enabled` 必须为 false 或 `release.deployment` 为 null。
 - `mode = deploy_to_environment` 时，`release.deployment` 不能为 null。
+- `release.gates.require_release_note`、`release.gates.require_coverage_passed`、`release.gates.require_rollback_plan` 必须为 true。
 
 ## 23. policies/budget.yaml
 
@@ -530,7 +547,26 @@ Skill Binding 字段：
 
 - 无预算限制时，`max_daily_model_cost_usd` 必须为 null，不使用 0 表示无限制。
 
-## 24. 配置校验顺序
+## 24. policies/engineering.yaml
+
+| 字段 | 规则 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `schema_version` | required | 无 | MVP 固定为 `1` |
+| `engineering.commit.enabled` | required | `true` | 启用 commit 规范 |
+| `engineering.commit.format` | required | `conventional_commits` | MVP 固定 |
+| `engineering.issue.required_fields` | required | 无 | Issue 必填字段 |
+| `engineering.fix.require_regression_test` | required | `true` | 回退后 fix 必须补回归测试 |
+| `engineering.release.require_release_note` | required | `true` | 发版必须有 release note |
+| `engineering.release.require_rollback_plan` | required | `true` | 发版必须有回滚计划 |
+| `engineering.coverage.default_thresholds` | required | 无 | 默认覆盖率阈值 |
+
+必须为空：
+
+- `engineering.issue.required_fields` 不允许为空数组。
+- `engineering.coverage.default_thresholds.changed_files` 不允许为 null。
+- `engineering.release.require_release_note`、`engineering.release.require_rollback_plan` 必须为 true。
+
+## 25. 配置校验顺序
 
 系统校验配置时按以下顺序：
 
@@ -544,7 +580,7 @@ Skill Binding 字段：
 8. 权限和敏感信息规则。
 9. provider/runtime/secret/resource 可用性。
 
-## 25. MVP 最小配置
+## 26. MVP 最小配置
 
 必须存在且通过 schema 校验：
 
@@ -561,6 +597,7 @@ Skill Binding 字段：
 - `policies/access.yaml`
 - `policies/permissions.yaml`
 - `policies/code-quality.yaml`
+- `policies/engineering.yaml`
 - `policies/orchestration.yaml`
 - `policies/comprehension.yaml`
 - `policies/logging.yaml`
@@ -572,7 +609,7 @@ Skill Binding 字段：
 - `policies/environments.yaml`，不启用部署时可为空对象。
 - `skills/enabled.yaml`，skills 未启用时可为空数组，但文件仍应存在。
 
-## 26. 进入实现前必须补的机器校验
+## 27. 进入实现前必须补的机器校验
 
 本文是人类可读 schema 规则。进入实现前必须转换为：
 

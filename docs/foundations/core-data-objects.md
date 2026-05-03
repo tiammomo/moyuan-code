@@ -431,6 +431,7 @@ created -> planning -> ready -> running -> completed -> released -> archived
 - `write_scope`
 - `acceptance_criteria`
 - `test_plan`
+- `rollback_or_fix_plan`
 - `risk_level`
 - `assigned_roles`
 - `status`
@@ -1254,6 +1255,9 @@ defined -> active -> degraded -> retired
 - `status`
 - `approval`
 - `tag`
+- `release_note`
+- `coverage_summary`
+- `rollback_plan`
 
 生命周期：
 

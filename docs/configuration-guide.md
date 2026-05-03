@@ -152,6 +152,13 @@ git:
     allow_auto_commit: false
     allow_auto_push: false
     allow_auto_pr: false
+  commit_policy:
+    enabled: true
+    format: conventional_commits
+    require_issue_ref: true
+    require_run_ref: true
+    require_quality_ref: true
+    allowed_types: [feat, fix, perf, refactor, test, docs, build, ci, chore, revert, hotfix]
   epic_branch:
     enabled: true
     naming: moyuan/{epic_id}
@@ -452,9 +459,52 @@ orchestration:
     require_style_check: true
     require_integration_checks: true
     merge_into_epic_branch_only: true
+
+  issue_spec:
+    required_fields:
+      - clarified_requirement
+      - acceptance_criteria
+      - test_plan
+      - write_scopes
+      - subagent_plan
+      - rollback_or_fix_plan
 ```
 
 ## 8. 质量、阅读理解与 Memory
+
+工程流程规范配置：
+
+```yaml
+schema_version: 1
+engineering:
+  commit:
+    enabled: true
+    format: conventional_commits
+    require_issue_ref: true
+    require_run_ref: true
+    require_quality_ref: true
+  issue:
+    required_fields:
+      - clarified_requirement
+      - acceptance_criteria
+      - test_plan
+      - write_scopes
+      - rollback_or_fix_plan
+  fix:
+    require_regression_test: true
+    require_root_cause: true
+  release:
+    require_release_note: true
+    require_rollback_plan: true
+  coverage:
+    default_thresholds:
+      line: 80
+      branch: 70
+      function: 80
+      statement: 80
+      changed_files: 85
+      new_code: 85
+```
 
 代码质量门禁：
 
@@ -471,6 +521,21 @@ quality:
 gates:
   runnable: {enabled: true, severity: blocker}
   test_gap: {enabled: true, severity: blocker}
+  coverage:
+    enabled: true
+    severity: blocker
+    thresholds:
+      line: 80
+      branch: 70
+      function: 80
+      statement: 80
+      changed_files: 85
+      new_code: 85
+    high_risk_thresholds:
+      auth_security_payment:
+        line: 90
+        branch: 85
+        changed_files: 90
   duplication:
     enabled: true
     max_new_duplicate_ratio: 0.08
@@ -686,6 +751,8 @@ release:
   gates:
     require_user_approval: true
     require_full_regression: true
+    require_release_note: true
+    require_coverage_passed: true
     require_smoke_tests: true
     require_monitor_window: true
     require_rollback_plan: true

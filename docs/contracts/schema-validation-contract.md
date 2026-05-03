@@ -19,6 +19,7 @@
 - `.moyuan/skills/registry.yaml`
 - `.moyuan/skills/bindings.yaml`
 - `.moyuan/policies/access.yaml`
+- `.moyuan/policies/engineering.yaml`
 - `.moyuan/policies/*.yaml`
 - `.moyuan/skills/enabled.yaml`
 

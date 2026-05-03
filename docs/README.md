@@ -89,6 +89,7 @@
 | [github-integration.md](./github-integration.md) | GitHub 连接、认证、token 权限、必填和可空字段 |
 | [agent-skills-memory.md](./agent-skills-memory.md) | Agent role、team、memory scope 和输出契约概要 |
 | [subagents-skills-system.md](./subagents-skills-system.md) | Subagent 和 skills 的唯一详细方案 |
+| [engineering-process-standards.md](./engineering-process-standards.md) | commit、issue、回退后 fix、发版和测试覆盖率规范 |
 | [model-tool-adapters.md](./model-tool-adapters.md) | Claude CLI、Codex CLI、GPT、Claude、GLM、MiniMax、第三方 API、gpt-image-2 和工具适配 |
 | [issue-orchestration.md](./issue-orchestration.md) | Issue Graph、并发调度和等待模型的专题参考 |
 | [code-lifecycle-quality-gates.md](./code-lifecycle-quality-gates.md) | 质量门禁、审核、返工和合入前检查的专题参考 |
@@ -125,7 +126,7 @@
 3. 编排优先：框架不绑定某一个模型或 CLI，而是通过统一 Agent Runtime 调度不同执行后端，并把 Subagent 作为显式执行实例管理。
 4. 任务图驱动：开发目标先拆成 Issue Graph，再按依赖、风险、写入范围和资源决定串行或并发。
 5. 前后端分工：前端默认交给 Claude CLI，后端和后端调优默认交给 Codex CLI，最终统一回到质量门禁和 review。
-6. 质量先于合入：AI 生成代码必须通过可运行性、测试、重复度、复杂度、架构边界和独立审查。
+6. 质量先于合入：AI 生成代码必须通过可运行性、测试覆盖率、重复度、复杂度、架构边界和独立审查。
 7. 运行中自我修复：运行失败、测试失败、冒烟失败和用户反馈先判断是否 bug，再按风险自动修复或升级人工。
 8. 记忆可治理：记忆先判断价值，再结构化抽取，经暂存去重、自动 compact 和维护后进入长期记忆。
 9. 仓库可治理：支持本地路径、GitHub、Gitee 和通用 Git URL，任务分支、集成分支和版本分支都受系统管理。

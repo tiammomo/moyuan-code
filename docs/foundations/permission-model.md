@@ -119,6 +119,8 @@ Moyuan 支持的 actor：
 - 自动修复涉及生产、权限、安全、支付、数据库迁移、公共 API 或跨模块写入。
 - `git push`、创建 PR/MR、创建 tag。
 - 发布、部署、回滚。
+- 覆盖率门禁豁免。
+- release note 或 rollback plan 缺失时继续发版。
 - SSH 连接服务器。
 - 修改 CI/CD、数据库迁移、权限、安全、支付相关代码。
 - 访问 secret 引用。

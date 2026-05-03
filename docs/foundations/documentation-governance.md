@@ -52,6 +52,7 @@ Moyuan Code 文档分为八层：
 | 配置字段规则 | `configuration-schema-spec.md` | 其他文档不重复 required/nullable 表 |
 | 仓库、Git、项目理解 | `repository-onboarding-git-management.md` | 不在路线图重复流程细节 |
 | Issue 编排和并发调度 | `issue-orchestration.md` | Agent 文档不重复 issue graph |
+| 工程流程规范 | `engineering-process-standards.md` | Git、Issue、质量、发布文档只引用规则，不重复阈值 |
 | 质量门禁 | `code-lifecycle-quality-gates.md` | Issue 文档只引用 gate 结果 |
 | 运行反馈与自我修复 | `mainlines/runtime-feedback-self-repair.md`、`policies/bug-detection-self-repair-policy.md`、`contracts/self-repair-contract.md` | 质量门禁只引用修复后的 gate 结果 |
 | Agent Role、Team、Memory Scope | `agent-skills-memory.md` | 不展开 Subagent 和 Skill Registry 细节 |
@@ -82,6 +83,7 @@ Moyuan Code 文档分为八层：
 | 运行反馈与自我修复 | quality_owner + orchestrator_owner | 控制运行信号、Bug 判断、自动修复和能力增强 |
 | 配置方案 | core_engineer | 控制 schema 和默认值 |
 | Issue 编排 | orchestrator_owner | 控制任务拆分和调度规则 |
+| 工程流程规范 | engineering_owner + quality_owner + release_owner | 控制 commit、issue、fix、release 和覆盖率规则 |
 | Subagent 与 Skills | orchestrator_owner + skill_owner | 控制 Subagent 生命周期、Skill Registry、绑定和效果反馈 |
 | Memory | memory_owner | 控制记录、检索、compact |
 | 模型与工具 | adapter_owner | 控制 provider、runtime、adapter |
@@ -104,10 +106,11 @@ Moyuan Code 文档分为八层：
 7. 是否影响端到端流程：更新 `mainlines/` 对应主线。
 8. 是否新增判断规则：更新 `policies/` 对应策略。
 9. 是否新增实现接口或事件结构：更新 `contracts/` 对应契约。
-10. 是否新增 Subagent、skill、委派或能力复用：更新 `subagents-skills-system.md`、契约、核心对象、状态机和配置 schema。
-11. 是否新增运行反馈、自我修复或能力增强：更新自我修复主线、策略、契约和 Memory 触发规则。
-12. 是否新增模块专题能力：更新对应专题文档。
-13. 是否需要入口：更新 `README.md`。
+10. 是否新增 commit、issue、fix、release 或 coverage 规则：更新 `engineering-process-standards.md` 和相关策略引用。
+11. 是否新增 Subagent、skill、委派或能力复用：更新 `subagents-skills-system.md`、契约、核心对象、状态机和配置 schema。
+12. 是否新增运行反馈、自我修复或能力增强：更新自我修复主线、策略、契约和 Memory 触发规则。
+13. 是否新增模块专题能力：更新对应专题文档。
+14. 是否需要入口：更新 `README.md`。
 
 ## 文档生命周期
 

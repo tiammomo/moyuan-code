@@ -28,6 +28,7 @@
 | 仓库接入与理解 | 本地/远程仓库、Git 分支、项目阅读理解 | [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md) |
 | 项目工作空间 | `.moyuan/` schema 索引 | [项目工作空间规范](./project-workspace-spec.md) |
 | 质量门禁 | 测试、重复度、复杂度、review、返工 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) |
+| 工程流程规范 | commit、issue、回退后 fix、发版和测试覆盖率 | [工程流程规范](./engineering-process-standards.md) |
 | 自我修复 | 运行信号、Bug Candidate、自动修复、回归测试、能力增强 | [运行反馈与自我修复主线](./mainlines/runtime-feedback-self-repair.md) |
 | Agent Memory | record gate、抽取、暂存、异步写入、检索、维护 | [Agent Memory 系统方案](./agent-memory-system.md) |
 | 模型和工具适配 | Claude Code、Codex、国产模型、Shell/Git/Test/MCP | [模型与工具适配规划](./model-tool-adapters.md) |
@@ -87,6 +88,8 @@
 - Subagent：Orchestrator 为具体任务创建的 Agent 执行实例，绑定父对象、role、runtime、skills、scope 和生命周期。
 - Epic：用户提出的原始开发目标，会被拆成多个 issues。
 - Issue：最小可执行开发单元，具备依赖、写入范围、验收标准和测试计划。
+- Commit Policy：提交信息、关联 issue/run/quality 和自动 commit 条件。
+- Coverage Gate：测试覆盖率门禁，包含总体覆盖率、变更文件覆盖率和新代码覆盖率。
 - Issue Graph：issues 之间的依赖 DAG。
 - Task：一次可追踪工作单元，可以对应一个 issue 或 issue 内的一次执行。
 - Run：Task 的一次执行实例，包含 Agent、模型、工具、Git、质量、测试和 memory 记录。

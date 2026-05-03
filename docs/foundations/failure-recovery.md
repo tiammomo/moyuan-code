@@ -488,7 +488,9 @@
 
 - release branch 创建失败。
 - 回归测试失败。
+- 覆盖率门禁失败。
 - release note 生成失败。
+- rollback plan 缺失。
 - tag 或 push 失败。
 
 系统动作：
@@ -496,11 +498,13 @@
 1. 标记 Release 为 failed。
 2. 保留 release branch 和测试结果。
 3. 阻止 deployment。
-4. 根据失败类型创建修复 issue。
+4. 根据失败类型创建修复 issue、coverage issue 或 release-note issue。
 
 禁止：
 
 - 未通过回归直接部署。
+- 覆盖率门禁失败且无审批豁免时继续发版。
+- rollback plan 缺失时继续生产发版。
 - tag 失败后伪造发布完成。
 
 恢复出口：

@@ -36,6 +36,7 @@
 | [完整配置方案](./configuration-guide.md) | 项目运行需要哪些配置 | 核心 YAML 都有示例和校验清单 |
 | [配置 Schema 规则](./configuration-schema-spec.md) | 配置字段哪些必填、可选、可为空、必须为空 | 核心 YAML 字段规则明确 |
 | [Issues 编排与并发调度](./issue-orchestration.md) | 任务如何拆分、依赖和并发 | Issue Graph、ready queue、合入门禁明确 |
+| [工程流程规范](./engineering-process-standards.md) | commit、issue、fix、release 和 coverage 是否统一 | 提交、issue、回退修复、发版和覆盖率规则明确 |
 | [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md) | 项目如何接入和理解 | 本地/远程接入、full/incremental comprehension 明确 |
 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) | AI 代码如何避免垃圾代码 | 测试、重复、复杂度、架构、安全、review 明确 |
 | [Agent、Skills 与编排](./agent-skills-memory.md) | 多 Agent 如何分工 | role、team、memory scope、输出契约明确 |
@@ -112,6 +113,7 @@
 - 依赖类型。
 - Issue Graph。
 - ready queue。
+- Issue 规范和必填字段。
 - 并发度计算。
 - 用户可见计划。
 
@@ -163,6 +165,8 @@
 - dirty worktree 保护。
 - 用户改动保护。
 - push / PR / MR 审批。
+- commit message 规范。
+- release note、coverage gate 和 rollback plan。
 
 通过标准：
 

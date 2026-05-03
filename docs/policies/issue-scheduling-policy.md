@@ -4,6 +4,8 @@
 
 决定用户需求是否需要澄清、如何拆分为 issues、如何构建 Issue Graph、哪些 issue 可以并发、哪些必须等待，以及每个 issue 应创建哪些 Subagent、绑定哪些 skills、由哪个 Agent Runtime 执行。
 
+Issue 字段、命名、粒度和 accepted 条件由 [工程流程规范](../engineering-process-standards.md) 维护。
+
 ## 2. 输入事实
 
 - 用户原始需求。
@@ -31,6 +33,7 @@
 - `CREATE_SUBAGENT_PLAN`
 - `SUBAGENT_BLOCKED`
 - `REPLAN_REQUIRED`
+- `ISSUE_SPEC_INVALID`
 
 ## 4. 澄清决策树
 
@@ -48,6 +51,8 @@ else if project facts can safely fill missing detail:
 else:
   CREATE_ISSUE_GRAPH
 ```
+
+如果生成的 issue 缺少 clarified requirement、acceptance criteria、test plan、write scope 或 rollback_or_fix_plan，则返回 `ISSUE_SPEC_INVALID`，不能进入 ready queue。
 
 ## 5. 并发决策树
 
@@ -173,10 +178,12 @@ else if preferred runtime unavailable:
 - `.moyuan/skills/registry.yaml`
 - `.moyuan/skills/bindings.yaml`
 - `.moyuan/policies/budget.yaml`
+- [工程流程规范](../engineering-process-standards.md)
 
 ## 12. 验收用例
 
 - API 契约未 accepted 时，前后端实现不启动。
+- Issue 缺少必填字段时不能进入 ready queue。
 - 前后端写入范围不冲突时，可以在契约 accepted 后并发。
 - 后端默认使用 Codex CLI。
 - 前端默认使用 Claude CLI。

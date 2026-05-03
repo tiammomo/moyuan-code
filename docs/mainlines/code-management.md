@@ -4,6 +4,8 @@
 
 代码管理主线负责 Git 分支、worktree、integration branch、PR/MR、用户改动保护和远程发布前的代码状态治理。
 
+Commit message、自动 commit、回退后 fix 和发版前 Git 要求见 [工程流程规范](../engineering-process-standards.md)。
+
 这条主线保证：
 
 - 每个 issue 在独立分支或 worktree 中执行。
@@ -72,6 +74,7 @@ epic integration branch accepted
 - dirty worktree 时是否阻断。
 - 是否创建新 worktree。
 - 是否允许自动 commit。
+- commit message 是否符合规范。
 - 是否允许自动 push。
 - 是否允许自动 PR/MR。
 - 合并冲突是否自动修复、返工还是升级人工。
@@ -141,3 +144,4 @@ GitHub 细节见 [GitHub 接入配置](../github-integration.md)。
 - 合入前一定有质量报告和 review 报告。
 - integration branch 合流失败会阻断下游。
 - release branch 不会从未通过门禁的代码创建。
+- 自动 commit 必须满足工程流程规范。

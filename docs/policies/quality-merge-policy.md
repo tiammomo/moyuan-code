@@ -4,6 +4,8 @@
 
 决定 AI 生成的代码是否可接受、是否需要返工、是否允许合入 integration branch，以及什么时候阻断下游 issue。
 
+覆盖率阈值、豁免和回退后 fix 验收由 [工程流程规范](../engineering-process-standards.md) 维护。
+
 ## 2. 输入事实
 
 - issue acceptance criteria。
@@ -11,6 +13,7 @@
 - changed files。
 - command results。
 - test/lint/build/typecheck results。
+- coverage report。
 - runtime signals。
 - repair attempt，如适用。
 - quality report。
@@ -24,6 +27,7 @@
 
 - `QUALITY_PASSED`
 - `QUALITY_FAILED`
+- `COVERAGE_FAILED`
 - `REVIEW_ACCEPTED`
 - `REVIEW_REJECTED`
 - `NEEDS_REWORK`
@@ -40,6 +44,8 @@ else if build/typecheck/lint required and failed:
   QUALITY_FAILED(blocker)
 else if tests required and failed:
   QUALITY_FAILED(blocker)
+else if coverage gate failed:
+  COVERAGE_FAILED(blocker)
 else if test gap unacceptable:
   QUALITY_FAILED(blocker)
 else if new duplicate ratio exceeds threshold:
@@ -109,6 +115,7 @@ else:
 - blocker quality finding。
 - high review finding 未解决。
 - build/test/lint/typecheck 失败。
+- 覆盖率低于阈值且无审批豁免。
 - 违反项目架构边界。
 - 新增重复代码超过阈值。
 - 合并冲突未解决。
@@ -118,6 +125,7 @@ else:
 产物：
 
 - `.moyuan/lifecycle/quality/`
+- `.moyuan/lifecycle/quality/coverage/`
 - `.moyuan/lifecycle/signals/`，如果验证失败形成运行信号。
 - `.moyuan/lifecycle/reviews/`
 - `.moyuan/lifecycle/merge-reports/`
@@ -135,6 +143,7 @@ else:
 
 - `.moyuan/policies/code-quality.yaml`
 - [Bug 判断与自我修复策略](./bug-detection-self-repair-policy.md)
+- [工程流程规范](../engineering-process-standards.md)
 - `.moyuan/policies/orchestration.yaml`
 - `.moyuan/policies/permissions.yaml`
 
@@ -143,5 +152,6 @@ else:
 - 测试失败不能合入。
 - reviewer rejected 不能合入。
 - quality_guard accepted 但 reviewer rejected 仍不能合入。
+- 覆盖率低于阈值且无豁免时不能合入。
 - 超过返工次数后升级人工确认。
 - 合入后必须重跑 integration checks。

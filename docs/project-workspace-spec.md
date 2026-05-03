@@ -158,6 +158,7 @@
 | `lifecycle/improvements/` | bug signature、fix pattern、测试策略和能力增强候选 | [自我修复契约](./contracts/self-repair-contract.md) |
 | `lifecycle/deployments/` | 投产记录、服务器部署结果、冒烟和监控报告 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | `policies/orchestration.yaml` | issue graph、自动并发、冲突保护、replan 策略 | [Issues 编排与并发调度](./issue-orchestration.md) |
+| `policies/engineering.yaml` | commit、issue、fix、release 和 coverage 规范入口 | [工程流程规范](./engineering-process-standards.md) |
 | `policies/access.yaml` | 项目级角色、成员访问边界和审批入口；不保存身份凭证明文 | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |
 | `policies/permissions.yaml` | 文件、命令、网络、密钥权限 | [参考架构](./reference-architecture.md) |
 | `policies/code-quality.yaml` | 质量门禁策略 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) |

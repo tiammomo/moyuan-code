@@ -4,6 +4,8 @@
 
 决定什么时候建议发版、什么时候创建 release branch、是否允许发布到 GitHub/Gitee、是否允许部署到目标环境，以及线上冒烟或监控异常时是否回滚。
 
+Release note、发版前置条件、批次规则、禁止发版条件和覆盖率门禁由 [工程流程规范](../engineering-process-standards.md) 维护。
+
 ## 2. 输入事实
 
 - accepted integration branch。
@@ -14,6 +16,7 @@
 - public API changes。
 - security changes。
 - quality reports。
+- coverage reports。
 - target environment。
 - resource group health。
 - rollback availability。
@@ -29,6 +32,7 @@
 - `DEPLOY_ALLOWED`
 - `DEPLOY_BLOCKED`
 - `ROLLBACK_REQUIRED`
+- `RELEASE_BLOCKED`
 - `MANUAL_INTERVENTION_REQUIRED`
 
 ## 4. 发版建议树
@@ -64,6 +68,12 @@ release_batch_score =
 if source branch != accepted integration branch:
   block
 else if full quality gates not passed:
+  block
+else if coverage gates not passed and exemption missing:
+  block
+else if release note missing:
+  block
+else if rollback plan missing:
   block
 else if release approval required and missing:
   block
@@ -139,11 +149,13 @@ else:
 - `.moyuan/policies/environments.yaml`
 - `.moyuan/policies/server-resources.yaml`
 - `.moyuan/policies/secrets.yaml`
+- [工程流程规范](../engineering-process-standards.md)
 
 ## 11. 验收用例
 
 - 未 accepted 的 integration branch 不能发版。
 - breaking API 必须单独发版。
+- release note、rollback plan 或覆盖率门禁缺失时不能发版。
 - 生产发布缺少审批时不能部署。
 - 资源组不健康时不能部署。
 - 冒烟失败且可回滚时必须回滚。

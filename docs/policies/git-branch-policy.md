@@ -4,6 +4,8 @@
 
 决定什么时候创建分支、worktree、integration branch、release branch、commit、push 和 PR/MR，并保护用户已有改动不被系统覆盖。
 
+Commit message、自动 commit 条件和禁止事项由 [工程流程规范](../engineering-process-standards.md) 维护。
+
 ## 2. 输入事实
 
 - repository source。
@@ -16,6 +18,7 @@
 - epic id。
 - quality and review status。
 - branch policy。
+- commit policy。
 - user approval。
 
 ## 3. 决策结果
@@ -26,6 +29,7 @@
 - `MERGE_TO_INTEGRATION`
 - `CREATE_RELEASE_BRANCH`
 - `CREATE_COMMIT`
+- `COMMIT_BLOCKED`
 - `PUSH_ALLOWED`
 - `PR_MR_ALLOWED`
 - `BLOCKED_USER_CHANGES`
@@ -82,6 +86,21 @@ if merge conflict:
 
 ## 7. 远程操作树
 
+Commit：
+
+```text
+if allow_auto_commit == false:
+  write commit suggestion
+else if quality or review not accepted:
+  COMMIT_BLOCKED
+else if commit message invalid:
+  COMMIT_BLOCKED
+else if diff outside issue write_scope:
+  COMMIT_BLOCKED
+else:
+  CREATE_COMMIT
+```
+
 ```text
 if allow_auto_push == false:
   require user approval
@@ -107,6 +126,7 @@ else:
 - dirty worktree。
 - provider auth missing。
 - branch protection blocks direct push。
+- commit message 不符合规范。
 - merge conflict。
 - quality/review 未通过。
 - release branch 来源不是 accepted integration branch。
@@ -132,10 +152,12 @@ else:
 - `.moyuan/policies/orchestration.yaml`
 - `.moyuan/policies/release.yaml`
 - `.moyuan/policies/permissions.yaml`
+- [工程流程规范](../engineering-process-standards.md)
 
 ## 11. 验收用例
 
 - dirty worktree 时不会创建写入任务。
 - issue 未通过质量门禁不会合入 integration branch。
 - branch protection 阻止 push 时会转为 PR/MR 建议。
+- commit message 不符合规范时不会自动提交。
 - release branch 不会从普通 issue branch 创建。

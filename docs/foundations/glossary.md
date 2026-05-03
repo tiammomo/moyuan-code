@@ -29,6 +29,8 @@
 | Epic | Epic | 用户提出的开发目标，会被拆成多个 issues | 不是单个开发任务 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Issue | Issue | 最小可执行开发单元，具备依赖、写入范围、验收标准和测试计划 | 不等同于 GitHub Issue | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Issue Graph | Issue Graph | Issues 之间的依赖 DAG，用于判断串行、并行和阻塞关系 | 不是简单任务列表 | [Issues 编排与并发调度](../issue-orchestration.md) |
+| Commit Policy | Commit Policy | commit message、关联 issue/run/quality、自动提交条件和禁止事项 | 不是 Git 分支策略本身 | [工程流程规范](../engineering-process-standards.md) |
+| Coverage Gate | Coverage Gate | 测试覆盖率门禁，包括总体、变更文件和新代码覆盖率 | 不是测试是否运行的唯一判断 | [工程流程规范](../engineering-process-standards.md) |
 | Ready Queue | Ready Queue | 当前依赖已满足、可以被调度执行的 issue 队列 | 不是所有未完成 issue | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Ready Issue | Ready Issue | 已满足依赖、契约、权限、资源和 Runtime 条件，可以进入代码开发的 issue | 不是用户刚提出的需求 | [需求规划与 Issue 编排主线](../mainlines/requirement-planning.md) |
 | Blocked Reason | Blocked Reason | issue、run、release 或 deployment 被阻断的结构化原因 | 不是普通错误文本 | [Issue 调度策略](../policies/issue-scheduling-policy.md) |
@@ -63,6 +65,7 @@
 | Epic Branch | Epic Branch | 一个 Epic 的集成分支，用于合并已验收 issues | 不是默认主分支 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Release Branch | Release Branch | 发布候选分支 | 不是任务开发分支 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Release | Release | 从 accepted issues 到版本分支、回归、tag、PR/MR 和发布记录的过程 | 不等同于部署 | [Issues 编排与并发调度](../issue-orchestration.md) |
+| Hotfix | Hotfix | 针对生产事故、安全问题或阻断发布问题的紧急修复和独立发版流程 | 不是普通低优先级 bugfix | [工程流程规范](../engineering-process-standards.md) |
 | Deployment | Deployment | 将发布版本部署到目标环境和资源组的过程 | 不等同于 Git push | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Environment | Environment | test、staging、production 等部署环境配置 | 不是单台机器 | [完整配置方案](../configuration-guide.md) |
 | Server Resource | Server Resource | 被登记和维护的服务器资产，包括云信息、规格、到期和健康检查 | 不是部署环境 | [完整配置方案](../configuration-guide.md) |
