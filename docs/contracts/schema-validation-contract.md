@@ -15,6 +15,9 @@
 - `.moyuan/runtimes/agent-runtimes.yaml`
 - `.moyuan/agents/roles.yaml`
 - `.moyuan/agents/teams.yaml`
+- `.moyuan/agents/subagents.yaml`
+- `.moyuan/skills/registry.yaml`
+- `.moyuan/skills/bindings.yaml`
 - `.moyuan/policies/access.yaml`
 - `.moyuan/policies/*.yaml`
 - `.moyuan/skills/enabled.yaml`
@@ -97,6 +100,9 @@ read yaml
 - routing 引用的 provider 和 model alias 存在。
 - role 引用的 model policy 存在。
 - team 引用的 role 存在。
+- subagent policy 引用的 parent type、role、runtime 和 lifecycle 状态合法。
+- skill binding 引用的 skill、role、issue 或 subagent 存在。
+- skill required tools 不能超出 role 或 subagent 权限。
 - access policy 引用的 project role 存在。
 - self_repair require_approval_for 只能引用已定义风险触发器。
 - environment 引用的 resource group 存在。

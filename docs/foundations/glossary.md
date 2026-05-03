@@ -35,9 +35,12 @@
 | Schedule | Schedule | Orchestrator 生成的执行排期、并发度和 worktree 分配 | 不是最终执行结果 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Run | Run | 一次任务执行实例，记录 Agent、模型、工具、Git、质量、测试和 Memory 信息 | 不是 Issue 本身 | [项目工作空间规范](../project-workspace-spec.md) |
 | Agent | Agent | 角色、工具权限、Memory scope、skills、模型策略和输出契约的组合 | 不等同于某个模型 | [Agent、Skills 与编排](../agent-skills-memory.md) |
+| Subagent | Subagent | Orchestrator 为具体任务创建的 Agent 执行实例，具备父对象、role、runtime、skills、scope 和生命周期 | 不是长期角色或模型本身 | [Subagent 与 Skills 系统方案](../subagents-skills-system.md) |
 | Role | Role | Agent 的职责定义，例如 backend、tester、reviewer | 不是具体执行进程 | [Agent、Skills 与编排](../agent-skills-memory.md) |
 | Team | Team | 一组 Agent role 的协作编排配置 | 不是组织团队 | [Agent、Skills 与编排](../agent-skills-memory.md) |
-| Skill | Skill | 可被 Agent 引用的专门能力、提示模板或工具知识 | 不是 Agent 本身 | [Agent、Skills 与编排](../agent-skills-memory.md) |
+| Skill | Skill | 可被 Agent Role 或 Subagent 引用的专门能力、提示模板、工具规范或领域知识 | 不是 Agent 本身，也不直接执行任务 | [Subagent 与 Skills 系统方案](../subagents-skills-system.md) |
+| Skill Registry | Skill Registry | 记录可用 skills、来源、版本、适配 role、风险和效果的能力目录 | 不是简单插件列表 | [Subagent 与 Skills 系统方案](../subagents-skills-system.md) |
+| Skill Binding | Skill Binding | 将 skill 绑定到项目、role、issue 或 subagent 的配置记录 | 不是一次临时提示词 | [Subagent 与 Skills 系统方案](../subagents-skills-system.md) |
 | Orchestrator | Orchestrator | 核心编排层，负责需求、Issue Graph、调度、状态、权限和合入决策 | 不是模型调用封装 | [参考架构](../reference-architecture.md) |
 | Agent Runtime | Agent Runtime | 执行 Agent 的运行时后端，可以是 CLI、API 或本地工具链 | 不是普通模型 provider | [模型与工具适配规划](../model-tool-adapters.md) |
 | Native Agent Runtime | Native Agent Runtime | Claude CLI、Codex CLI 这类能直接读写仓库和执行工具的强 Agent 后端 | 不是纯文本 LLM API | [模型与工具适配规划](../model-tool-adapters.md) |

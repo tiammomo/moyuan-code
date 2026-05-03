@@ -22,6 +22,7 @@
 ```ts
 interface RuntimeInvocation {
   run_id: string;
+  subagent_id?: string;
   project_id: string;
   issue_id: string;
   auth_context: {
@@ -32,6 +33,7 @@ interface RuntimeInvocation {
     trace_id: string;
   };
   role: string;
+  skill_binding_ids: string[];
   runtime_id: string;
   mode: "ask" | "code" | "review" | "test" | "plan";
   workspace_root: string;
@@ -52,6 +54,7 @@ interface RuntimeInvocation {
 ```ts
 interface RuntimeResult {
   run_id: string;
+  subagent_id?: string;
   runtime_id: string;
   status:
     | "completed"

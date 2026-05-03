@@ -39,6 +39,7 @@
 
 - Agent Runtime 和模型 Provider：[模型与工具适配规划](../model-tool-adapters.md)
 - Agent role、team 和 skills：[Agent、Skills 与编排](../agent-skills-memory.md)
+- Subagent 与 Skills：[Subagent 与 Skills 系统方案](../subagents-skills-system.md)
 - Memory：[Agent Memory 系统方案](../agent-memory-system.md)
 - 自我修复：[Bug 判断与自我修复策略](../policies/bug-detection-self-repair-policy.md)
 - 鉴权：[鉴权与访问控制策略](../policies/auth-access-policy.md)

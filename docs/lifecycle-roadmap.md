@@ -23,6 +23,7 @@
 | 策略决策树 | 鉴权、阅读理解、调度、质量、Bug 判断、自我修复、Git、服务器、发布、Provider、Memory 决策 | [策略决策树](./policies/README.md) |
 | 用户与鉴权 | 用户、组织、会话、API Token、角色、审批、审计 | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |
 | 多 Agent 编排 | role、team、handoff、输出契约 | [Agent、Skills 与编排](./agent-skills-memory.md) |
+| Subagent 与 Skills | Subagent 生命周期、Skill Registry、推荐、绑定和效果反馈 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | Issues 编排 | 自动拆分 issues、依赖图、并发调度、ready queue | [Issues 编排与并发调度](./issue-orchestration.md) |
 | 仓库接入与理解 | 本地/远程仓库、Git 分支、项目阅读理解 | [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md) |
 | 项目工作空间 | `.moyuan/` schema 索引 | [项目工作空间规范](./project-workspace-spec.md) |
@@ -83,6 +84,7 @@
 - Approval：高风险操作的结构化人工确认记录。
 - Workspace：项目内 `.moyuan/` 控制区，保存配置、状态、记忆和产物。
 - Agent：角色、工具权限、memory 范围、skills、模型策略和输出契约的组合。
+- Subagent：Orchestrator 为具体任务创建的 Agent 执行实例，绑定父对象、role、runtime、skills、scope 和生命周期。
 - Epic：用户提出的原始开发目标，会被拆成多个 issues。
 - Issue：最小可执行开发单元，具备依赖、写入范围、验收标准和测试计划。
 - Issue Graph：issues 之间的依赖 DAG。
@@ -93,7 +95,7 @@
 - Repair Attempt：一次自动或半自动修复尝试。
 - Improvement Record：由成功修复或重复问题产生的能力增强候选。
 - Adapter：外部能力封装层，例如 Codex、Claude Code、国产模型、Git、Shell、MCP。
-- Skill：可复用任务能力包。
+- Skill：可被 Role 或 Subagent 引用的可复用任务能力包。
 - Memory：跨任务保留的结构化上下文。
 
 ## 4. 端到端流程
@@ -116,7 +118,7 @@
   -> 同步 base branch
   -> Incremental Project Comprehension
   -> 创建任务分支
-  -> 多 Agent 协作开发
+  -> 创建 Subagent / 多 Agent 协作开发
   -> 质量门禁
   -> 测试验证
   -> 独立 Review
@@ -341,7 +343,12 @@ moyuan logs export
 moyuan logs audit
 moyuan memory curate
 moyuan memory audit
+moyuan subagent list
+moyuan subagent show <subagent-id>
+moyuan subagent retry <subagent-id>
 moyuan skills evaluate
+moyuan skills recommend <issue-id>
+moyuan skills bind <skill-id> --role <role-id>
 moyuan ci run
 moyuan repo pr create <task-id>
 ```
@@ -358,7 +365,7 @@ moyuan repo pr create <task-id>
 - 明确用户、组织、会话、API Token、角色、审批和鉴权审计。
 - 明确仓库接入、项目理解、质量门禁、自我修复、Memory、日志和审计策略。
 - 明确首批 Adapter 和 Runtime contract。
-- 明确进入实现前的契约层，包括 auth、self-repair、schema、runtime、logging 和 workspace migration。
+- 明确进入实现前的契约层，包括 auth、subagent/skill、self-repair、schema、runtime、logging 和 workspace migration。
 
 验收：
 
@@ -384,6 +391,7 @@ moyuan repo pr create <task-id>
 - 支持需求丰富和意图澄清判断。
 - 支持用户可见 issue graph 和 schedule。
 - 支持基于 issue 依赖和写入范围计算 ready queue。
+- 支持显式创建 subagent 执行实例，并记录父对象、role、runtime、skills、scope 和状态。
 - 创建和执行任务。
 - 每次代码生成后自动执行质量门禁。
 - 运行失败、测试失败和 review finding 可以生成 bug candidate。
@@ -418,6 +426,8 @@ moyuan repo pr create <task-id>
 - 实现模型路由策略。
 - 实现 `find-skills` 推荐入口。
 - 实现 role-skill 动态绑定。
+- 实现 Skill Registry、Skill Binding 和 Skill Effectiveness。
+- 实现 Subagent 并发调度、输出收敛和失败恢复。
 
 验收：
 
@@ -427,6 +437,8 @@ moyuan repo pr create <task-id>
 - Claude CLI 和 Codex CLI 能在 issue worktree 内执行，并把改动交回质量门禁。
 - skills 推荐结果可落盘。
 - Agent 执行时能引用启用 skills。
+- Subagent 能被创建、调度、重试、归档和审计。
+- Skill 效果能影响后续推荐、降权或禁用。
 
 ### Phase 3：Memory 强化
 
@@ -531,8 +543,8 @@ Adapter 路线：
 2. 补充用户与鉴权设计，使平台用户、组织、会话、API Token、角色、审批和审计有唯一权威入口。
 3. 补充运行反馈与自我修复设计，使 Runtime Signal、Bug Candidate、Repair Attempt 和 Improvement Record 有唯一权威入口。
 4. 补充术语表中的 Mainline、Policy、Decision Tree、Ready Issue、Blocked Reason、Contract 等概念。
-5. 新增状态机总表，统一 User、Project、Epic、Issue、Run、Bug Candidate、Repair Attempt、Release、Deployment、Memory、Server Resource 的状态来源。
-6. 新增契约层文档，至少包含 auth session、self-repair、schema validation、runtime adapter、logging audit event 和 workspace migration。
+5. 新增状态机总表，统一 User、Project、Epic、Issue、Run、Subagent、Skill、Bug Candidate、Repair Attempt、Release、Deployment、Memory、Server Resource 的状态来源。
+6. 新增契约层文档，至少包含 auth session、subagent skill、self-repair、schema validation、runtime adapter、logging audit event 和 workspace migration。
 7. 补充 Gitee、GitLab、generic Git 的独立接入字段表。
 8. 补充安全威胁模型，覆盖 prompt injection、模型外发、仓库恶意文件、远程命令、密钥泄露、账号接管、错误自动修复和生产误操作。
 9. 补充 Moyuan 框架自身测试策略，覆盖 fixture repos、mock runtime、Git sandbox、schema golden tests、auth tests、self-repair tests 和 E2E。

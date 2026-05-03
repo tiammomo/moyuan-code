@@ -30,8 +30,10 @@ interface LogEvent {
   run_id?: string;
   epic_id?: string;
   issue_id?: string;
+  subagent_id?: string;
   agent_role?: string;
   runtime_id?: string;
+  skill_id?: string;
   branch?: string;
   commit?: string;
   severity?: "debug" | "info" | "warning" | "error" | "critical";
@@ -111,7 +113,8 @@ interface StateChangedEvent extends LogEvent {
 | 平台用户与访问控制 | auth.login、auth.logout、auth.token.created、auth.token.revoked、auth.decision.deny、auth.approval.created |
 | 项目接入与阅读理解 | project_added、repository_cloned、comprehension_started、comprehension_completed |
 | 需求规划与 Issue 编排 | requirement_refined、clarification_decided、issue_graph_created、schedule_created |
-| 代码开发 | runtime_started、runtime_completed、quality_started、review_completed |
+| 代码开发 | subagent.created、subagent.dispatched、runtime_started、runtime_completed、quality_started、review_completed |
+| Subagent 与 Skills | subagent.planned、subagent.completed、subagent.failed、skill.recommended、skill.bound、skill.effectiveness.recorded |
 | 运行反馈与自我修复 | self_repair.signal.captured、self_repair.bug.classified、self_repair.repair.planned、self_repair.repair.completed |
 | 代码管理 | branch_created、worktree_created、merge_attempted、merge_completed |
 | 服务器资源管理 | host_added、resource_check_completed、expiration_alert_created |

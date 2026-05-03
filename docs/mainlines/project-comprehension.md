@@ -93,6 +93,8 @@ issue completed
 - `.moyuan/policies/comprehension.yaml`
 - `.moyuan/policies/memory.yaml`
 - `.moyuan/skills/enabled.yaml`
+- `.moyuan/skills/registry.yaml`
+- `.moyuan/skills/bindings.yaml`
 
 字段规则见 [配置 Schema 规则](../configuration-schema-spec.md)。
 

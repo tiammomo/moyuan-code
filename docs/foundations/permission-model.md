@@ -39,6 +39,7 @@ Moyuan 支持的 actor：
 | Service Account | 自动化调用 Moyuan 的非人类 actor | CI、发布、部署、报告同步 |
 | API Token | User 或 Service Account 的受限凭证 | 调用 API、触发自动化任务 |
 | Orchestrator | 核心编排层 | 调度、状态流转、权限判断、合入决策 |
+| Subagent | Orchestrator 创建的具体执行实例 | 在父对象授权范围内执行规划、实现、验证或修复 |
 | Agent Role | 具备职责和工具权限的角色 | 规划、实现、测试、review、发布 |
 | Native Agent Runtime | Claude CLI、Codex CLI 等强执行后端 | 读写文件、运行命令、生成 diff |
 | Adapter | Shell、Git、模型、MCP、Image 等外部能力封装 | 执行受控操作 |
@@ -84,6 +85,7 @@ Moyuan 支持的 actor：
 | Git 操作 | branch、commit、push、merge、tag | 覆盖、发布错误 |
 | 模型 API | GPT、Claude、GLM、MiniMax、第三方网关 | 数据外发 |
 | Native Runtime | Claude CLI、Codex CLI | 越权写入、命令执行 |
+| Skill | 内置、项目、组织或外部技能 | 不兼容能力、恶意提示、越权工具 |
 | Memory | facts、decisions、lessons | 错误长期记忆 |
 | Secret | API key、SSH key、registry token | 凭证泄露 |
 | Server Resource | 测试开发机、生产机 | 线上事故 |
@@ -155,6 +157,8 @@ project workspace policy
   + platform role
   + project membership
   + role tools
+  + subagent scope
+  + skill required tools
   + team policy
   + issue write_scope
   + runtime capability
@@ -169,6 +173,8 @@ project workspace policy
 - 任意来源 `REQUIRE_APPROVAL`，最终为 `REQUIRE_APPROVAL`。
 - 只有全部允许时才是 `ALLOW`。
 - Issue 的 `write_scope` 不能扩大 workspace 的 `writable_paths`。
+- Subagent 的 `write_scope` 不能扩大 Issue 的 `write_scope`。
+- Skill 需要的工具权限不能扩大 Subagent 或 Agent Role 权限。
 - Runtime 能力不能扩大 Agent Role 权限。
 - API Token scope 不能扩大 User 或 Service Account 角色权限。
 
@@ -211,6 +217,24 @@ Claude CLI 和 Codex CLI 必须遵守：
 - 命令执行受 allowlist/denylist 限制。
 - 输出必须脱敏后写入日志。
 - 不能自行 push、tag、deploy，除非权限策略明确允许并完成审批。
+
+## Subagent 与 Skill 权限边界
+
+Subagent 必须遵守：
+
+- 必须继承 Orchestrator 下发的 `auth_context`。
+- 必须绑定父对象，不能脱离 Epic、Issue、Run、Repair Attempt、Release、Deployment 或 Memory Job 独立执行。
+- 读写范围必须小于或等于父对象授权范围。
+- 不允许自行创建无限层级子任务。
+- 输出必须回到 Orchestrator 收敛，不允许直接合入、push 或 deploy。
+
+Skill 必须遵守：
+
+- 外部 skill 默认不可信。
+- 高风险 skill 需要审批后才能启用。
+- Skill 不能要求读取 secret 明文。
+- Skill 不能覆盖权限策略、质量门禁或发布策略。
+- Skill 效果只能影响推荐、降权或禁用，不能直接扩大权限。
 
 ## 模型 Provider 权限
 

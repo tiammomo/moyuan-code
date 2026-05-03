@@ -54,7 +54,8 @@ Moyuan Code 文档分为八层：
 | Issue 编排和并发调度 | `issue-orchestration.md` | Agent 文档不重复 issue graph |
 | 质量门禁 | `code-lifecycle-quality-gates.md` | Issue 文档只引用 gate 结果 |
 | 运行反馈与自我修复 | `mainlines/runtime-feedback-self-repair.md`、`policies/bug-detection-self-repair-policy.md`、`contracts/self-repair-contract.md` | 质量门禁只引用修复后的 gate 结果 |
-| Agent、Team、Skills | `agent-skills-memory.md` | Memory 细节只引用 Memory 文档 |
+| Agent Role、Team、Memory Scope | `agent-skills-memory.md` | 不展开 Subagent 和 Skill Registry 细节 |
+| Subagent 与 Skills | `subagents-skills-system.md`、`contracts/subagent-skill-contract.md` | Agent 文档只引用概要 |
 | Agent Memory | `agent-memory-system.md` | 其他文档只说明如何调用 |
 | 模型、Runtime、Adapter | `model-tool-adapters.md` | 配置细节回到 configuration guide |
 | 术语 | `foundations/glossary.md` | 其他文档使用术语，不重新定义 |
@@ -81,6 +82,7 @@ Moyuan Code 文档分为八层：
 | 运行反馈与自我修复 | quality_owner + orchestrator_owner | 控制运行信号、Bug 判断、自动修复和能力增强 |
 | 配置方案 | core_engineer | 控制 schema 和默认值 |
 | Issue 编排 | orchestrator_owner | 控制任务拆分和调度规则 |
+| Subagent 与 Skills | orchestrator_owner + skill_owner | 控制 Subagent 生命周期、Skill Registry、绑定和效果反馈 |
 | Memory | memory_owner | 控制记录、检索、compact |
 | 模型与工具 | adapter_owner | 控制 provider、runtime、adapter |
 | 质量门禁 | quality_owner | 控制测试、review、阻断规则 |
@@ -102,9 +104,10 @@ Moyuan Code 文档分为八层：
 7. 是否影响端到端流程：更新 `mainlines/` 对应主线。
 8. 是否新增判断规则：更新 `policies/` 对应策略。
 9. 是否新增实现接口或事件结构：更新 `contracts/` 对应契约。
-10. 是否新增运行反馈、自我修复或能力增强：更新自我修复主线、策略、契约和 Memory 触发规则。
-11. 是否新增模块专题能力：更新对应专题文档。
-12. 是否需要入口：更新 `README.md`。
+10. 是否新增 Subagent、skill、委派或能力复用：更新 `subagents-skills-system.md`、契约、核心对象、状态机和配置 schema。
+11. 是否新增运行反馈、自我修复或能力增强：更新自我修复主线、策略、契约和 Memory 触发规则。
+12. 是否新增模块专题能力：更新对应专题文档。
+13. 是否需要入口：更新 `README.md`。
 
 ## 文档生命周期
 
@@ -310,9 +313,9 @@ prompt 管理规则：
 - 权威来源表是否准确。
 - CLI 是否只在路线图出现。
 - 配置是否只在配置方案完整展开。
-- 主线是否覆盖平台用户与访问控制、项目接入、需求规划、代码开发、代码管理、服务器资源和发布投产。
+- 主线是否覆盖平台用户与访问控制、项目接入、需求规划、代码开发、运行反馈与自我修复、代码管理、服务器资源和发布投产。
 - 策略是否覆盖关键决策点和人工确认条件。
-- 契约是否覆盖 auth、self-repair、schema、runtime、logging 和 workspace migration。
+- 契约是否覆盖 auth、subagent/skill、self-repair、schema、runtime、logging 和 workspace migration。
 - 核心对象是否和配置一致。
 - 权限和失败恢复是否覆盖新增能力。
 - 图片、讲解和需要保留的 prompt 是否仍然准确。

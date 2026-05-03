@@ -13,6 +13,7 @@
 - 明确每个 issue 的前置依赖、验收标准、写入范围和测试要求。
 - 自动判断并发执行数量。
 - 为每个 issue 分配合适的 Agent team。
+- 为每个可执行工作单元创建显式 Subagent。
 - 依赖未完成的 issue 不启动。
 - 并发执行的 issue 必须避免写入冲突。
 - 每个 issue 都经过质量门禁和独立 review。
@@ -45,6 +46,7 @@
 - branch/worktree。
 - quality gate。
 - style constraints。
+- subagent plan。
 
 ### Issue Graph
 
@@ -180,7 +182,7 @@ issues:
 
 系统需要自己决定并发数，不是固定全开。
 
-并发度由 Scheduler 计算：
+Issue 并发度由 Scheduler 计算：
 
 ```text
 parallelism = min(
@@ -189,6 +191,20 @@ parallelism = min(
   available_worktrees,
   model_budget_slots,
   tool_execution_slots,
+  non_conflicting_write_sets
+)
+```
+
+Subagent 并发度由 Scheduler 计算：
+
+```text
+subagent_parallelism = min(
+  project_policy.max_parallel_subagents,
+  ready_subagent_count,
+  issue_parallelism_budget,
+  available_runtime_slots,
+  available_worktrees,
+  model_budget_slots,
   non_conflicting_write_sets
 )
 ```
@@ -210,7 +226,38 @@ parallelism = min(
 - 多个测试补齐 issue 覆盖不同模块。
 - 文档、测试、低风险重构互不冲突。
 
-## 6.1 前端 Claude / 后端 Codex 的编排等待设计
+## 6.1 Subagent 编排
+
+Subagent 是 Orchestrator 对具体工作单元的显式委派实例。完整模型见 [Subagent 与 Skills 系统方案](./subagents-skills-system.md)。
+
+Issue 被调度时，不直接等同于一个 Runtime 调用，而是先生成 Subagent Plan：
+
+```text
+Ready Issue
+  -> resolve required roles
+  -> resolve skills
+  -> create subagent instances
+  -> dispatch runtime
+  -> collect outputs
+  -> validate output contracts
+  -> quality gate / review
+  -> issue accepted or needs_rework
+```
+
+典型映射：
+
+| Issue 类型 | 默认 Subagent |
+| --- | --- |
+| discovery | project_reader、module_mapper |
+| design | planner、architect |
+| backend | backend、tester、quality_guard、reviewer |
+| frontend | frontend、tester、quality_guard、reviewer |
+| quality | quality_guard、repair_agent、reviewer |
+| release | release_manager、tester、reviewer |
+
+Subagent 不能自行无限拆分子任务。需要继续拆分时，必须把建议交回 Orchestrator，由 Orchestrator 更新 Issue Graph。
+
+## 6.2 前端 Claude / 后端 Codex 的编排等待设计
 
 本项目以代码开发效果为核心目标。默认执行策略：
 

@@ -7,6 +7,7 @@
 ## 2. 输入事实
 
 - issue acceptance criteria。
+- subagent results。
 - changed files。
 - command results。
 - test/lint/build/typecheck results。
@@ -72,6 +73,8 @@ else:
 
 ```text
 if quality not passed:
+  MERGE_BLOCKED
+else if subagent output contract invalid:
   MERGE_BLOCKED
 else if review not accepted:
   MERGE_BLOCKED

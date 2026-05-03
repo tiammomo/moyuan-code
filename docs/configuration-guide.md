@@ -311,9 +311,9 @@ agent_runtimes:
     capture_git_diff_after_finish: true
 ```
 
-## 6. Agent、Team 与 Skills
+## 6. Agent、Subagent、Team 与 Skills
 
-Agent role、team、skill 绑定和 memory scope 的完整设计见 [Agent、Skills 与编排](./agent-skills-memory.md)。配置中只保留可执行映射。
+Agent role、team 和 memory scope 的概要见 [Agent、Skills 与编排](./agent-skills-memory.md)。Subagent 生命周期、Skill Registry、Skill Binding 和效果反馈的完整设计见 [Subagent 与 Skills 系统方案](./subagents-skills-system.md)。配置中只保留可执行映射。
 
 ```yaml
 schema_version: 1
@@ -361,9 +361,59 @@ teams:
       - reviewer
 ```
 
+`agents/subagents.yaml` 控制 Subagent 创建、父子关系、并发和输出契约：
+
+```yaml
+schema_version: 1
+subagents:
+  enabled: true
+  max_parallel_subagents: 4
+  require_parent: true
+  require_output_contract: true
+  require_skill_compatibility_check: true
+  allowed_parent_types:
+    - epic
+    - issue
+    - run
+    - repair_attempt
+    - release
+    - deployment
+    - memory_job
+  lifecycle:
+    retry_on:
+      - runtime_unavailable
+      - timeout
+    max_retries: 1
+    require_orchestrator_for_child_tasks: true
+```
+
+`skills/registry.yaml` 和 `skills/bindings.yaml` 让 skills 可发现、可绑定、可审计：
+
+```yaml
+schema_version: 1
+skills:
+  - id: backend-development
+    name: Backend Development
+    version: 1.0.0
+    source: builtin
+    supported_roles: [backend, repair_agent]
+    task_types: [backend, repair]
+    required_tools: [read_project, edit_code, run_tests]
+    memory_scopes: [project_facts, lessons]
+    risk_level: medium
+    enabled: true
+
+bindings:
+  - skill_id: backend-development
+    target_type: role
+    target_id: backend
+    priority: 100
+    status: enabled
+```
+
 ## 7. Issue 编排与等待策略
 
-Issue Graph、并发度、前端 Claude / 后端 Codex 的等待模型由 [Issues 编排与并发调度](./issue-orchestration.md) 展开。配置只负责启用和限制。
+Issue Graph、Subagent 并发度、前端 Claude / 后端 Codex 的等待模型由 [Issues 编排与并发调度](./issue-orchestration.md) 和 [Subagent 与 Skills 系统方案](./subagents-skills-system.md) 展开。配置只负责启用和限制。
 
 ```yaml
 schema_version: 1
@@ -372,6 +422,7 @@ orchestration:
   issue_graph: true
   auto_parallelism: true
   max_parallel_issues: 3
+  max_parallel_subagents: 4
   require_clean_worktree: true
   use_epic_integration_branch: true
   use_issue_worktrees: true

@@ -1,5 +1,7 @@
 # Agent、Skills 与编排
 
+本文保留 Agent role、team、输出契约和 memory scope 的概要。Subagent 生命周期、Skill Registry、Skill 推荐、Skill 绑定和效果反馈的完整设计由 [Subagent 与 Skills 系统方案](./subagents-skills-system.md) 维护。
+
 ## 1. Agent 角色体系
 
 Agent 不是模型本身，而是以下配置的组合：
@@ -9,6 +11,8 @@ Agent 不是模型本身，而是以下配置的组合：
 ```
 
 详细 Memory 机制由 [Agent Memory 系统方案](./agent-memory-system.md) 维护，本文件只定义 Agent 如何引用 memory。
+
+Agent Role 是职责模板。真正被 Orchestrator 调度执行的是 Subagent。Subagent 是带有父对象、role、runtime、skills、memory scope、读写范围和生命周期的一次执行实例。
 
 ## 2. 核心角色
 
@@ -133,9 +137,28 @@ memory_candidates:
     confidence: number
 ```
 
-## 5. Skills 体系
+## 5. Subagent 引用
 
-Skill 是可复用能力包，用于让 Agent 在特定任务上有稳定流程和知识。
+Subagent 的权威定义见 [Subagent 与 Skills 系统方案](./subagents-skills-system.md)。
+
+最小创建链路：
+
+```text
+Issue / Run / Repair Attempt
+  -> resolve Agent Role
+  -> select skills
+  -> assemble memory scope
+  -> create Subagent
+  -> dispatch Runtime
+  -> validate output
+  -> quality gate / review
+```
+
+Subagent 不能绕过 Issue Graph、权限、Runtime Adapter、质量门禁、review 或 Memory Record Gate。
+
+## 6. Skills 体系
+
+Skill 是可复用能力包，用于让 Agent 在特定任务上有稳定流程和知识。完整 Skill Registry、推荐、绑定和效果反馈见 [Subagent 与 Skills 系统方案](./subagents-skills-system.md)。
 
 Skill 类型：
 
@@ -159,7 +182,7 @@ Project Comprehension
   -> recommend enable/bind
 ```
 
-## 6. Role 与 Skill 绑定
+## 7. Role 与 Skill 绑定
 
 默认绑定：
 
@@ -195,7 +218,7 @@ Project Comprehension
 - 低风险 confirmed bug 追加 `repair_agent`，修复完成后追加 `improvement_curator`。
 - 项目接入和远程分支同步后追加 `project_reader`、`module_mapper` 和 `memory_curator`。
 
-## 7. Memory Scope
+## 8. Memory Scope
 
 不同 Agent 只检索与职责相关的 memory，避免上下文污染。
 

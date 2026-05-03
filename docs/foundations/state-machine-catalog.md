@@ -26,6 +26,10 @@
 | Schedule | Scheduler | [Issue 调度策略](../policies/issue-scheduling-policy.md) | `run` |
 | Run | Agent Runtime | [参考架构](../reference-architecture.md) | `run`、`agent`、`model` |
 | Quality Report | Quality Guard | [质量与合入策略](../policies/quality-merge-policy.md) | `quality` |
+| Subagent | Orchestrator | [Subagent 与 Skills 系统方案](../subagents-skills-system.md) | `agent`、`run`、`audit` |
+| Skill Definition | Skill Registry | [Subagent 与 Skills 系统方案](../subagents-skills-system.md) | `agent`、`audit` |
+| Skill Binding | Skill Registry | [Subagent 与 Skills 系统方案](../subagents-skills-system.md) | `agent`、`audit` |
+| Skill Effectiveness | Skill Registry | [Subagent 与 Skills 系统方案](../subagents-skills-system.md) | `agent`、`memory` |
 | Runtime Signal | Self Repair Engine | [运行反馈与自我修复主线](../mainlines/runtime-feedback-self-repair.md) | `error`、`quality`、`release` |
 | Bug Candidate | Self Repair Engine | [Bug 判断与自我修复策略](../policies/bug-detection-self-repair-policy.md) | `error`、`quality`、`memory` |
 | Repair Attempt | Orchestrator | [自我修复契约](../contracts/self-repair-contract.md) | `run`、`quality`、`audit` |
@@ -207,7 +211,50 @@ needs_rework
 blocked
 ```
 
-## 14. Runtime Signal 状态
+## 14. Subagent 状态
+
+```text
+planned -> context_assembled -> dispatched -> running -> output_collected -> validated -> completed -> archived
+```
+
+失败和返工出口：
+
+```text
+blocked
+failed
+timeout
+needs_rework
+needs_user_input
+cancelled
+superseded
+```
+
+## 15. Skill Definition 状态
+
+```text
+registered -> candidate -> enabled -> disabled -> deprecated -> archived
+```
+
+## 16. Skill Binding 状态
+
+```text
+candidate -> enabled -> disabled -> deprecated
+```
+
+## 17. Skill Effectiveness 状态
+
+```text
+recorded -> aggregated -> applied -> archived
+```
+
+失败出口：
+
+```text
+invalid
+rejected
+```
+
+## 18. Runtime Signal 状态
 
 ```text
 captured -> normalized -> correlated -> classified -> archived
@@ -220,7 +267,7 @@ invalid
 insufficient_context
 ```
 
-## 15. Bug Candidate 状态
+## 19. Bug Candidate 状态
 
 ```text
 detected -> classifying -> confirmed -> issue_created -> repairing -> repaired -> archived
@@ -235,7 +282,7 @@ enhancement_candidate
 blocked
 ```
 
-## 16. Repair Attempt 状态
+## 20. Repair Attempt 状态
 
 ```text
 planned -> branch_created -> running -> quality_checking -> reviewing -> accepted -> merged
@@ -251,7 +298,7 @@ escalated
 cancelled
 ```
 
-## 17. Improvement Record 状态
+## 21. Improvement Record 状态
 
 ```text
 candidate -> approved -> applied -> archived
@@ -264,7 +311,7 @@ rejected
 superseded
 ```
 
-## 18. Runtime Session 状态
+## 22. Runtime Session 状态
 
 ```text
 created -> active -> idle -> resumable -> closed
@@ -278,7 +325,7 @@ lost
 expired
 ```
 
-## 19. Memory Record 状态
+## 23. Memory Record 状态
 
 ```text
 candidate -> staged -> committed -> indexed -> active
@@ -294,7 +341,7 @@ conflict_review_required
 archived
 ```
 
-## 20. Server Resource 状态
+## 24. Server Resource 状态
 
 ```text
 registered -> checking -> active -> maintenance_required -> retired
@@ -309,7 +356,7 @@ expired
 blocked_for_production
 ```
 
-## 21. Release 状态
+## 25. Release 状态
 
 ```text
 suggested -> planned -> branch_created -> regression_running -> ready_to_publish -> published -> completed
@@ -324,7 +371,7 @@ rollback_required
 cancelled
 ```
 
-## 22. Deployment 状态
+## 26. Deployment 状态
 
 ```text
 created -> precheck_running -> deploying -> smoke_testing -> monitoring -> healthy -> completed
@@ -342,7 +389,7 @@ rolled_back
 manual_intervention_required
 ```
 
-## 23. 状态变更记录要求
+## 27. 状态变更记录要求
 
 每次状态变化必须记录：
 

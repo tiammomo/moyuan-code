@@ -130,6 +130,8 @@
 | `repository.yaml` | 仓库来源、remote、分支策略、PR/MR 策略 | [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md) |
 | `agents/roles.yaml` | Agent role、工具权限、skills、memory scope | [Agent、Skills 与编排](./agent-skills-memory.md) |
 | `agents/teams.yaml` | 默认 team、任务类型 team、验证链路 | [Agent、Skills 与编排](./agent-skills-memory.md) |
+| `agents/subagents.yaml` | Subagent 创建、并发、生命周期和委派策略 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
+| `agents/subagents/` | Subagent 实例、父对象、状态、输出和审计索引 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `models/providers.yaml` | 模型服务商 API、账号、模型能力、额度、健康检查和第三方网关 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `models/routing.yaml` | 模型路由、fallback、成本策略 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `visuals/architecture-visuals.yaml` | gpt-image-2 架构流程图生成、编辑、讲解和复核策略 | [完整配置方案](./configuration-guide.md) |
@@ -137,7 +139,10 @@
 | `runtimes/agent-runtimes.yaml` | Claude CLI、Codex CLI 等原生 Agent Runtime 调用、会话、隔离和审计 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `runtimes/` | 原生 Agent Runtime 会话、输出和上下文文件 | [完整配置方案](./configuration-guide.md) |
 | `model-ops/` | 模型服务商快照、用量、健康检查、成本和故障记录 | [完整配置方案](./configuration-guide.md) |
-| `skills/enabled.yaml` | 启用 skills、skill source | [Agent、Skills 与编排](./agent-skills-memory.md) |
+| `skills/enabled.yaml` | 启用 skills、skill source | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
+| `skills/registry.yaml` | Skill Registry、版本、来源、适配 role、风险和契约 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
+| `skills/bindings.yaml` | project、role、issue、subagent 级 skill 绑定 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
+| `skills/effectiveness/` | skill 使用效果、质量影响、返工和降权依据 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `memory/` | 长期记忆、候选、暂存、索引、审计 | [Agent Memory 系统方案](./agent-memory-system.md) |
 | `logs/` | run、agent、model、git、quality、release、memory、audit 和 error 核心日志 | [完整配置方案](./configuration-guide.md) |
 | `comprehension/` | 项目画像、模块地图、理解事件 | [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md) |

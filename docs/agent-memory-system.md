@@ -13,6 +13,8 @@
 - Memory 需要冷/热分层、自动 compact 压缩、定期总结、过期和冲突处理。
 - Prompt 需要明确 record/retrieve 的触发场景，而不是让 Agent 随机决定。
 
+Subagent 只能产生 memory candidate，不能直接写入长期 Memory。Subagent 的 role、skills、父对象、质量结果和 Skill Effectiveness 会作为 Record Gate 的输入事实。
+
 ## 2. 六环节流水线
 
 ```text
@@ -62,6 +64,7 @@ record_gate:
 - 质量门禁发现重复出现的问题。
 - 发布、回滚、安全或架构策略被确认。
 - 远程分支拉取后发现项目结构、模块边界或命令发生变化。
+- Subagent 完成的实现、修复、review 或 skill 效果已经被质量门禁、review 或用户确认。
 
 禁止进入候选记忆的场景：
 

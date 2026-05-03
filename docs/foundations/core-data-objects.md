@@ -304,6 +304,7 @@ cancelled
 
 - User
 - Run
+- Subagent
 - Issue
 - Release
 - Deployment
@@ -573,6 +574,7 @@ needs_user_input
 
 - Issue
 - Agent Role
+- Subagent
 - Runtime Session
 - Quality Report
 - Runtime Signal
@@ -607,7 +609,8 @@ defined -> enabled -> disabled -> deprecated
 
 - Agent Team
 - Run
-- Skill
+- Skill Definition
+- Skill Binding
 - Memory Record
 
 ## Agent Team
@@ -638,6 +641,186 @@ defined -> enabled -> disabled
 - Epic
 - Issue
 - Run
+
+## Subagent
+
+职责：表示 Orchestrator 为具体父任务创建的一次 Agent 执行实例。
+
+关键字段：
+
+- `id`
+- `project_id`
+- `parent_type`
+- `parent_id`
+- `issue_id`
+- `run_id`
+- `role_id`
+- `type`
+- `runtime_id`
+- `model_policy_id`
+- `skill_binding_ids`
+- `memory_scopes`
+- `read_scope`
+- `write_scope`
+- `allowed_tools`
+- `status`
+- `trace_id`
+
+生命周期：
+
+```text
+planned -> context_assembled -> dispatched -> running -> output_collected -> validated -> completed -> archived
+```
+
+失败或返工状态：
+
+```text
+blocked
+failed
+timeout
+needs_rework
+needs_user_input
+cancelled
+superseded
+```
+
+落盘位置：
+
+- `.moyuan/agents/subagents/`
+- `.moyuan/lifecycle/runs/`
+- `.moyuan/logs/agents/`
+
+关联对象：
+
+- Agent Role
+- Agent Team
+- Epic
+- Issue
+- Run
+- Repair Attempt
+- Release
+- Deployment
+- Runtime Session
+- Skill Binding
+- Memory Record
+
+## Skill Definition
+
+职责：定义一个可复用 skill 的来源、版本、适配角色、工具要求、风险和契约。
+
+关键字段：
+
+- `id`
+- `name`
+- `version`
+- `source`
+- `description`
+- `supported_roles`
+- `task_types`
+- `required_tools`
+- `memory_scopes`
+- `risk_level`
+- `input_contract_ref`
+- `output_contract_ref`
+- `validation_commands`
+- `enabled`
+
+生命周期：
+
+```text
+registered -> candidate -> enabled -> disabled -> deprecated -> archived
+```
+
+落盘位置：
+
+- `.moyuan/skills/registry.yaml`
+- `.moyuan/skills/enabled.yaml`
+
+关联对象：
+
+- Agent Role
+- Subagent
+- Skill Binding
+- Skill Effectiveness
+
+## Skill Binding
+
+职责：表示 skill 被绑定到 project、role、issue 或 subagent 的具体配置。
+
+关键字段：
+
+- `id`
+- `project_id`
+- `skill_id`
+- `target_type`
+- `target_id`
+- `priority`
+- `config`
+- `status`
+
+生命周期：
+
+```text
+candidate -> enabled -> disabled -> deprecated
+```
+
+落盘位置：
+
+- `.moyuan/skills/bindings.yaml`
+- `.moyuan/agents/roles.yaml`
+
+关联对象：
+
+- Skill Definition
+- Agent Role
+- Subagent
+- Issue
+- Project
+
+## Skill Effectiveness
+
+职责：记录 skill 在某次 subagent 执行中的效果，支撑后续推荐、降权、禁用和能力增强。
+
+关键字段：
+
+- `id`
+- `project_id`
+- `skill_id`
+- `subagent_id`
+- `issue_id`
+- `outcome`
+- `quality_impact`
+- `rework_reduced`
+- `bug_introduced`
+- `reviewer_decision`
+- `notes`
+- `created_at`
+
+生命周期：
+
+```text
+recorded -> aggregated -> applied -> archived
+```
+
+失败或终止状态：
+
+```text
+invalid
+rejected
+```
+
+落盘位置：
+
+- `.moyuan/skills/effectiveness/`
+- `.moyuan/memory/candidates/`，如果作为 Memory 候选。
+
+关联对象：
+
+- Skill Definition
+- Skill Binding
+- Subagent
+- Improvement Record
+- Memory Record
 
 ## Runtime Session
 

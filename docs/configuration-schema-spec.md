@@ -272,7 +272,61 @@ Runtime 字段：
 - 一个可执行 team 不能同时让 `planners`、`implementers`、`verifiers` 都为空。
 - release team 可以让 `implementers` 为空，但 `verifiers` 不应为空。
 
-## 11. policies/permissions.yaml
+## 11. agents/subagents.yaml
+
+| 字段 | 规则 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `schema_version` | required | 无 | MVP 固定为 `1` |
+| `subagents.enabled` | required | `true` | 是否启用显式 Subagent |
+| `subagents.max_parallel_subagents` | required | `1` | 至少为 1 |
+| `subagents.require_parent` | required | `true` | 必须为 true |
+| `subagents.require_output_contract` | required | `true` | 必须为 true |
+| `subagents.require_skill_compatibility_check` | required | `true` | 必须为 true |
+| `subagents.lifecycle` | required | 无 | 状态集合和失败恢复入口 |
+| `subagents.allowed_parent_types` | required | 无 | epic、issue、run、repair_attempt、release、deployment、memory_job |
+
+必须为空：
+
+- `allowed_parent_types` 不允许为空数组。
+- `max_parallel_subagents` 不能为 null。
+- `require_parent`、`require_output_contract`、`require_skill_compatibility_check` 必须为 true。
+
+## 12. skills/registry.yaml、skills/enabled.yaml、skills/bindings.yaml
+
+Skill Registry 字段：
+
+| 字段 | 规则 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `schema_version` | required | 无 | MVP 固定为 `1` |
+| `skills` | required | 无 | 可为空数组，但 registry 文件必须存在 |
+| `skills.*.id` | required | 无 | skill id |
+| `skills.*.version` | required | 无 | semver 或内部版本 |
+| `skills.*.source` | required | 无 | builtin、project、organization、marketplace、manual |
+| `skills.*.supported_roles` | required | 无 | 至少一个 role |
+| `skills.*.task_types` | required | 无 | 至少一个任务类型 |
+| `skills.*.required_tools` | optional | `[]` | 可为空 |
+| `skills.*.memory_scopes` | optional | `[]` | 可为空 |
+| `skills.*.risk_level` | required | `low` | low、medium、high |
+| `skills.*.enabled` | required | `false` | 默认不自动启用外部 skill |
+
+Skill Binding 字段：
+
+| 字段 | 规则 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `bindings` | optional | `[]` | 可为空数组 |
+| `bindings.*.skill_id` | required | 无 | 必须引用 registry |
+| `bindings.*.target_type` | required | 无 | project、role、issue、subagent |
+| `bindings.*.target_id` | required | 无 | 绑定目标 |
+| `bindings.*.priority` | optional | `100` | 越小优先级越高 |
+| `bindings.*.status` | required | `enabled` | candidate、enabled、disabled、deprecated |
+
+必须为空：
+
+- 外部 marketplace skill 未审批时，`enabled` 必须为 false。
+- `supported_roles` 和 `task_types` 不允许为空数组。
+- `target_type = subagent` 时，`target_id` 必须引用已存在 subagent。
+
+## 13. policies/permissions.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -290,7 +344,7 @@ Runtime 字段：
 - 生产部署启用时，`commands.require_approval` 不能为空。
 - secret 访问不能出现在 `commands.allow` 中。
 
-## 12. policies/secrets.yaml
+## 14. policies/secrets.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -306,7 +360,7 @@ Runtime 字段：
 - `usage` 不允许为空数组。
 - 不需要投产、远程私有仓库、registry、第三方 API 时，`secrets` 可以为空对象。
 
-## 13. policies/orchestration.yaml
+## 15. policies/orchestration.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -315,6 +369,7 @@ Runtime 字段：
 | `orchestration.issue_graph` | required | `true` | 是否生成 issue graph |
 | `orchestration.auto_parallelism` | required | `true` | 是否自动并发 |
 | `orchestration.max_parallel_issues` | required | `1` | 至少为 1 |
+| `orchestration.max_parallel_subagents` | required | `1` | 至少为 1 |
 | `orchestration.concurrency_guards` | required | 无 | 并发保护 |
 | `orchestration.waiting_policy` | required | 无 | 编排等待策略 |
 | `orchestration.merge_gate` | required | 无 | 合入门禁 |
@@ -322,12 +377,13 @@ Runtime 字段：
 必须为空：
 
 - `max_parallel_issues` 不能为 null。
+- `max_parallel_subagents` 不能为 null。
 - `merge_gate` 不能为空对象。
 - `waiting_policy.queues` 不能缺少 `blocked_queue`、`ready_queue`、`running_queue`、`review_queue`。
 - `waiting_policy.frontend_runtime` 必须引用 `claude_cli`。
 - `waiting_policy.backend_runtime` 必须引用 `codex_cli`。
 
-## 14. policies/code-quality.yaml
+## 16. policies/code-quality.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -350,7 +406,7 @@ Runtime 字段：
 - `self_repair.mode` 不能为 null。
 - `self_repair.require_approval_for` 不能为空数组。
 
-## 15. policies/comprehension.yaml
+## 17. policies/comprehension.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -366,7 +422,7 @@ Runtime 字段：
 - `mode.initial` 不允许为空。
 - `mode.after_pull` 不允许为空。
 
-## 16. policies/memory.yaml
+## 18. policies/memory.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -385,7 +441,7 @@ Runtime 字段：
 - `retrieval.top_k` 不能为 null。
 - `compact.triggers` 不能为空对象。
 
-## 17. policies/logging.yaml
+## 19. policies/logging.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -402,7 +458,7 @@ Runtime 字段：
 - `streams.audit` 不允许为空。
 - `streams.error` 不允许为空。
 
-## 18. policies/server-resources.yaml
+## 20. policies/server-resources.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -421,7 +477,7 @@ Runtime 字段：
 - `category = production` 的 host 不能缺少 `owner`、`auth_ref`、`lifecycle.expires_at`。
 - `cloud.enabled = false` 时，`cloud.account`、`cloud.instance_id` 可以为 null。
 
-## 19. policies/environments.yaml
+## 21. policies/environments.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -441,7 +497,7 @@ Runtime 字段：
 - `production.approval_required` 必须为 true。
 - `production.rollback` 不允许为空。
 
-## 20. policies/release.yaml
+## 22. policies/release.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -459,7 +515,7 @@ Runtime 字段：
 - `mode = branch_only` 时，`release.deployment.enabled` 必须为 false 或 `release.deployment` 为 null。
 - `mode = deploy_to_environment` 时，`release.deployment` 不能为 null。
 
-## 21. policies/budget.yaml
+## 23. policies/budget.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -474,21 +530,7 @@ Runtime 字段：
 
 - 无预算限制时，`max_daily_model_cost_usd` 必须为 null，不使用 0 表示无限制。
 
-## 22. skills/enabled.yaml
-
-| 字段 | 规则 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `schema_version` | required | 无 | MVP 固定为 `1` |
-| `enabled_skills` | optional | `[]` | 可为空 |
-| `sources.local` | optional | `[]` | 可为空 |
-| `sources.global` | optional | `[]` | 可为空 |
-| `sources.remote.enabled` | required | `false` | 远程 skill 默认禁用 |
-
-必须为空：
-
-- `sources.remote.enabled = false` 时，`sources.remote.urls` 必须为空数组或 null。
-
-## 23. 配置校验顺序
+## 24. 配置校验顺序
 
 系统校验配置时按以下顺序：
 
@@ -502,7 +544,7 @@ Runtime 字段：
 8. 权限和敏感信息规则。
 9. provider/runtime/secret/resource 可用性。
 
-## 24. MVP 最小配置
+## 25. MVP 最小配置
 
 必须存在且通过 schema 校验：
 
@@ -513,6 +555,9 @@ Runtime 字段：
 - `runtimes/agent-runtimes.yaml`
 - `agents/roles.yaml`
 - `agents/teams.yaml`
+- `agents/subagents.yaml`
+- `skills/registry.yaml`
+- `skills/bindings.yaml`
 - `policies/access.yaml`
 - `policies/permissions.yaml`
 - `policies/code-quality.yaml`
@@ -525,9 +570,9 @@ Runtime 字段：
 - `policies/secrets.yaml`，仅本地公开仓库且无外部 API 时可为空对象。
 - `policies/server-resources.yaml`，不启用部署时 `hosts` 可为空。
 - `policies/environments.yaml`，不启用部署时可为空对象。
-- `skills/enabled.yaml`，skills 未启用时可为空数组。
+- `skills/enabled.yaml`，skills 未启用时可为空数组，但文件仍应存在。
 
-## 25. 进入实现前必须补的机器校验
+## 26. 进入实现前必须补的机器校验
 
 本文是人类可读 schema 规则。进入实现前必须转换为：
 

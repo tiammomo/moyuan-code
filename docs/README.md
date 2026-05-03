@@ -20,7 +20,7 @@
 
 6. [配置方案](./configuration-guide.md) 与 [配置 Schema 规则](./configuration-schema-spec.md)：前者说明配置组合方式和关键样例，后者维护字段必填、可空、必须为空和条件必填规则。
 
-7. [契约文档](./contracts/README.md)：理解身份会话、自我修复、schema 校验、Runtime Adapter、日志审计事件和 Workspace 迁移的实现契约。
+7. [契约文档](./contracts/README.md)：理解身份会话、Subagent 与 Skill、自我修复、schema 校验、Runtime Adapter、日志审计事件和 Workspace 迁移的实现契约。
 
 8. [Agent Memory 系统方案](./agent-memory-system.md)：理解记忆判断、抽取、暂存去重、自动 compact、分层存储、检索和长期维护。
 
@@ -32,10 +32,11 @@
 | [reference-architecture.md](./reference-architecture.md) | 系统架构、模块职责、状态机和上下文链路 |
 | [mainlines/](./mainlines/README.md) | 按真实生命周期组织的 8 条主线流程 |
 | [policies/](./policies/README.md) | 可实现为规则引擎或状态机的策略决策树 |
-| [contracts/](./contracts/README.md) | 面向实现的 auth、self-repair、schema、runtime、logging 和 migration 契约 |
+| [contracts/](./contracts/README.md) | 面向实现的 auth、subagent/skill、self-repair、schema、runtime、logging 和 migration 契约 |
 | [project-workspace-spec.md](./project-workspace-spec.md) | `.moyuan/` 工作空间目录和 schema 索引 |
 | [configuration-guide.md](./configuration-guide.md) | 配置总览、关键配置组合和最小/投产闭环 |
 | [configuration-schema-spec.md](./configuration-schema-spec.md) | 配置字段规则、必填/可空/必须为空约束 |
+| [subagents-skills-system.md](./subagents-skills-system.md) | Subagent 生命周期、Skill Registry、推荐、绑定和效果反馈 |
 | [agent-memory-system.md](./agent-memory-system.md) | Agent Memory 唯一详细方案 |
 
 ## 主线文档
@@ -73,6 +74,7 @@
 | 契约 | 文档 | 作用 |
 | --- | --- | --- |
 | 身份会话契约 | [contracts/auth-session-contract.md](./contracts/auth-session-contract.md) | 统一用户身份、会话、API Token、服务账号和鉴权决策接口 |
+| Subagent 与 Skill 契约 | [contracts/subagent-skill-contract.md](./contracts/subagent-skill-contract.md) | 定义 Subagent、Skill Registry、Skill 绑定和效果反馈接口 |
 | 自我修复契约 | [contracts/self-repair-contract.md](./contracts/self-repair-contract.md) | 定义 Runtime Signal、Bug Candidate、Repair Attempt 和能力增强接口 |
 | Schema 校验契约 | [contracts/schema-validation-contract.md](./contracts/schema-validation-contract.md) | 将配置规则转成机器可校验 schema 和 runtime validator |
 | Runtime Adapter 契约 | [contracts/runtime-adapter-contract.md](./contracts/runtime-adapter-contract.md) | 统一 Claude CLI、Codex CLI 等 Runtime 的调用边界 |
@@ -85,7 +87,8 @@
 | --- | --- |
 | [repository-onboarding-git-management.md](./repository-onboarding-git-management.md) | 本地/远程仓库接入、Git 分支、远程拉取后的项目阅读理解 |
 | [github-integration.md](./github-integration.md) | GitHub 连接、认证、token 权限、必填和可空字段 |
-| [agent-skills-memory.md](./agent-skills-memory.md) | Agent role、team、skills、memory scope 和输出契约 |
+| [agent-skills-memory.md](./agent-skills-memory.md) | Agent role、team、memory scope 和输出契约概要 |
+| [subagents-skills-system.md](./subagents-skills-system.md) | Subagent 和 skills 的唯一详细方案 |
 | [model-tool-adapters.md](./model-tool-adapters.md) | Claude CLI、Codex CLI、GPT、Claude、GLM、MiniMax、第三方 API、gpt-image-2 和工具适配 |
 | [issue-orchestration.md](./issue-orchestration.md) | Issue Graph、并发调度和等待模型的专题参考 |
 | [code-lifecycle-quality-gates.md](./code-lifecycle-quality-gates.md) | 质量门禁、审核、返工和合入前检查的专题参考 |
@@ -97,10 +100,10 @@
 | 文档 | 作用 |
 | --- | --- |
 | [foundations/glossary.md](./foundations/glossary.md) | 核心术语 |
-| [foundations/core-data-objects.md](./foundations/core-data-objects.md) | User、Organization、Project、Issue、Run、Bug Candidate、Repair Attempt、Memory、Server、Release、Deployment 等核心对象 |
+| [foundations/core-data-objects.md](./foundations/core-data-objects.md) | User、Organization、Project、Issue、Run、Subagent、Skill、Bug Candidate、Repair Attempt、Memory、Server、Release、Deployment 等核心对象 |
 | [foundations/permission-model.md](./foundations/permission-model.md) | 用户身份、文件、命令、网络、密钥、Git、部署和模型权限边界 |
 | [foundations/failure-recovery.md](./foundations/failure-recovery.md) | 失败分类、恢复策略、人工介入和审计要求 |
-| [foundations/state-machine-catalog.md](./foundations/state-machine-catalog.md) | User、Project、Issue、Run、Bug Candidate、Repair Attempt、Release、Deployment 等状态机总表 |
+| [foundations/state-machine-catalog.md](./foundations/state-machine-catalog.md) | User、Project、Issue、Run、Subagent、Skill、Bug Candidate、Repair Attempt、Release、Deployment 等状态机总表 |
 | [foundations/documentation-governance.md](./foundations/documentation-governance.md) | 文档权威来源、重复控制、资产管理和维护规则 |
 | [design-readiness-checklist.md](./design-readiness-checklist.md) | 进入实现前的设计就绪门禁 |
 
@@ -119,7 +122,7 @@
 
 1. 项目隔离：每个被管理项目都拥有独立工作空间、配置、记忆、任务状态和审计记录。
 2. 身份先行：任何项目、Git、Runtime、服务器、发布和模型操作都先建立 `auth_context`，再判断权限和审批。
-3. 编排优先：框架不绑定某一个模型或 CLI，而是通过统一 Agent Runtime 调度不同执行后端。
+3. 编排优先：框架不绑定某一个模型或 CLI，而是通过统一 Agent Runtime 调度不同执行后端，并把 Subagent 作为显式执行实例管理。
 4. 任务图驱动：开发目标先拆成 Issue Graph，再按依赖、风险、写入范围和资源决定串行或并发。
 5. 前后端分工：前端默认交给 Claude CLI，后端和后端调优默认交给 Codex CLI，最终统一回到质量门禁和 review。
 6. 质量先于合入：AI 生成代码必须通过可运行性、测试、重复度、复杂度、架构边界和独立审查。
@@ -136,6 +139,6 @@
 
 - 所有核心设计文档通过 [设计就绪门禁](./design-readiness-checklist.md)。
 - 配置规则已能转换为 JSON Schema、Zod schema 或 TypeScript runtime validator。
-- 契约文档已覆盖 auth、self-repair、schema、runtime、logging 和 workspace migration。
+- 契约文档已覆盖 auth、subagent/skill、self-repair、schema、runtime、logging 和 workspace migration。
 - 核心对象、权限模型、失败恢复和文档维护规则没有互相冲突。
 - README 只保留导航和边界，不重复专题方案细节。

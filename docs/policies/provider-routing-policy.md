@@ -8,6 +8,8 @@
 
 - task type。
 - agent role。
+- subagent type。
+- skill requirements。
 - code sensitivity。
 - memory sensitivity。
 - provider health。
@@ -46,6 +48,19 @@ else if task is memory extraction light:
   USE_DOMESTIC_MODEL_API if data policy allows
 else if task is architecture diagram image:
   USE_GPT_IMAGE_2
+```
+
+Subagent 路由补充：
+
+```text
+if subagent.type == implementation_subagent and role == frontend:
+  USE_CLAUDE_CLI
+else if subagent.type == implementation_subagent and role == backend:
+  USE_CODEX_CLI
+else if subagent.type == verification_subagent:
+  USE_CODEX_CLI or trusted API
+else if skill requires shell_exec or file_write:
+  require Native Agent Runtime
 ```
 
 ## 5. 敏感数据路由树

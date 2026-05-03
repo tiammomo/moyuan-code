@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-代码开发主线负责消费已经通过规划的 ready issues，调度 Claude CLI、Codex CLI 和相关 Agent 完成代码实现、测试、质量复核和返工。
+代码开发主线负责消费已经通过规划的 ready issues，创建显式 Subagent，调度 Claude CLI、Codex CLI 和相关 Agent 完成代码实现、测试、质量复核和返工。
 
 需求完善、意图澄清、Issue Graph 和并发计划由 [需求规划与 Issue 编排主线](./requirement-planning.md) 负责。代码开发主线不重新拆分需求，只执行已经进入 `ready_queue` 的 issue。
 
@@ -21,11 +21,12 @@
 - issue graph 和 schedule。
 - 最新项目画像、模块地图和历史决策。
 - 当前 Git 状态、分支策略和写入权限。
-- Agent role、team、runtime、provider routing 和 skills。
+- Agent role、team、Subagent plan、runtime、provider routing 和 skills。
 
 输出：
 
 - issue worktrees。
+- subagent instances。
 - code diff。
 - test report。
 - quality report。
@@ -38,10 +39,12 @@
 ready issue
   -> load issue spec and accepted contracts
   -> load project context and scoped memory
-  -> select role, team, runtime and provider
+  -> select role, team, skills, runtime and provider
+  -> create subagent instances
   -> prepare issue branch/worktree
-  -> run Claude/Codex agents
-  -> collect diff and command results
+  -> dispatch Claude/Codex runtime
+  -> collect subagent outputs, diff and command results
+  -> validate subagent output contracts
   -> run local checks
   -> quality gates
   -> independent review
@@ -62,6 +65,8 @@ ready issue
 核心决策：
 
 - 当前 issue 应使用 Claude CLI、Codex CLI 还是普通模型 API。
+- 当前 issue 应创建哪些 Subagent，以及是否允许并发。
+- 当前 issue 应绑定哪些 skills。
 - 当前 issue 是否满足启动条件。
 - Agent 生成的 diff 是否可接受。
 - 质量失败后返工几轮，什么时候升级人工处理。
@@ -76,6 +81,7 @@ Issue 进入代码开发主线前必须满足：
 - Issue 已进入 `ready_queue`。
 - 写入范围不与 running issue 冲突。
 - Runtime 健康且有可用 slot。
+- Subagent role、skills、scope 和输出契约可解析。
 - worktree、预算、权限和模型路由满足要求。
 - 没有等待用户澄清或审批。
 
@@ -98,6 +104,9 @@ Issue 进入代码开发主线前必须满足：
 
 - `.moyuan/agents/roles.yaml`
 - `.moyuan/agents/teams.yaml`
+- `.moyuan/agents/subagents.yaml`
+- `.moyuan/skills/registry.yaml`
+- `.moyuan/skills/bindings.yaml`
 - `.moyuan/runtimes/agent-runtimes.yaml`
 - `.moyuan/models/routing.yaml`
 - `.moyuan/policies/orchestration.yaml`

@@ -217,6 +217,42 @@
 - 备用 Runtime 成功。
 - 人工修正后重新运行。
 
+## Subagent 执行失败
+
+触发条件：
+
+- 父对象不存在或状态不允许创建 Subagent。
+- role、runtime、skill 或 memory scope 无法解析。
+- Subagent 输出不符合契约。
+- Subagent 写入范围与其他 running subagent 冲突。
+- Skill 与任务、role 或权限不兼容。
+- Skill 被 reviewer 或 quality_guard 判定产生负面影响。
+
+系统动作：
+
+1. 标记 Subagent 为 `failed`、`blocked`、`needs_rework` 或 `superseded`。
+2. 写入 `subagent.failed` 或 `subagent.output_validated` 事件。
+3. 如果是 Runtime 暂时不可用，可按策略重试或 fallback。
+4. 如果是 skill 不兼容，禁用本次 binding 并重新推荐。
+5. 如果是写入冲突，阻断合入并交回 Scheduler 重新排队。
+6. 如果达到重试上限，父 Issue 进入 `needs_rework` 或 `needs_human_intervention`。
+
+禁止：
+
+- Subagent 自行提升权限。
+- Subagent 自行创建无限层级子任务。
+- 忽略输出契约失败。
+- 为了恢复而扩大 write scope。
+- 外部 skill 未审批时读取敏感代码、secret 或长期 Memory。
+
+恢复出口：
+
+- 重新创建 Subagent。
+- 重新绑定 skill。
+- fallback Runtime 成功。
+- 父 Issue 重新规划。
+- 人工确认后继续。
+
 ## 模型 API 失败
 
 触发条件：
