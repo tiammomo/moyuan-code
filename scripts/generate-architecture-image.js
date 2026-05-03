@@ -93,29 +93,29 @@ function buildDiagramSpec() {
 第一行：从左到右 7 个主流程层，每层一个编号卡片，卡片顶部使用深蓝标题条。
 
 1. 输入与权限层
-   - Platform User / CLI/API
+   - 用户入口 / CLI/API
    - Auth Context / RBAC
-   - Approval / Audit
-   - Secret Ref
+   - 审批 / 审计
+   - 密钥引用
 
 2. 仓库接入层
-   - Local Path / GitHub / Gitee
+   - 本地仓库 / GitHub / Gitee
    - Git Adapter
    - clone / fetch / branch
-   - .moyuan init
+   - 初始化 .moyuan
 
 3. 项目理解层
    - Project Comprehension
-   - Project Profile
-   - Module Map
-   - Commands / Risk Files
+   - 项目画像
+   - 模块地图
+   - 命令 / 风险文件
 
 4. 需求规划层
    - Requirement Refiner
    - Clarification Gate
    - Issue Planner
    - Issue Graph
-   - Scheduler
+   - 调度器
 
 5. Multi-Agent 执行层
    - Subagent Manager
@@ -128,14 +128,14 @@ function buildDiagramSpec() {
    - Build / Lint / Test
    - Quality Gate
    - Review
-   - Epic Integration Branch
+   - 集成分支
 
 7. 发布投产层
    - Release Branch / Tag
-   - GitHub/Gitee Push
+   - 推送 GitHub/Gitee
    - Deployment
-   - Smoke / Monitor
-   - Rollback
+   - 冒烟 / 监控
+   - 回滚
 
 第二行：Workspace / Data Store 沉淀层，用一条虚线边框包起来，放 6 个数据库圆柱或文件库图标，从左到右：
 - repository.yaml / project.yaml
@@ -153,22 +153,22 @@ function buildDiagramSpec() {
 右侧竖向补充层：
 8. Server Resources
    - test_dev / production
-   - cloud metadata / expires_at
-   - healthcheck / owner
+   - 云元数据 / 到期时间
+   - 健康检查 / 负责人
 9. Provider & Runtime
    - GPT / Claude / GLM / MiniMax
-   - Third-party API policy
+   - 第三方 API 策略
    - Runtime Adapter
 
 底部：治理与反馈层，横向时间线，使用浅棕或深蓝标题条：
 10. Runtime Signals
-    - error / test failure / smoke failure
+    - 错误 / 测试失败 / 冒烟失败
 11. Self Repair
     - Bug Candidate -> Repair Attempt
 12. Agent Memory
     - Record Gate / Retrieve / Memory Compact
 13. Documentation & Contracts
-    - Config Schema / Failure Recovery / Audit Logs
+    - Config Schema / Failure Recovery / 审计日志
 
 箭头规则：
 - 主流程用粗实线从 1 -> 7。
@@ -178,7 +178,7 @@ function buildDiagramSpec() {
 视觉要求：
 - 版式参考用户提供的横版调用逻辑图：编号模块、深蓝标题条、浅色内容区、箭头清晰、数据存储圆柱、底部调度/治理层、右上图例。
 - 不要出现人物肖像，不要出现参考图里的股票、交易、时间、业务名或任何无关内容。
-- 中文用于说明，英文专有名词必须保留：Repository Onboarding、Project Comprehension、Issue Graph、Subagent、Skills Registry、Model Routing、Quality Gate、Release Pipeline、Deployment、Agent Memory、Memory Compact。
+- 普通动作、说明和中文业务语义必须用中文；英文专有名词必须保留：Auth Context、RBAC、Git Adapter、Project Comprehension、Issue Graph、Subagent、Skills Registry、Model Routing、Quality Gate、Review、Release Branch、Deployment、Agent Memory、Memory Compact、Runtime Adapter。
 - 每个卡片只保留 3-5 个核心技术点，不要大段文字。
 - 横版宽屏布局，信息密度适中但不拥挤。
 - 使用白底、浅灰卡片、深色文字，模块标题条以深蓝为主，少量绿、橙、青区分分区。
@@ -202,7 +202,7 @@ ${docsContext}
 输出要求：
 - 只生成一张完整横版技术调用逻辑图。
 - 图片中不要出现说明性长段落，必须用编号模块、箭头、数据存储层、图标和短要点表达。
-- 中文用于模块标题和说明性短语；英文专有名词必须原样保留，不要翻译成中文。
+- 普通说明尽量使用中文；英文专有名词必须原样保留，不要翻译成中文。
 - 不要把规格里的长句原样放进图里。
 - 每个主题只放核心技术点，详细设计保留在配套讲解文档中。
 - 图需要让工程师一眼看懂当前 Moyuan Code 项目的端到端执行链路、并发编排、质量控制、发布投产和长期反馈闭环。
