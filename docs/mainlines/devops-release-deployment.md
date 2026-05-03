@@ -1,0 +1,150 @@
+# DevOps 发布投产主线
+
+## 1. 目标
+
+DevOps 发布投产主线负责从已通过质量门禁的 integration branch 创建 release branch，完成版本说明、tag、远程推送、PR/MR、部署投产、线上冒烟、监控窗口、回滚和复盘。
+
+这条主线的目标不是替代 CI/CD 平台，而是统一控制发布决策、服务器资源引用、审批、冒烟、监控和回滚状态。
+
+## 2. 输入与输出
+
+输入：
+
+- accepted integration branch。
+- included issues 和 excluded issues。
+- quality reports。
+- review reports。
+- migration checklist。
+- release policy。
+- target environment。
+- server resource group。
+
+输出：
+
+- release suggestion。
+- release branch。
+- tag。
+- release notes。
+- PR/MR。
+- deployment record。
+- smoke test result。
+- monitor window result。
+- rollback record。
+- release retrospective。
+- release memory candidates。
+
+## 3. 端到端流程
+
+```text
+integration branch accepted
+  -> calculate release batch score
+  -> create release suggestion
+  -> user approval if required
+  -> create release branch
+  -> full quality gates
+  -> regression tests
+  -> migration and config checks
+  -> generate release notes
+  -> create tag if configured
+  -> push release branch to GitHub/Gitee
+  -> create PR/MR if configured
+  -> resolve target environment
+  -> resolve resource group
+  -> pre-deploy backup
+  -> deploy
+  -> online smoke tests
+  -> monitor window
+  -> healthy, rollback, or manual intervention
+  -> retrospective and memory candidates
+```
+
+## 4. 发布批次建议
+
+默认建议：
+
+- 低风险功能：累计 3-7 个 accepted issues 后建议发版。
+- 中风险功能：累计 2-4 个 accepted issues 后建议发版。
+- 高风险变更：单独发版窗口。
+- hotfix/security：立即进入 hotfix/release 流水线。
+
+高风险包括：
+
+- 数据库迁移。
+- 鉴权、安全、支付。
+- 公共 API breaking change。
+- 多服务联动。
+- 无法自动回滚。
+- 生产监控缺失。
+
+## 5. 决策点
+
+调用策略：
+
+- [发布投产策略](../policies/release-deployment-policy.md)
+- [服务器资源策略](../policies/server-resource-policy.md)
+- [Git 分支策略](../policies/git-branch-policy.md)
+- [质量与合入策略](../policies/quality-merge-policy.md)
+- [Memory 决策策略](../policies/memory-decision-policy.md)
+
+核心决策：
+
+- 是否达到发版批次。
+- 是否必须单独发版。
+- 是否允许创建 release branch。
+- 是否允许 tag 和 push。
+- 是否允许部署到目标环境。
+- 目标服务器资源是否健康。
+- 线上冒烟失败是否回滚。
+- 监控窗口异常是否回滚或人工介入。
+
+## 6. 配置入口
+
+- `.moyuan/policies/release.yaml`
+- `.moyuan/policies/server-resources.yaml`
+- `.moyuan/policies/environments.yaml`
+- `.moyuan/policies/secrets.yaml`
+- `.moyuan/policies/permissions.yaml`
+- `.moyuan/policies/logging.yaml`
+
+## 7. Workspace 产物
+
+```text
+.moyuan/lifecycle/releases/
+.moyuan/lifecycle/deployments/
+.moyuan/lifecycle/rollback/
+.moyuan/lifecycle/retrospectives/
+```
+
+## 8. 日志与审计
+
+必须记录：
+
+- release suggested。
+- release branch created。
+- tag created。
+- push attempted/completed。
+- PR/MR created。
+- approval requested/granted/rejected。
+- deployment started/completed/failed。
+- smoke test result。
+- monitor window result。
+- rollback started/completed/failed。
+- release retrospective。
+
+日志流：
+
+- `release`
+- `git`
+- `quality`
+- `audit`
+- `memory`
+- `error`
+
+## 9. 验收标准
+
+- release branch 只能从 accepted integration branch 创建。
+- 高风险发布必须要求用户确认。
+- 生产投产必须引用生产资源组。
+- 生产投产前必须有备份、健康检查、冒烟和回滚策略。
+- 冒烟失败或监控异常会进入回滚或人工介入。
+- 发布完成后生成 release memory candidates。

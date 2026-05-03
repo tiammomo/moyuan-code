@@ -13,13 +13,15 @@
 
 ## 文档分层
 
-Moyuan Code 文档分为五层：
+Moyuan Code 文档分为七层：
 
 | 层级 | 目录/文档 | 作用 |
 | --- | --- | --- |
 | 入口层 | `README.md` | 给读者导航，不承载完整方案 |
 | 基础规范层 | `foundations/`、`design-readiness-checklist.md` | 定义术语、对象、权限、失败恢复和文档门禁 |
 | 总体规划层 | `lifecycle-roadmap.md`、`reference-architecture.md` | 定义产品方向、生命周期、架构和阶段 |
+| 主线层 | `mainlines/` | 按真实生命周期串联端到端流程 |
+| 策略层 | `policies/` | 定义可实现的决策树、阻断条件和人工确认规则 |
 | 专题设计层 | `issue-orchestration.md`、`agent-memory-system.md` 等 | 定义单一能力的完整设计 |
 | 资产层 | `assets/`、`.moyuan/visuals/` | 保存架构图、讲解和可追溯生成产物 |
 
@@ -28,6 +30,8 @@ Moyuan Code 文档分为五层：
 - 入口层只放索引和原则。
 - 基础规范层优先被引用，不能依赖专题文档定义术语。
 - 总体规划层描述全局流程，不展开模块内部细节。
+- 主线层描述端到端执行流程，不重复完整配置和对象字段。
+- 策略层描述决策树，不重复流程背景和专题细节。
 - 专题设计层只能有一个权威文档负责一个能力。
 - 资产层必须能追溯到生成 prompt 或说明文档；prompt 默认归为生成产物，不参与文档权威性判断。
 
@@ -38,6 +42,8 @@ Moyuan Code 文档分为五层：
 | 文档索引和阅读入口 | `README.md` | 只做简短说明和链接 |
 | 产品定位、生命周期、CLI、Phase | `lifecycle-roadmap.md` | 专题文档不重复 CLI 列表 |
 | 总体架构和状态机 | `reference-architecture.md` | 专题文档只引用状态机 |
+| 端到端执行主线 | `mainlines/` | 专题文档不再重复整条生命周期流程 |
+| 策略决策树 | `policies/` | 主线文档只引用策略，不展开所有判断分支 |
 | Workspace 目录和 schema 索引 | `project-workspace-spec.md` | 不展开完整配置 |
 | 配置组合示例 | `configuration-guide.md` | 其他文档只给局部片段或引用 |
 | 配置字段规则 | `configuration-schema-spec.md` | 其他文档不重复 required/nullable 表 |
@@ -63,6 +69,8 @@ Moyuan Code 文档分为五层：
 | 基础规范 | architect | 保证术语、对象、权限一致 |
 | 路线图 | product_owner + architect | 控制 MVP、Phase、CLI |
 | 架构 | architect | 控制模块边界和状态机 |
+| 主线 | product_owner + architect + domain_owner | 控制端到端流程和产物边界 |
+| 策略 | architect + domain_owner | 控制决策树、阻断条件和人工确认规则 |
 | 配置方案 | core_engineer | 控制 schema 和默认值 |
 | Issue 编排 | orchestrator_owner | 控制任务拆分和调度规则 |
 | Memory | memory_owner | 控制记录、检索、compact |
@@ -83,8 +91,10 @@ Moyuan Code 文档分为五层：
 4. 是否新增 CLI：只更新 `lifecycle-roadmap.md`。
 5. 是否新增状态或异常：更新 `reference-architecture.md` 或 `foundations/failure-recovery.md`。
 6. 是否新增权限边界：更新 `foundations/permission-model.md`。
-7. 是否新增模块专题能力：更新对应专题文档。
-8. 是否需要入口：更新 `README.md`。
+7. 是否影响端到端流程：更新 `mainlines/` 对应主线。
+8. 是否新增判断规则：更新 `policies/` 对应策略。
+9. 是否新增模块专题能力：更新对应专题文档。
+10. 是否需要入口：更新 `README.md`。
 
 ## 文档生命周期
 
@@ -119,6 +129,8 @@ Moyuan Code 文档分为五层：
 
 - 顶层专题文档使用 kebab-case。
 - 基础规范放在 `docs/foundations/`。
+- 主线文档放在 `docs/mainlines/`，按业务主线命名。
+- 策略文档放在 `docs/policies/`，使用 `<domain>-policy.md` 命名。
 - 正式引用的图片和讲解可以放在 `docs/assets/`。
 - 生成 prompt、diagram spec 和中间产物优先放在 `.moyuan/visuals/`，避免污染 docs 正文扫描。
 - 图片、prompt、explanation 共享同一个前缀。
@@ -130,6 +142,8 @@ Moyuan Code 文档分为五层：
 ```text
 docs/foundations/glossary.md
 docs/foundations/core-data-objects.md
+docs/mainlines/code-development.md
+docs/policies/issue-scheduling-policy.md
 docs/assets/moyuan-code-architecture-<timestamp>.png
 docs/assets/moyuan-code-architecture-<timestamp>.explanation.md
 .moyuan/visuals/prompts/moyuan-code-architecture-<timestamp>.prompt.md
@@ -182,6 +196,8 @@ docs/assets/moyuan-code-architecture-<timestamp>.explanation.md
 - Memory 机制在 Agent 文档重复说明。
 - 权限策略在多个文档给出不同规则。
 - 服务器资源字段在环境配置和资源配置中重复维护。
+- 主线文档重复专题文档的大段细节。
+- 策略文档重复主线文档的完整流程背景。
 
 ## 资产管理规则
 
@@ -218,6 +234,8 @@ prompt 管理规则：
 - 是否已有权威文档？
 - 是否会造成重复？
 - 是否需要更新 README 索引？
+- 是否需要更新 mainlines 索引？
+- 是否需要更新 policies 索引？
 - 是否需要更新 schema 索引？
 - 是否需要更新术语表？
 - 是否新增核心对象？
@@ -234,6 +252,8 @@ prompt 管理规则：
 - 标题编号是否连续。
 - CLI 是否只出现在路线图。
 - 配置是否只在配置文档完整展开。
+- 主线是否只描述流程，不重复字段级配置。
+- 策略是否以决策树形式表达。
 - 新增资产是否命名清晰。
 - 是否有明文密钥或敏感信息。
 - 是否存在新的重复权威来源。
@@ -274,6 +294,8 @@ prompt 管理规则：
 - 权威来源表是否准确。
 - CLI 是否只在路线图出现。
 - 配置是否只在配置方案完整展开。
+- 主线是否覆盖项目接入、代码开发、代码管理、服务器资源和发布投产。
+- 策略是否覆盖关键决策点和人工确认条件。
 - 核心对象是否和配置一致。
 - 权限和失败恢复是否覆盖新增能力。
 - 图片、讲解和需要保留的 prompt 是否仍然准确。

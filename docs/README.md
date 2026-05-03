@@ -12,13 +12,13 @@
 
 2. [参考架构](./reference-architecture.md)：理解系统分层、核心模块、运行链路、上下文装配和安全边界。
 
-3. [项目工作空间规范](./project-workspace-spec.md)：理解每个被管理项目独立 `.moyuan/` 工作空间、目录职责和 schema 索引。
+3. [主线文档](./mainlines/README.md)：按项目接入、代码开发、代码管理、服务器资源和 DevOps 发布投产 5 条主线理解真实执行流程。
 
-4. [配置方案](./configuration-guide.md) 与 [配置 Schema 规则](./configuration-schema-spec.md)：前者说明配置组合方式和关键样例，后者维护字段必填、可空、必须为空和条件必填规则。
+4. [策略决策树](./policies/README.md)：理解澄清、阅读理解、并发调度、质量合入、Git、服务器、发布、Provider 和 Memory 的判断规则。
 
-5. [Issues 编排与并发调度](./issue-orchestration.md)：理解需求完善、澄清判断、Issue Graph、依赖调度、前端 Claude / 后端 Codex 等待机制、合入门禁和发布触发。
+5. [项目工作空间规范](./project-workspace-spec.md)：理解每个被管理项目独立 `.moyuan/` 工作空间、目录职责和 schema 索引。
 
-6. [代码生命周期质量门禁](./code-lifecycle-quality-gates.md)：理解 AI 生成代码后如何检查可运行性、测试缺口、重复度、复杂度、架构边界和返工。
+6. [配置方案](./configuration-guide.md) 与 [配置 Schema 规则](./configuration-schema-spec.md)：前者说明配置组合方式和关键样例，后者维护字段必填、可空、必须为空和条件必填规则。
 
 7. [Agent Memory 系统方案](./agent-memory-system.md)：理解记忆判断、抽取、暂存去重、自动 compact、分层存储、检索和长期维护。
 
@@ -28,12 +28,37 @@
 | --- | --- |
 | [lifecycle-roadmap.md](./lifecycle-roadmap.md) | 产品定位、生命周期、CLI、Phase 和路线图 |
 | [reference-architecture.md](./reference-architecture.md) | 系统架构、模块职责、状态机和上下文链路 |
+| [mainlines/](./mainlines/README.md) | 按真实生命周期组织的 5 条主线流程 |
+| [policies/](./policies/README.md) | 可实现为规则引擎或状态机的策略决策树 |
 | [project-workspace-spec.md](./project-workspace-spec.md) | `.moyuan/` 工作空间目录和 schema 索引 |
 | [configuration-guide.md](./configuration-guide.md) | 配置总览、关键配置组合和最小/投产闭环 |
 | [configuration-schema-spec.md](./configuration-schema-spec.md) | 配置字段规则、必填/可空/必须为空约束 |
-| [issue-orchestration.md](./issue-orchestration.md) | 需求拆分、Issue Graph、并发调度、等待和发布编排 |
-| [code-lifecycle-quality-gates.md](./code-lifecycle-quality-gates.md) | 质量门禁、审核、返工和合入前检查 |
 | [agent-memory-system.md](./agent-memory-system.md) | Agent Memory 唯一详细方案 |
+
+## 主线文档
+
+| 主线 | 文档 | 作用 |
+| --- | --- | --- |
+| 项目接入与阅读理解 | [mainlines/project-comprehension.md](./mainlines/project-comprehension.md) | 本地/远程仓库接入、full/incremental/diff comprehension、项目画像和 memory candidates |
+| 代码开发 | [mainlines/code-development.md](./mainlines/code-development.md) | 需求完善、Issue Graph、多 Agent 开发、质量复核和返工 |
+| 代码管理 | [mainlines/code-management.md](./mainlines/code-management.md) | branch、worktree、integration branch、PR/MR 和用户改动保护 |
+| 服务器资源管理 | [mainlines/server-resource-management.md](./mainlines/server-resource-management.md) | 测试开发机、生产机、云资产、到期、巡检和资源组 |
+| DevOps 发布投产 | [mainlines/devops-release-deployment.md](./mainlines/devops-release-deployment.md) | release branch、tag、部署、线上冒烟、监控、回滚和复盘 |
+
+## 策略决策树
+
+策略文档把流程中的判断节点整理成接近可实现的决策树。后续代码实现时，策略应优先转为规则引擎、状态机或 runtime validator。
+
+| 策略 | 文档 |
+| --- | --- |
+| 项目阅读理解策略 | [policies/project-comprehension-policy.md](./policies/project-comprehension-policy.md) |
+| Issue 调度策略 | [policies/issue-scheduling-policy.md](./policies/issue-scheduling-policy.md) |
+| 质量与合入策略 | [policies/quality-merge-policy.md](./policies/quality-merge-policy.md) |
+| Git 分支策略 | [policies/git-branch-policy.md](./policies/git-branch-policy.md) |
+| 服务器资源策略 | [policies/server-resource-policy.md](./policies/server-resource-policy.md) |
+| 发布投产策略 | [policies/release-deployment-policy.md](./policies/release-deployment-policy.md) |
+| Provider 路由策略 | [policies/provider-routing-policy.md](./policies/provider-routing-policy.md) |
+| Memory 决策策略 | [policies/memory-decision-policy.md](./policies/memory-decision-policy.md) |
 
 ## 专题设计文档
 
@@ -43,6 +68,8 @@
 | [github-integration.md](./github-integration.md) | GitHub 连接、认证、token 权限、必填和可空字段 |
 | [agent-skills-memory.md](./agent-skills-memory.md) | Agent role、team、skills、memory scope 和输出契约 |
 | [model-tool-adapters.md](./model-tool-adapters.md) | Claude CLI、Codex CLI、GPT、Claude、GLM、MiniMax、第三方 API、gpt-image-2 和工具适配 |
+| [issue-orchestration.md](./issue-orchestration.md) | Issue Graph、并发调度和等待模型的专题参考 |
+| [code-lifecycle-quality-gates.md](./code-lifecycle-quality-gates.md) | 质量门禁、审核、返工和合入前检查的专题参考 |
 
 ## 基础规范
 

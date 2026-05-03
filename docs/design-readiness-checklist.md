@@ -29,6 +29,8 @@
 | [基础规范](./foundations/README.md) | 术语、对象、权限、失败恢复是否统一 | 五份基础规范存在且互相不冲突 |
 | [总体规划与生命周期路线图](./lifecycle-roadmap.md) | MVP、Phase、CLI 是否清楚 | CLI 只在此维护，Phase 验收可执行 |
 | [参考架构](./reference-architecture.md) | 系统模块和状态机是否清楚 | 模块职责、状态、上下文链路明确 |
+| [主线文档](./mainlines/README.md) | 端到端流程是否按真实生命周期组织 | 5 条主线覆盖接入、开发、代码管理、服务器资源和发布投产 |
+| [策略决策树](./policies/README.md) | 关键判断是否可转成实现策略 | 决策树、阻断条件、人工确认和日志要求明确 |
 | [项目工作空间规范](./project-workspace-spec.md) | `.moyuan/` 目录和 schema 索引是否清楚 | 每个目录都有职责和权威文档 |
 | [完整配置方案](./configuration-guide.md) | 项目运行需要哪些配置 | 核心 YAML 都有示例和校验清单 |
 | [配置 Schema 规则](./configuration-schema-spec.md) | 配置字段哪些必填、可选、可为空、必须为空 | 核心 YAML 字段规则明确 |
@@ -40,6 +42,23 @@
 | [模型与工具适配规划](./model-tool-adapters.md) | 外部能力如何接入 | Provider、Runtime、Adapter、Image、错误分类明确 |
 
 ## 核心链路门禁
+
+### 0. 主线和策略链路
+
+必须明确：
+
+- 项目接入与阅读理解主线。
+- 代码开发主线。
+- 代码管理主线。
+- 服务器资源管理主线。
+- DevOps 发布投产主线。
+- 每条主线引用的策略决策树。
+- 策略的输入事实、决策结果、阻断条件和人工确认条件。
+
+通过标准：
+
+- 可以从主线文档直接拆出端到端实现 issue。
+- 可以从策略文档直接实现规则引擎、状态机或 runtime validator。
 
 ### 1. 项目接入链路
 
