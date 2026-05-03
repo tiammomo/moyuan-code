@@ -27,6 +27,11 @@
 │                        │ - project comprehension              │
 │                        │ - server resource inventory           │
 ├───────────────────────┼─────────────────────────────────────┤
+│ Self Repair Engine     │ Quality Engine                       │
+│ - runtime signals      │ - gates / verification               │
+│ - bug candidates       │ - review contracts                   │
+│ - repair attempts      │ - regression results                 │
+├───────────────────────┼─────────────────────────────────────┤
 │ Skills Engine          │ Memory Engine                        │
 │ - find-skills adapter  │ - short-term context                 │
 │ - recommendation       │ - long-term project memory           │
@@ -71,6 +76,7 @@ CLI 需要覆盖：
 - memory 管理。
 - skills 推荐。
 - 生命周期报告。
+- Bug Candidate 和 Repair Attempt 查看。
 - 服务器资源添加、巡检、续费提醒和退役。
 
 API 预留：
@@ -152,6 +158,31 @@ Agent Runtime 负责执行一个具体 Agent 的任务。
 - 管理模型预算。
 - 管理仓库来源、remote、默认分支和任务分支状态。
 - 管理任务分支策略和 Git 审计记录。
+
+### Self Repair Engine
+
+Self Repair Engine 负责运行反馈、Bug 判断、自动修复和能力增强。
+
+职责：
+
+- 采集测试、运行、冒烟、监控、用户反馈和 review 信号。
+- 生成 Runtime Signal。
+- 聚合 Bug Candidate。
+- 判断 confirmed bug、not bug、needs evidence 或 enhancement candidate。
+- 为低风险 confirmed bug 创建 Repair Attempt。
+- 将修复任务交回 Orchestrator、Runtime、质量门禁和 review。
+- 将成功修复经验写入 Memory candidate 和 Improvement Record。
+
+### Quality Engine
+
+Quality Engine 负责执行质量门禁、验证命令、回归检查和 review contract 校验。
+
+职责：
+
+- 运行 build、test、lint、typecheck 和回归脚本。
+- 生成 Quality Report。
+- 把失败信号交给 Self Repair Engine。
+- 阻止未通过门禁的代码进入 accepted 或 merged。
 
 ### Skills Engine
 

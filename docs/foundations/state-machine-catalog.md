@@ -26,6 +26,10 @@
 | Schedule | Scheduler | [Issue 调度策略](../policies/issue-scheduling-policy.md) | `run` |
 | Run | Agent Runtime | [参考架构](../reference-architecture.md) | `run`、`agent`、`model` |
 | Quality Report | Quality Guard | [质量与合入策略](../policies/quality-merge-policy.md) | `quality` |
+| Runtime Signal | Self Repair Engine | [运行反馈与自我修复主线](../mainlines/runtime-feedback-self-repair.md) | `error`、`quality`、`release` |
+| Bug Candidate | Self Repair Engine | [Bug 判断与自我修复策略](../policies/bug-detection-self-repair-policy.md) | `error`、`quality`、`memory` |
+| Repair Attempt | Orchestrator | [自我修复契约](../contracts/self-repair-contract.md) | `run`、`quality`、`audit` |
+| Improvement Record | Memory Engine | [自我修复契约](../contracts/self-repair-contract.md) | `memory`、`audit` |
 | Runtime Session | Agent Runtime | [模型与工具适配规划](../model-tool-adapters.md) | `agent`、`error` |
 | Memory Record | Memory Engine | [Agent Memory 系统方案](../agent-memory-system.md) | `memory`、`audit` |
 | Server Resource | Resource Manager | [服务器资源策略](../policies/server-resource-policy.md) | `run`、`audit` |
@@ -203,7 +207,64 @@ needs_rework
 blocked
 ```
 
-## 14. Runtime Session 状态
+## 14. Runtime Signal 状态
+
+```text
+captured -> normalized -> correlated -> classified -> archived
+```
+
+失败出口：
+
+```text
+invalid
+insufficient_context
+```
+
+## 15. Bug Candidate 状态
+
+```text
+detected -> classifying -> confirmed -> issue_created -> repairing -> repaired -> archived
+```
+
+分流和失败出口：
+
+```text
+not_bug
+needs_evidence
+enhancement_candidate
+blocked
+```
+
+## 16. Repair Attempt 状态
+
+```text
+planned -> branch_created -> running -> quality_checking -> reviewing -> accepted -> merged
+```
+
+失败出口：
+
+```text
+blocked
+failed
+needs_rework
+escalated
+cancelled
+```
+
+## 17. Improvement Record 状态
+
+```text
+candidate -> approved -> applied -> archived
+```
+
+失败出口：
+
+```text
+rejected
+superseded
+```
+
+## 18. Runtime Session 状态
 
 ```text
 created -> active -> idle -> resumable -> closed
@@ -217,7 +278,7 @@ lost
 expired
 ```
 
-## 15. Memory Record 状态
+## 19. Memory Record 状态
 
 ```text
 candidate -> staged -> committed -> indexed -> active
@@ -233,7 +294,7 @@ conflict_review_required
 archived
 ```
 
-## 16. Server Resource 状态
+## 20. Server Resource 状态
 
 ```text
 registered -> checking -> active -> maintenance_required -> retired
@@ -248,7 +309,7 @@ expired
 blocked_for_production
 ```
 
-## 17. Release 状态
+## 21. Release 状态
 
 ```text
 suggested -> planned -> branch_created -> regression_running -> ready_to_publish -> published -> completed
@@ -263,7 +324,7 @@ rollback_required
 cancelled
 ```
 
-## 18. Deployment 状态
+## 22. Deployment 状态
 
 ```text
 created -> precheck_running -> deploying -> smoke_testing -> monitoring -> healthy -> completed
@@ -281,7 +342,7 @@ rolled_back
 manual_intervention_required
 ```
 
-## 19. 状态变更记录要求
+## 23. 状态变更记录要求
 
 每次状态变化必须记录：
 

@@ -78,6 +78,11 @@ interface RuntimeResult {
     severity: "low" | "medium" | "high" | "blocker";
     message: string;
   }>;
+  runtime_signals: Array<{
+    signal_type: "test_failure" | "runtime_error" | "review_finding";
+    summary: string;
+    evidence_refs: string[];
+  }>;
   memory_candidates: string[];
   native_session_id?: string;
 }

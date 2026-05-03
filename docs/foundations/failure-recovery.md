@@ -331,6 +331,40 @@
 - 返工后 review accepted。
 - 用户确认风险接受。
 
+## 自我修复失败
+
+触发条件：
+
+- Runtime Signal 无法归一化。
+- Bug Candidate 无法判断是否为 bug。
+- 自动修复复现步骤失败。
+- 修复改动超出 write scope。
+- 修复后质量门禁失败。
+- Reviewer 拒绝修复。
+- 自动修复超过轮次上限。
+
+系统动作：
+
+1. 标记 Repair Attempt 为 `failed`、`needs_rework` 或 `escalated`。
+2. 保存修复计划、diff、测试结果和失败原因。
+3. 如果是证据不足，Bug Candidate 进入 `needs_evidence`。
+4. 如果是风险过高，生成普通 issue 或审批请求。
+5. 如果重复失败，写入 Memory candidate，提醒后续任务降低自动修复信心。
+
+禁止：
+
+- 为了修复而删除失败测试。
+- 降低质量门禁。
+- 扩大写入范围。
+- 在无法确认 bug 时继续自动改代码。
+
+恢复出口：
+
+- 补充证据后重新分类。
+- 降级为人工修复 issue。
+- 用户审批高风险修复。
+- 取消 bug candidate。
+
 ## Memory 写入失败
 
 触发条件：

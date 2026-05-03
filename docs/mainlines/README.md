@@ -1,6 +1,6 @@
 # 主线文档
 
-主线文档按真实项目生命周期和平台治理流程组织，帮助读者从平台用户与访问控制、被管理项目接入、需求规划、开发、代码管理、服务器资源到发布投产完整走通。
+主线文档按真实项目生命周期和平台治理流程组织，帮助读者从平台用户与访问控制、被管理项目接入、需求规划、开发、运行反馈与自我修复、代码管理、服务器资源到发布投产完整走通。
 
 主线不是按模块名划分，而是按专家判定标准划分。满足以下条件越多，越应该成为主线：
 
@@ -28,6 +28,7 @@
 | 项目接入与阅读理解 | [project-comprehension.md](./project-comprehension.md) | 接入本地/远程仓库，建立项目画像、模块地图和理解快照 |
 | 需求规划与 Issue 编排 | [requirement-planning.md](./requirement-planning.md) | 将用户需求完善、澄清、拆分为 Issue Graph 和可执行 schedule |
 | 代码开发 | [code-development.md](./code-development.md) | 消费 ready issue，完成多 Agent 实现、测试、质量复核和返工 |
+| 运行反馈与自我修复 | [runtime-feedback-self-repair.md](./runtime-feedback-self-repair.md) | 采集运行信号，判断 bug，自动修复低风险问题并沉淀能力 |
 | 代码管理 | [code-management.md](./code-management.md) | 管理任务分支、worktree、integration branch、PR/MR 和用户改动保护 |
 | 服务器资源管理 | [server-resource-management.md](./server-resource-management.md) | 统一维护测试开发机、生产机、云资产、到期、巡检和资源组 |
 | DevOps 发布投产 | [devops-release-deployment.md](./devops-release-deployment.md) | 管理 release branch、tag、部署、线上冒烟、监控、回滚和复盘 |
@@ -39,6 +40,7 @@
 - Agent Runtime 和模型 Provider：[模型与工具适配规划](../model-tool-adapters.md)
 - Agent role、team 和 skills：[Agent、Skills 与编排](../agent-skills-memory.md)
 - Memory：[Agent Memory 系统方案](../agent-memory-system.md)
+- 自我修复：[Bug 判断与自我修复策略](../policies/bug-detection-self-repair-policy.md)
 - 鉴权：[鉴权与访问控制策略](../policies/auth-access-policy.md)
 - 权限：[权限模型](../foundations/permission-model.md)
 - 失败恢复：[失败恢复设计](../foundations/failure-recovery.md)
@@ -61,6 +63,7 @@
 
 - [鉴权与访问控制策略](../policies/auth-access-policy.md)
 - [质量与合入策略](../policies/quality-merge-policy.md)
+- [Bug 判断与自我修复策略](../policies/bug-detection-self-repair-policy.md)
 - [Provider 路由策略](../policies/provider-routing-policy.md)
 - [Memory 决策策略](../policies/memory-decision-policy.md)
 

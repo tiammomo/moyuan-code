@@ -29,9 +29,9 @@
 | [基础规范](./foundations/README.md) | 术语、对象、用户鉴权、权限、失败恢复是否统一 | 基础规范存在且互相不冲突 |
 | [总体规划与生命周期路线图](./lifecycle-roadmap.md) | MVP、Phase、CLI 是否清楚 | CLI 只在此维护，Phase 验收可执行 |
 | [参考架构](./reference-architecture.md) | 系统模块和状态机是否清楚 | 模块职责、状态、上下文链路明确 |
-| [主线文档](./mainlines/README.md) | 端到端流程是否按真实生命周期组织 | 7 条主线覆盖平台用户与访问控制、接入、需求规划、开发、代码管理、服务器资源和发布投产 |
+| [主线文档](./mainlines/README.md) | 端到端流程是否按真实生命周期组织 | 8 条主线覆盖平台用户与访问控制、接入、需求规划、开发、自我修复、代码管理、服务器资源和发布投产 |
 | [策略决策树](./policies/README.md) | 关键判断是否可转成实现策略 | 决策树、阻断条件、人工确认和日志要求明确 |
-| [契约文档](./contracts/README.md) | 实现接口、错误、日志和迁移契约是否明确 | auth、schema、runtime、logging、workspace migration 契约存在 |
+| [契约文档](./contracts/README.md) | 实现接口、错误、日志和迁移契约是否明确 | auth、self-repair、schema、runtime、logging、workspace migration 契约存在 |
 | [项目工作空间规范](./project-workspace-spec.md) | `.moyuan/` 目录和 schema 索引是否清楚 | 每个目录都有职责和权威文档 |
 | [完整配置方案](./configuration-guide.md) | 项目运行需要哪些配置 | 核心 YAML 都有示例和校验清单 |
 | [配置 Schema 规则](./configuration-schema-spec.md) | 配置字段哪些必填、可选、可为空、必须为空 | 核心 YAML 字段规则明确 |
@@ -52,12 +52,13 @@
 - 项目接入与阅读理解主线。
 - 需求规划与 Issue 编排主线。
 - 代码开发主线。
+- 运行反馈与自我修复主线。
 - 代码管理主线。
 - 服务器资源管理主线。
 - DevOps 发布投产主线。
 - 每条主线引用的策略决策树。
 - 策略的输入事实、决策结果、阻断条件和人工确认条件。
-- 契约文档覆盖 auth、schema、runtime、logging 和 workspace migration。
+- 契约文档覆盖 auth、self-repair、schema、runtime、logging 和 workspace migration。
 
 通过标准：
 
@@ -165,6 +166,27 @@
 通过标准：
 
 - 系统不会覆盖用户改动，不会未经审查合入主分支。
+
+### 5.1 运行反馈与自我修复链路
+
+必须明确：
+
+- Runtime Signal 来源。
+- Bug Candidate 分类。
+- confirmed bug、not bug、needs evidence、enhancement candidate 的边界。
+- 自动修复允许条件。
+- 自动修复阻断条件。
+- Repair Attempt 状态。
+- 回归测试要求。
+- 质量门禁和 review 回路。
+- 修复经验如何进入 Memory。
+
+通过标准：
+
+- 系统不会把偶发环境问题当作代码 bug 静默修复。
+- 系统不会把新需求直接当作 bug 修复。
+- 自动修复不能绕过写入范围、审批、质量门禁和 review。
+- 项目使用过程中能沉淀 bug signature、fix pattern 和测试经验。
 
 ### 6. Release / Deploy 链路
 
@@ -340,8 +362,10 @@ design_debt:
 - 核心数据对象缺失。
 - 没有权限模型。
 - 没有身份、会话、API Token 或审批模型。
+- 没有自我修复的 bug 判断、阻断和质量回路。
 - 没有失败恢复路径。
 - Claude CLI / Codex CLI 可以绕过质量门禁。
+- 自动修复可以删除失败测试、放宽门禁或扩大写入范围。
 - 第三方 API 数据边界不清楚。
 - 高风险操作可以绕过鉴权或审批。
 - 生产部署没有回滚和审批策略。
@@ -359,4 +383,5 @@ design_debt:
 - 为 GitHub 之外的 Gitee、GitLab、generic git 补充独立接入字段表。
 - 为配置项补充统一的 required/optional/nullable 机器可读标记。
 - 为用户、组织、成员、Token 和审批补充配置/数据库迁移细则。
+- 为自我修复补充 fixture、mock signal、repair sandbox 和回归测试模板。
 - 对配置示例做一次冗余和敏感信息审计。

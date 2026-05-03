@@ -370,6 +370,7 @@ Prompt 分两层。
 - 项目接入后，强制 record comprehension candidates。
 - 拉取远程分支后，强制 retrieve 旧项目画像并 record 变化。
 - Review 完成后，强制 record 被确认的质量经验。
+- 自我修复完成后，强制 record 被验证的 bug signature、root cause、fix pattern 和 regression test。
 
 Record Prompt 核心规则：
 
@@ -398,6 +399,8 @@ Retrieve Prompt 核心规则：
 - 拉取远程分支后完成 incremental comprehension。
 - 质量门禁发现高价值经验。
 - Review Agent 给出被接受的结论。
+- 自我修复成功并通过质量门禁和 review。
+- 同类 bug 重复出现并被确认。
 - 测试、构建、发布命令被确认。
 - 任务完成后产生可复用经验。
 

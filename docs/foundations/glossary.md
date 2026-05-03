@@ -51,6 +51,10 @@
 | Compact | Compact | 对 Memory 自动压缩、合并、去重和整理 | 不是简单删除 | [Agent Memory 系统方案](../agent-memory-system.md) |
 | Quality Gate | Quality Gate | 对 AI 生成代码执行的可运行性、测试、重复、复杂度、架构和安全检查 | 不是人工 review 的替代 | [代码生命周期质量门禁](../code-lifecycle-quality-gates.md) |
 | Review | Review | 对 diff、风险、测试缺口和可维护性的独立审核 | 不是测试命令 | [代码生命周期质量门禁](../code-lifecycle-quality-gates.md) |
+| Runtime Signal | Runtime Signal | 运行、测试、冒烟、监控、用户反馈或 review 中产生的异常信号 | 不是已确认 bug | [运行反馈与自我修复主线](../mainlines/runtime-feedback-self-repair.md) |
+| Bug Candidate | Bug Candidate | 由 Runtime Signal 聚合出的疑似 bug，等待分类和证据确认 | 不等同于 Issue | [运行反馈与自我修复主线](../mainlines/runtime-feedback-self-repair.md) |
+| Repair Attempt | Repair Attempt | 一次自动或半自动修复尝试，必须受写入范围、质量门禁和 review 控制 | 不是绕过流程的热修 | [自我修复契约](../contracts/self-repair-contract.md) |
+| Improvement Record | Improvement Record | 成功修复或重复问题产生的能力增强候选 | 不是自动生效的策略变更 | [自我修复契约](../contracts/self-repair-contract.md) |
 | Worktree | Worktree | Git worktree，用于隔离并行 issue 开发 | 不是长期分支策略 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Task Branch | Task Branch | 单个 issue 或 task 的开发分支 | 不是 release branch | [仓库接入、Git 与项目理解](../repository-onboarding-git-management.md) |
 | Epic Branch | Epic Branch | 一个 Epic 的集成分支，用于合并已验收 issues | 不是默认主分支 | [Issues 编排与并发调度](../issue-orchestration.md) |

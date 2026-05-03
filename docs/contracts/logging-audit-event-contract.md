@@ -112,6 +112,7 @@ interface StateChangedEvent extends LogEvent {
 | 项目接入与阅读理解 | project_added、repository_cloned、comprehension_started、comprehension_completed |
 | 需求规划与 Issue 编排 | requirement_refined、clarification_decided、issue_graph_created、schedule_created |
 | 代码开发 | runtime_started、runtime_completed、quality_started、review_completed |
+| 运行反馈与自我修复 | self_repair.signal.captured、self_repair.bug.classified、self_repair.repair.planned、self_repair.repair.completed |
 | 代码管理 | branch_created、worktree_created、merge_attempted、merge_completed |
 | 服务器资源管理 | host_added、resource_check_completed、expiration_alert_created |
 | DevOps 发布投产 | release_suggested、release_branch_created、deploy_started、smoke_completed、rollback_started |

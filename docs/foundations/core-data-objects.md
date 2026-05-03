@@ -545,6 +545,7 @@ planned -> executing -> paused -> completed -> replanned
 - `commands`
 - `tests`
 - `quality_gates`
+- `runtime_signals`
 - `memory_candidates`
 - `logs`
 
@@ -574,6 +575,8 @@ needs_user_input
 - Agent Role
 - Runtime Session
 - Quality Report
+- Runtime Signal
+- Repair Attempt
 - Memory Record
 
 ## Agent Role
@@ -769,6 +772,9 @@ candidate -> staged -> committed -> hot -> warm -> cold -> archived
 - Run
 - Agent Role
 - Project Comprehension
+- Bug Candidate
+- Repair Attempt
+- Improvement Record
 
 ## Quality Report
 
@@ -801,6 +807,188 @@ created -> checking -> passed -> failed -> superseded
 - Run
 - Issue
 - Review
+- Bug Candidate
+- Repair Attempt
+
+## Runtime Signal
+
+职责：表示测试、运行、冒烟、监控、用户反馈或 review 中产生的异常信号。
+
+关键字段：
+
+- `id`
+- `project_id`
+- `signal_type`
+- `source_type`
+- `source_id`
+- `summary`
+- `evidence_refs`
+- `environment`
+- `trace_id`
+- `occurred_at`
+
+生命周期：
+
+```text
+captured -> normalized -> correlated -> classified -> archived
+```
+
+失败状态：
+
+```text
+invalid
+insufficient_context
+```
+
+落盘位置：
+
+- `.moyuan/lifecycle/signals/`
+- `.moyuan/logs/errors/`
+
+关联对象：
+
+- Run
+- Issue
+- Release
+- Deployment
+- Bug Candidate
+
+## Bug Candidate
+
+职责：表示由一个或多个 Runtime Signal 聚合出的疑似 bug。
+
+关键字段：
+
+- `id`
+- `project_id`
+- `signal_ids`
+- `title`
+- `affected_scope`
+- `suspected_root_cause`
+- `reproducible`
+- `reproduction_commands`
+- `classification`
+- `confidence`
+- `risk_level`
+- `status`
+
+生命周期：
+
+```text
+detected -> classifying -> confirmed -> issue_created -> repairing -> repaired -> archived
+```
+
+失败或分流状态：
+
+```text
+not_bug
+needs_evidence
+enhancement_candidate
+blocked
+```
+
+落盘位置：
+
+- `.moyuan/lifecycle/bug-candidates/`
+
+关联对象：
+
+- Runtime Signal
+- Issue
+- Repair Attempt
+- Quality Report
+- Memory Record
+
+## Repair Attempt
+
+职责：表示一次自动或半自动修复尝试。
+
+关键字段：
+
+- `id`
+- `bug_candidate_id`
+- `project_id`
+- `issue_id`
+- `run_id`
+- `repair_branch`
+- `write_scope`
+- `strategy`
+- `status`
+- `regression_tests`
+- `quality_report_id`
+- `review_decision`
+
+生命周期：
+
+```text
+planned -> branch_created -> running -> quality_checking -> reviewing -> accepted -> merged
+```
+
+失败或终止状态：
+
+```text
+blocked
+failed
+needs_rework
+escalated
+cancelled
+```
+
+落盘位置：
+
+- `.moyuan/lifecycle/repair-attempts/`
+
+关联对象：
+
+- Bug Candidate
+- Issue
+- Run
+- Quality Report
+- Review
+- Improvement Record
+
+## Improvement Record
+
+职责：表示由成功修复或重复问题产生的能力增强候选。
+
+关键字段：
+
+- `id`
+- `project_id`
+- `source_repair_attempt_id`
+- `type`
+- `summary`
+- `confidence`
+- `status`
+- `target`
+- `created_at`
+
+生命周期：
+
+```text
+candidate -> approved -> applied -> archived
+```
+
+失败或终止状态：
+
+```text
+rejected
+superseded
+```
+
+落盘位置：
+
+- `.moyuan/lifecycle/improvements/`
+- `.moyuan/memory/candidates/`，如果作为 Memory 候选。
+
+关联对象：
+
+- Repair Attempt
+- Memory Record
+- Agent Role
+- Skill
+- Model Policy
+- Module Map
 
 ## Server Resource
 

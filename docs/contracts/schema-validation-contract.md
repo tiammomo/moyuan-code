@@ -98,6 +98,7 @@ read yaml
 - role 引用的 model policy 存在。
 - team 引用的 role 存在。
 - access policy 引用的 project role 存在。
+- self_repair require_approval_for 只能引用已定义风险触发器。
 - environment 引用的 resource group 存在。
 - resource group 引用的 host id 存在。
 - release 引用的 remote provider 已配置。

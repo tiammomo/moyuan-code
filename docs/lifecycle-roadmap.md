@@ -11,28 +11,30 @@
 - 以项目为单位隔离配置、任务、memory、skills、模型策略和审计记录。
 - 支持本地路径和远程 Git 仓库接入。
 - 每次项目接入和远程分支同步后自动执行项目阅读理解。
-- 通过多 Agent 分工完成需求、设计、开发、质量门禁、测试、review、发布和复盘。
+- 通过多 Agent 分工完成需求、设计、开发、质量门禁、测试、review、运行反馈、自我修复、发布和复盘。
 - 让可靠结论进入可治理的 Agent Memory 系统，支撑长期迭代。
+- 通过运行信号、Bug 判断、自动修复和能力增强，让项目越使用越完善。
 
 ## 2. 核心能力
 
 | 能力 | 说明 | 权威文档 |
 | --- | --- | --- |
-| 主线流程 | 平台用户与访问控制、项目接入、需求规划、代码开发、代码管理、服务器资源、DevOps 发布投产 | [主线文档](./mainlines/README.md) |
-| 策略决策树 | 鉴权、阅读理解、调度、质量、Git、服务器、发布、Provider、Memory 决策 | [策略决策树](./policies/README.md) |
+| 主线流程 | 平台用户与访问控制、项目接入、需求规划、代码开发、运行反馈与自我修复、代码管理、服务器资源、DevOps 发布投产 | [主线文档](./mainlines/README.md) |
+| 策略决策树 | 鉴权、阅读理解、调度、质量、Bug 判断、自我修复、Git、服务器、发布、Provider、Memory 决策 | [策略决策树](./policies/README.md) |
 | 用户与鉴权 | 用户、组织、会话、API Token、角色、审批、审计 | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |
 | 多 Agent 编排 | role、team、handoff、输出契约 | [Agent、Skills 与编排](./agent-skills-memory.md) |
 | Issues 编排 | 自动拆分 issues、依赖图、并发调度、ready queue | [Issues 编排与并发调度](./issue-orchestration.md) |
 | 仓库接入与理解 | 本地/远程仓库、Git 分支、项目阅读理解 | [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md) |
 | 项目工作空间 | `.moyuan/` schema 索引 | [项目工作空间规范](./project-workspace-spec.md) |
 | 质量门禁 | 测试、重复度、复杂度、review、返工 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) |
+| 自我修复 | 运行信号、Bug Candidate、自动修复、回归测试、能力增强 | [运行反馈与自我修复主线](./mainlines/runtime-feedback-self-repair.md) |
 | Agent Memory | record gate、抽取、暂存、异步写入、检索、维护 | [Agent Memory 系统方案](./agent-memory-system.md) |
 | 模型和工具适配 | Claude Code、Codex、国产模型、Shell/Git/Test/MCP | [模型与工具适配规划](./model-tool-adapters.md) |
 | 架构 | Orchestrator、Agent Runtime、Memory Engine、Adapter Layer | [参考架构](./reference-architecture.md) |
 
 ## 2.1 主线映射
 
-未来开发按 7 条主线推进。主线不是模块清单，而是真实生命周期中的端到端流程。
+未来开发按 8 条主线推进。主线不是模块清单，而是真实生命周期中的端到端流程。
 
 | 主线 | 负责范围 | 主要阶段 | 权威文档 |
 | --- | --- | --- | --- |
@@ -40,6 +42,7 @@
 | 项目接入与阅读理解 | 本地/远程仓库接入、full/incremental/diff comprehension、项目画像、模块地图 | DISCOVERY | [项目接入与阅读理解主线](./mainlines/project-comprehension.md) |
 | 需求规划与 Issue 编排 | 需求完善、澄清判断、Issue Graph、依赖、schedule、ready/blocked queue | PLANNING / DESIGN | [需求规划与 Issue 编排主线](./mainlines/requirement-planning.md) |
 | 代码开发 | 消费 ready issue，执行 Claude/Codex 开发、测试、复核和返工 | IMPLEMENTATION / QUALITY_CHECK / REVIEW | [代码开发主线](./mainlines/code-development.md) |
+| 运行反馈与自我修复 | 运行信号、Bug 判断、自动修复、回归测试、能力增强 | VERIFICATION / OPERATION / RETROSPECTIVE | [运行反馈与自我修复主线](./mainlines/runtime-feedback-self-repair.md) |
 | 代码管理 | branch、worktree、integration branch、PR/MR、用户改动保护 | IMPLEMENTATION / REVIEW / RELEASE | [代码管理主线](./mainlines/code-management.md) |
 | 服务器资源管理 | 测试开发机、生产机、云资产、到期、巡检、资源组 | OPERATION | [服务器资源管理主线](./mainlines/server-resource-management.md) |
 | DevOps 发布投产 | release branch、tag、部署、线上冒烟、监控、回滚、复盘 | RELEASE / OPERATION / RETROSPECTIVE | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
@@ -62,6 +65,7 @@
 | 项目阅读理解策略 | 项目接入与阅读理解 | [project-comprehension-policy.md](./policies/project-comprehension-policy.md) |
 | Issue 调度策略 | 需求规划与 Issue 编排、代码开发 | [issue-scheduling-policy.md](./policies/issue-scheduling-policy.md) |
 | 质量与合入策略 | 代码开发、代码管理、DevOps 发布投产 | [quality-merge-policy.md](./policies/quality-merge-policy.md) |
+| Bug 判断与自我修复策略 | 代码开发、运行反馈与自我修复、DevOps 发布投产、Memory | [bug-detection-self-repair-policy.md](./policies/bug-detection-self-repair-policy.md) |
 | Git 分支策略 | 代码管理、DevOps 发布投产 | [git-branch-policy.md](./policies/git-branch-policy.md) |
 | 服务器资源策略 | 服务器资源管理、DevOps 发布投产 | [server-resource-policy.md](./policies/server-resource-policy.md) |
 | 发布投产策略 | DevOps 发布投产 | [release-deployment-policy.md](./policies/release-deployment-policy.md) |
@@ -84,6 +88,10 @@
 - Issue Graph：issues 之间的依赖 DAG。
 - Task：一次可追踪工作单元，可以对应一个 issue 或 issue 内的一次执行。
 - Run：Task 的一次执行实例，包含 Agent、模型、工具、Git、质量、测试和 memory 记录。
+- Runtime Signal：运行、测试、冒烟、监控、用户反馈或 review 中产生的异常信号。
+- Bug Candidate：由运行信号聚合出的疑似 bug。
+- Repair Attempt：一次自动或半自动修复尝试。
+- Improvement Record：由成功修复或重复问题产生的能力增强候选。
 - Adapter：外部能力封装层，例如 Codex、Claude Code、国产模型、Git、Shell、MCP。
 - Skill：可复用任务能力包。
 - Memory：跨任务保留的结构化上下文。
@@ -112,6 +120,7 @@
   -> 质量门禁
   -> 测试验证
   -> 独立 Review
+  -> 运行信号采集 / Bug 判断 / 自动修复
   -> 提交 / Push / PR / 发布
   -> Memory 沉淀和复盘
 ```
@@ -178,7 +187,7 @@ DISCOVERY
 
 动作：运行 test、lint、build、typecheck、benchmark 或回归脚本。
 
-产物：测试报告、验证结论、修复任务。
+产物：测试报告、验证结论、runtime signal、bug candidate、修复任务。
 
 ### REVIEW
 
@@ -200,17 +209,17 @@ DISCOVERY
 
 目标：跟踪线上或使用反馈。
 
-动作：接收日志、指标和用户反馈，关联到任务和版本，生成 bugfix 或 tuning task。
+动作：接收日志、指标和用户反馈，关联到任务和版本，生成 runtime signal，判断是否 bug，创建 bugfix、repair attempt 或 tuning task。
 
-产物：issue/task、operation memory。
+产物：runtime signal、bug candidate、repair attempt、issue/task、operation memory。
 
 ### RETROSPECTIVE
 
 目标：沉淀经验。
 
-动作：总结迭代成果、识别重复问题、更新 project memory、更新 skills 推荐权重。
+动作：总结迭代成果、识别重复问题、更新 project memory、更新 skills 推荐权重，沉淀 bug signature、root cause、fix pattern 和 regression test。
 
-产物：retrospective、lessons memory、下一轮建议。
+产物：retrospective、lessons memory、improvement record、下一轮建议。
 
 ## 6. CLI 路线
 
@@ -243,6 +252,8 @@ moyuan git status
 moyuan git branch list
 moyuan quality check <task-id>
 moyuan quality report <run-id>
+moyuan bug list
+moyuan bug show <bug-id>
 moyuan logs tail
 moyuan logs query --run <run-id>
 moyuan approval list
@@ -280,6 +291,10 @@ moyuan issue run-ready <epic-id>
 moyuan issue replan <epic-id>
 moyuan review <task-id>
 moyuan review <task-id> --quality-gate
+moyuan repair plan <bug-id>
+moyuan repair run <repair-id>
+moyuan repair status <repair-id>
+moyuan repair approve <repair-id>
 moyuan release prepare
 moyuan release suggest
 moyuan release publish <release-id>
@@ -339,11 +354,11 @@ moyuan repo pr create <task-id>
 
 - 明确核心抽象。
 - 明确 `.moyuan/` schema。
-- 明确 7 条主线和 9 类策略决策树。
+- 明确 8 条主线和 10 类策略决策树。
 - 明确用户、组织、会话、API Token、角色、审批和鉴权审计。
-- 明确仓库接入、项目理解、质量门禁、Memory、日志和审计策略。
+- 明确仓库接入、项目理解、质量门禁、自我修复、Memory、日志和审计策略。
 - 明确首批 Adapter 和 Runtime contract。
-- 明确进入实现前的契约层，包括 auth、schema、runtime、logging 和 workspace migration。
+- 明确进入实现前的契约层，包括 auth、self-repair、schema、runtime、logging 和 workspace migration。
 
 验收：
 
@@ -371,6 +386,8 @@ moyuan repo pr create <task-id>
 - 支持基于 issue 依赖和写入范围计算 ready queue。
 - 创建和执行任务。
 - 每次代码生成后自动执行质量门禁。
+- 运行失败、测试失败和 review finding 可以生成 bug candidate。
+- 低风险 confirmed bug 可以自动创建 repair attempt。
 - 支持 Reviewer Agent 独立审核 diff 和 quality report。
 - 支持高风险操作审批记录。
 - 保存 run 记录。
@@ -387,6 +404,7 @@ moyuan repo pr create <task-id>
 - 发布流程包含 release branch、回归、release notes、审批、tag、push 到 GitHub/Gitee、PR/MR、服务器部署、线上冒烟、生产监控和回滚。
 - 所有配置和产物都保存在 `.moyuan/`。
 - AI 生成代码未通过测试、审查、复杂度、重复度或测试缺口检查时不能进入完成状态。
+- 自动修复不能绕过质量门禁、review、写入范围和审批。
 
 ### Phase 2：多模型与 Skills
 
@@ -419,6 +437,7 @@ moyuan repo pr create <task-id>
 - 实现暂存去重和异步写入。
 - 实现关键词 + 向量混合检索。
 - 实现 memory approval 和 curator。
+- 实现 bug signature、root cause、fix pattern 和 regression test 的 Memory candidate。
 
 验收：
 
@@ -426,6 +445,26 @@ moyuan repo pr create <task-id>
 - 项目理解结果可以转为 memory candidates。
 - 过时和冲突 memory 能被标记。
 - 敏感信息不会进入长期 memory。
+- 类似 bug 再次出现时能检索历史修复经验。
+
+### Phase 3.5：运行反馈与自我修复
+
+目标：
+
+- 实现 Runtime Signal 采集。
+- 实现 Bug Candidate 分类。
+- 实现低风险自动修复。
+- 实现 repair attempt 状态追踪。
+- 实现修复后的回归测试、质量门禁和 review。
+- 实现 improvement record 和能力增强建议。
+
+验收：
+
+- 稳定测试失败能自动生成 confirmed bug candidate。
+- 非 bug 和 enhancement 不会直接触发代码修改。
+- 低风险 confirmed bug 可以在 issue worktree 内自动修复并补充回归测试。
+- 自动修复失败超过上限后转人工 issue。
+- 成功修复能沉淀 Memory，并影响后续测试策略、skills 推荐或模型路由建议。
 
 ### Phase 4：团队协作与审计
 
@@ -488,15 +527,16 @@ Adapter 路线：
 
 优先级：
 
-1. 同步路线图、README、设计门禁和文档治理，使 7 条主线和策略层成为正式结构。
+1. 同步路线图、README、设计门禁和文档治理，使 8 条主线和策略层成为正式结构。
 2. 补充用户与鉴权设计，使平台用户、组织、会话、API Token、角色、审批和审计有唯一权威入口。
-3. 补充术语表中的 Mainline、Policy、Decision Tree、Ready Issue、Blocked Reason、Contract 等概念。
-4. 新增状态机总表，统一 User、Project、Epic、Issue、Run、Release、Deployment、Memory、Server Resource 的状态来源。
-5. 新增契约层文档，至少包含 auth session、schema validation、runtime adapter、logging audit event 和 workspace migration。
-6. 补充 Gitee、GitLab、generic Git 的独立接入字段表。
-7. 补充安全威胁模型，覆盖 prompt injection、模型外发、仓库恶意文件、远程命令、密钥泄露、账号接管和生产误操作。
-8. 补充 Moyuan 框架自身测试策略，覆盖 fixture repos、mock runtime、Git sandbox、schema golden tests、auth tests 和 E2E。
-9. 完成一次文档就绪巡检，再决定是否进入实现 issue 拆分。
+3. 补充运行反馈与自我修复设计，使 Runtime Signal、Bug Candidate、Repair Attempt 和 Improvement Record 有唯一权威入口。
+4. 补充术语表中的 Mainline、Policy、Decision Tree、Ready Issue、Blocked Reason、Contract 等概念。
+5. 新增状态机总表，统一 User、Project、Epic、Issue、Run、Bug Candidate、Repair Attempt、Release、Deployment、Memory、Server Resource 的状态来源。
+6. 新增契约层文档，至少包含 auth session、self-repair、schema validation、runtime adapter、logging audit event 和 workspace migration。
+7. 补充 Gitee、GitLab、generic Git 的独立接入字段表。
+8. 补充安全威胁模型，覆盖 prompt injection、模型外发、仓库恶意文件、远程命令、密钥泄露、账号接管、错误自动修复和生产误操作。
+9. 补充 Moyuan 框架自身测试策略，覆盖 fixture repos、mock runtime、Git sandbox、schema golden tests、auth tests、self-repair tests 和 E2E。
+10. 完成一次文档就绪巡检，再决定是否进入实现 issue 拆分。
 
 进入实现拆分前必须满足：
 

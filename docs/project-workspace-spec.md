@@ -97,6 +97,10 @@
     runs/
     quality/
     reviews/
+    signals/
+    bug-candidates/
+    repair-attempts/
+    improvements/
     releases/
     deployments/
     retrospectives/
@@ -143,6 +147,10 @@
 | `lifecycle/issue-graphs/` | issue DAG、ready queue、blocked/running 状态 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | `lifecycle/schedules/` | 调度计划、并发度、worktree 分配 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | `lifecycle/` | 需求、设计、run、quality、review、release、retro | [总体规划与生命周期路线图](./lifecycle-roadmap.md) |
+| `lifecycle/signals/` | 运行、测试、冒烟、监控、用户反馈和 review 异常信号 | [运行反馈与自我修复主线](./mainlines/runtime-feedback-self-repair.md) |
+| `lifecycle/bug-candidates/` | 疑似 bug、证据、分类结果和阻断原因 | [运行反馈与自我修复主线](./mainlines/runtime-feedback-self-repair.md) |
+| `lifecycle/repair-attempts/` | 自动修复计划、执行记录、质量结果和 review 结论 | [自我修复契约](./contracts/self-repair-contract.md) |
+| `lifecycle/improvements/` | bug signature、fix pattern、测试策略和能力增强候选 | [自我修复契约](./contracts/self-repair-contract.md) |
 | `lifecycle/deployments/` | 投产记录、服务器部署结果、冒烟和监控报告 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | `policies/orchestration.yaml` | issue graph、自动并发、冲突保护、replan 策略 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | `policies/access.yaml` | 项目级角色、成员访问边界和审批入口；不保存身份凭证明文 | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |

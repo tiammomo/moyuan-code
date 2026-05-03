@@ -53,6 +53,7 @@ Moyuan Code 文档分为八层：
 | 仓库、Git、项目理解 | `repository-onboarding-git-management.md` | 不在路线图重复流程细节 |
 | Issue 编排和并发调度 | `issue-orchestration.md` | Agent 文档不重复 issue graph |
 | 质量门禁 | `code-lifecycle-quality-gates.md` | Issue 文档只引用 gate 结果 |
+| 运行反馈与自我修复 | `mainlines/runtime-feedback-self-repair.md`、`policies/bug-detection-self-repair-policy.md`、`contracts/self-repair-contract.md` | 质量门禁只引用修复后的 gate 结果 |
 | Agent、Team、Skills | `agent-skills-memory.md` | Memory 细节只引用 Memory 文档 |
 | Agent Memory | `agent-memory-system.md` | 其他文档只说明如何调用 |
 | 模型、Runtime、Adapter | `model-tool-adapters.md` | 配置细节回到 configuration guide |
@@ -77,6 +78,7 @@ Moyuan Code 文档分为八层：
 | 策略 | architect + domain_owner | 控制决策树、阻断条件和人工确认规则 |
 | 契约 | core_engineer + architect | 控制实现接口、事件、错误和迁移 |
 | 用户与鉴权 | identity_owner + architect | 控制用户、会话、Token、角色、审批和审计 |
+| 运行反馈与自我修复 | quality_owner + orchestrator_owner | 控制运行信号、Bug 判断、自动修复和能力增强 |
 | 配置方案 | core_engineer | 控制 schema 和默认值 |
 | Issue 编排 | orchestrator_owner | 控制任务拆分和调度规则 |
 | Memory | memory_owner | 控制记录、检索、compact |
@@ -100,8 +102,9 @@ Moyuan Code 文档分为八层：
 7. 是否影响端到端流程：更新 `mainlines/` 对应主线。
 8. 是否新增判断规则：更新 `policies/` 对应策略。
 9. 是否新增实现接口或事件结构：更新 `contracts/` 对应契约。
-10. 是否新增模块专题能力：更新对应专题文档。
-11. 是否需要入口：更新 `README.md`。
+10. 是否新增运行反馈、自我修复或能力增强：更新自我修复主线、策略、契约和 Memory 触发规则。
+11. 是否新增模块专题能力：更新对应专题文档。
+12. 是否需要入口：更新 `README.md`。
 
 ## 文档生命周期
 
@@ -309,7 +312,7 @@ prompt 管理规则：
 - 配置是否只在配置方案完整展开。
 - 主线是否覆盖平台用户与访问控制、项目接入、需求规划、代码开发、代码管理、服务器资源和发布投产。
 - 策略是否覆盖关键决策点和人工确认条件。
-- 契约是否覆盖 auth、schema、runtime、logging 和 workspace migration。
+- 契约是否覆盖 auth、self-repair、schema、runtime、logging 和 workspace migration。
 - 核心对象是否和配置一致。
 - 权限和失败恢复是否覆盖新增能力。
 - 图片、讲解和需要保留的 prompt 是否仍然准确。
@@ -441,6 +444,7 @@ prompt 管理规则：
 - 新 CLI 只改路线图。
 - 新配置完整示例只改配置方案。
 - 新鉴权边界先改平台用户与访问控制主线、鉴权策略和身份会话契约。
+- 新自我修复边界先改运行反馈与自我修复主线、Bug 判断策略和自我修复契约。
 - 新权限边界改权限模型。
 - 新失败场景改失败恢复。
 - 新文档必须接入 README 或 foundations README。

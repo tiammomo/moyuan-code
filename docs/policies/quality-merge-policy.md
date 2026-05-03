@@ -10,6 +10,8 @@
 - changed files。
 - command results。
 - test/lint/build/typecheck results。
+- runtime signals。
+- repair attempt，如适用。
 - quality report。
 - review findings。
 - style constraints。
@@ -50,6 +52,8 @@ else if dependency/security risk high:
 else:
   QUALITY_PASSED
 ```
+
+失败结果如果形成稳定 runtime signal，应交给 [Bug 判断与自我修复策略](./bug-detection-self-repair-policy.md) 判断是否为 confirmed bug。质量策略本身不直接决定是否自动修复。
 
 ## 5. Review 决策树
 
@@ -111,6 +115,7 @@ else:
 产物：
 
 - `.moyuan/lifecycle/quality/`
+- `.moyuan/lifecycle/signals/`，如果验证失败形成运行信号。
 - `.moyuan/lifecycle/reviews/`
 - `.moyuan/lifecycle/merge-reports/`
 
@@ -126,6 +131,7 @@ else:
 ## 10. 关联配置
 
 - `.moyuan/policies/code-quality.yaml`
+- [Bug 判断与自我修复策略](./bug-detection-self-repair-policy.md)
 - `.moyuan/policies/orchestration.yaml`
 - `.moyuan/policies/permissions.yaml`
 

@@ -28,6 +28,9 @@ Agent 不是模型本身，而是以下配置的组合：
 | frontend | 前端功能和交互实现 | 设计、接口约定、UI 需求 | 页面变更、组件、交互验证 |
 | tester | 测试设计和执行 | 需求、代码变更、风险 | 测试用例、测试结果、缺口 |
 | quality_guard | 质量门禁、重复度、复杂度和可维护性审核 | diff、quality report、项目规范 | 质量结论、返工项、阻断原因 |
+| bug_triager | 运行信号和疑似 bug 分类 | runtime signal、日志、测试失败、用户反馈 | bug classification、evidence、blocked reason |
+| repair_agent | 低风险 bug 的最小修复和回归测试 | confirmed bug、repair plan、write scope | 修复 diff、回归测试、风险说明 |
+| improvement_curator | 修复经验和能力增强候选整理 | repair attempts、quality reports、memory candidates | improvement record、skill/model/quality 建议 |
 | reviewer | 代码审查和风险识别 | diff、设计、测试结果 | review findings、修复建议 |
 | security | 安全审计 | 代码、依赖、配置、权限 | 漏洞风险、修复建议 |
 | release_manager | 版本分支建议、release notes、tag、push/PR、服务器部署投产和维护 | integration branch、accepted issues、测试记录、服务器配置 | release/deploy suggestion、release note、tag、PR/MR、deployment record |
@@ -51,6 +54,10 @@ verifiers:
   - tester
   - quality_guard
   - reviewer
+self_repair:
+  triager: bug_triager
+  repairer: repair_agent
+  curator: improvement_curator
 ```
 
 默认 Runtime 绑定：
@@ -61,6 +68,9 @@ role_runtime_defaults:
   backend: codex_cli
   backend_tuning: codex_cli
   tester: codex_cli
+  bug_triager: codex_cli
+  repair_agent: codex_cli
+  improvement_curator: codex_cli
   reviewer: codex_cli
   architect: claude_cli
   planner: claude_cli
@@ -181,6 +191,8 @@ Project Comprehension
 - 涉及鉴权时追加 `security-review`。
 - 涉及迁移时追加 `migration-planning`。
 - 涉及 UI 回归时追加 `visual-regression`。
+- 运行失败、测试失败、冒烟失败或用户反馈异常时追加 `bug_triager`。
+- 低风险 confirmed bug 追加 `repair_agent`，修复完成后追加 `improvement_curator`。
 - 项目接入和远程分支同步后追加 `project_reader`、`module_mapper` 和 `memory_curator`。
 
 ## 7. Memory Scope
@@ -202,6 +214,9 @@ Project Comprehension
 | backend_tuning | 性能历史、测试命令、瓶颈记录 | 优化结论和指标 |
 | tester | 测试策略、历史缺口 | 新测试命令和回归经验 |
 | quality_guard | 质量规范、重复问题 | 质量经验和坏味道模式 |
+| bug_triager | 历史 bug、错误 signature、模块风险 | bug classification、证据和误报经验 |
+| repair_agent | fix pattern、回归测试、模块约束 | 已验证修复经验和回归测试 |
+| improvement_curator | repair history、质量经验、skills 效果 | improvement record、能力增强建议 |
 | reviewer | 历史风险、决策、规范 | 被接受的 review 结论 |
 | release_manager | 发布历史、版本批次偏好、远程仓库策略、服务器和回滚策略 | release/deploy suggestion、deployment memory、release memory |
 | memory_curator | 全部候选、暂存区、冲突和低频记忆 | compact summary、合并、过期、降权结果 |

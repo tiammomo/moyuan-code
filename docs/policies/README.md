@@ -32,6 +32,7 @@
 | 项目阅读理解策略 | [project-comprehension-policy.md](./project-comprehension-policy.md) | full/incremental/diff comprehension、stale memory |
 | Issue 调度策略 | [issue-scheduling-policy.md](./issue-scheduling-policy.md) | 澄清、拆分、依赖、并发、等待队列、Runtime 分派 |
 | 质量与合入策略 | [quality-merge-policy.md](./quality-merge-policy.md) | 质量门禁、返工、review、合入 integration branch |
+| Bug 判断与自我修复策略 | [bug-detection-self-repair-policy.md](./bug-detection-self-repair-policy.md) | 运行信号、bug 分类、自动修复、增强候选和学习闭环 |
 | Git 分支策略 | [git-branch-policy.md](./git-branch-policy.md) | branch/worktree/PR/MR/用户改动保护 |
 | 服务器资源策略 | [server-resource-policy.md](./server-resource-policy.md) | 服务器登记、资源组、到期、巡检、生产权限 |
 | 发布投产策略 | [release-deployment-policy.md](./release-deployment-policy.md) | release batch、release branch、tag、deploy、smoke、rollback |
@@ -47,8 +48,9 @@
 3. 用户改动保护。
 4. 生产环境保护。
 5. 质量和合入门禁。
-6. 资源和预算限制。
-7. Agent Runtime 和 Provider 路由。
-8. 成本优化。
+6. Bug 判断与自我修复策略。
+7. 资源和预算限制。
+8. Agent Runtime 和 Provider 路由。
+9. 成本优化。
 
 任何成本优化、并发优化或自动化操作都不能绕过鉴权、权限、安全、质量和生产保护。

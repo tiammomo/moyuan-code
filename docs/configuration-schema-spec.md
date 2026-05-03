@@ -336,12 +336,19 @@ Runtime 字段：
 | `quality.required_for_all_code_tasks` | required | `true` | 必须为 true |
 | `quality.max_rework_rounds` | required | `3` | 返工上限 |
 | `gates` | required | 无 | 至少包含 runnable、test_gap |
+| `self_repair.enabled` | required | `true` | 是否启用运行反馈和自我修复 |
+| `self_repair.mode` | required | `candidate_only` | observe_only、candidate_only、issue_only、auto_repair_low_risk |
+| `self_repair.max_attempts_per_bug` | required | `2` | 单个 bug 自动修复上限 |
+| `self_repair.require_regression_test` | required | `true` | 自动修复必须补回归测试 |
+| `self_repair.require_approval_for` | required | 无 | 高风险修复审批触发器 |
 
 必须为空：
 
 - `gates.runnable` 不允许为空。
 - `gates.test_gap` 不允许为空。
 - `quality.max_rework_rounds` 不能为 null。
+- `self_repair.mode` 不能为 null。
+- `self_repair.require_approval_for` 不能为空数组。
 
 ## 15. policies/comprehension.yaml
 
