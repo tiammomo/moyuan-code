@@ -19,6 +19,7 @@ const apiKey = process.env.OPENAI_API_KEY;
 const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
 const imagePath = process.env.IMAGE_API_PATH || "/images/generations";
 const size = process.env.IMAGE_SIZE || "3072x2048";
+const sizeLabel = process.env.IMAGE_SIZE_LABEL || (size.startsWith("4096x") ? "4K" : "2K");
 const quality = process.env.IMAGE_QUALITY || "high";
 const outputFormat = process.env.IMAGE_OUTPUT_FORMAT || "png";
 const timeoutMs = Number(process.env.IMAGE_TIMEOUT_MS || 180000);
@@ -80,11 +81,11 @@ function collectDocsContext() {
 function buildDiagramSpec() {
   return `
 图名：Moyuan Code Multi-Agent SDLC 调用逻辑
-目标：生成一张横版 2K 技术信息流图，用编号层级、主流程箭头、辅助流程虚线、数据/工作空间沉淀层和底部治理层，精炼展示 Moyuan Code 的核心调用逻辑。参考用户给出的优秀横版流程图风格：顶部强标题、分层编号模块、深蓝标题条、浅色卡片、数据库圆柱、右上图例、底部调度/控制层。不要照搬参考图的业务内容，只参考版式组织方式。
+目标：生成一张横版 ${sizeLabel} 技术信息流图，用编号层级、主流程箭头、辅助流程虚线、数据/工作空间沉淀层和底部治理层，精炼展示 Moyuan Code 的核心调用逻辑。参考用户给出的优秀横版流程图风格：顶部强标题、分层编号模块、深蓝标题条、浅色卡片、数据库圆柱、右上图例、底部调度/控制层。不要照搬参考图的业务内容，只参考版式组织方式。
 受众：技术负责人、架构师、后端/前端/测试/运维 Agent 配置人员、后续实现工程师。
 
 画面布局：
-请生成一张横版 2K 宽屏技术流程图，不是竖版海报。整体结构必须像工程调用逻辑图：
+请生成一张横版 ${sizeLabel} 宽屏技术流程图，不是竖版海报。整体结构必须像工程调用逻辑图：
 
 顶部：大标题居中
 - 标题：Moyuan Code Multi-Agent SDLC 调用逻辑
@@ -192,7 +193,7 @@ function buildDiagramSpec() {
 function buildPrompt() {
   const docsContext = collectDocsContext();
   return `
-你是资深软件架构图设计师和技术信息图设计师。请根据下面的设计规格，生成一张适合技术评审会议展示的横版 2K 技术调用逻辑图。
+你是资深软件架构图设计师和技术信息图设计师。请根据下面的设计规格，生成一张适合技术评审会议展示的横版 ${sizeLabel} 技术调用逻辑图。
 
 ${buildDiagramSpec()}
 
