@@ -126,6 +126,8 @@
     environments.yaml
   reports/
   tmp/
+    transactions/
+  .locks/
 ```
 
 ## 3. Schema 索引
@@ -177,6 +179,8 @@
 | `policies/release.yaml` | 版本分支、tag、PR/MR、投产和回滚策略 | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
 | `policies/environments.yaml` | 服务器、环境、部署方式、健康检查、监控配置引用 | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
 | `reports/` | 人类可读报告 | [总体规划与生命周期路线图](./lifecycle-roadmap.md) |
+| `tmp/transactions/` | 跨文件状态变更的事务 journal、崩溃恢复和回滚依据 | [持久化与并发一致性](./persistence-concurrency-consistency.md) |
+| `.locks/` | project、issue、graph、run、memory、release 等 scoped lock | [持久化与并发一致性](./persistence-concurrency-consistency.md) |
 
 ## 4. project.yaml 最小结构
 

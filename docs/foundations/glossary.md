@@ -36,6 +36,7 @@
 | Blocked Reason | Blocked Reason | issue、run、release 或 deployment 被阻断的结构化原因 | 不是普通错误文本 | [Issue 调度策略](../policies/issue-scheduling-policy.md) |
 | Schedule | Schedule | Orchestrator 生成的执行排期、并发度和 worktree 分配 | 不是最终执行结果 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Run | Run | 一次任务执行实例，记录 Agent、模型、工具、Git、质量、测试和 Memory 信息 | 不是 Issue 本身 | [项目工作空间规范](../project-workspace-spec.md) |
+| State Store | State Store | Workspace Manager 背后的状态读写抽象，负责原子写、版本、锁和事务恢复 | 不是业务数据库选型本身 | [持久化与并发一致性](../persistence-concurrency-consistency.md) |
 | Agent | Agent | 角色、工具权限、Memory scope、skills、模型策略和输出契约的组合 | 不等同于某个模型 | [Agent 角色与团队概览](../agent-roles-overview.md) |
 | Subagent | Subagent | Orchestrator 为具体任务创建的 Agent 执行实例，具备父对象、role、runtime、skills、scope 和生命周期 | 不是长期角色或模型本身 | [Subagent 与 Skills 系统方案](../subagents-skills-system.md) |
 | Role | Role | Agent 的职责定义，例如 backend、tester、reviewer | 不是具体执行进程 | [Agent 角色与团队概览](../agent-roles-overview.md) |
@@ -74,6 +75,7 @@
 | Audit Log | Audit Log | 审批、密钥访问、高风险命令和保护路径访问的不可变审计事件 | 不是普通 debug log | [日志与审计事件契约](../contracts/logging-audit-event-contract.md) |
 | Visual Diagram | Visual Diagram | 由 gpt-image-2 辅助生成的架构流程图、部署拓扑图或讲解资产 | 不是代码事实来源 | [模型与工具适配规划](../model-tool-adapters.md) |
 | Diagram Spec | Diagram Spec | 生成架构图前的结构化图定义，包括节点、边、层级和敏感信息省略项 | 不是图片文件 | [模型与工具适配规划](../model-tool-adapters.md) |
+| Golden Fixture | Golden Fixture | 用于固定 Moyuan 本体行为预期的测试样例和 expected 结果 | 不是为了通过测试随意更新的快照 | [框架自身测试策略](../framework-testing-strategy.md) |
 
 ## 命名约定
 

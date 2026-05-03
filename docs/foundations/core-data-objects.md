@@ -35,7 +35,7 @@
 | Memory 与质量 | Memory Record、Quality Report |
 | 运行反馈与自我修复 | Runtime Signal、Bug Candidate、Repair Attempt、Improvement Record |
 | 资源与发布 | Server Resource、Resource Group、Release、Deployment、Environment |
-| 可视化与审计 | Visual Diagram、Diagram Spec、Audit Log、Log Event |
+| 可视化与审计 | Visual Diagram、Diagram Spec、Transaction Journal、Audit Log、Log Event |
 
 ## 3. 对象索引
 
@@ -79,6 +79,7 @@
 | Deployment | 投产、冒烟、监控和回滚记录 | Release Manager | `.moyuan/lifecycle/deployments/` | Release、Environment、Server Resource |
 | Visual Diagram | gpt-image-2 辅助生成的架构图 | Visual Service | `.moyuan/visuals/`、`docs/assets/` | Project Comprehension、Diagram Spec |
 | Diagram Spec | 生成架构图前的结构化图定义 | Visual Service | `.moyuan/visuals/specs/` | Visual Diagram |
+| Transaction Journal | 跨文件状态变更、恢复和回滚的事务记录 | Workspace Manager | `.moyuan/tmp/transactions/` | Workspace、Run、Issue、Release、Audit Log |
 | Audit Log | 审批、密钥访问、高风险命令和权限拒绝 | Audit Service | `.moyuan/logs/audit/` | User、Run、Release、Deployment |
 | Log Event | 核心运行日志事件 | Logging Service | `.moyuan/logs/` | Run、Subagent、Model Provider、Git、Memory |
 
@@ -148,6 +149,7 @@ User / Service Account
 | Memory | `.moyuan/memory/` | 候选、暂存、长期记忆、compact 结果 |
 | 项目理解 | `.moyuan/comprehension/` | project profile、module map、events |
 | 日志审计 | `.moyuan/logs/` | run、agent、model、git、quality、release、memory、audit、error |
+| 事务和锁 | `.moyuan/tmp/transactions/`、`.moyuan/.locks/` | 状态写入恢复、锁和并发控制 |
 | 控制面对象 | 控制面数据库或本地身份文件 | User、Organization、Membership、API Token、Approval |
 | 密钥 | secret manager、环境变量或系统 credential store | 只在配置里保存引用 |
 

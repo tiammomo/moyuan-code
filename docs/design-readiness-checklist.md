@@ -43,6 +43,9 @@
 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) | Subagent 和 skills 是否显式建模 | Subagent 生命周期、Skill Registry、绑定、效果反馈明确 |
 | [Agent Memory 系统方案](./agent-memory-system.md) | Memory 如何记录、检索、整理 | record、retrieve、compact、审计明确 |
 | [模型与工具适配规划](./model-tool-adapters.md) | 外部能力如何接入 | Provider、Runtime、Adapter、Image、错误分类明确 |
+| [实现模块拆分](./implementation-module-map.md) | 设计如何映射到代码模块 | 模块职责、依赖方向、实现顺序和测试替身明确 |
+| [框架自身测试策略](./framework-testing-strategy.md) | Moyuan 本体如何验证 | fake runtime、golden fixtures、CI 门禁和失败恢复测试明确 |
+| [持久化与并发一致性](./persistence-concurrency-consistency.md) | `.moyuan/` 状态如何抗并发和崩溃 | 原子写、锁、版本、事务、幂等和恢复规则明确 |
 
 ## 核心链路门禁
 
@@ -267,6 +270,57 @@
 通过标准：
 
 - 架构图可以辅助讲解，但不作为事实来源。
+
+### 11. 实现模块链路
+
+必须明确：
+
+- 代码模块分层。
+- Orchestrator、Scheduler、Subagent、Runtime Adapter、Workspace、Memory、Quality、Git、Release 的边界。
+- 模块依赖方向。
+- 禁止绕过的基础能力。
+- 最小实现顺序。
+
+通过标准：
+
+- 可以从模块图直接拆分实现 issues。
+- 任一模块都不能绕过 Auth、Policy、Workspace、Logging、Quality Gate。
+
+### 12. 框架自身测试链路
+
+必须明确：
+
+- fake repo。
+- fake Claude CLI。
+- fake Codex CLI。
+- fake model provider。
+- golden Issue Graph。
+- workspace recovery 测试。
+- secret scan 和 docs link check。
+- fixture regression。
+
+通过标准：
+
+- 不依赖真实模型、真实 GitHub/Gitee 或真实服务器，也能测试核心编排闭环。
+- 历史失败能沉淀为 regression fixture。
+
+### 13. 持久化和并发一致性链路
+
+必须明确：
+
+- `.moyuan/` 状态写入 API。
+- 原子写。
+- scoped lock。
+- optimistic version。
+- transaction journal。
+- append-only log。
+- crash recovery。
+- idempotency key。
+
+通过标准：
+
+- 并发 issue、Subagent、Runtime、Quality Gate 不会覆盖彼此状态。
+- 崩溃后不会把 issue、run、memory 或 release 留在不可判断状态。
 
 ## 基础规范门禁
 

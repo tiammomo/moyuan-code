@@ -24,6 +24,8 @@
 
 8. [Agent Memory 系统方案](./agent-memory-system.md)：理解记忆判断、抽取、暂存去重、自动 compact、分层存储、检索和长期维护。
 
+9. [实现模块拆分](./implementation-module-map.md)、[框架自身测试策略](./framework-testing-strategy.md) 与 [持久化与并发一致性](./persistence-concurrency-consistency.md)：进入代码实现前，确认代码模块、测试替身、状态写入、锁和崩溃恢复边界。
+
 ## 核心设计文档
 
 | 文档 | 作用 |
@@ -39,6 +41,9 @@
 | [agent-roles-overview.md](./agent-roles-overview.md) | Agent role、team、默认 Runtime 和 memory scope 概览 |
 | [subagents-skills-system.md](./subagents-skills-system.md) | Subagent 生命周期、Skill Registry、推荐、绑定和效果反馈 |
 | [agent-memory-system.md](./agent-memory-system.md) | Agent Memory 唯一详细方案 |
+| [implementation-module-map.md](./implementation-module-map.md) | 将设计文档映射为后续代码模块、依赖方向和实现顺序 |
+| [framework-testing-strategy.md](./framework-testing-strategy.md) | Moyuan 本体测试策略、fake runtime、golden fixtures 和 CI 门禁 |
+| [persistence-concurrency-consistency.md](./persistence-concurrency-consistency.md) | `.moyuan/` 状态持久化、锁、事务、并发控制和崩溃恢复 |
 
 ## 主线文档
 
@@ -94,6 +99,9 @@
 | [model-tool-adapters.md](./model-tool-adapters.md) | Claude CLI、Codex CLI、GPT、Claude、GLM、MiniMax、第三方 API、gpt-image-2 和工具适配 |
 | [issue-orchestration.md](./issue-orchestration.md) | Issue Graph、并发调度和等待模型的专题参考 |
 | [code-lifecycle-quality-gates.md](./code-lifecycle-quality-gates.md) | 质量门禁、审核、返工和合入前检查的专题参考 |
+| [implementation-module-map.md](./implementation-module-map.md) | 实现模块拆分和最小落地顺序 |
+| [framework-testing-strategy.md](./framework-testing-strategy.md) | 框架自身测试策略和回归 fixture 设计 |
+| [persistence-concurrency-consistency.md](./persistence-concurrency-consistency.md) | 状态一致性、锁、事务和恢复策略 |
 
 ## 基础规范
 
@@ -142,5 +150,6 @@
 - 所有核心设计文档通过 [设计就绪门禁](./design-readiness-checklist.md)。
 - 配置规则已能转换为 JSON Schema、Zod schema 或 TypeScript runtime validator。
 - 契约文档已覆盖 auth、subagent/skill、self-repair、schema、runtime、logging 和 workspace migration。
+- 实现模块拆分、框架自身测试策略、持久化与并发一致性已经通过设计评审。
 - 核心对象、权限模型、失败恢复和文档维护规则没有互相冲突。
 - README 只保留导航和边界，不重复专题方案细节。
