@@ -31,6 +31,7 @@
 | [参考架构](./reference-architecture.md) | 系统模块和状态机是否清楚 | 模块职责、状态、上下文链路明确 |
 | [主线文档](./mainlines/README.md) | 端到端流程是否按真实生命周期组织 | 6 条主线覆盖接入、需求规划、开发、代码管理、服务器资源和发布投产 |
 | [策略决策树](./policies/README.md) | 关键判断是否可转成实现策略 | 决策树、阻断条件、人工确认和日志要求明确 |
+| [契约文档](./contracts/README.md) | 实现接口、错误、日志和迁移契约是否明确 | schema、runtime、logging、workspace migration 契约存在 |
 | [项目工作空间规范](./project-workspace-spec.md) | `.moyuan/` 目录和 schema 索引是否清楚 | 每个目录都有职责和权威文档 |
 | [完整配置方案](./configuration-guide.md) | 项目运行需要哪些配置 | 核心 YAML 都有示例和校验清单 |
 | [配置 Schema 规则](./configuration-schema-spec.md) | 配置字段哪些必填、可选、可为空、必须为空 | 核心 YAML 字段规则明确 |
@@ -55,11 +56,13 @@
 - DevOps 发布投产主线。
 - 每条主线引用的策略决策树。
 - 策略的输入事实、决策结果、阻断条件和人工确认条件。
+- 契约文档覆盖 schema、runtime、logging 和 workspace migration。
 
 通过标准：
 
 - 可以从主线文档直接拆出端到端实现 issue。
 - 可以从策略文档直接实现规则引擎、状态机或 runtime validator。
+- 可以从契约文档直接定义 TypeScript interface、JSON Schema、日志事件和测试用例。
 
 ### 1. 项目接入链路
 
@@ -260,6 +263,8 @@
 - CLI 只在路线图维护。
 - 配置完整示例只在配置方案维护。
 - 新能力有写入规则。
+- 状态机总表已纳入基础规范。
+- 契约文档已纳入 README 和设计门禁。
 
 ## 进入实现前的设计评审问题
 
@@ -286,7 +291,7 @@
 ```yaml
 design_debt:
   id: debt-001
-  title: 待补 schema 迁移策略
+  title: schema 迁移策略需在 Phase 1 前确认
   affected_docs:
     - configuration-guide.md
   risk: 中
@@ -316,15 +321,15 @@ design_debt:
 - 生产部署没有回滚和审批策略。
 - `.moyuan/` 目录职责不清楚。
 - 配置字段缺少必填、可为空或必须为空规则。
+- 关键实现契约缺失，导致 runtime、schema 或日志无法落地。
 - 同一能力存在多个互相冲突的权威文档。
 
-## 当前建议
+## 后续文档补强项
 
-当前文档已经覆盖主要能力，但进入实现前仍建议补强：
+当前文档已经覆盖主要能力。进入实现前仍建议补强以下文档规格：
 
-- 将 Phase 1 MVP 从路线图拆成可执行 issue 清单。
 - 将 [配置 Schema 规则](./configuration-schema-spec.md) 转成可机器校验的 schema。
-- 为 Claude CLI、Codex CLI、Git Adapter、Model Provider 定义更细的 runtime contract。
+- 为 Git Adapter、Model Provider 补充更细的 adapter contract。
 - 为 GitHub 之外的 Gitee、GitLab、generic git 补充独立接入字段表。
 - 为配置项补充统一的 required/optional/nullable 机器可读标记。
 - 对配置示例做一次冗余和敏感信息审计。

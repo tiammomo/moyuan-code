@@ -17,6 +17,8 @@
 
 | 能力 | 说明 | 权威文档 |
 | --- | --- | --- |
+| 主线流程 | 项目接入、需求规划、代码开发、代码管理、服务器资源、DevOps 发布投产 | [主线文档](./mainlines/README.md) |
+| 策略决策树 | 阅读理解、调度、质量、Git、服务器、发布、Provider、Memory 决策 | [策略决策树](./policies/README.md) |
 | 多 Agent 编排 | role、team、handoff、输出契约 | [Agent、Skills 与编排](./agent-skills-memory.md) |
 | Issues 编排 | 自动拆分 issues、依赖图、并发调度、ready queue | [Issues 编排与并发调度](./issue-orchestration.md) |
 | 仓库接入与理解 | 本地/远程仓库、Git 分支、项目阅读理解 | [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md) |
@@ -25,6 +27,42 @@
 | Agent Memory | record gate、抽取、暂存、异步写入、检索、维护 | [Agent Memory 系统方案](./agent-memory-system.md) |
 | 模型和工具适配 | Claude Code、Codex、国产模型、Shell/Git/Test/MCP | [模型与工具适配规划](./model-tool-adapters.md) |
 | 架构 | Orchestrator、Agent Runtime、Memory Engine、Adapter Layer | [参考架构](./reference-architecture.md) |
+
+## 2.1 主线映射
+
+未来开发按 6 条主线推进。主线不是模块清单，而是真实生命周期中的端到端流程。
+
+| 主线 | 负责范围 | 主要阶段 | 权威文档 |
+| --- | --- | --- | --- |
+| 项目接入与阅读理解 | 本地/远程仓库接入、full/incremental/diff comprehension、项目画像、模块地图 | DISCOVERY | [项目接入与阅读理解主线](./mainlines/project-comprehension.md) |
+| 需求规划与 Issue 编排 | 需求完善、澄清判断、Issue Graph、依赖、schedule、ready/blocked queue | PLANNING / DESIGN | [需求规划与 Issue 编排主线](./mainlines/requirement-planning.md) |
+| 代码开发 | 消费 ready issue，执行 Claude/Codex 开发、测试、复核和返工 | IMPLEMENTATION / QUALITY_CHECK / REVIEW | [代码开发主线](./mainlines/code-development.md) |
+| 代码管理 | branch、worktree、integration branch、PR/MR、用户改动保护 | IMPLEMENTATION / REVIEW / RELEASE | [代码管理主线](./mainlines/code-management.md) |
+| 服务器资源管理 | 测试开发机、生产机、云资产、到期、巡检、资源组 | OPERATION | [服务器资源管理主线](./mainlines/server-resource-management.md) |
+| DevOps 发布投产 | release branch、tag、部署、线上冒烟、监控、回滚、复盘 | RELEASE / OPERATION / RETROSPECTIVE | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
+
+横切能力：
+
+- Agent Runtime、Provider、Adapter 和模型路由。
+- Agent Memory。
+- 权限、日志、审计和失败恢复。
+- 配置 schema 和 workspace 管理。
+- gpt-image-2 架构可视化。
+
+## 2.2 策略层映射
+
+策略层负责把主线中的判断节点整理成可实现的决策树。后续实现时，策略优先转为规则引擎、状态机或 runtime validator。
+
+| 策略 | 主要调用主线 | 权威文档 |
+| --- | --- | --- |
+| 项目阅读理解策略 | 项目接入与阅读理解 | [project-comprehension-policy.md](./policies/project-comprehension-policy.md) |
+| Issue 调度策略 | 需求规划与 Issue 编排、代码开发 | [issue-scheduling-policy.md](./policies/issue-scheduling-policy.md) |
+| 质量与合入策略 | 代码开发、代码管理、DevOps 发布投产 | [quality-merge-policy.md](./policies/quality-merge-policy.md) |
+| Git 分支策略 | 代码管理、DevOps 发布投产 | [git-branch-policy.md](./policies/git-branch-policy.md) |
+| 服务器资源策略 | 服务器资源管理、DevOps 发布投产 | [server-resource-policy.md](./policies/server-resource-policy.md) |
+| 发布投产策略 | DevOps 发布投产 | [release-deployment-policy.md](./policies/release-deployment-policy.md) |
+| Provider 路由策略 | 需求规划、代码开发、Memory、架构可视化 | [provider-routing-policy.md](./policies/provider-routing-policy.md) |
+| Memory 决策策略 | 所有主线 | [memory-decision-policy.md](./policies/memory-decision-policy.md) |
 
 ## 3. 关键抽象
 
@@ -273,15 +311,18 @@ moyuan repo pr create <task-id>
 
 - 明确核心抽象。
 - 明确 `.moyuan/` schema。
-- 明确仓库接入、项目理解、质量门禁和 memory 策略。
-- 明确首批 adapter。
+- 明确 6 条主线和 8 类策略决策树。
+- 明确仓库接入、项目理解、质量门禁、Memory、日志和审计策略。
+- 明确首批 Adapter 和 Runtime contract。
+- 明确进入实现前的契约层，包括 schema、runtime、logging 和 workspace migration。
 
 验收：
 
-- 文档可直接拆分实现 issue。
+- 文档可直接支撑后续拆分实现 issue，但当前阶段不强制拆 issue 清单。
 - 每个能力只有一个权威文档展开细节。
 - [设计就绪门禁](./design-readiness-checklist.md) 结论必须为 `READY` 或明确记录 `READY_WITH_RISKS` 的设计债务。
 - 权限、失败恢复、核心数据对象和文档维护规则必须完成并接入 README。
+- 主线层、策略层和契约层互相引用清楚，没有重复权威来源。
 
 ### Phase 1：本地 CLI MVP
 
@@ -406,23 +447,23 @@ Adapter 路线：
 - Beta：DashScope、DeepSeek、Zhipu、MCP。
 - Production：GitHub/Gitee/GitLab PR/MR、CI/CD、Observability、Enterprise SSO/Policy。
 
-## 9. 近期任务拆分
+## 9. 文档迭代计划
 
-1. 定义 `.moyuan/` schema。
-2. 实现 `moyuan project add --local`。
-3. 实现 `moyuan project add --remote` 和远程 clone。
-4. 实现 `moyuan init`。
-5. 实现项目 inspect。
-6. 实现 `moyuan comprehend --full`。
-7. 实现 `moyuan comprehend --since <commit>`。
-8. 实现 Git 状态识别和任务分支创建。
-9. 实现拉取远程分支后的增量阅读理解。
-10. 实现 task/run 数据模型。
-11. 实现 Claude Code Adapter 最小命令调用。
-12. 实现 Codex Adapter 最小命令调用。
-13. 实现 OpenAI-compatible Adapter。
-14. 实现 Agent role 配置加载。
-15. 实现 memory add/search。
-16. 实现 skills recommend 的接口占位和结果落盘。
-17. 实现 run report。
-18. 用一个真实本地项目和一个远程 Git 项目跑通端到端流程。
+当前阶段先继续完善文档规格，不拆分实现 issue 清单。
+
+优先级：
+
+1. 同步路线图、README、设计门禁和文档治理，使 6 条主线和策略层成为正式结构。
+2. 补充术语表中的 Mainline、Policy、Decision Tree、Ready Issue、Blocked Reason、Contract 等概念。
+3. 新增状态机总表，统一 Project、Epic、Issue、Run、Release、Deployment、Memory、Server Resource 的状态来源。
+4. 新增契约层文档，至少包含 schema validation、runtime adapter、logging audit event 和 workspace migration。
+5. 补充 Gitee、GitLab、generic Git 的独立接入字段表。
+6. 补充安全威胁模型，覆盖 prompt injection、模型外发、仓库恶意文件、远程命令、密钥泄露和生产误操作。
+7. 补充 Moyuan 框架自身测试策略，覆盖 fixture repos、mock runtime、Git sandbox、schema golden tests 和 E2E。
+8. 完成一次文档就绪巡检，再决定是否进入实现 issue 拆分。
+
+进入实现拆分前必须满足：
+
+- [设计就绪门禁](./design-readiness-checklist.md) 没有 `NOT_READY` 项。
+- 主线、策略、契约、配置、对象、权限和失败恢复互相不冲突。
+- 关键实现契约能直接转成代码接口、schema 或测试用例。

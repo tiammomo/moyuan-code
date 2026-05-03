@@ -22,6 +22,7 @@ Moyuan Code 文档分为七层：
 | 总体规划层 | `lifecycle-roadmap.md`、`reference-architecture.md` | 定义产品方向、生命周期、架构和阶段 |
 | 主线层 | `mainlines/` | 按真实生命周期串联端到端流程 |
 | 策略层 | `policies/` | 定义可实现的决策树、阻断条件和人工确认规则 |
+| 契约层 | `contracts/` | 定义面向实现的接口、事件、错误和迁移契约 |
 | 专题设计层 | `issue-orchestration.md`、`agent-memory-system.md` 等 | 定义单一能力的完整设计 |
 | 资产层 | `assets/`、`.moyuan/visuals/` | 保存架构图、讲解和可追溯生成产物 |
 
@@ -32,6 +33,7 @@ Moyuan Code 文档分为七层：
 - 总体规划层描述全局流程，不展开模块内部细节。
 - 主线层描述端到端执行流程，不重复完整配置和对象字段。
 - 策略层描述决策树，不重复流程背景和专题细节。
+- 契约层描述实现接口，不重复主线流程和策略分支。
 - 专题设计层只能有一个权威文档负责一个能力。
 - 资产层必须能追溯到生成 prompt 或说明文档；prompt 默认归为生成产物，不参与文档权威性判断。
 
@@ -44,6 +46,7 @@ Moyuan Code 文档分为七层：
 | 总体架构和状态机 | `reference-architecture.md` | 专题文档只引用状态机 |
 | 端到端执行主线 | `mainlines/` | 专题文档不再重复整条生命周期流程 |
 | 策略决策树 | `policies/` | 主线文档只引用策略，不展开所有判断分支 |
+| 实现契约 | `contracts/` | 主线和策略只引用契约，不重复接口结构 |
 | Workspace 目录和 schema 索引 | `project-workspace-spec.md` | 不展开完整配置 |
 | 配置组合示例 | `configuration-guide.md` | 其他文档只给局部片段或引用 |
 | 配置字段规则 | `configuration-schema-spec.md` | 其他文档不重复 required/nullable 表 |
@@ -71,6 +74,7 @@ Moyuan Code 文档分为七层：
 | 架构 | architect | 控制模块边界和状态机 |
 | 主线 | product_owner + architect + domain_owner | 控制端到端流程和产物边界 |
 | 策略 | architect + domain_owner | 控制决策树、阻断条件和人工确认规则 |
+| 契约 | core_engineer + architect | 控制实现接口、事件、错误和迁移 |
 | 配置方案 | core_engineer | 控制 schema 和默认值 |
 | Issue 编排 | orchestrator_owner | 控制任务拆分和调度规则 |
 | Memory | memory_owner | 控制记录、检索、compact |
@@ -93,8 +97,9 @@ Moyuan Code 文档分为七层：
 6. 是否新增权限边界：更新 `foundations/permission-model.md`。
 7. 是否影响端到端流程：更新 `mainlines/` 对应主线。
 8. 是否新增判断规则：更新 `policies/` 对应策略。
-9. 是否新增模块专题能力：更新对应专题文档。
-10. 是否需要入口：更新 `README.md`。
+9. 是否新增实现接口或事件结构：更新 `contracts/` 对应契约。
+10. 是否新增模块专题能力：更新对应专题文档。
+11. 是否需要入口：更新 `README.md`。
 
 ## 文档生命周期
 
@@ -131,6 +136,7 @@ Moyuan Code 文档分为七层：
 - 基础规范放在 `docs/foundations/`。
 - 主线文档放在 `docs/mainlines/`，按业务主线命名。
 - 策略文档放在 `docs/policies/`，使用 `<domain>-policy.md` 命名。
+- 契约文档放在 `docs/contracts/`，使用 `<domain>-contract.md` 命名。
 - 新主线必须满足“独立生命周期、独立产物、关键阻断决策、独立 owner、横切引用、独立失败恢复”中的至少三项。
 - 正式引用的图片和讲解可以放在 `docs/assets/`。
 - 生成 prompt、diagram spec 和中间产物优先放在 `.moyuan/visuals/`，避免污染 docs 正文扫描。
@@ -145,6 +151,7 @@ docs/foundations/glossary.md
 docs/foundations/core-data-objects.md
 docs/mainlines/code-development.md
 docs/policies/issue-scheduling-policy.md
+docs/contracts/runtime-adapter-contract.md
 docs/assets/moyuan-code-architecture-<timestamp>.png
 docs/assets/moyuan-code-architecture-<timestamp>.explanation.md
 .moyuan/visuals/prompts/moyuan-code-architecture-<timestamp>.prompt.md
@@ -199,6 +206,7 @@ docs/assets/moyuan-code-architecture-<timestamp>.explanation.md
 - 服务器资源字段在环境配置和资源配置中重复维护。
 - 主线文档重复专题文档的大段细节。
 - 策略文档重复主线文档的完整流程背景。
+- 契约文档重复主线流程或策略决策树。
 
 ## 资产管理规则
 
@@ -237,6 +245,7 @@ prompt 管理规则：
 - 是否需要更新 README 索引？
 - 是否需要更新 mainlines 索引？
 - 是否需要更新 policies 索引？
+- 是否需要更新 contracts 索引？
 - 是否需要更新 schema 索引？
 - 是否需要更新术语表？
 - 是否新增核心对象？
@@ -255,6 +264,7 @@ prompt 管理规则：
 - 配置是否只在配置文档完整展开。
 - 主线是否只描述流程，不重复字段级配置。
 - 策略是否以决策树形式表达。
+- 契约是否只描述实现接口、事件、错误和迁移。
 - 新增资产是否命名清晰。
 - 是否有明文密钥或敏感信息。
 - 是否存在新的重复权威来源。
@@ -297,6 +307,7 @@ prompt 管理规则：
 - 配置是否只在配置方案完整展开。
 - 主线是否覆盖项目接入、需求规划、代码开发、代码管理、服务器资源和发布投产。
 - 策略是否覆盖关键决策点和人工确认条件。
+- 契约是否覆盖 schema、runtime、logging 和 workspace migration。
 - 核心对象是否和配置一致。
 - 权限和失败恢复是否覆盖新增能力。
 - 图片、讲解和需要保留的 prompt 是否仍然准确。

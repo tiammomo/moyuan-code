@@ -8,8 +8,9 @@
 2. [核心数据对象](./core-data-objects.md)
 3. [权限模型](./permission-model.md)
 4. [失败恢复设计](./failure-recovery.md)
-5. [文档维护规则](./documentation-governance.md)
-6. [设计就绪门禁](../design-readiness-checklist.md)
+5. [状态机总表](./state-machine-catalog.md)
+6. [文档维护规则](./documentation-governance.md)
+7. [设计就绪门禁](../design-readiness-checklist.md)
 
 维护边界：
 

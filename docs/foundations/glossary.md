@@ -13,10 +13,16 @@
 | 项目理解 | Project Comprehension | 对项目结构、模块、命令、依赖和风险的阅读理解结果 | 不是一次性摘要 | [仓库接入、Git 与项目理解](../repository-onboarding-git-management.md) |
 | 项目画像 | Project Profile | 项目理解后的稳定画像，包括技术栈、模块、命令和风险 | 不是完整源码复制 | [仓库接入、Git 与项目理解](../repository-onboarding-git-management.md) |
 | 模块地图 | Module Map | 项目模块边界、职责和依赖关系 | 不是文件树的简单罗列 | [仓库接入、Git 与项目理解](../repository-onboarding-git-management.md) |
+| 主线 | Mainline | 按真实生命周期组织的端到端流程，具备独立输入、输出、阻断决策和产物 | 不是代码模块或功能列表 | [主线文档](../mainlines/README.md) |
+| 策略 | Policy | 在主线关键节点执行的判断规则，可实现为规则引擎、状态机或校验器 | 不是流程叙述 | [策略决策树](../policies/README.md) |
+| 决策树 | Decision Tree | 将输入事实映射为决策结果的规则结构 | 不是自然语言建议 | [策略决策树](../policies/README.md) |
+| 契约 | Contract | 面向实现的接口、输入输出、错误类型、日志和验收规则 | 不是概念说明 | [契约文档](../contracts/README.md) |
 | Epic | Epic | 用户提出的开发目标，会被拆成多个 issues | 不是单个开发任务 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Issue | Issue | 最小可执行开发单元，具备依赖、写入范围、验收标准和测试计划 | 不等同于 GitHub Issue | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Issue Graph | Issue Graph | Issues 之间的依赖 DAG，用于判断串行、并行和阻塞关系 | 不是简单任务列表 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Ready Queue | Ready Queue | 当前依赖已满足、可以被调度执行的 issue 队列 | 不是所有未完成 issue | [Issues 编排与并发调度](../issue-orchestration.md) |
+| Ready Issue | Ready Issue | 已满足依赖、契约、权限、资源和 Runtime 条件，可以进入代码开发的 issue | 不是用户刚提出的需求 | [需求规划与 Issue 编排主线](../mainlines/requirement-planning.md) |
+| Blocked Reason | Blocked Reason | issue、run、release 或 deployment 被阻断的结构化原因 | 不是普通错误文本 | [Issue 调度策略](../policies/issue-scheduling-policy.md) |
 | Schedule | Schedule | Orchestrator 生成的执行排期、并发度和 worktree 分配 | 不是最终执行结果 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Run | Run | 一次任务执行实例，记录 Agent、模型、工具、Git、质量、测试和 Memory 信息 | 不是 Issue 本身 | [项目工作空间规范](../project-workspace-spec.md) |
 | Agent | Agent | 角色、工具权限、Memory scope、skills、模型策略和输出契约的组合 | 不等同于某个模型 | [Agent、Skills 与编排](../agent-skills-memory.md) |
@@ -64,3 +70,4 @@
 - `Environment` 是部署环境，`Resource Group` 是服务器集合。
 - `Memory` 是长期记忆，`Runtime State` 是当前执行状态。
 - `Visual Diagram` 是辅助讲解产物，不作为架构事实的唯一来源。
+- `Mainline` 描述端到端流程，`Policy` 描述决策规则，`Contract` 描述实现接口。
