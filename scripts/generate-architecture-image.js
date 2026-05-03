@@ -79,74 +79,57 @@ function collectDocsContext() {
 
 function buildDiagramSpec() {
   return `
-图名：Moyuan Code 多 Agent 研发全生命周期技术流程图
-目标：展示当前项目从用户需求、仓库接入、项目理解、Issue Graph、Subagent 并发执行、质量复核、Git 合入、发布投产到 Memory/日志反馈的完整技术流程。
+图名：Moyuan Code 多 Agent 研发全生命周期可视化地图
+目标：用中文为主、图标为主、少量短标签的方式，展示当前项目从用户需求、仓库接入、项目理解、Issue Graph、Subagent 并发执行、质量复核、Git 合入、发布投产到 Memory/日志反馈的完整技术流程。
 受众：技术负责人、架构师、后端/前端/测试/运维 Agent 配置人员、后续实现工程师。
 
 画面布局：
-请用横向泳道图或分层流程图。必须包含 7 条技术主线，并用箭头展示主流程和反馈回路。
+请生成一张横向技术可视化地图，不要做纯文本表格。采用“主流程从左到右 + 底部反馈环”的结构。每个主模块用大号中文标题、图标、小型流程节点和少量短标签表达。
 
-1. 入口与控制面
-   - Platform User / CLI / API / Web Console
-   - Auth Context / RBAC / Approval / Audit
-   - Secret refs, no plaintext secrets
+主流程 7 个大模块：
+
+1. 入口与权限
+   - 图标建议：用户头像、终端窗口、API 插头、盾牌、审批勾选
+   - 短标签：用户入口、CLI/API、身份上下文、RBAC、审批审计
 
 2. 仓库接入与项目理解
-   - Local Path / GitHub / Gitee / Generic Git
-   - Git Adapter: clone, fetch, branch, worktree, PR/MR capability
-   - .moyuan Workspace initialization
-   - Full / Incremental / Diff Project Comprehension
-   - Project Profile, Module Map, Commands, Risk Files, Memory Candidates
+   - 图标建议：代码仓库、Git 分支、云端仓库、放大镜、项目地图
+   - 短标签：本地/GitHub/Gitee、Git Adapter、初始化 .moyuan、项目画像、模块地图
 
-3. 需求规划与 Issue Graph
-   - Requirement Refiner
-   - Clarification Gate: needs_user_input or proceed
-   - Issue Planner
-   - Dependency Planner
-   - Scheduler
-   - User-visible Issue Graph
-   - ready_queue / blocked_queue / running_queue / review_queue
+3. 需求规划与 Issue 图
+   - 图标建议：便签需求、问号气泡、DAG 节点图、队列看板
+   - 短标签：需求完善、澄清判断、Issue 拆分、依赖图、调度队列
 
-4. Subagent 执行平面
-   - Agent Roles Overview: frontend, backend, backend_tuning, tester, quality_guard, reviewer, release_manager
-   - Subagent Manager: parent issue/run, role, skills, memory scope, write scope
-   - Skills Registry / find-skills / Skill Binding / Effectiveness
-   - Runtime Adapter
-   - Claude CLI for frontend and architecture-heavy work
-   - Codex CLI for backend, tests, review, quality and repair
-   - Model Providers: GPT, Claude, GLM, MiniMax, DeepSeek, DashScope, Third-party API
+4. 多 Agent 执行
+   - 图标建议：多个 Agent 节点、工具箱、技能拼图、Claude/Codex 运行器、模型云
+   - 短标签：Subagent、Skills、Claude CLI、Codex CLI、模型路由
 
-5. 代码质量与合入
-   - issue branch / issue worktree
-   - code edits and generated tests
-   - build / lint / typecheck / unit tests / integration tests
-   - coverage, duplication, complexity, architecture boundary, security
-   - independent review
-   - accepted -> merge to epic integration branch
-   - failed -> needs_rework -> replan
+5. 质量门禁与合入
+   - 图标建议：代码文件、测试烧杯、仪表盘、锁门、合并箭头
+   - 短标签：构建测试、覆盖率、重复复杂度、安全扫描、Review、集成分支
 
-6. 版本发布与服务器 DevOps
-   - release suggestion and release batch policy
-   - release branch, release notes, tag
-   - push to GitHub/Gitee, PR/MR
-   - environments: test, staging, production
-   - server resources: test_dev, production, cloud metadata, expiration, renewal owner
-   - deployment, backup, online smoke tests, monitoring window, rollback
+6. 发布与服务器
+   - 图标建议：版本标签、GitHub/Gitee 云、服务器机柜、火箭/部署箭头、监控波形、回滚按钮
+   - 短标签：版本分支、Tag、PR/MR、测试机、生产机、冒烟监控、回滚
 
-7. 反馈闭环和长期治理
-   - Runtime Signals -> Bug Candidate -> Repair Attempt -> Improvement Record
-   - Agent Memory: Record Gate, Extraction, Staging Dedup, Async Write, Retrieval, Automatic Compact, Reflection
-   - Unified Logs: run, agent, model, git, quality, release, deployment, memory, audit, error
-   - Documentation Governance, Config Schema, Contracts, Failure Recovery
-   - gpt-image-2 Visuals: diagram spec, prompt, image, explanation
+7. 反馈与长期治理
+   - 图标建议：环形箭头、大脑/记忆库、日志卷轴、Bug 修复扳手、文档书本
+   - 短标签：运行信号、Bug 判断、自动修复、Memory 压缩、统一日志、文档治理
+
+底部反馈环：
+从“运行信号/日志/质量问题/用户反馈”流向“Bug 候选 -> 修复尝试 -> 改进记录 -> Memory compact -> 策略/技能/文档更新”，再虚线回到“需求规划”和“多 Agent 执行”。
 
 视觉要求：
-- 生成清晰的工程技术流程图，不要营销风格，不要卡通，不要 3D，不要抽象插画。
-- 使用白底、深灰文字、蓝/绿/橙/紫作为泳道或模块区分色。
-- 标签要短、粗、清晰；不要大量小字。
+- 中文优先。图片内 90% 以上文字用中文；英文只保留必要技术名：Claude CLI、Codex CLI、Issue Graph、Memory、Logs、PR/MR、Tag。
+- 必须使用合适的图标、简化设备图、节点图、箭头和小型可视化元素，不要纯文本框堆叠。
+- 生成清晰的工程技术流程图，不要营销风格，不要卡通人物，不要 3D，不要抽象插画。
+- 白底或极浅灰底，深灰文字，蓝/绿/橙/紫/青作为模块区分色。
+- 每个模块最多 5 个短标签；每个标签尽量 2-6 个汉字。
+- 标题必须大、粗、清晰；小字不能密集。
 - 用实线箭头表示主流程，用虚线箭头表示反馈闭环和治理回路。
 - 画面中必须能看出“需求 -> Issue Graph -> Subagent 并发执行 -> 质量门禁 -> Git 合入 -> 发布部署 -> Memory/Logs/自我修复反馈”的主流程。
-- 右下角放一个小型图例：solid arrow = main flow, dashed arrow = feedback.
+- 右下角放一个小型图例：实线=主流程，虚线=反馈。
+- 整体要比普通架构图更好看，但仍然是技术向，不要变成宣传海报。
 - 不要出现任何 API Key、token、私网 IP、真实账号或密码。
 `;
 }
@@ -154,7 +137,7 @@ function buildDiagramSpec() {
 function buildPrompt() {
   const docsContext = collectDocsContext();
   return `
-你是资深软件架构图设计师。请根据下面的设计规格，生成一张适合技术评审会议展示的技术流程图。
+你是资深软件架构图设计师和技术信息图设计师。请根据下面的设计规格，生成一张适合技术评审会议展示的中文技术可视化流程图。
 
 ${buildDiagramSpec()}
 
@@ -163,8 +146,9 @@ ${docsContext}
 
 输出要求：
 - 只生成一张完整架构流程图。
-- 图片中不要出现说明性段落，保留必要短标签即可。
-- 所有文字使用中文，英文技术名可以保留，例如 Claude CLI、Codex CLI、Issue Graph、Memory、Logs。
+- 图片中不要出现说明性段落，必须用图标、节点、箭头和少量短中文标签表达。
+- 中文优先，英文只保留必要技术名，例如 Claude CLI、Codex CLI、Issue Graph、Memory、Logs。
+- 不要把规格里的长句原样放进图里。
 - 图需要让工程师一眼看懂当前 Moyuan Code 项目的端到端执行链路、并发编排、质量控制、发布投产和长期反馈闭环。
 `;
 }
