@@ -24,6 +24,7 @@ Moyuan Code 文档分为八层：
 | 策略层 | `policies/` | 定义可实现的决策树、阻断条件和人工确认规则 |
 | 契约层 | `contracts/` | 定义面向实现的接口、事件、错误和迁移契约 |
 | 专题设计层 | `issue-orchestration.md`、`agent-memory-system.md` 等 | 定义单一能力的完整设计 |
+| 决策记录层 | `adr/` | 记录关键架构决策、替代方案和影响 |
 | 资产层 | `assets/`、`.moyuan/visuals/` | 保存架构图、讲解和可追溯生成产物 |
 
 维护规则：
@@ -35,6 +36,7 @@ Moyuan Code 文档分为八层：
 - 策略层描述决策树，不重复流程背景和专题细节。
 - 契约层描述实现接口，不重复主线流程和策略分支。
 - 专题设计层只能有一个权威文档负责一个能力。
+- 决策记录层解释为什么选择某个技术方向，不替代架构、配置或契约文档。
 - 资产层必须能追溯到生成 prompt 或说明文档；prompt 默认归为生成产物，不参与文档权威性判断。
 
 ## 权威来源原则
@@ -65,6 +67,8 @@ Moyuan Code 文档分为八层：
 | 用户与鉴权 | `mainlines/platform-user-access.md`、`policies/auth-access-policy.md`、`contracts/auth-session-contract.md` | 权限模型只承接资源和动作边界 |
 | 权限模型 | `foundations/permission-model.md` | 配置文档只保留 YAML 示例 |
 | 失败恢复 | `foundations/failure-recovery.md` | 状态机文档只保留状态定义 |
+| 安全威胁模型 | `threat-model.md` | 权限模型定义资源和动作，威胁模型定义攻击场景和缓解措施 |
+| 架构决策记录 | `adr/` | 其他文档只引用 ADR，不重复决策背景和替代方案 |
 | 文档维护规则 | `foundations/documentation-governance.md` | 本文为准 |
 
 ## 文档负责人
@@ -90,6 +94,8 @@ Moyuan Code 文档分为八层：
 | 模型与工具 | adapter_owner | 控制 provider、runtime、adapter |
 | 质量门禁 | quality_owner | 控制测试、review、阻断规则 |
 | 仓库和 Git | git_owner | 控制接入、分支、用户改动保护 |
+| 安全威胁模型 | security_owner + architect | 控制攻击面、缓解措施和安全测试要求 |
+| ADR | architect | 控制关键技术决策记录和替代方案 |
 | 资产 | doc_maintainer | 控制图、prompt、讲解和敏感信息 |
 
 变更文档时，必须确认受影响责任角色。
@@ -111,7 +117,9 @@ Moyuan Code 文档分为八层：
 11. 是否新增 Subagent、skill、委派或能力复用：更新 `subagents-skills-system.md`、契约、核心对象、状态机和配置 schema。
 12. 是否新增运行反馈、自我修复或能力增强：更新自我修复主线、策略、契约和 Memory 触发规则。
 13. 是否新增模块专题能力：更新对应专题文档。
-14. 是否需要入口：更新 `README.md`。
+14. 是否改变关键技术选择：新增或更新 `adr/`。
+15. 是否引入新攻击面：更新 `threat-model.md`。
+16. 是否需要入口：更新 `README.md`。
 
 ## 文档生命周期
 
@@ -149,6 +157,7 @@ Moyuan Code 文档分为八层：
 - 主线文档放在 `docs/mainlines/`，按业务主线命名。
 - 策略文档放在 `docs/policies/`，使用 `<domain>-policy.md` 命名。
 - 契约文档放在 `docs/contracts/`，使用 `<domain>-contract.md` 命名。
+- ADR 放在 `docs/adr/`，使用 `NNNN-kebab-case-title.md` 命名。
 - 新主线必须满足“独立生命周期、独立产物、关键阻断决策、独立 owner、横切引用、独立失败恢复”中的至少三项。
 - 正式引用的图片和讲解可以放在 `docs/assets/`。
 - 生成 prompt、diagram spec 和中间产物优先放在 `.moyuan/visuals/`，避免污染 docs 正文扫描。

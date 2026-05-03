@@ -46,6 +46,8 @@
 | [实现模块拆分](./implementation-module-map.md) | 设计如何映射到代码模块 | 模块职责、依赖方向、实现顺序和测试替身明确 |
 | [框架自身测试策略](./framework-testing-strategy.md) | Moyuan 本体如何验证 | fake runtime、golden fixtures、CI 门禁和失败恢复测试明确 |
 | [持久化与并发一致性](./persistence-concurrency-consistency.md) | `.moyuan/` 状态如何抗并发和崩溃 | 原子写、锁、版本、事务、幂等和恢复规则明确 |
+| [安全威胁模型](./threat-model.md) | 主要攻击面和缓解措施是否明确 | 不可信仓库、Native Runtime、第三方 API、Memory、Skill、Git、生产服务器风险有控制措施 |
+| [ADR 架构决策记录](./adr/README.md) | 关键技术决策是否可追踪 | 已接受决策有背景、影响、替代方案和相关文档 |
 
 ## 核心链路门禁
 
@@ -321,6 +323,40 @@
 
 - 并发 issue、Subagent、Runtime、Quality Gate 不会覆盖彼此状态。
 - 崩溃后不会把 issue、run、memory 或 release 留在不可判断状态。
+
+### 14. 安全威胁链路
+
+必须明确：
+
+- 不可信仓库指令注入。
+- Native Runtime 越权写入。
+- 恶意命令执行。
+- Secret 泄露。
+- 第三方 API 数据外发。
+- Memory 污染。
+- Skill 供应链风险。
+- Git 和发布篡改。
+- 生产服务器风险。
+
+通过标准：
+
+- 每个高风险攻击面都有默认阻断、审批或审计策略。
+- 安全测试用例可以加入框架自身测试策略。
+- 权限模型、Provider 路由、Runtime Adapter 和质量门禁能共同缓解风险。
+
+### 15. ADR 决策链路
+
+必须明确：
+
+- 已接受 ADR。
+- 待评审 ADR。
+- 被替代 ADR。
+- 每个 ADR 的影响范围。
+
+通过标准：
+
+- 关键技术决策不是隐式散落在聊天或代码里。
+- 与 ADR 冲突的实现 issue 必须先更新或新增 ADR。
 
 ## 基础规范门禁
 

@@ -76,6 +76,8 @@
 | Visual Diagram | Visual Diagram | 由 gpt-image-2 辅助生成的架构流程图、部署拓扑图或讲解资产 | 不是代码事实来源 | [模型与工具适配规划](../model-tool-adapters.md) |
 | Diagram Spec | Diagram Spec | 生成架构图前的结构化图定义，包括节点、边、层级和敏感信息省略项 | 不是图片文件 | [模型与工具适配规划](../model-tool-adapters.md) |
 | Golden Fixture | Golden Fixture | 用于固定 Moyuan 本体行为预期的测试样例和 expected 结果 | 不是为了通过测试随意更新的快照 | [框架自身测试策略](../framework-testing-strategy.md) |
+| Threat Model | Threat Model | 从攻击者视角描述 Moyuan 攻击面、威胁场景和缓解措施 | 不是权限模型的字段清单 | [安全威胁模型](../threat-model.md) |
+| ADR | Architecture Decision Record | 记录关键架构决策、背景、影响和替代方案 | 不是完整设计文档或任务列表 | [ADR 架构决策记录](../adr/README.md) |
 
 ## 命名约定
 
