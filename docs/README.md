@@ -2,37 +2,90 @@
 
 当前阶段：规划设计。
 
-`moyuan-code` 目标是构建一个面向代码开发全生命周期的多 Agent 开发框架。框架需要统一调度 Claude Code、Codex、本地/远程命令行工具以及多种国产大模型 API，并支持按项目隔离工作空间、配置、记忆、skills 和迭代记录。
+`moyuan-code` 是一个面向代码开发全生命周期的多 Agent 开发框架。它的核心目标是：在理解项目代码的基础上，把用户开发需求自动完善、拆分为 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 API 分工开发，并通过质量门禁、Git 分支、发布流水线、Memory 和日志持续管理项目迭代。
 
-## 文档索引
+本文是 docs 入口，只负责导航和边界说明，不承载完整方案。
 
-- [基础规范](./foundations/README.md)：术语、核心数据对象、权限模型、失败恢复和文档维护规则。
-- [设计就绪门禁](./design-readiness-checklist.md)：进入代码实现前必须满足的文档完整性和风险收敛标准。
-- [总体规划与生命周期路线图](./lifecycle-roadmap.md)：产品定位、端到端流程、CLI 路线、Phase 和近期任务。
-- [参考架构](./reference-architecture.md)：系统分层、核心模块、运行链路和安全边界。
-- [项目工作空间规范](./project-workspace-spec.md)：`.moyuan/` schema 索引、目录职责和配置归属。
-- [完整配置方案](./configuration-guide.md)：项目接入、模型、gpt-image-2 架构可视化、Agent、编排、质量、Memory、核心日志、服务器资源、发布投产和环境配置。
-- [配置 Schema 规则](./configuration-schema-spec.md)：所有 `.moyuan/` 配置字段的必填、可选、可为空和必须为空规则。
-- [Issues 编排与并发调度](./issue-orchestration.md)：需求自动拆分、依赖图、ready queue、并发度和 issue 执行编排。
-- [仓库接入、Git 与项目理解](./repository-onboarding-git-management.md)：本地/远程仓库接入、任务分支、项目阅读理解。
-- [GitHub 接入配置](./github-integration.md)：GitHub 仓库连接、认证、token 权限、必填和可空字段。
-- [代码生命周期质量门禁](./code-lifecycle-quality-gates.md)：AI 生成代码后的验证、审查、复杂度、重复度和返工机制。
-- [Agent、Skills 与编排](./agent-skills-memory.md)：角色体系、team、skills、memory scope 和输出契约。
-- [Agent Memory 系统方案](./agent-memory-system.md)：记忆判断、抽取、暂存去重、异步写入、分层存储和动态维护。
-- [模型与工具适配规划](./model-tool-adapters.md)：Claude Code、Codex、GPT、Claude、GLM、MiniMax、gpt-image-2、第三方模型 API 和工具执行适配层。
+## 推荐阅读顺序
+
+1. [总体规划与生命周期路线图](./lifecycle-roadmap.md)：先看产品定位、端到端流程、CLI 路线、Phase 和近期落地范围。
+
+2. [参考架构](./reference-architecture.md)：理解系统分层、核心模块、运行链路、上下文装配和安全边界。
+
+3. [项目工作空间规范](./project-workspace-spec.md)：理解每个被管理项目独立 `.moyuan/` 工作空间、目录职责和 schema 索引。
+
+4. [配置方案](./configuration-guide.md) 与 [配置 Schema 规则](./configuration-schema-spec.md)：前者说明配置组合方式和关键样例，后者维护字段必填、可空、必须为空和条件必填规则。
+
+5. [Issues 编排与并发调度](./issue-orchestration.md)：理解需求完善、澄清判断、Issue Graph、依赖调度、前端 Claude / 后端 Codex 等待机制、合入门禁和发布触发。
+
+6. [代码生命周期质量门禁](./code-lifecycle-quality-gates.md)：理解 AI 生成代码后如何检查可运行性、测试缺口、重复度、复杂度、架构边界和返工。
+
+7. [Agent Memory 系统方案](./agent-memory-system.md)：理解记忆判断、抽取、暂存去重、自动 compact、分层存储、检索和长期维护。
+
+## 核心设计文档
+
+| 文档 | 作用 |
+| --- | --- |
+| [lifecycle-roadmap.md](./lifecycle-roadmap.md) | 产品定位、生命周期、CLI、Phase 和路线图 |
+| [reference-architecture.md](./reference-architecture.md) | 系统架构、模块职责、状态机和上下文链路 |
+| [project-workspace-spec.md](./project-workspace-spec.md) | `.moyuan/` 工作空间目录和 schema 索引 |
+| [configuration-guide.md](./configuration-guide.md) | 配置总览、关键配置组合和最小/投产闭环 |
+| [configuration-schema-spec.md](./configuration-schema-spec.md) | 配置字段规则、必填/可空/必须为空约束 |
+| [issue-orchestration.md](./issue-orchestration.md) | 需求拆分、Issue Graph、并发调度、等待和发布编排 |
+| [code-lifecycle-quality-gates.md](./code-lifecycle-quality-gates.md) | 质量门禁、审核、返工和合入前检查 |
+| [agent-memory-system.md](./agent-memory-system.md) | Agent Memory 唯一详细方案 |
+
+## 专题设计文档
+
+| 文档 | 作用 |
+| --- | --- |
+| [repository-onboarding-git-management.md](./repository-onboarding-git-management.md) | 本地/远程仓库接入、Git 分支、远程拉取后的项目阅读理解 |
+| [github-integration.md](./github-integration.md) | GitHub 连接、认证、token 权限、必填和可空字段 |
+| [agent-skills-memory.md](./agent-skills-memory.md) | Agent role、team、skills、memory scope 和输出契约 |
+| [model-tool-adapters.md](./model-tool-adapters.md) | Claude CLI、Codex CLI、GPT、Claude、GLM、MiniMax、第三方 API、gpt-image-2 和工具适配 |
+
+## 基础规范
+
+基础规范集中在 [foundations/](./foundations/README.md)，用于统一术语、对象、权限、失败恢复和文档维护规则。
+
+| 文档 | 作用 |
+| --- | --- |
+| [foundations/glossary.md](./foundations/glossary.md) | 核心术语 |
+| [foundations/core-data-objects.md](./foundations/core-data-objects.md) | Project、Issue、Run、Agent、Memory、Server、Release、Deployment 等核心对象 |
+| [foundations/permission-model.md](./foundations/permission-model.md) | 文件、命令、网络、密钥、Git、部署和模型权限边界 |
+| [foundations/failure-recovery.md](./foundations/failure-recovery.md) | 失败分类、恢复策略、人工介入和审计要求 |
+| [foundations/documentation-governance.md](./foundations/documentation-governance.md) | 文档权威来源、重复控制、资产管理和维护规则 |
+| [design-readiness-checklist.md](./design-readiness-checklist.md) | 进入实现前的设计就绪门禁 |
+
+## 辅助资产
+
+[assets/](./assets/) 目录不是当前文档体系的核心设计来源。这里保存的是 `gpt-image-2` 生成的辅助可视化产物，例如架构图图片和讲解文档。
+
+规则：
+
+- 核心设计以 Markdown 文档为准，不以图片为准。
+- 图片只用于辅助讲解和评审沟通。
+- 生成 prompt 默认放在 `.moyuan/visuals/prompts/`，不参与 docs 正文巡检。
+- 当图片与核心文档不一致时，以核心文档为准，并更新或废弃旧图。
 
 ## 设计原则
 
 1. 项目隔离：每个被管理项目都拥有独立工作空间、配置、记忆、任务状态和审计记录。
-2. 编排优先：框架不把自己绑定到某一个模型或 CLI，而是通过统一 Agent Runtime 调度不同执行后端。
-3. 可替换适配：Claude Code、Codex、国产大模型、MCP、命令行工具都通过 adapter 接入。
-4. Issue 编排：开发目标自动拆成 issues，按依赖图和冲突检测决定串行或并发执行。
-5. 生命周期管理：需求、设计、开发、评审、测试、发布、回归和复盘都进入可追踪流程。
-6. 仓库可接入：被管理项目可以来自本地路径或远程 Git 仓库，远程仓库可覆盖 GitHub、Gitee 和通用 Git URL。
-7. 分支可治理：每个任务默认在独立工作分支中执行，框架自动创建、同步、检查和收尾分支。
-8. 自动理解：每次项目接入后、每次远程分支拉取后，都要执行项目阅读理解并更新项目画像。
-9. 记忆可治理：记忆先判断价值，再结构化抽取，经暂存去重后异步写入，并定期维护。
-10. 日志可追踪：run、agent、model、Git、质量门禁、Memory、发布部署和错误都进入统一核心日志，敏感信息默认脱敏。
-11. 资源可治理：测试开发机和生产机进入统一资源清单，环境部署只引用资源组，生产操作必须走 release/deploy pipeline。
-12. 质量门禁：AI 生成代码必须通过验证、审查、重复度、复杂度和测试缺口检查，失败则进入返工。
-13. 人在关键环节确认：权限提升、跨目录写入、发布、删除、密钥访问和高风险命令需要策略控制。
+2. 编排优先：框架不绑定某一个模型或 CLI，而是通过统一 Agent Runtime 调度不同执行后端。
+3. 任务图驱动：开发目标先拆成 Issue Graph，再按依赖、风险、写入范围和资源决定串行或并发。
+4. 前后端分工：前端默认交给 Claude CLI，后端和后端调优默认交给 Codex CLI，最终统一回到质量门禁和 review。
+5. 质量先于合入：AI 生成代码必须通过可运行性、测试、重复度、复杂度、架构边界和独立审查。
+6. 记忆可治理：记忆先判断价值，再结构化抽取，经暂存去重、自动 compact 和维护后进入长期记忆。
+7. 仓库可治理：支持本地路径、GitHub、Gitee 和通用 Git URL，任务分支、集成分支和版本分支都受系统管理。
+8. 发布可控制：版本分支、tag、PR/MR、部署、线上冒烟、监控和回滚进入统一流水线。
+9. 资源可维护：测试开发机和生产机统一登记，云服务器到期、健康检查、备份和维护记录可追踪。
+10. 敏感信息不落盘：API key、token、SSH key、云凭证和 `.env` 明文只能以引用形式出现。
+
+## 进入实现前
+
+正式进入代码实现前，需要完成：
+
+- 所有核心设计文档通过 [设计就绪门禁](./design-readiness-checklist.md)。
+- 配置规则已能转换为 JSON Schema、Zod schema 或 TypeScript runtime validator。
+- 核心对象、权限模型、失败恢复和文档维护规则没有互相冲突。
+- README 只保留导航和边界，不重复专题方案细节。
