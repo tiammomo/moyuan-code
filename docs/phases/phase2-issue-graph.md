@@ -32,7 +32,7 @@
 | `phase2-006` | `task-model-strategy-switch` | completed | 同一任务按策略切换模型、Runtime 和 fallback | `phase2-005` | `orchestrator_owner` | 同一 issue 可审计地切换模型策略且不绕过质量门禁 |
 | `phase2-007` | `native-runtime-session-recovery` | completed | Claude CLI/Codex CLI session resume、失败降级、diff capture 增强 | `beta-015`,`phase2-006` | `runtime_owner` | CLI runtime 失败后可恢复、归档或安全降级 |
 | `phase2-008` | `gpt-image-2-diagram-pipeline` | planned | 架构图/流程图/部署拓扑图的 diagram spec、讲解文档和资产索引 | `phase2-005` | `visualization_owner` | 可读取项目理解和 Issue Graph 生成可追踪图像资产 |
-| `phase2-009` | `subagent-scheduler-retry-archive` | planned | Subagent 调度、重试、归档、输出收敛和审计增强 | `phase2-003`,`phase2-007` | `orchestrator_owner` | Subagent 可被调度、重试、归档、审计和聚合输出 |
+| `phase2-009` | `subagent-scheduler-retry-archive` | completed | Subagent 调度、重试、归档、输出收敛和审计增强 | `phase2-003`,`phase2-007` | `orchestrator_owner` | Subagent 可被调度、重试、归档、审计和聚合输出 |
 
 ## 4. 推荐执行顺序
 
@@ -45,7 +45,7 @@
 
 ## 5. 当前执行入口
 
-下一步执行 `phase2-009 subagent-scheduler-retry-archive`。
+下一步执行 `phase2-008 gpt-image-2-diagram-pipeline`。
 
 实现边界：
 

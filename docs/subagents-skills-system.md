@@ -106,11 +106,21 @@ planned -> context_assembled -> dispatched -> running -> output_collected -> val
 blocked
 failed
 timeout
+waiting_runtime
+retrying
 needs_rework
 needs_user_input
 cancelled
 superseded
 ```
+
+Phase 2 当前落地：
+
+- Subagent Instance 会记录 `retry_policy`、`retry_count`、`max_retries`、`blocked_reason`、`archive_reason`、`recovery_id`、`failure_category` 和 `output_converged`。
+- Native Runtime recovery 出现时，Orchestrator 会把对应 Subagent 标记为 `archived`，保留 recovery 引用，后续由 Scheduler 决定是否等待、返工或允许新 run。
+- Scheduler plan 会输出 `subagent_backlog`，并在 dispatch decision 中附带 subagent/recovery/retry 字段。
+- `subagent_retry_exhausted`、`subagent_waiting_runtime` 和 `subagent_needs_rework` 会阻止继续 dispatch。
+- 查询入口复用现有 `moyuan orchestrator subagent list/show` 和 API `GET /v1/projects/:project_id/subagents`、`GET /subagents/:subagent_id`。
 
 状态变化必须写入：
 

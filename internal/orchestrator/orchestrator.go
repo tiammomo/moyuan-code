@@ -139,6 +139,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		state.SubagentID = instance.ID
 		state.RuntimeID = options.RuntimeID
 		state.RuntimeStatus = rt.Status
+		state.RecoveryID = rt.RecoveryID
 	}); err != nil {
 		return Result{}, err
 	}
@@ -169,6 +170,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		state.SubagentID = instance.ID
 		state.RuntimeID = options.RuntimeID
 		state.RuntimeStatus = rt.Status
+		state.RecoveryID = rt.RecoveryID
 		state.QualityStatus = report.Status
 		state.QualityReportID = report.ID
 	})
@@ -176,10 +178,23 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		return Result{}, err
 	}
 	subagentStatus := "completed"
+	finishOptions := subagent.FinishOptions{Status: subagentStatus, OutputConverged: true}
 	if status != "accepted" {
 		subagentStatus = "needs_rework"
+		finishOptions = subagent.FinishOptions{Status: subagentStatus, BlockedReason: statusReason(status, rt.Status, report.Status)}
+		if rt.RecoveryID != "" {
+			subagentStatus = "archived"
+			finishOptions = subagent.FinishOptions{
+				Status:          subagentStatus,
+				BlockedReason:   "runtime_" + rt.Status,
+				ArchiveReason:   "native_runtime_recovery",
+				RecoveryID:      rt.RecoveryID,
+				FailureCategory: runtimeFailureCategory(rt),
+				OutputConverged: false,
+			}
+		}
 	}
-	_, _, _ = subagent.Finish(rootDir, instance.ID, subagentStatus)
+	_, _, _ = subagent.FinishWithOptions(rootDir, instance.ID, finishOptions)
 	issueState, err := transitionIssue(rootDir, "phase1-epic", issueID, status, statusReason(status, rt.Status, report.Status), run.ID, func(state *IssueState) {
 		state.QualityReportID = report.ID
 	})
@@ -223,4 +238,20 @@ func statusReason(status string, runtimeStatus string, qualityStatus string) str
 		return "quality_" + qualityStatus
 	}
 	return status
+}
+
+func runtimeFailureCategory(result runtime.Result) string {
+	for _, risk := range result.Risks {
+		switch risk {
+		case "runtime_failed", "pre_existing_dirty_worktree", "protected_paths_changed", "diff_unavailable":
+			return risk
+		}
+		if len(risk) >= len("runtime_unavailable") && risk[:len("runtime_unavailable")] == "runtime_unavailable" {
+			return "runtime_unavailable"
+		}
+	}
+	if result.Status != "completed" {
+		return "runtime_" + result.Status
+	}
+	return ""
 }

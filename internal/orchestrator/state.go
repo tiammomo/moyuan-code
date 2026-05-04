@@ -32,6 +32,7 @@ type RunState struct {
 	SubagentID      string       `json:"subagent_id,omitempty"`
 	RuntimeID       string       `json:"runtime_id,omitempty"`
 	RuntimeStatus   string       `json:"runtime_status,omitempty"`
+	RecoveryID      string       `json:"recovery_id,omitempty"`
 	QualityStatus   string       `json:"quality_status,omitempty"`
 	QualityReportID string       `json:"quality_report_id,omitempty"`
 	UpdatedAt       string       `json:"updated_at"`

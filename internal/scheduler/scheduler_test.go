@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"moyuan-code/internal/issues"
+	"moyuan-code/internal/subagent"
 	"moyuan-code/internal/workspace"
 )
 
@@ -71,5 +72,53 @@ func TestBuildHonorsRuntimeSlotBudget(t *testing.T) {
 	}
 	if len(plan.WaitingQueue) != 1 || plan.WaitingQueue[0].Reason != "runtime_slot" {
 		t.Fatalf("expected runtime slot waiting reason: %+v", plan.WaitingQueue)
+	}
+}
+
+func TestBuildWaitsWhenSubagentRetryIsExhausted(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	graph := issues.Graph{
+		Epic: issues.Epic{ID: "retry-budget", Title: "retry", Status: "planned"},
+		Nodes: []issues.Node{
+			{ID: "backend-a", Title: "backend API", Status: "ready"},
+		},
+	}
+	if err := issues.SaveGraph(root, graph); err != nil {
+		t.Fatal(err)
+	}
+	instance, err := subagent.Create(root, subagent.CreateOptions{
+		IssueID:   "backend-a",
+		RunID:     "run-failed",
+		Role:      "backend",
+		RuntimeID: "codex_cli",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := subagent.FinishWithOptions(root, instance.ID, subagent.FinishOptions{
+		Status:          "archived",
+		ArchiveReason:   "native_runtime_recovery",
+		RecoveryID:      "recovery-run-failed-codex-cli",
+		FailureCategory: "runtime_failed",
+		MaxRetries:      1,
+	}); err != nil || !ok {
+		t.Fatalf("finish subagent: ok=%v err=%v", ok, err)
+	}
+
+	plan, err := Build(root, "retry-budget", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Parallelism != 0 {
+		t.Fatalf("expected no dispatch after retry exhausted: %+v", plan)
+	}
+	if len(plan.WaitingQueue) != 1 || plan.WaitingQueue[0].Reason != "subagent_retry_exhausted" {
+		t.Fatalf("expected retry exhausted waiting reason: %+v", plan.WaitingQueue)
+	}
+	if len(plan.SubagentBacklog) != 1 || plan.SubagentBacklog[0].RecoveryID == "" {
+		t.Fatalf("expected subagent backlog with recovery id: %+v", plan.SubagentBacklog)
 	}
 }

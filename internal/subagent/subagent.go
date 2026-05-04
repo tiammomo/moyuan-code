@@ -30,23 +30,41 @@ type CreateOptions struct {
 }
 
 type Instance struct {
-	ID             string   `json:"id"`
-	ParentType     string   `json:"parent_type"`
-	ParentID       string   `json:"parent_id"`
-	IssueID        string   `json:"issue_id"`
-	RunID          string   `json:"run_id"`
-	Role           string   `json:"role"`
-	RuntimeID      string   `json:"runtime_id"`
-	ProviderID     string   `json:"provider_id,omitempty"`
-	ModelID        string   `json:"model_id,omitempty"`
-	Status         string   `json:"status"`
-	Skills         []string `json:"skills"`
-	MemoryScope    []string `json:"memory_scope"`
-	ReadScope      []string `json:"read_scope"`
-	WriteScope     []string `json:"write_scope"`
-	OutputContract []string `json:"output_contract"`
-	CreatedAt      string   `json:"created_at"`
-	UpdatedAt      string   `json:"updated_at"`
+	ID              string   `json:"id"`
+	ParentType      string   `json:"parent_type"`
+	ParentID        string   `json:"parent_id"`
+	IssueID         string   `json:"issue_id"`
+	RunID           string   `json:"run_id"`
+	Role            string   `json:"role"`
+	RuntimeID       string   `json:"runtime_id"`
+	ProviderID      string   `json:"provider_id,omitempty"`
+	ModelID         string   `json:"model_id,omitempty"`
+	Status          string   `json:"status"`
+	RetryPolicy     string   `json:"retry_policy,omitempty"`
+	RetryCount      int      `json:"retry_count"`
+	MaxRetries      int      `json:"max_retries"`
+	BlockedReason   string   `json:"blocked_reason,omitempty"`
+	ArchiveReason   string   `json:"archive_reason,omitempty"`
+	RecoveryID      string   `json:"recovery_id,omitempty"`
+	FailureCategory string   `json:"failure_category,omitempty"`
+	OutputConverged bool     `json:"output_converged"`
+	Skills          []string `json:"skills"`
+	MemoryScope     []string `json:"memory_scope"`
+	ReadScope       []string `json:"read_scope"`
+	WriteScope      []string `json:"write_scope"`
+	OutputContract  []string `json:"output_contract"`
+	CreatedAt       string   `json:"created_at"`
+	UpdatedAt       string   `json:"updated_at"`
+}
+
+type FinishOptions struct {
+	Status          string `json:"status"`
+	BlockedReason   string `json:"blocked_reason,omitempty"`
+	ArchiveReason   string `json:"archive_reason,omitempty"`
+	RecoveryID      string `json:"recovery_id,omitempty"`
+	FailureCategory string `json:"failure_category,omitempty"`
+	OutputConverged bool   `json:"output_converged"`
+	MaxRetries      int    `json:"max_retries,omitempty"`
 }
 
 func Create(rootDir string, options CreateOptions) (Instance, error) {
@@ -73,6 +91,9 @@ func Create(rootDir string, options CreateOptions) (Instance, error) {
 		ProviderID:     strings.TrimSpace(options.ProviderID),
 		ModelID:        strings.TrimSpace(options.ModelID),
 		Status:         "dispatched",
+		RetryPolicy:    "manual_review_then_retry",
+		RetryCount:     0,
+		MaxRetries:     1,
 		Skills:         normalizeList(options.Skills),
 		MemoryScope:    normalizeList(options.MemoryScope),
 		ReadScope:      normalizeList(options.ReadScope),
@@ -92,11 +113,33 @@ func Create(rootDir string, options CreateOptions) (Instance, error) {
 }
 
 func Finish(rootDir string, id string, status string) (Instance, bool, error) {
+	return FinishWithOptions(rootDir, id, FinishOptions{Status: status})
+}
+
+func FinishWithOptions(rootDir string, id string, options FinishOptions) (Instance, bool, error) {
 	instance, found, err := Load(rootDir, id)
 	if err != nil || !found {
 		return instance, found, err
 	}
-	instance.Status = defaultString(status, "completed")
+	previous := instance.Status
+	instance.Status = defaultString(options.Status, "completed")
+	if instance.MaxRetries == 0 {
+		instance.MaxRetries = 1
+	}
+	if options.MaxRetries > 0 {
+		instance.MaxRetries = options.MaxRetries
+	}
+	if instance.RetryPolicy == "" {
+		instance.RetryPolicy = "manual_review_then_retry"
+	}
+	if instance.Status == "archived" || instance.Status == "retrying" {
+		instance.RetryCount++
+	}
+	instance.BlockedReason = strings.TrimSpace(options.BlockedReason)
+	instance.ArchiveReason = strings.TrimSpace(options.ArchiveReason)
+	instance.RecoveryID = strings.TrimSpace(options.RecoveryID)
+	instance.FailureCategory = strings.TrimSpace(options.FailureCategory)
+	instance.OutputConverged = options.OutputConverged
 	instance.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	if err := fsutil.WriteJSON(instancePath(rootDir, instance.ID), instance); err != nil {
 		return Instance{}, false, err
@@ -104,7 +147,7 @@ func Finish(rootDir string, id string, status string) (Instance, bool, error) {
 	if err := fsutil.AppendJSONL(filepath.Join(instancesDir(rootDir), "instances.jsonl"), instance); err != nil {
 		return Instance{}, false, err
 	}
-	_ = logging.Log(rootDir, "run", "subagent.finished", map[string]any{"subagent_id": instance.ID, "status": instance.Status, "run_id": instance.RunID})
+	_ = logging.Log(rootDir, "run", "subagent.finished", map[string]any{"subagent_id": instance.ID, "from": previous, "status": instance.Status, "run_id": instance.RunID, "recovery_id": instance.RecoveryID})
 	return instance, true, nil
 }
 

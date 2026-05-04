@@ -150,6 +150,7 @@ blocked_queue
 ready_queue
 running_queue
 review_queue
+subagent_backlog
 ```
 
 `BLOCKED` 必须记录原因：
@@ -165,6 +166,16 @@ review_queue
 | `waiting_review` | review accepted |
 | `waiting_user_input` | 用户补充或批准 |
 | `dirty_worktree` | 用户处理本地改动 |
+| `subagent_waiting_runtime` | Runtime 恢复或 provider 可用 |
+| `subagent_needs_rework` | 返工 issue 重新规划或用户确认 |
+| `subagent_retry_exhausted` | 人工复核后创建新 run 或调整 retry policy |
+
+Phase 2 当前实现中，Scheduler 会读取 Subagent 的 retry/archive 状态：
+
+- `archived + retry_count >= max_retries`：进入 waiting，原因 `subagent_retry_exhausted`。
+- `waiting_runtime`：进入 waiting，原因 `subagent_waiting_runtime`。
+- `needs_rework`：进入 waiting，原因 `subagent_needs_rework`。
+- `retrying`：保留 retry metadata，继续按 runtime slot 和写入范围调度。
 
 ## 7. 前端 Runtime 选择 / 后端 Codex
 

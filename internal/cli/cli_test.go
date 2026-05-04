@@ -298,6 +298,7 @@ func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 	subagentShown := runCLI(t, root, "orchestrator", "subagent", "show", acceptedSubagentID)
 	assertContains(t, subagentShown.stdout, `"role": "backend"`)
 	assertContains(t, subagentShown.stdout, `"output_contract"`)
+	assertContains(t, subagentShown.stdout, `"output_converged": true`)
 	subagentList := runCLI(t, root, "orchestrator", "subagent", "list", "--limit", "1")
 	assertContains(t, subagentList.stdout, acceptedSubagentID)
 

@@ -32,6 +32,8 @@ export type SubagentStatus =
   | "blocked"
   | "failed"
   | "timeout"
+  | "waiting_runtime"
+  | "retrying"
   | "needs_rework"
   | "needs_user_input"
   | "cancelled"
@@ -54,6 +56,14 @@ export interface SubagentInstance {
   writeScope: string[];
   allowedTools: string[];
   status: SubagentStatus;
+  retryPolicy?: "manual_review_then_retry" | "no_retry" | "auto_retry_low_risk";
+  retryCount: number;
+  maxRetries: number;
+  blockedReason?: string;
+  archiveReason?: string;
+  recoveryId?: string;
+  failureCategory?: string;
+  outputConverged: boolean;
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
