@@ -135,7 +135,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	router := NewRouter(Options{RootDir: root, Store: &db})
 	assertGETContains(t, router, "/v1/projects/managed", http.StatusOK, `"project"`, `"managed"`)
 	assertGETContains(t, router, "/v1/projects/managed/epics/phase1-epic/issue-graph", http.StatusOK, `"issue_graph"`, `"phase1-013"`)
-	assertGETContains(t, router, "/v1/projects/managed/epics/phase1-epic/schedule", http.StatusOK, `"schedule"`, `"ready_queue"`, `"blocked_reason"`)
+	assertGETContains(t, router, "/v1/projects/managed/epics/phase1-epic/schedule", http.StatusOK, `"schedule"`, `"ready_queue"`, `"blocked_reason"`, `"dispatch_queue"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)
 	assertGETContains(t, router, "/v1/projects/managed/runs/"+result.RunID, http.StatusOK, `"run"`, `"completed"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality/"+result.QualityReport.ID, http.StatusOK, `"quality_report"`, `"accepted"`)

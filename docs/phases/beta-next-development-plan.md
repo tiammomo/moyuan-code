@@ -25,8 +25,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P0 | `beta-001` | `state-query-api` | completed | 控制面 API 可查询项目核心状态 | API + 测试 + 文档同步 |
 | P0 | `beta-002` | `issue-graph-api` | completed | API 可展示 issue graph、schedule 和队列 | issue graph 可被前端可视化读取 |
 | P0 | `beta-003` | `requirement-to-issues` | completed | 需求丰富、澄清判断和 issue graph 生成 | 用户需求可转为 issues DAG |
-| P1 | `beta-004` | `parallel-orchestration-engine` | in_progress | 自动并发、等待和 replan | 并发度由系统决策且可审计 |
-| P1 | `beta-005` | `review-merge-pipeline` | planned | 复核通过后合入任务分支 | review gate 阻断未达标代码 |
+| P1 | `beta-004` | `parallel-orchestration-engine` | completed | 自动并发、等待和 replan | 并发度由系统决策且可审计 |
+| P1 | `beta-005` | `review-merge-pipeline` | in_progress | 复核通过后合入任务分支 | review gate 阻断未达标代码 |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -119,7 +119,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - planner 会落盘 requirement plan、issue graph 和 schedule。
 - 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
 
-## 6. 当前任务：`beta-004 parallel-orchestration-engine`
+## 6. 已完成任务：`beta-004 parallel-orchestration-engine`
 
 范围：
 
@@ -138,4 +138,33 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 同一写入范围的 ready issue 不会同时进入 dispatch。
 - 不同写入范围的 ready issue 可被排入同一批。
 - 输出可审计的 parallelism 和 waiting reason。
+- `go test ./...` 通过。
+
+完成记录：
+
+- Scheduler plan 已新增 `dispatch_queue`、`waiting_queue`、`max_parallel`、`runtime_slots`。
+- 同一写入范围冲突会进入 waiting，并给出 `write_scope_conflict`。
+- 并发预算不足会进入 waiting，并给出 `runtime_slot`。
+- API schedule 读取已返回 scheduler plan，包含 dispatch 决策。
+- 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
+
+## 7. 当前任务：`beta-005 review-merge-pipeline`
+
+范围：
+
+- 复用现有 quality report 和 review_status，定义 issue 完成后的 merge gate 结果。
+- 生成 merge decision：ready_to_merge、needs_rework、blocked。
+- 为后续 GitHub/Gitee PR/MR 提供只读决策依据。
+
+非目标：
+
+- 不执行 git merge。
+- 不 push、不创建 PR/MR。
+- 不修改生产分支。
+
+验收：
+
+- accepted issue + accepted quality report 可得到 ready_to_merge。
+- rejected quality report 必须得到 needs_rework。
+- 缺失质量报告或 issue 未 accepted 时必须 blocked。
 - `go test ./...` 通过。
