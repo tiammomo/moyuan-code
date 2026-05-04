@@ -310,6 +310,8 @@ export type GitProviderPlanSummary = {
   create_mode?: string;
   remote_link?: string;
   remote_status?: string;
+  preview_decision?: string;
+  create_decision?: string;
   sync_decision?: string;
   sync_reason?: string;
   manual_required: boolean;

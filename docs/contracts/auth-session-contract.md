@@ -237,6 +237,9 @@ Phase 5 第一批已提供最小 API 鉴权中间件：
 
 - `provider.refresh`：需要 `provider:write`。
 - `approval.decide`：需要 `approval:decide`。
+- `auth.session.create` / `auth.session.revoke`：需要 `auth:write`。
+- `auth.token.create` / `auth.token.revoke`：需要 `auth:write`。
+- `auth.service_account.upsert`：需要 `auth:write`。
 - `deployment.execute`：需要 `deploy:execute`。
 - `visual.render`：需要 `visual:render`。
 - `resource.renew` / `resource.retire`：需要 `resource:write`。

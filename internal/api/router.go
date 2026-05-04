@@ -2020,6 +2020,16 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case "/v1/projects/:project_id/approvals/:approval_id/decide":
 		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
+	case "/v1/projects/:project_id/auth/sessions":
+		return authzRule{Action: "auth.session.create", Risk: "high", Scopes: []string{"auth:write"}}, true
+	case "/v1/projects/:project_id/auth/api-tokens":
+		return authzRule{Action: "auth.token.create", Risk: "critical", Scopes: []string{"auth:write"}}, true
+	case "/v1/projects/:project_id/auth/service-accounts":
+		return authzRule{Action: "auth.service_account.upsert", Risk: "high", Scopes: []string{"auth:write"}}, true
+	case "/v1/projects/:project_id/auth/sessions/:session_id/revoke":
+		return authzRule{Action: "auth.session.revoke", Risk: "high", Scopes: []string{"auth:write"}}, true
+	case "/v1/projects/:project_id/auth/api-tokens/:token_id/revoke":
+		return authzRule{Action: "auth.token.revoke", Risk: "high", Scopes: []string{"auth:write"}}, true
 	case "/v1/projects/:project_id/deployments/:deployment_id/execute":
 		return authzRule{Action: "deployment.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case "/v1/projects/:project_id/visuals/assets/:asset_id/render":
@@ -2046,6 +2056,16 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case strings.Contains(rawPath, "/approvals/") && strings.HasSuffix(rawPath, "/decide"):
 		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
+	case strings.HasSuffix(rawPath, "/auth/sessions"):
+		return authzRule{Action: "auth.session.create", Risk: "high", Scopes: []string{"auth:write"}}, true
+	case strings.HasSuffix(rawPath, "/auth/api-tokens"):
+		return authzRule{Action: "auth.token.create", Risk: "critical", Scopes: []string{"auth:write"}}, true
+	case strings.HasSuffix(rawPath, "/auth/service-accounts"):
+		return authzRule{Action: "auth.service_account.upsert", Risk: "high", Scopes: []string{"auth:write"}}, true
+	case strings.Contains(rawPath, "/auth/sessions/") && strings.HasSuffix(rawPath, "/revoke"):
+		return authzRule{Action: "auth.session.revoke", Risk: "high", Scopes: []string{"auth:write"}}, true
+	case strings.Contains(rawPath, "/auth/api-tokens/") && strings.HasSuffix(rawPath, "/revoke"):
+		return authzRule{Action: "auth.token.revoke", Risk: "high", Scopes: []string{"auth:write"}}, true
 	case strings.Contains(rawPath, "/deployments/") && strings.HasSuffix(rawPath, "/execute"):
 		return authzRule{Action: "deployment.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case strings.Contains(rawPath, "/visuals/assets/") && strings.HasSuffix(rawPath, "/render"):

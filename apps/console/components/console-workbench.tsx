@@ -9,11 +9,13 @@ import {
   ChevronRight,
   CircleDotDashed,
   GitBranch,
+  KeyRound,
   Layers3,
   Lock,
   MemoryStick,
   Network,
   Play,
+  RefreshCw,
   Rocket,
   ScrollText,
   Search,
@@ -21,7 +23,10 @@ import {
   ShieldCheck,
   Sparkles,
   TerminalSquare,
+  UserPlus,
+  Wrench,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import type { ConsoleSnapshot, IssueNode, StatusTone } from "@/lib/types";
 
@@ -45,12 +50,23 @@ const nav = [
 ];
 
 export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
+  const router = useRouter();
   const [selectedIssueID, setSelectedIssueID] = useState(snapshot.issues[0]?.id ?? "");
   const [requirementText, setRequirementText] = useState("");
   const [requirementState, setRequirementState] = useState<RequirementSubmitState>({ status: "idle" });
   const [recoveryArtifactState, setRecoveryArtifactState] = useState<Record<string, RecoveryArtifactState>>({});
   const [visualActionState, setVisualActionState] = useState<Record<string, VisualActionState>>({});
   const [deploymentActionState, setDeploymentActionState] = useState<DeploymentActionState>({ status: "idle" });
+  const [approvalForm, setApprovalForm] = useState({ decidedBy: "console-owner", reason: "reviewed in console" });
+  const [approvalActionState, setApprovalActionState] = useState<Record<string, ActionState>>({});
+  const [sessionForm, setSessionForm] = useState({ userID: "developer", displayName: "Developer", roles: "developer" });
+  const [tokenForm, setTokenForm] = useState({ name: "console-token", actorID: "developer", scopes: "project:read" });
+  const [serviceAccountForm, setServiceAccountForm] = useState({ id: "", name: "Release Bot", roles: "release_bot,deploy_executor" });
+  const [accessActionState, setAccessActionState] = useState<Record<string, ActionState>>({});
+  const [resourceForm, setResourceForm] = useState({ actorID: "ops-owner", expiresAt: "2099-01-01", reason: "console maintenance" });
+  const [resourceActionState, setResourceActionState] = useState<Record<string, ActionState>>({});
+  const [gitActionState, setGitActionState] = useState<Record<string, ActionState>>({});
+  const [gitCreateApproved, setGitCreateApproved] = useState(false);
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
   const latestDeployment = snapshot.deployments[0];
@@ -223,6 +239,195 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
       });
     } catch (error) {
       setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Resource health scan failed." });
+    }
+  }
+
+  async function decideApproval(approvalID: string, decision: "approved" | "rejected") {
+    setApprovalActionState((current) => ({
+      ...current,
+      [approvalID]: { status: "running", message: `${decision === "approved" ? "Approving" : "Rejecting"} approval...` },
+    }));
+    try {
+      const payload = await postJSON<ApprovalDecisionEnvelope>(`/api/projects/${snapshot.project.id}/approvals/${encodeURIComponent(approvalID)}/decide`, {
+        decision,
+        decided_by: approvalForm.decidedBy,
+        reason: approvalForm.reason,
+      });
+      const approval = payload.approval;
+      if (!approval) {
+        throw new Error(payload.error ?? "Approval decision returned no record.");
+      }
+      setApprovalActionState((current) => ({
+        ...current,
+        [approvalID]: { status: approval.status === "approved" ? "completed" : "blocked", id: approval.id, message: approval.decision ?? approval.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setApprovalActionState((current) => ({
+        ...current,
+        [approvalID]: { status: "error", message: error instanceof Error ? error.message : "Approval decision failed." },
+      }));
+    }
+  }
+
+  async function createSession(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAccessActionState((current) => ({ ...current, session: { status: "running", message: "Creating session..." } }));
+    try {
+      const payload = await postJSON<AuthSessionEnvelope>(`/api/projects/${snapshot.project.id}/auth/sessions`, {
+        user_id: sessionForm.userID,
+        display_name: sessionForm.displayName,
+        roles: splitCSV(sessionForm.roles),
+      });
+      if (!payload.session) {
+        throw new Error(payload.error ?? "Session create returned no record.");
+      }
+      setAccessActionState((current) => ({
+        ...current,
+        session: { status: "completed", id: payload.session?.id, message: "SESSION_CREATED" },
+      }));
+      router.refresh();
+    } catch (error) {
+      setAccessActionState((current) => ({
+        ...current,
+        session: { status: "error", message: error instanceof Error ? error.message : "Session create failed." },
+      }));
+    }
+  }
+
+  async function createAPIToken(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAccessActionState((current) => ({ ...current, token: { status: "running", message: "Creating API token..." } }));
+    try {
+      const payload = await postJSON<APITokenCreateEnvelope>(`/api/projects/${snapshot.project.id}/auth/api-tokens`, {
+        name: tokenForm.name,
+        actor_id: tokenForm.actorID,
+        scopes: splitCSV(tokenForm.scopes),
+      });
+      if (!payload.api_token) {
+        throw new Error(payload.error ?? "API token create returned no record.");
+      }
+      setAccessActionState((current) => ({
+        ...current,
+        token: {
+          status: "completed",
+          id: payload.api_token?.id,
+          message: "API_TOKEN_CREATED",
+          secretPreview: payload.token_value ? `${payload.token_value.slice(0, 18)}...` : undefined,
+        },
+      }));
+      router.refresh();
+    } catch (error) {
+      setAccessActionState((current) => ({
+        ...current,
+        token: { status: "error", message: error instanceof Error ? error.message : "API token create failed." },
+      }));
+    }
+  }
+
+  async function revokeAPIToken(tokenID: string) {
+    setAccessActionState((current) => ({ ...current, [tokenID]: { status: "running", message: "Revoking token..." } }));
+    try {
+      const payload = await postJSON<APITokenRevokeEnvelope>(`/api/projects/${snapshot.project.id}/auth/api-tokens/${encodeURIComponent(tokenID)}/revoke`, {
+        actor_id: resourceForm.actorID,
+        reason: resourceForm.reason,
+      });
+      if (!payload.api_token) {
+        throw new Error(payload.error ?? "API token revoke returned no record.");
+      }
+      setAccessActionState((current) => ({
+        ...current,
+        [tokenID]: { status: "completed", id: payload.api_token?.id, message: "API_TOKEN_REVOKED" },
+      }));
+      router.refresh();
+    } catch (error) {
+      setAccessActionState((current) => ({
+        ...current,
+        [tokenID]: { status: "error", message: error instanceof Error ? error.message : "API token revoke failed." },
+      }));
+    }
+  }
+
+  async function createServiceAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAccessActionState((current) => ({ ...current, service: { status: "running", message: "Creating service account..." } }));
+    try {
+      const payload = await postJSON<ServiceAccountEnvelope>(`/api/projects/${snapshot.project.id}/auth/service-accounts`, {
+        id: serviceAccountForm.id,
+        name: serviceAccountForm.name,
+        roles: splitCSV(serviceAccountForm.roles),
+      });
+      if (!payload.service_account) {
+        throw new Error(payload.error ?? "Service account create returned no record.");
+      }
+      setAccessActionState((current) => ({
+        ...current,
+        service: { status: "completed", id: payload.service_account?.id, message: "SERVICE_ACCOUNT_UPSERTED" },
+      }));
+      router.refresh();
+    } catch (error) {
+      setAccessActionState((current) => ({
+        ...current,
+        service: { status: "error", message: error instanceof Error ? error.message : "Service account create failed." },
+      }));
+    }
+  }
+
+  async function runGitProviderAction(planID: string, action: "preview" | "sync" | "create") {
+    setGitActionState((current) => ({ ...current, [planID]: { status: "running", message: `${action} PR/MR...` } }));
+    try {
+      const payload = await postJSON<GitProviderActionEnvelope>(`/api/projects/${snapshot.project.id}/git-provider-plans/${encodeURIComponent(planID)}/${action}`, {
+        approved: action === "create" ? gitCreateApproved : undefined,
+      });
+      const plan = payload.git_provider_plan;
+      if (!plan) {
+        throw new Error(payload.error ?? "PR/MR action returned no plan.");
+      }
+      setGitActionState((current) => ({
+        ...current,
+        [planID]: {
+          status: isGitActionCompleted(plan) ? "completed" : "blocked",
+          id: plan.id,
+          message:
+            plan.pr_mr?.create_decision ||
+            plan.pr_mr?.preview_decision ||
+            plan.pr_mr?.sync_decision ||
+            plan.decision ||
+            plan.pr_mr?.remote_status ||
+            plan.status,
+        },
+      }));
+      router.refresh();
+    } catch (error) {
+      setGitActionState((current) => ({
+        ...current,
+        [planID]: { status: "error", message: error instanceof Error ? error.message : "PR/MR action failed." },
+      }));
+    }
+  }
+
+  async function runResourceAction(resourceID: string, action: "renew" | "retire") {
+    setResourceActionState((current) => ({ ...current, [resourceID]: { status: "running", message: `${action} resource...` } }));
+    try {
+      const body =
+        action === "renew"
+          ? { actor_id: resourceForm.actorID, expires_at: resourceForm.expiresAt, reason: resourceForm.reason }
+          : { actor_id: resourceForm.actorID, reason: resourceForm.reason };
+      const payload = await postJSON<ResourceActionEnvelope>(`/api/projects/${snapshot.project.id}/resources/${encodeURIComponent(resourceID)}/${action}`, body);
+      const record = payload.maintenance_record;
+      if (!record) {
+        throw new Error(payload.error ?? "Resource action returned no maintenance record.");
+      }
+      setResourceActionState((current) => ({
+        ...current,
+        [resourceID]: { status: record.status === "completed" ? "completed" : "blocked", id: record.id, message: record.decision ?? record.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setResourceActionState((current) => ({
+        ...current,
+        [resourceID]: { status: "error", message: error instanceof Error ? error.message : "Resource action failed." },
+      }));
     }
   }
 
@@ -702,6 +907,19 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
         <section className="auditGrid">
           <div className="panel">
             <PanelTitle icon={<Lock size={18} />} title="Approval Queue" meta={`${snapshot.approvals.length} records`} />
+            <div className="controlForm compact">
+              <label>
+                <span>Decider</span>
+                <input
+                  onChange={(event) => setApprovalForm((current) => ({ ...current, decidedBy: event.target.value }))}
+                  value={approvalForm.decidedBy}
+                />
+              </label>
+              <label>
+                <span>Reason</span>
+                <input onChange={(event) => setApprovalForm((current) => ({ ...current, reason: event.target.value }))} value={approvalForm.reason} />
+              </label>
+            </div>
             <div className="signalList">
               {snapshot.approvals.length > 0 ? (
                 snapshot.approvals.map((approval) => (
@@ -719,6 +937,31 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       <code>{shortTimestamp(approval.requested_at)}</code>
                     </div>
                     <small>{approval.request_reason || approval.decision_reason || `requested by ${approval.requested_by}`}</small>
+                    {approval.status === "pending" ? (
+                      <div className="signalActions">
+                        <button
+                          className="inlineActionButton"
+                          disabled={approvalActionState[approval.id]?.status === "running"}
+                          onClick={() => void decideApproval(approval.id, "approved")}
+                          type="button"
+                        >
+                          <CheckCircle2 size={13} />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          className="inlineActionButton danger"
+                          disabled={approvalActionState[approval.id]?.status === "running"}
+                          onClick={() => void decideApproval(approval.id, "rejected")}
+                          type="button"
+                        >
+                          <AlertTriangle size={13} />
+                          <span>Reject</span>
+                        </button>
+                        {approvalActionState[approval.id]?.message ? (
+                          <small className={`actionMessage ${approvalActionState[approval.id]?.status}`}>{approvalActionState[approval.id]?.message}</small>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 ))
               ) : (
@@ -762,6 +1005,94 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
               title="Access Baseline"
               meta={`${activeSessions.length} sessions / ${activeTokens.length} tokens / ${activeServiceAccounts.length} service accounts`}
             />
+            <div className="accessForms">
+              <form className="controlForm" onSubmit={createSession}>
+                <div className="controlFormTitle">
+                  <UserPlus size={15} />
+                  <strong>Session</strong>
+                </div>
+                <label>
+                  <span>User</span>
+                  <input onChange={(event) => setSessionForm((current) => ({ ...current, userID: event.target.value }))} value={sessionForm.userID} />
+                </label>
+                <label>
+                  <span>Display</span>
+                  <input
+                    onChange={(event) => setSessionForm((current) => ({ ...current, displayName: event.target.value }))}
+                    value={sessionForm.displayName}
+                  />
+                </label>
+                <label>
+                  <span>Roles</span>
+                  <input onChange={(event) => setSessionForm((current) => ({ ...current, roles: event.target.value }))} value={sessionForm.roles} />
+                </label>
+                <div className="buttonRow">
+                  <button className="inlineActionButton" disabled={accessActionState.session?.status === "running"} type="submit">
+                    <UserPlus size={13} />
+                    <span>Create</span>
+                  </button>
+                  <ActionFeedback state={accessActionState.session} />
+                </div>
+              </form>
+
+              <form className="controlForm" onSubmit={createAPIToken}>
+                <div className="controlFormTitle">
+                  <KeyRound size={15} />
+                  <strong>API Token</strong>
+                </div>
+                <label>
+                  <span>Name</span>
+                  <input onChange={(event) => setTokenForm((current) => ({ ...current, name: event.target.value }))} value={tokenForm.name} />
+                </label>
+                <label>
+                  <span>Actor</span>
+                  <input onChange={(event) => setTokenForm((current) => ({ ...current, actorID: event.target.value }))} value={tokenForm.actorID} />
+                </label>
+                <label>
+                  <span>Scopes</span>
+                  <input onChange={(event) => setTokenForm((current) => ({ ...current, scopes: event.target.value }))} value={tokenForm.scopes} />
+                </label>
+                <div className="buttonRow">
+                  <button className="inlineActionButton" disabled={accessActionState.token?.status === "running"} type="submit">
+                    <KeyRound size={13} />
+                    <span>Create</span>
+                  </button>
+                  <ActionFeedback state={accessActionState.token} />
+                </div>
+              </form>
+
+              <form className="controlForm" onSubmit={createServiceAccount}>
+                <div className="controlFormTitle">
+                  <ShieldCheck size={15} />
+                  <strong>Service Account</strong>
+                </div>
+                <label>
+                  <span>ID</span>
+                  <input onChange={(event) => setServiceAccountForm((current) => ({ ...current, id: event.target.value }))} value={serviceAccountForm.id} />
+                </label>
+                <label>
+                  <span>Name</span>
+                  <input
+                    onChange={(event) => setServiceAccountForm((current) => ({ ...current, name: event.target.value }))}
+                    value={serviceAccountForm.name}
+                  />
+                </label>
+                <label>
+                  <span>Roles</span>
+                  <input
+                    onChange={(event) => setServiceAccountForm((current) => ({ ...current, roles: event.target.value }))}
+                    value={serviceAccountForm.roles}
+                  />
+                </label>
+                <div className="buttonRow">
+                  <button className="inlineActionButton" disabled={accessActionState.service?.status === "running"} type="submit">
+                    <ShieldCheck size={13} />
+                    <span>Upsert</span>
+                  </button>
+                  <ActionFeedback state={accessActionState.service} />
+                </div>
+              </form>
+            </div>
             <div className="accessList">
               <div className="accessCard">
                 <div className="accessCardHeader">
@@ -792,8 +1123,21 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       <span>{token.scopes.join(", ") || "scope pending"}</span>
                     </div>
                     <code>{token.token_prefix || compactID(token.id)}</code>
+                    {token.status === "active" ? (
+                      <button
+                        className="inlineActionButton danger compactButton"
+                        disabled={accessActionState[token.id]?.status === "running"}
+                        onClick={() => void revokeAPIToken(token.id)}
+                        type="button"
+                      >
+                        <span>Revoke</span>
+                      </button>
+                    ) : null}
                   </div>
                 ))}
+                {snapshot.api_tokens.map((token) =>
+                  accessActionState[token.id]?.message ? <ActionFeedback key={`${token.id}-feedback`} state={accessActionState[token.id]} /> : null,
+                )}
                 {snapshot.api_tokens.length === 0 ? <div className="emptyState">No API tokens</div> : null}
               </div>
 
@@ -838,6 +1182,24 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
 
           <div className="panel">
             <PanelTitle icon={<Server size={18} />} title="Server Resources" meta={`${snapshot.maintenance_records.length} maintenance`} />
+            <div className="controlForm compact">
+              <label>
+                <span>Actor</span>
+                <input onChange={(event) => setResourceForm((current) => ({ ...current, actorID: event.target.value }))} value={resourceForm.actorID} />
+              </label>
+              <label>
+                <span>Expires</span>
+                <input
+                  onChange={(event) => setResourceForm((current) => ({ ...current, expiresAt: event.target.value }))}
+                  type="date"
+                  value={resourceForm.expiresAt}
+                />
+              </label>
+              <label>
+                <span>Reason</span>
+                <input onChange={(event) => setResourceForm((current) => ({ ...current, reason: event.target.value }))} value={resourceForm.reason} />
+              </label>
+            </div>
             <div className="resourceList">
               {snapshot.resources.length > 0 ? (
                 snapshot.resources.map((resource) => (
@@ -850,6 +1212,27 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       </span>
                     </div>
                     <StatusPill tone={resource.environment === "production" ? "warning" : "ok"} label={resource.environment} />
+                    <div className="rowActions">
+                      <button
+                        className="inlineActionButton"
+                        disabled={resourceActionState[resource.id]?.status === "running"}
+                        onClick={() => void runResourceAction(resource.id, "renew")}
+                        type="button"
+                      >
+                        <RefreshCw size={13} />
+                        <span>Renew</span>
+                      </button>
+                      <button
+                        className="inlineActionButton danger"
+                        disabled={resourceActionState[resource.id]?.status === "running"}
+                        onClick={() => void runResourceAction(resource.id, "retire")}
+                        type="button"
+                      >
+                        <Wrench size={13} />
+                        <span>Retire</span>
+                      </button>
+                    </div>
+                    {resourceActionState[resource.id]?.message ? <ActionFeedback state={resourceActionState[resource.id]} /> : null}
                   </div>
                 ))
               ) : (
@@ -884,6 +1267,12 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
               <ChevronRight size={15} />
               <span>deploy plan</span>
             </div>
+            <div className="releaseControls">
+              <label className="checkboxLine">
+                <input checked={gitCreateApproved} onChange={(event) => setGitCreateApproved(event.target.checked)} type="checkbox" />
+                <span>Approved create</span>
+              </label>
+            </div>
             <div className="prmrList">
               {snapshot.git_provider_plans.length > 0 ? (
                 snapshot.git_provider_plans.slice(0, 3).map((plan) => (
@@ -895,7 +1284,37 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       </span>
                     </div>
                     <StatusPill tone={toneForStatus(plan.status)} label={plan.remote_status || plan.status} />
-                    <code>{plan.sync_decision || plan.decision}</code>
+                    <code>{plan.create_decision || plan.preview_decision || plan.sync_decision || plan.decision}</code>
+                    <div className="rowActions wide">
+                      <button
+                        className="inlineActionButton"
+                        disabled={gitActionState[plan.id]?.status === "running"}
+                        onClick={() => void runGitProviderAction(plan.id, "preview")}
+                        type="button"
+                      >
+                        <Search size={13} />
+                        <span>Preview</span>
+                      </button>
+                      <button
+                        className="inlineActionButton"
+                        disabled={gitActionState[plan.id]?.status === "running"}
+                        onClick={() => void runGitProviderAction(plan.id, "sync")}
+                        type="button"
+                      >
+                        <RefreshCw size={13} />
+                        <span>Sync</span>
+                      </button>
+                      <button
+                        className="inlineActionButton"
+                        disabled={gitActionState[plan.id]?.status === "running"}
+                        onClick={() => void runGitProviderAction(plan.id, "create")}
+                        type="button"
+                      >
+                        <GitBranch size={13} />
+                        <span>Create</span>
+                      </button>
+                      {gitActionState[plan.id]?.message ? <ActionFeedback state={gitActionState[plan.id]} /> : null}
+                    </div>
                   </div>
                 ))
               ) : (
@@ -1004,6 +1423,121 @@ type ResourceHealthScanEnvelope = {
     results?: unknown[];
   };
 };
+
+type ActionStatus = "idle" | "running" | "completed" | "blocked" | "error";
+
+type ActionState = {
+  status: ActionStatus;
+  id?: string;
+  message?: string;
+  secretPreview?: string;
+};
+
+type ApprovalDecisionEnvelope = {
+  error?: string;
+  approval?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type AuthSessionEnvelope = {
+  error?: string;
+  session?: {
+    id?: string;
+    status?: string;
+  };
+};
+
+type APITokenCreateEnvelope = {
+  error?: string;
+  api_token?: {
+    id?: string;
+    status?: string;
+  };
+  token_value?: string;
+};
+
+type APITokenRevokeEnvelope = {
+  error?: string;
+  api_token?: {
+    id?: string;
+    status?: string;
+  };
+};
+
+type ServiceAccountEnvelope = {
+  error?: string;
+  service_account?: {
+    id?: string;
+    status?: string;
+  };
+};
+
+type GitProviderActionEnvelope = {
+  error?: string;
+  git_provider_plan?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+    pr_mr?: {
+      remote_status?: string;
+      preview_decision?: string;
+      create_decision?: string;
+      sync_decision?: string;
+    };
+  };
+};
+
+type ResourceActionEnvelope = {
+  error?: string;
+  maintenance_record?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+async function postJSON<T extends { error?: string }>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = (await response.json().catch(() => ({}))) as T;
+  if (!response.ok) {
+    throw new Error(payload.error ?? `Request failed with status ${response.status}`);
+  }
+  return payload;
+}
+
+function splitCSV(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isGitActionCompleted(plan: NonNullable<GitProviderActionEnvelope["git_provider_plan"]>) {
+  const decision = plan.pr_mr?.create_decision || plan.pr_mr?.preview_decision || plan.pr_mr?.sync_decision || plan.decision || "";
+  const remoteStatus = plan.pr_mr?.remote_status || "";
+  if (decision.includes("FAILED") || decision.includes("REQUIRED") || remoteStatus.includes("required") || remoteStatus.includes("missing")) {
+    return false;
+  }
+  return Boolean(decision || remoteStatus || plan.status);
+}
+
+function ActionFeedback({ state }: { state?: ActionState }) {
+  if (!state?.message) return null;
+  return (
+    <small className={`actionMessage ${state.status}`}>
+      {state.id ? `${compactID(state.id)} / ` : ""}
+      {state.message}
+      {state.secretPreview ? ` / ${state.secretPreview}` : ""}
+    </small>
+  );
+}
 
 function PanelTitle({ icon, title, meta }: { icon: React.ReactNode; title: string; meta: string }) {
   return (

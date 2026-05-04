@@ -23,7 +23,7 @@ Phase 4 已完成并通过 readiness：
 | P0 | `phase5-002` | `secret-ref-resolver` | completed | 安全解析 `secret:`/`env:` 引用并注入 adapter | Secret 明文不出现在响应、日志、Memory、prompt 或测试 fixture |
 | P1 | `phase5-003` | `github-gitee-pr-mr-adapter` | completed | PR/MR preview/create/status adapter | 默认 preview，真实 create 需 authz + approval |
 | P1 | `phase5-004` | `deployment-smoke-monitor-adapters` | completed | smoke/monitor 结果记录和 rollback 建议 | production 必须 approval，结果可审计 |
-| P1 | `phase5-005` | `console-controlled-forms` | planned | Console 增加受控操作表单 | 表单只调用后端受控 API，状态以后端为准 |
+| P1 | `phase5-005` | `console-controlled-forms` | completed | Console 增加受控操作表单 | 表单只调用后端受控 API，状态以后端为准 |
 
 ## 3. 执行规划：`phase5-001 auth-context-rbac-middleware`
 
@@ -31,7 +31,7 @@ Phase 4 已完成并通过 readiness：
 
 - 增加 API auth middleware，可从 header 解析 API token 或使用 local owner fallback。
 - 输出统一 AuthContext：actor、auth method、roles/scopes、project、trace。
-- 对高风险 API 做最小 RBAC：provider probe、approval decision、deployment execute、visual script、resource renew/retire、git sync。
+- 对高风险 API 做最小 RBAC：provider probe、approval decision、auth session/token/service account 写操作、deployment execute、visual script、resource renew/retire、git sync。
 - allow/deny/require approval 决策必须写入 audit log。
 
 非目标：
@@ -52,7 +52,7 @@ Phase 4 已完成并通过 readiness：
 范围：
 
 - `internal/auth` 增加 RequestContext、AuthzResult、Bearer token/session/local owner 解析和最小 scope/role 授权。
-- API 增加 authz middleware，保护 provider refresh、approval decide、deployment execute、visual render、resource renew/retire 和 git provider sync。
+- API 增加 authz middleware，保护 provider refresh、approval decide、auth session/token/service account 写操作、deployment execute、visual render、resource renew/retire、git provider sync 和 PR/MR create。
 - local_single_user 模式保留 owner fallback；team_server 模式必须提供有效 Bearer token 或 session。
 - API token 按 scope 校验，scope 不足返回 `AUTH_TOKEN_SCOPE_MISMATCH`。
 - allow/deny 写入 `auth.decision.allow` / `auth.decision.deny` audit event。
@@ -146,7 +146,30 @@ Phase 4 已完成并通过 readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 8. 验证要求
+## 8. 已完成任务：`phase5-005 console-controlled-forms`
+
+范围：
+
+- Console `Approval Queue` 增加审批决定输入和 `Approve` / `Reject` 操作，结果以后端 approval API 为准。
+- Console `Access Baseline` 增加 session、API token 和 service account 受控表单；API token 列表支持 revoke。
+- Console `Release Pipeline` 增加 Git Provider PR/MR `Preview`、`Sync`、`Create` 操作，真实 create 仍受后端 authz、approval、secret resolver 和写开关约束。
+- Console `Server Resources` 增加资源续期与退役操作，维护记录以后端返回为权威状态。
+- 所有 mutation 成功后刷新 server snapshot；前端不自行伪造权威状态。
+
+非目标：
+
+- 不在 Console 展示 secret 明文；API token 创建只显示短 preview。
+- 不绕过 team_server 下的 API token/session 鉴权。
+- 不实现生产 SSH/云厂商真实操作。
+
+验证：
+
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 9. 验证要求
 
 每完成一个 Phase 5 issue，至少运行：
 

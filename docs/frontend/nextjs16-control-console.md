@@ -158,8 +158,8 @@ apps/console/
 | Runtime Recoveries | 查看原生 runtime 失败归档、fallback candidate、resume hint、stdout/stderr 和 diff 摘要预览 |
 | Subagent Backlog | 查看 retry/archive 后进入调度等待的 subagent、失败原因和重试预算 |
 | Visual Assets | 查看架构图 plan、diagram spec、prompt、route decision、render execution、script path 和图片生成状态；支持受控 dry-run render |
-| Git & Release | 查看分支、PR/MR plan、release suggestion 和 tag/push 计划 |
-| Server Resources | 查看 test_dev、production 机器、到期、健康和维护窗口 |
+| Git & Release | 查看分支、PR/MR plan、release suggestion 和 tag/push 计划；通过受控按钮触发 PR/MR preview、sync 和 create |
+| Server Resources | 查看 test_dev、production 机器、到期、健康和维护窗口；通过受控表单记录续期和退役 |
 | Deployments | 查看部署计划、审批、线上冒烟、监控和 rollback |
 | Logs & Audit | 查看核心日志、审计事件和 trace |
 | Settings | 项目配置索引、权限、策略和 schema 校验结果 |
@@ -197,7 +197,7 @@ apps/console/
 - Live Workbench：运行中 issue 的状态、日志和下一步持续刷新。
 - Phase 2 Observability：把 runtime recoveries、subagent backlog、visual assets 和 visual render executions 放在同一屏，便于判断“失败如何恢复、任务为什么等待、架构图是否已规划、图片生成是否已进入受控执行”。
 - Runtime Evidence Preview：runtime recovery 可展开 stdout、stderr 和 diff summary 的受控预览；后端只读取 recovery 记录指向且位于 `.moyuan/` 下的归档文件。
-- Controlled Actions：低风险动作可从 Console 触发后端 dry-run 或 preview，例如 visual render dry-run；高风险动作仍必须进入 approval/authz。
+- Controlled Actions：低风险动作可从 Console 触发后端 dry-run 或 preview，例如 visual render dry-run；审批决定、API token、service account、PR/MR create、资源续期/退役等写操作必须调用后端受控 API，高风险动作仍进入 approval/authz。
 - Schema-aware Forms：表单从 contract/schema 生成约束，错误能定位到字段。
 - AI Assist Surface：保留“让 agent 解释当前状态 / 生成修复建议 / 生成发布说明”的入口，但不能绕过后端门禁。
 

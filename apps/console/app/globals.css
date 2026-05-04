@@ -686,6 +686,75 @@ dd {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.controlForm,
+.accessForms {
+  display: grid;
+  gap: 10px;
+}
+
+.controlForm {
+  padding: 12px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.controlForm.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 14px 14px 0;
+  border: 0;
+  background: transparent;
+}
+
+.controlFormTitle,
+.buttonRow,
+.rowActions,
+.releaseControls,
+.checkboxLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controlFormTitle {
+  color: #334155;
+  font-size: 13px;
+}
+
+.controlForm label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.controlForm label span,
+.checkboxLine span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.controlForm input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text);
+}
+
+.controlForm input:focus {
+  border-color: #9bb9f9;
+  outline: 3px solid rgba(39, 110, 241, 0.12);
+}
+
+.accessForms {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 14px 14px 0;
+}
+
 .accessList {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -756,6 +825,10 @@ dd {
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.accessRow .compactButton {
+  flex: 0 0 auto;
 }
 
 .timeline,
@@ -937,9 +1010,23 @@ dd {
   font-weight: 700;
 }
 
+.inlineActionButton.danger {
+  border-color: #f1b9b2;
+  color: var(--red);
+}
+
 .inlineActionButton:disabled {
   cursor: wait;
   opacity: 0.68;
+}
+
+.actionMessage {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.actionMessage.running {
+  color: var(--blue);
 }
 
 .actionMessage.completed {
@@ -1037,6 +1124,20 @@ meter {
   padding: 0 14px 14px;
 }
 
+.releaseControls {
+  justify-content: flex-end;
+  padding: 0 14px 12px;
+}
+
+.checkboxLine {
+  min-height: 28px;
+}
+
+.checkboxLine input {
+  width: 14px;
+  height: 14px;
+}
+
 .prmrItem {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1079,6 +1180,29 @@ meter {
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.rowActions {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.rowActions.wide {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+
+.resourceItem {
+  flex-wrap: wrap;
+}
+
+.resourceItem .actionMessage {
+  flex-basis: 100%;
+}
+
+.resourceItem .rowActions {
+  flex: 0 0 auto;
 }
 
 .approvalStrip {
@@ -1174,8 +1298,10 @@ meter {
   .lowerGrid,
   .observabilityGrid,
   .auditGrid,
+  .accessForms,
   .accessList,
   .auditList,
+  .controlForm.compact,
   .bottomGrid {
     grid-template-columns: 1fr;
   }

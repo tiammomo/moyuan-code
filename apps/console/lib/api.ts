@@ -511,6 +511,8 @@ function normalizeGitProviderPlans(rawPlans: unknown[]): GitProviderPlanSummary[
       create_mode: readString(prmr, "create_mode", ""),
       remote_link: readString(prmr, "remote_link", ""),
       remote_status: readString(prmr, "remote_status", ""),
+      preview_decision: readString(prmr, "preview_decision", ""),
+      create_decision: readString(prmr, "create_decision", ""),
       sync_decision: readString(prmr, "sync_decision", ""),
       sync_reason: readString(prmr, "sync_reason", ""),
       manual_required: readBoolean(raw, "manual_required"),

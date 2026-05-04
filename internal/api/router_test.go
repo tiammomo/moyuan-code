@@ -104,6 +104,10 @@ func TestGinRouterAuthzMiddlewareProtectsHighRiskWrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	authWriter, err := auth.CreateAPIToken(root, auth.CreateTokenOptions{Name: "auth-writer", ActorID: "svc-security", Scopes: []string{"auth:write"}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	db, err := store.Open(root)
 	if err != nil {
 		t.Fatal(err)
@@ -118,6 +122,10 @@ func TestGinRouterAuthzMiddlewareProtectsHighRiskWrites(t *testing.T) {
 	assertPostContains(t, router, "/v1/projects/managed/resources/dev-sec/renew", body, http.StatusForbidden, "AUTH_MISSING_CREDENTIAL")
 	assertPostWithHeadersContains(t, router, "/v1/projects/managed/resources/dev-sec/renew", body, map[string]string{"Authorization": "Bearer " + readOnly.TokenValue}, http.StatusForbidden, "AUTH_TOKEN_SCOPE_MISMATCH")
 	assertPostWithHeadersContains(t, router, "/v1/projects/managed/resources/dev-sec/renew", body, map[string]string{"Authorization": "Bearer " + resourceWriter.TokenValue}, http.StatusOK, `"RESOURCE_RENEWAL_RECORDED"`)
+	tokenBody := `{"name":"console","actor_id":"svc-console","scopes":["project:read"]}`
+	assertPostContains(t, router, "/v1/projects/managed/auth/api-tokens", tokenBody, http.StatusForbidden, "AUTH_MISSING_CREDENTIAL")
+	assertPostWithHeadersContains(t, router, "/v1/projects/managed/auth/api-tokens", tokenBody, map[string]string{"Authorization": "Bearer " + resourceWriter.TokenValue}, http.StatusForbidden, "AUTH_TOKEN_SCOPE_MISMATCH")
+	assertPostWithHeadersContains(t, router, "/v1/projects/managed/auth/api-tokens", tokenBody, map[string]string{"Authorization": "Bearer " + authWriter.TokenValue}, http.StatusCreated, `"api_token"`)
 	assertGETContains(t, router, "/v1/projects/managed/audit-events?event=auth.decision.deny&limit=5", http.StatusOK, `"auth.decision.deny"`)
 }
 
