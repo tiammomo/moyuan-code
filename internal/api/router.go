@@ -440,6 +440,23 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(status, gin.H{"deployment": plan})
 	})
+	router.GET("/v1/projects/:project_id/deployments", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plans, err := deployment.ListPlans(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"deployments": plans})
+	})
 	router.GET("/v1/projects/:project_id/deployments/:deployment_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -491,6 +508,23 @@ func NewRouter(options Options) *gin.Engine {
 			status = http.StatusAccepted
 		}
 		c.JSON(status, gin.H{"execution": execution})
+	})
+	router.GET("/v1/projects/:project_id/deployment-executions", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		executions, err := deployment.ListExecutions(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"executions": executions})
 	})
 	router.GET("/v1/projects/:project_id/deployment-executions/:execution_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

@@ -28,7 +28,7 @@
 | `beta-009` | `server-resource-registry` | completed | 测试机/生产机、到期时间、配置、权限、健康和维护记录 | `beta-001` | `infra_owner` | 服务器资源可登记、查询、审计 |
 | `beta-010` | `devops-deploy-smoke-monitor` | completed | 部署、线上冒烟、生产监控和后续更新维护 | `beta-008`,`beta-009` | `devops_owner` | 可对配置服务器执行受控发布和回滚 |
 | `beta-011` | `controlled-deploy-executor` | completed | 受控部署执行器基线，支持 dry-run 和受限 local shell | `beta-010` | `devops_owner` | execution 可审计，生产真实执行被阻断 |
-| `beta-012` | `console-api-integration` | planned | Web Console 接入更多真实 API 和状态视图 | `beta-011` | `frontend` | 控制台可展示 live requirement、deployment execution 和资源健康 |
+| `beta-012` | `console-api-integration` | completed | Web Console 接入更多真实 API 和状态视图 | `beta-011` | `frontend` | 控制台可展示 live requirement、deployment execution 和资源健康 |
 | `beta-013` | `subagent-run-visibility` | planned | Subagent/run 过程可视化 | `beta-004`,`beta-005` | `orchestrator_owner` | 用户能追踪运行队列、等待原因、质量和 review |
 | `beta-014` | `server-health-check-executor` | planned | 服务器健康检查执行器和历史记录 | `beta-009`,`beta-011` | `infra_owner` | test_dev/staging 可执行 health scan 并回写资源状态 |
 
@@ -46,7 +46,7 @@
 
 ## 4. 当前执行入口
 
-Beta 第一批计划层能力已完成，`beta-011 controlled-deploy-executor` 已完成执行器基线。下一步准备 `beta-012 console-api-integration`。
+Beta 第一批计划层能力已完成，`beta-011 controlled-deploy-executor` 和 `beta-012 console-api-integration` 已完成。下一步准备 `beta-013 subagent-run-visibility`。
 
 实现边界：
 

@@ -2,6 +2,8 @@ import { connection } from "next/server";
 import { demoSnapshot } from "./demo-data";
 import type {
   ConsoleSnapshot,
+  DeploymentExecutionSummary,
+  DeploymentSummary,
   IssueNode,
   ProjectSummary,
   ProviderSummary,
@@ -43,13 +45,23 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     };
   }
 
-  const [graphResponse, scheduleResponse, providersResponse, resourcesResponse, memoryResponse] = await Promise.all([
+  const [
+    graphResponse,
+    scheduleResponse,
+    providersResponse,
+    resourcesResponse,
+    deploymentsResponse,
+    executionsResponse,
+    memoryResponse,
+  ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
     apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: ScheduleItem[]; waiting_queue?: ScheduleItem[] } }>>(
       `/projects/${project.id}/epics/phase1-epic/schedule?limit=4`,
     ),
     apiGet<ApiEnvelope<{ providers: unknown[] }>>(`/projects/${project.id}/providers`),
     apiGet<ApiEnvelope<{ resources: unknown[] }>>(`/projects/${project.id}/resources`),
+    apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
+    apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
     apiGet<ApiEnvelope<{ candidates: unknown[] }>>(`/projects/${project.id}/memory/candidates?limit=3`),
   ]);
 
@@ -60,6 +72,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   ];
   const providers = normalizeProviders(providersResponse?.providers ?? []);
   const resources = normalizeResources(resourcesResponse?.resources ?? []);
+  const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
+  const executions = normalizeExecutions(executionsResponse?.executions ?? []);
+  const timeline = liveTimeline(executions, deployments);
 
   return {
     mode: "live",
@@ -72,12 +87,16 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       blocked: issues.filter((issue) => issue.status === "blocked" || issue.status === "waiting").length,
       providers: providers.length,
       resources: resources.length,
+      deployments: deployments.length,
+      executions: executions.length,
     },
     issues: issues.length > 0 ? issues : demoSnapshot.issues,
     schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
     providers: providers.length > 0 ? providers : demoSnapshot.providers,
     resources,
-    timeline: demoSnapshot.timeline,
+    deployments,
+    executions,
+    timeline: timeline.length > 0 ? timeline : demoSnapshot.timeline,
     quality: demoSnapshot.quality,
     memory:
       memoryResponse?.candidates?.map((candidate, index) => ({
@@ -139,6 +158,52 @@ function normalizeResources(rawResources: unknown[]): ResourceSummary[] {
   }));
 }
 
+function normalizeDeployments(rawDeployments: unknown[]): DeploymentSummary[] {
+  return rawDeployments.map((raw, index) => ({
+    id: readString(raw, "id", `deployment-${index + 1}`),
+    release_id: readString(raw, "release_id", ""),
+    environment: readString(raw, "environment", "test_dev"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    resource_count: readObjectArray(raw, "resources").length,
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeExecutions(rawExecutions: unknown[]): DeploymentExecutionSummary[] {
+  return rawExecutions.map((raw, index) => ({
+    id: readString(raw, "id", `execution-${index + 1}`),
+    deployment_id: readString(raw, "deployment_id", ""),
+    environment: readString(raw, "environment", "test_dev"),
+    mode: readString(raw, "mode", "dry_run"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    step_count: readObjectArray(raw, "steps").length,
+    started_at: readString(raw, "started_at", ""),
+  }));
+}
+
+function liveTimeline(executions: DeploymentExecutionSummary[], deployments: DeploymentSummary[]) {
+  return [
+    ...executions.map((execution) => ({
+      id: execution.id,
+      title: `Deploy execution ${execution.mode}`,
+      detail: `${execution.decision} / ${execution.step_count} steps`,
+      tone: toneFromStatus(execution.status),
+      time: shortTime(execution.started_at),
+    })),
+    ...deployments.map((deployment) => ({
+      id: deployment.id,
+      title: `Deployment plan ${deployment.environment}`,
+      detail: `${deployment.decision} / ${deployment.resource_count} resources`,
+      tone: toneFromStatus(deployment.status),
+      time: shortTime(deployment.created_at),
+    })),
+  ].slice(0, 5);
+}
+
 function laneFor(role: string, status: string): IssueNode["lane"] {
   if (role.includes("frontend")) return "frontend";
   if (role.includes("quality") || status === "waiting") return "quality";
@@ -161,4 +226,28 @@ function readArray(value: unknown, key: string): string[] {
   const field = readUnknown(value, key);
   if (!Array.isArray(field)) return [];
   return field.filter((item): item is string => typeof item === "string");
+}
+
+function readObjectArray(value: unknown, key: string): Record<string, unknown>[] {
+  const field = readUnknown(value, key);
+  if (!Array.isArray(field)) return [];
+  return field.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
+}
+
+function toneFromStatus(status: string) {
+  if (status === "completed" || status === "planned") return "ok" as const;
+  if (status === "running") return "running" as const;
+  if (status === "blocked" || status === "failed") return "blocked" as const;
+  return "neutral" as const;
+}
+
+function shortTime(value?: string) {
+  if (!value) return "live";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "live";
+  return new Intl.DateTimeFormat("en", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }

@@ -49,6 +49,29 @@ export type ResourceSummary = {
   health?: string;
 };
 
+export type DeploymentSummary = {
+  id: string;
+  release_id: string;
+  environment: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  resource_count: number;
+  created_at?: string;
+};
+
+export type DeploymentExecutionSummary = {
+  id: string;
+  deployment_id: string;
+  environment: string;
+  mode: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  step_count: number;
+  started_at?: string;
+};
+
 export type TimelineEvent = {
   id: string;
   title: string;
@@ -83,13 +106,16 @@ export type ConsoleSnapshot = {
     blocked: number;
     providers: number;
     resources: number;
+    deployments: number;
+    executions: number;
   };
   issues: IssueNode[];
   schedule: ScheduleItem[];
   providers: ProviderSummary[];
   resources: ResourceSummary[];
+  deployments: DeploymentSummary[];
+  executions: DeploymentExecutionSummary[];
   timeline: TimelineEvent[];
   quality: QualitySignal[];
   memory: MemorySignal[];
 };
-

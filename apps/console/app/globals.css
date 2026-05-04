@@ -34,7 +34,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -259,6 +260,13 @@ h1 {
   align-items: stretch;
 }
 
+.opsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .panel {
   min-width: 0;
   border: 1px solid var(--line);
@@ -446,6 +454,120 @@ dd {
   background: #fff9ec;
   color: #835101;
   font-size: 13px;
+}
+
+.requirementForm {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.requirementForm textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.requirementForm textarea:focus {
+  border-color: #9bb9f9;
+  outline: 3px solid rgba(39, 110, 241, 0.12);
+}
+
+.formFooter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid #9bb9f9;
+  border-radius: 8px;
+  background: var(--blue);
+  color: #fff;
+  cursor: pointer;
+}
+
+.primaryButton:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.formResult {
+  display: grid;
+  gap: 4px;
+  min-height: 38px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+
+.formResult strong {
+  color: var(--blue);
+  text-transform: capitalize;
+}
+
+.formResult.needs_user_input strong,
+.formResult.error strong {
+  color: var(--amber);
+}
+
+.formResult.error {
+  border-color: #f1b9b2;
+  background: #fff4f3;
+}
+
+.formResult code {
+  width: fit-content;
+  color: var(--muted);
+}
+
+.executionList {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.executionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.executionItem div {
+  min-width: 0;
+  flex: 1;
+}
+
+.executionItem strong,
+.executionItem span {
+  display: block;
+}
+
+.executionItem span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .lowerGrid,
@@ -670,6 +792,7 @@ meter {
   }
 
   .mainGrid,
+  .opsGrid,
   .lowerGrid,
   .bottomGrid {
     grid-template-columns: 1fr;
@@ -714,7 +837,8 @@ meter {
   }
 
   .graphCanvas,
-  .heroGrid {
+  .heroGrid,
+  .formFooter {
     grid-template-columns: 1fr;
   }
 

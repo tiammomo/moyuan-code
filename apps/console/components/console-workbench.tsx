@@ -21,7 +21,7 @@ import {
   Sparkles,
   TerminalSquare,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import type { ConsoleSnapshot, IssueNode, StatusTone } from "@/lib/types";
 
 const laneLabels: Record<IssueNode["lane"], string> = {
@@ -45,8 +45,43 @@ const nav = [
 
 export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [selectedIssueID, setSelectedIssueID] = useState(snapshot.issues[0]?.id ?? "");
+  const [requirementText, setRequirementText] = useState("");
+  const [requirementState, setRequirementState] = useState<RequirementSubmitState>({ status: "idle" });
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
+
+  async function submitRequirement(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = requirementText.trim();
+    if (!text) {
+      setRequirementState({ status: "error", message: "Requirement text is required." });
+      return;
+    }
+    setRequirementState({ status: "planning", message: "Planning issue graph..." });
+    try {
+      const response = await fetch(`/api/projects/${snapshot.project.id}/requirements/plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const payload = (await response.json()) as RequirementPlanEnvelope;
+      if (!payload.requirement) {
+        throw new Error(payload.error ?? "Requirement planner returned no result.");
+      }
+      const decision = payload.requirement.clarification_decision;
+      const needsInput = Boolean(decision?.required);
+      setRequirementState({
+        status: needsInput ? "needs_user_input" : "planned",
+        id: payload.requirement.id,
+        epic: payload.requirement.epic_id,
+        message: needsInput
+          ? decision?.questions?.[0] ?? "This requirement needs clarification."
+          : `${payload.requirement.issues?.length ?? 0} issues generated.`,
+      });
+    } catch (error) {
+      setRequirementState({ status: "error", message: error instanceof Error ? error.message : "Requirement planning failed." });
+    }
+  }
 
   return (
     <main className="shell">
@@ -101,7 +136,64 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           <MetricCard label="Issues" value={snapshot.stats.issues} tone="neutral" detail={`${snapshot.stats.accepted} accepted`} />
           <MetricCard label="Blocked" value={snapshot.stats.blocked} tone={snapshot.stats.blocked > 0 ? "warning" : "ok"} detail="dependency / approval" />
           <MetricCard label="Providers" value={snapshot.stats.providers} tone="running" detail="Claude / Codex / API" />
-          <MetricCard label="Resources" value={snapshot.stats.resources} tone="neutral" detail="test_dev / production" />
+          <MetricCard label="Deploys" value={snapshot.stats.executions} tone="neutral" detail={`${snapshot.stats.deployments} plans`} />
+        </section>
+
+        <section className="opsGrid">
+          <div className="panel requirementPanel">
+            <PanelTitle icon={<Sparkles size={18} />} title="Requirement Intake" meta="plan to issue graph" />
+            <form className="requirementForm" onSubmit={submitRequirement}>
+              <textarea
+                aria-label="Requirement text"
+                onChange={(event) => setRequirementText(event.target.value)}
+                placeholder="Describe a feature, fix, or operational change with verification expectations..."
+                rows={3}
+                value={requirementText}
+              />
+              <div className="formFooter">
+                <button className="primaryButton" disabled={requirementState.status === "planning"} type="submit">
+                  <Play size={16} />
+                  <span>{requirementState.status === "planning" ? "Planning" : "Plan Issues"}</span>
+                </button>
+                {requirementState.status !== "idle" ? (
+                  <div className={`formResult ${requirementState.status}`}>
+                    <strong>{requirementState.status.replaceAll("_", " ")}</strong>
+                    <span>{requirementState.message}</span>
+                    {requirementState.epic ? <code>{requirementState.epic}</code> : null}
+                  </div>
+                ) : null}
+              </div>
+            </form>
+          </div>
+
+          <div className="panel executionPanel">
+            <PanelTitle icon={<Rocket size={18} />} title="Deployment Executions" meta={`${snapshot.executions.length} recent`} />
+            <div className="executionList">
+              {snapshot.executions.length > 0 ? (
+                snapshot.executions.map((execution) => (
+                  <div className="executionItem" key={execution.id}>
+                    <div>
+                      <strong>{execution.mode}</strong>
+                      <span>{execution.decision}</span>
+                    </div>
+                    <StatusPill tone={toneForStatus(execution.status)} label={execution.status} />
+                  </div>
+                ))
+              ) : snapshot.deployments.length > 0 ? (
+                snapshot.deployments.map((deployment) => (
+                  <div className="executionItem" key={deployment.id}>
+                    <div>
+                      <strong>{deployment.environment}</strong>
+                      <span>{deployment.decision}</span>
+                    </div>
+                    <StatusPill tone={toneForStatus(deployment.status)} label={deployment.status} />
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No deployment executions yet</div>
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="mainGrid">
@@ -243,7 +335,10 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   <div className="resourceItem" key={resource.id}>
                     <div>
                       <strong>{resource.id}</strong>
-                      <span>{resource.host}</span>
+                      <span>
+                        {resource.host}
+                        {resource.health ? ` / ${resource.health}` : ""}
+                      </span>
                     </div>
                     <StatusPill tone={resource.environment === "production" ? "warning" : "ok"} label={resource.environment} />
                   </div>
@@ -275,6 +370,26 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
     </main>
   );
 }
+
+type RequirementSubmitState = {
+  status: "idle" | "planning" | "planned" | "needs_user_input" | "error";
+  id?: string;
+  epic?: string;
+  message?: string;
+};
+
+type RequirementPlanEnvelope = {
+  error?: string;
+  requirement?: {
+    id?: string;
+    epic_id?: string;
+    issues?: unknown[];
+    clarification_decision?: {
+      required?: boolean;
+      questions?: string[];
+    };
+  };
+};
 
 function PanelTitle({ icon, title, meta }: { icon: React.ReactNode; title: string; meta: string }) {
   return (
@@ -327,9 +442,9 @@ function groupIssues(issues: IssueNode[]) {
 }
 
 function toneForStatus(status: string): StatusTone {
-  if (status === "accepted" || status === "passed" || status === "ready") return "ok";
+  if (status === "accepted" || status === "passed" || status === "ready" || status === "completed" || status === "planned") return "ok";
   if (status === "running" || status === "dispatch") return "running";
-  if (status === "blocked" || status === "rejected") return "blocked";
+  if (status === "blocked" || status === "rejected" || status === "failed") return "blocked";
   if (status === "waiting" || status === "pending") return "warning";
   return "neutral";
 }

@@ -34,7 +34,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P1 | `beta-009` | `server-resource-registry` | completed | 测试机/生产机资源纳管 | 可登记、查询、审计服务器资源 |
 | P1 | `beta-010` | `devops-deploy-smoke-monitor` | completed | 部署、线上冒烟和生产监控计划 | 可生成受控部署计划 |
 | P2 | `beta-011` | `controlled-deploy-executor` | completed | 受控部署执行器基线 | dry-run/local_shell 执行可审计，生产真实执行被阻断 |
-| P1 | `beta-012` | `console-api-integration` | planned | Web Console 接入更多真实 API | 控制台可展示 live requirement、deploy execution、resource health |
+| P1 | `beta-012` | `console-api-integration` | completed | Web Console 接入更多真实 API | 控制台可展示 live requirement、deploy execution、resource health |
 | P1 | `beta-013` | `subagent-run-visibility` | planned | Subagent/run 过程可视化 | 运行队列、等待原因、review/quality 结果可追踪 |
 | P2 | `beta-014` | `server-health-check-executor` | planned | 服务器健康检查执行器 | test_dev/staging 资源可执行受控 health check 并回写资源状态 |
 
@@ -375,20 +375,35 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - Execution 写入 `.moyuan/lifecycle/deployments/executions/`，汇总写入 `executions.jsonl`，并记录 `deployment.execution.created` 日志。
 - 当前只开放 dry-run 和受限 local shell；production 真实执行仍阻断。
 
-## 14. 下一步任务建议
+## 14. 已完成任务：`beta-012 console-api-integration`
 
-### `beta-012 console-api-integration`
-
-范围草案：
+范围：
 
 - Web Console 从 demo fallback 逐步迁移到 live API。
 - 增加 requirement plan 表单、deployment execution 面板和 server resource health 面板。
 - 明确 loading、empty、error、blocked 和 stale 状态。
 
-退出条件：
+非目标：
 
-- 控制台可用真实 API 展示项目、providers、resources、issue graph、schedule 和 deployment execution。
-- `npm run typecheck`、`npm run build`、`npm audit --omit=dev` 通过。
+- 不在前端直接读 `.moyuan` 文件。
+- 不从前端执行高风险 Git、deploy 或 production 操作。
+- 不把 demo 数据完全删除，空项目或 API 缺失时仍用于首屏可观察性。
+
+验收：
+
+- 控制台可用真实 API 展示项目、providers、resources、issue graph、schedule、deployments 和 deployment executions。
+- Requirement Intake 可通过 Web Console 调用 `requirements/plan` 低风险入口。
+- deployment execution 和 server resource health 有独立状态视图。
+- `go test ./...`、`npm run typecheck`、`npm run build`、`npm audit --omit=dev` 通过。
+
+完成记录：
+
+- 已新增 API：`GET /v1/projects/:project_id/deployments`、`GET /v1/projects/:project_id/deployment-executions`。
+- Web Console 已接入 deployments、deployment executions 和 live timeline。
+- Web Console 已新增 Requirement Intake 表单，提交后展示 clarification 或 issue graph 生成结果。
+- Server Resources 视图展示 health 信息，Deployment Executions 视图展示 dry-run/local_shell 执行状态。
+
+## 15. 下一步任务建议
 
 ### `beta-013 subagent-run-visibility`
 

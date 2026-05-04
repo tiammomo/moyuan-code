@@ -17,6 +17,8 @@ export const demoSnapshot: ConsoleSnapshot = {
     blocked: 1,
     providers: 5,
     resources: 2,
+    deployments: 1,
+    executions: 1,
   },
   issues: [
     {
@@ -145,6 +147,31 @@ export const demoSnapshot: ConsoleSnapshot = {
       owner: "ops",
       expires_at: "2026-09-30",
       health: "approval_required",
+    },
+  ],
+  deployments: [
+    {
+      id: "deployment-v0-1-0-test-dev",
+      release_id: "release-v0.1.0",
+      environment: "test_dev",
+      status: "planned",
+      decision: "DEPLOY_PLAN_READY",
+      reasons: ["release_and_resources_ready"],
+      resource_count: 1,
+      created_at: "2026-05-05T00:00:00.000Z",
+    },
+  ],
+  executions: [
+    {
+      id: "deploy-exec-dry-run",
+      deployment_id: "deployment-v0-1-0-test-dev",
+      environment: "test_dev",
+      mode: "dry_run",
+      status: "completed",
+      decision: "DEPLOY_EXECUTION_DRY_RUN",
+      reasons: ["no_remote_or_local_commands_executed"],
+      step_count: 4,
+      started_at: "2026-05-05T00:12:00.000Z",
     },
   ],
   timeline: [

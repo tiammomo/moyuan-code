@@ -3,6 +3,7 @@ package deployment
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -165,6 +166,37 @@ func Load(rootDir string, id string) (Plan, bool, error) {
 	return plan, found, err
 }
 
+func ListPlans(rootDir string, limit int) ([]Plan, error) {
+	if err := workspace.EnsureDirs(workspace.ForRoot(rootDir)); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(workspace.ForRoot(rootDir).DeploymentsDir)
+	if err != nil {
+		return nil, err
+	}
+	plans := []Plan{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var plan Plan
+		found, err := fsutil.ReadJSON(filepath.Join(workspace.ForRoot(rootDir).DeploymentsDir, entry.Name()), &plan)
+		if err != nil {
+			return nil, err
+		}
+		if found && plan.ID != "" {
+			plans = append(plans, plan)
+		}
+	}
+	sort.SliceStable(plans, func(i, j int) bool {
+		return plans[i].CreatedAt > plans[j].CreatedAt
+	})
+	if limit > 0 && len(plans) > limit {
+		return plans[:limit], nil
+	}
+	return plans, nil
+}
+
 func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execution, error) {
 	if err := workspace.EnsureDirs(workspace.ForRoot(rootDir)); err != nil {
 		return Execution{}, err
@@ -247,6 +279,41 @@ func LoadExecution(rootDir string, id string) (Execution, bool, error) {
 	var execution Execution
 	found, err := fsutil.ReadJSON(executionPath(rootDir, id), &execution)
 	return execution, found, err
+}
+
+func ListExecutions(rootDir string, limit int) ([]Execution, error) {
+	if err := workspace.EnsureDirs(workspace.ForRoot(rootDir)); err != nil {
+		return nil, err
+	}
+	dir := filepath.Join(workspace.ForRoot(rootDir).DeploymentsDir, "executions")
+	if err := fsutil.EnsureDir(dir); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	executions := []Execution{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var execution Execution
+		found, err := fsutil.ReadJSON(filepath.Join(dir, entry.Name()), &execution)
+		if err != nil {
+			return nil, err
+		}
+		if found && execution.ID != "" {
+			executions = append(executions, execution)
+		}
+	}
+	sort.SliceStable(executions, func(i, j int) bool {
+		return executions[i].StartedAt > executions[j].StartedAt
+	})
+	if limit > 0 && len(executions) > limit {
+		return executions[:limit], nil
+	}
+	return executions, nil
 }
 
 func finish(rootDir string, plan Plan) (Plan, error) {
