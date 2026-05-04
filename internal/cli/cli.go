@@ -96,7 +96,7 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 	case "resources":
 		text, result, exitCode, err = handleResources(argv[1:], cwd)
 	case "deploy":
-		text, result, exitCode, err = handleDeploy(argv[1:], cwd)
+		text, result, exitCode, err = handleDeploy(ctx, argv[1:], cwd)
 	case "logs":
 		text, result, exitCode, err = handleLogs(argv[1:], cwd)
 	default:
@@ -174,7 +174,9 @@ func usage() string {
 		"moyuan resources disable <resource-id>",
 		"moyuan resources expiration scan",
 		"moyuan deploy plan <release-id> --environment test_dev [--resource <resource-id>]",
+		"moyuan deploy execute <deployment-id> [--mode dry_run] [--approved] [--command <safe-command>]",
 		"moyuan deploy show <deployment-id>",
+		"moyuan deploy execution <execution-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -989,7 +991,7 @@ func handleResources(args []string, cwd string) (string, any, int, error) {
 	return "unknown resources command\n", nil, 1, nil
 }
 
-func handleDeploy(args []string, cwd string) (string, any, int, error) {
+func handleDeploy(ctx context.Context, args []string, cwd string) (string, any, int, error) {
 	rootDir := mustRoot(cwd)
 	if len(args) == 0 {
 		return "unknown deploy command\n", nil, 1, nil
@@ -1022,6 +1024,33 @@ func handleDeploy(args []string, cwd string) (string, any, int, error) {
 			return "", map[string]any{}, 1, nil
 		}
 		return "", plan, 0, nil
+	case "execute":
+		if len(args) < 2 {
+			return "missing deployment id\n", nil, 1, nil
+		}
+		execution, err := deployment.Execute(ctx, rootDir, deployment.ExecuteOptions{
+			DeploymentID: args[1],
+			Mode:         flagValue(args, "--mode", "dry_run"),
+			Approved:     hasFlag(args, "--approved"),
+			Commands:     flagValues(args, "--command"),
+		})
+		code := 0
+		if execution.Status == "blocked" || execution.Status == "failed" {
+			code = 1
+		}
+		return "", execution, code, err
+	case "execution":
+		if len(args) < 2 {
+			return "missing execution id\n", nil, 1, nil
+		}
+		execution, ok, err := deployment.LoadExecution(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", execution, 0, nil
 	}
 	return "unknown deploy command\n", nil, 1, nil
 }

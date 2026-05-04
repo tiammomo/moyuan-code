@@ -436,6 +436,30 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	assertFileContains(t, root, ".moyuan/lifecycle/deployments/plans.jsonl", deploymentID)
 	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "deployment.plan.created")
 
+	deployDryRun := runCLI(t, root, "deploy", "execute", deploymentID)
+	assertContains(t, deployDryRun.stdout, `"status": "completed"`)
+	assertContains(t, deployDryRun.stdout, `"decision": "DEPLOY_EXECUTION_DRY_RUN"`)
+	assertContains(t, deployDryRun.stdout, `"no_remote_or_local_commands_executed"`)
+	dryRunExecutionID := decodeStringField(t, deployDryRun.stdout, "id")
+	assertFileExists(t, root, ".moyuan/lifecycle/deployments/executions/"+dryRunExecutionID+".json")
+
+	deployExecution := runCLI(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--approved", "--command", "printf deployment-ok")
+	assertContains(t, deployExecution.stdout, `"status": "completed"`)
+	assertContains(t, deployExecution.stdout, `"decision": "DEPLOY_EXECUTION_COMPLETED"`)
+	assertContains(t, deployExecution.stdout, `"deployment-ok"`)
+	executionID := decodeStringField(t, deployExecution.stdout, "id")
+	executionShown := runCLI(t, root, "deploy", "execution", executionID)
+	assertContains(t, executionShown.stdout, executionID)
+	assertContains(t, executionShown.stdout, `"local_shell"`)
+	assertFileContains(t, root, ".moyuan/lifecycle/deployments/executions.jsonl", executionID)
+	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "deployment.execution.created")
+
+	unsafeExecution := runCLIAllowFailure(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--approved", "--command", "rm -rf /tmp/nope")
+	if unsafeExecution.code == 0 {
+		t.Fatalf("expected unsafe deployment command to fail: %s", unsafeExecution.stdout)
+	}
+	assertContains(t, unsafeExecution.stdout, `"command_not_allowed"`)
+
 	prodResource := runCLI(t, root, "resources", "add",
 		"--id", "deploy-prod",
 		"--environment", "production",

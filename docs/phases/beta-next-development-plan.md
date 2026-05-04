@@ -17,6 +17,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - Runtime adapter、Claude CLI/Codex CLI 调用契约和 local shell fallback。
 - Quality review gate、Memory record gate、repair controlled loop。
 - Gin + GORM 基线，项目注册会同步 `.moyuan/state.db`。
+- 部署计划后已具备受控 execution 记录、dry-run 预演和受限 local shell 执行框架。
 
 ## 2. Beta 第一批任务
 
@@ -32,7 +33,10 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P1 | `beta-008` | `release-branch-pipeline` | completed | 版本分支、tag 和 GitHub/Gitee 发布记录 | 可根据积累量生成 release plan |
 | P1 | `beta-009` | `server-resource-registry` | completed | 测试机/生产机资源纳管 | 可登记、查询、审计服务器资源 |
 | P1 | `beta-010` | `devops-deploy-smoke-monitor` | completed | 部署、线上冒烟和生产监控计划 | 可生成受控部署计划 |
-| P2 | `beta-011` | `controlled-deploy-executor` | planned | 受控 SSH/云厂商部署执行器 | 在审批和 allowlist 下执行真实部署 |
+| P2 | `beta-011` | `controlled-deploy-executor` | completed | 受控部署执行器基线 | dry-run/local_shell 执行可审计，生产真实执行被阻断 |
+| P1 | `beta-012` | `console-api-integration` | planned | Web Console 接入更多真实 API | 控制台可展示 live requirement、deploy execution、resource health |
+| P1 | `beta-013` | `subagent-run-visibility` | planned | Subagent/run 过程可视化 | 运行队列、等待原因、review/quality 结果可追踪 |
+| P2 | `beta-014` | `server-health-check-executor` | planned | 服务器健康检查执行器 | test_dev/staging 资源可执行受控 health check 并回写资源状态 |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -338,16 +342,74 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 当前不执行 SSH、云 API、真实部署、真实冒烟或监控 API。
 - 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
 
-## 13. 下一步：`beta-011 controlled-deploy-executor`
+## 13. 已完成任务：`beta-011 controlled-deploy-executor`
 
-范围草案：
+范围：
 
 - 在 deployment plan 基础上接入受控执行器。
-- 对 SSH、shell、云厂商 API、部署命令和监控查询建立 allowlist。
-- production 必须绑定 approval、rollback plan 和资源健康检查。
+- 建立 deployment execution 记录。
+- 支持默认 dry-run，预演部署、smoke、monitor 和 rollback 步骤。
+- 支持受限 `local_shell`，仅允许极小安全命令集合，且必须显式 `approved`。
+- production 非 dry-run 执行当前阶段强制阻断。
 
 非目标：
 
 - 不允许无审批生产部署。
 - 不允许仓库配置直接覆盖执行 allowlist。
 - 不允许把 secret value 写入日志、Memory 或模型上下文。
+- 不接入真实 SSH、云厂商 API 或外部监控 API。
+
+验收：
+
+- deployment plan 未 ready 时不能执行。
+- dry-run 不运行任何远程或本地命令。
+- local shell 未审批时阻断，危险命令被 allowlist 阻断。
+- execution 记录可通过 CLI/API 查询，并写入审计日志。
+- `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 `deployment.Execute` 和 `deployment.LoadExecution`。
+- 已支持 CLI：`moyuan deploy execute <deployment-id>`、`moyuan deploy execution <execution-id>`。
+- 已支持 API：`POST /v1/projects/:project_id/deployments/:deployment_id/execute`、`GET /v1/projects/:project_id/deployment-executions/:execution_id`。
+- Execution 写入 `.moyuan/lifecycle/deployments/executions/`，汇总写入 `executions.jsonl`，并记录 `deployment.execution.created` 日志。
+- 当前只开放 dry-run 和受限 local shell；production 真实执行仍阻断。
+
+## 14. 下一步任务建议
+
+### `beta-012 console-api-integration`
+
+范围草案：
+
+- Web Console 从 demo fallback 逐步迁移到 live API。
+- 增加 requirement plan 表单、deployment execution 面板和 server resource health 面板。
+- 明确 loading、empty、error、blocked 和 stale 状态。
+
+退出条件：
+
+- 控制台可用真实 API 展示项目、providers、resources、issue graph、schedule 和 deployment execution。
+- `npm run typecheck`、`npm run build`、`npm audit --omit=dev` 通过。
+
+### `beta-013 subagent-run-visibility`
+
+范围草案：
+
+- 为 subagent/run 暴露列表 API 和控制台视图。
+- 展示 role、runtime、provider、blocked reason、quality/review 状态和 artifact 路径。
+- 支持按 project/epic/issue 过滤。
+
+退出条件：
+
+- 用户能在控制台看清每个 issue 的执行队列、等待原因和复核结果。
+
+### `beta-014 server-health-check-executor`
+
+范围草案：
+
+- 基于 server resource registry 的 healthcheck 配置执行受控健康检查。
+- test_dev/staging 可自动执行，production 必须审批。
+- 健康检查结果回写 resource inventory 和 events。
+
+退出条件：
+
+- 服务器资源支持 `health scan`，控制台可展示 last_status 和 scan history。

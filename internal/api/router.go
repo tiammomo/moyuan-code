@@ -57,6 +57,12 @@ type deploymentPlanRequest struct {
 	Approved    bool     `json:"approved"`
 }
 
+type deploymentExecuteRequest struct {
+	Mode     string   `json:"mode"`
+	Approved bool     `json:"approved"`
+	Commands []string `json:"commands"`
+}
+
 func NewRouter(options Options) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -454,6 +460,58 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"deployment": plan})
+	})
+	router.POST("/v1/projects/:project_id/deployments/:deployment_id/execute", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req deploymentExecuteRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		execution, err := deployment.Execute(c.Request.Context(), rootDir, deployment.ExecuteOptions{
+			DeploymentID: c.Param("deployment_id"),
+			Mode:         req.Mode,
+			Approved:     req.Approved,
+			Commands:     req.Commands,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if execution.Status == "blocked" || execution.Status == "failed" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"execution": execution})
+	})
+	router.GET("/v1/projects/:project_id/deployment-executions/:execution_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		execution, found, err := deployment.LoadExecution(rootDir, c.Param("execution_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "deployment execution not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"execution": execution})
 	})
 	router.POST("/v1/projects/:project_id/requirements/plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
