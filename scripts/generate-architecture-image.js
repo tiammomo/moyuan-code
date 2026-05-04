@@ -79,6 +79,10 @@ function collectDocsContext() {
 }
 
 function buildDiagramSpec() {
+  if (process.env.DIAGRAM_VARIANT === "docs-structure-16x9") {
+    return buildDocsStructureDiagramSpec();
+  }
+
   return `
 图名：Moyuan Code Multi-Agent SDLC 调用逻辑
 目标：生成一张横版 ${sizeLabel} 技术信息流图，用编号层级、主流程箭头、辅助流程虚线、数据/工作空间沉淀层和底部治理层，精炼展示 Moyuan Code 的核心调用逻辑。参考用户给出的优秀横版流程图风格：顶部强标题、分层编号模块、深蓝标题条、浅色卡片、数据库圆柱、右上图例、底部调度/控制层。不要照搬参考图的业务内容，只参考版式组织方式。
@@ -187,6 +191,144 @@ function buildDiagramSpec() {
 - 文字必须清晰可读，不要密集小字。
 - 整体是技术调用逻辑图，不是宣传海报，不要夸张视觉效果。
 - 不要出现任何 API Key、token、私网 IP、真实账号或密码。
+`;
+}
+
+function buildDocsStructureDiagramSpec() {
+  return `
+图名：Moyuan Code 文档驱动全生命周期流程
+目标：基于当前最新 docs 文档结构，生成一张横版 ${sizeLabel}、严格 16:9 的技术流程图。它不是旧图放大，而是重新梳理文档体系表达的完整过程：项目接入、项目理解、需求规划、Issue Graph、多 Agent 编排、质量合入、运行反馈、自我修复、服务器资源、发布投产、Memory、日志审计、安全威胁模型、ADR 和实现就绪门禁。
+受众：技术负责人、架构师、后端/前端/测试/运维 Agent 配置人员、后续实现工程师。
+
+画面布局要求：
+- 画布必须是 16:9 横版宽屏，适合 4096x2160。
+- 顶部大标题居中：Moyuan Code 文档驱动全生命周期流程
+- 右上角图例：实线 = Main Flow，虚线 = Control / Feedback，圆柱 = Workspace / State，菱形 = Gate。
+- 使用工程调用逻辑图风格：编号模块、深蓝标题条、浅色卡片、清晰箭头、数据圆柱、门禁菱形、右侧控制面、底部治理闭环。
+- 不要竖向长图，不要海报，不要大段文字，不要人物肖像。
+
+主流程第一行，从左到右 8 个主模块：
+
+1. 用户入口与权限
+   - CLI / API / Web Console
+   - Auth Context / RBAC
+   - Approval / Audit
+   - Secret Ref
+
+2. 仓库接入
+   - Local Path / GitHub / Gitee
+   - Git Adapter
+   - clone / fetch / branch
+   - 初始化 .moyuan
+
+3. Project Comprehension
+   - Project Profile
+   - Module Map
+   - Commands / Risk Files
+   - Memory Candidates
+
+4. 需求规划
+   - Requirement Refiner
+   - Clarification Gate
+   - Issue Planner
+   - Issue Graph
+
+5. Scheduler
+   - ready / blocked / running / review
+   - parallelism budget
+   - worktree / runtime slots
+   - write scope conflict
+
+6. Multi-Agent 执行
+   - Subagent Plan
+   - Claude CLI / Codex CLI
+   - Skills Registry / find-skills
+   - Model Routing
+
+7. 质量合入
+   - Build / Lint / Test
+   - Coverage / Duplication
+   - Quality Gate
+   - Reviewer / Merge
+
+8. 发布投产
+   - Release Branch / Tag
+   - GitHub/Gitee Push
+   - Deployment
+   - Smoke / Monitor / Rollback
+
+中间横向 Workspace / State 层，用虚线大框包起来，放 8 个圆柱或文件库：
+- project.yaml / repository.yaml
+- comprehension/
+- lifecycle/issue-graphs/
+- agents/subagents/
+- runtimes/sessions/
+- memory/
+- resources/
+- logs/audit/
+
+右侧控制面，竖排 4 个模块：
+
+9. Server Resources
+   - test_dev / production
+   - cloud metadata / expires_at
+   - healthcheck / owner
+
+10. Provider & Runtime
+   - GPT / Claude / GLM / MiniMax
+   - Third-party API Policy
+   - Runtime Adapter
+
+11. Security Model
+   - Threat Model
+   - protected paths
+   - data policy
+   - secret redaction
+
+12. ADR & Readiness
+   - ADR records
+   - module map
+   - test strategy
+   - consistency rules
+
+底部反馈治理层，横向 5 个模块：
+
+13. Runtime Signals
+    - error / test failure / smoke failure
+
+14. Self Repair
+    - Bug Candidate
+    - Repair Attempt
+    - regression
+
+15. Agent Memory
+    - Record Gate
+    - Retrieve
+    - Memory Compact
+
+16. Framework Tests
+    - fake runtime
+    - golden fixtures
+    - recovery tests
+
+17. Documentation Governance
+    - schema index
+    - contracts
+    - design readiness
+
+箭头规则：
+- 主流程用粗实线从 1 -> 8。
+- 主流程各模块向 Workspace / State 层用向下虚线沉淀状态。
+- 底部反馈层用虚线回到 4 需求规划、5 Scheduler、6 Multi-Agent 执行。
+- 右侧控制面用虚线连接 1、6、8 和 Workspace。
+
+视觉要求：
+- 普通动作和说明尽量用中文；英文技术专有名词必须保留：Auth Context、RBAC、Git Adapter、Project Comprehension、Issue Graph、Scheduler、Subagent Plan、Skills Registry、Model Routing、Quality Gate、Reviewer、Deployment、Runtime Adapter、Threat Model、ADR、Agent Memory、Memory Compact。
+- 每个模块只放 3-4 个核心技术点，避免拥挤。
+- 16:9 宽屏下信息密度要高但清晰，卡片不要重叠，文字必须可读。
+- 色彩：白底、浅灰卡片、深蓝标题条为主，右侧控制面用青/橙，底部治理层用棕/深蓝。
+- 使用统一线性图标：用户盾牌、Git 分支、文件搜索、DAG、队列、机器人、测试瓶、火箭、服务器、云、锁、文档、数据库、扳手。
+- 不要出现 API Key、token、私网 IP、真实账号、密码或具体密钥值。
 `;
 }
 
