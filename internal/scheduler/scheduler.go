@@ -47,6 +47,12 @@ func Build(rootDir string, epicID string, maxParallel int) (Plan, error) {
 		if node.Status == "blocked" {
 			plan.BlockedReason[node.ID] = "waiting_dependencies"
 		}
+		switch node.Status {
+		case "running", "quality_checking", "verifying":
+			plan.RunningQueue = append(plan.RunningQueue, node.ID)
+		case "reviewing":
+			plan.ReviewQueue = append(plan.ReviewQueue, node.ID)
+		}
 	}
 	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(rootDir).SchedulerDir, epicID+"-plan.json"), plan); err != nil {
 		return Plan{}, err

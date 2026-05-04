@@ -122,6 +122,9 @@ func usage() string {
 		"moyuan runtime invoke <runtime-id> --prompt <command>",
 		"moyuan orchestrator plan <epic-id>",
 		"moyuan orchestrator run <issue-id> [--runtime local_shell] [--prompt <command>]",
+		"moyuan orchestrator status <issue-id>",
+		"moyuan orchestrator issue status <issue-id>",
+		"moyuan orchestrator run status <run-id>",
 		"moyuan memory add --summary <text> [--kind fact]",
 		"moyuan memory search <query>",
 		"moyuan memory compact",
@@ -452,6 +455,16 @@ func handleOrchestrator(ctx context.Context, args []string, cwd string) (string,
 		plan, err := orchestrator.Plan(rootDir, epicID)
 		return "", plan, 0, err
 	case "run":
+		if len(args) >= 3 && args[1] == "status" {
+			state, ok, err := orchestrator.LoadRunState(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", state, 0, nil
+		}
 		issueID := "task-unknown"
 		if len(args) > 1 {
 			issueID = args[1]
@@ -464,6 +477,29 @@ func handleOrchestrator(ctx context.Context, args []string, cwd string) (string,
 			code = 1
 		}
 		return "", result, code, err
+	case "status":
+		if len(args) < 2 {
+			return "missing issue id\n", nil, 1, nil
+		}
+		state, ok, err := orchestrator.LoadIssueState(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", state, 0, nil
+	case "issue":
+		if len(args) >= 3 && args[1] == "status" {
+			state, ok, err := orchestrator.LoadIssueState(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", state, 0, nil
+		}
 	}
 	return "unknown orchestrator command\n", nil, 1, nil
 }

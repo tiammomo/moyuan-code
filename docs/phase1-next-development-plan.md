@@ -15,6 +15,7 @@
 - `phase1-013 e2e-smoke` 已覆盖本地项目和本地 bare remote 模拟远程项目的端到端 CLI 链路。
 - `phase1-014 runtime-diff-capture` 已捕获 before/after git snapshot、changed files、diff summary，并阻断脏工作区和保护路径变更。
 - `phase1-015 native-runtime-adapters` 已补齐 Claude CLI / Codex CLI 的 prompt file、cwd、env allowlist、stdout/stderr、result contract 和失败分类。
+- `phase1-016 orchestrator-state-machine` 已持久化 issue/run 状态、转移历史、accepted/needs_rework 结论，并同步 issue graph/schedule。
 - 当前测试覆盖已经包含 package unit test、CLI smoke 和 Phase 1 e2e smoke。
 
 下一步目标不是继续铺更多模块，而是把“能跑通、能审计、能复核、能失败恢复”的 MVP 闭环做实。
@@ -26,7 +27,7 @@
 | Done | `phase1-013` | `e2e-smoke` | 用本地仓库和远程仓库样例验证完整 CLI 闭环 | `phase1-001`~`phase1-012` | 已由 Go e2e smoke 覆盖本地项目和本地 bare remote 模拟远程项目 |
 | Done | `phase1-014` | `runtime-diff-capture` | 为 runtime run 捕获 before/after git 状态、changed files 和 diff summary | `phase1-005`,`phase1-006`,`phase1-008` | runtime result 已包含 git snapshot、changed files、diff summary，dirty worktree 和 protected path 可被阻断 |
 | Done | `phase1-015` | `native-runtime-adapters` | 补齐 Claude CLI / Codex CLI 的真实调用契约和失败降级 | `phase1-014` | fake CLI 测试通过，CLI 缺失和非零退出有明确分类 |
-| P1 | `phase1-016` | `orchestrator-state-machine` | 持久化 issue/run 状态流转，连接 quality、review 和 rework | `phase1-014`,`phase1-015` | issue 能从 ready 到 running/review/accepted/needs_rework 可追踪 |
+| Done | `phase1-016` | `orchestrator-state-machine` | 持久化 issue/run 状态流转，连接 quality、review 和 rework | `phase1-014`,`phase1-015` | issue/run 状态可查询，accepted/needs_rework 可追踪，issue graph/schedule 可同步 |
 | P1 | `phase1-017` | `quality-review-hardening` | 强化质量复核：diff review、secret scan、重复/复杂度/保护路径检查 | `phase1-014`,`phase1-016` | 不合格 diff 不能进入 accepted |
 | P1 | `phase1-018` | `memory-record-gate` | 将当前 memory stub 升级为 record gate、staging、dedup、compact 最小闭环 | `phase1-007`,`phase1-016` | 可记录项目事实和运行经验，compact 可自动产生摘要 |
 | P2 | `phase1-019` | `repair-controlled-loop` | 将 runtime signal、bug candidate、repair attempt 接入受控修复闭环 | `phase1-016`,`phase1-017`,`phase1-018` | 修复必须补回归测试并重新通过 quality gate |
@@ -37,8 +38,8 @@
 1. `phase1-013 e2e-smoke` 已完成，当前 CLI 骨架有可重复 e2e 基线。
 2. `phase1-014 runtime-diff-capture` 已完成，后续 Native Runtime 修改代码时可以进入 diff 复核。
 3. `phase1-015 native-runtime-adapters` 已完成，Claude CLI / Codex CLI 已从 health check 占位推进到可执行契约。
-4. 下一步做 `phase1-016 orchestrator-state-machine`，让 issue/run 状态不只停留在单次命令输出。
-5. 并行推进 `phase1-017 quality-review-hardening` 和 `phase1-018 memory-record-gate`，但二者都不能绕过 orchestrator 状态机。
+4. `phase1-016 orchestrator-state-machine` 已完成，issue/run 状态不再只停留在单次命令输出。
+5. 下一步做 `phase1-017 quality-review-hardening`，随后推进 `phase1-018 memory-record-gate`。
 6. 最后做 `phase1-019 repair-controlled-loop` 和 `phase1-020 docs-release-readiness`。
 
 ## 4. 任务详情
@@ -114,6 +115,8 @@
 
 ### `phase1-016 orchestrator-state-machine`
 
+状态：已完成。
+
 范围：
 
 - 持久化 epic、issue、run 的状态快照。
@@ -125,6 +128,14 @@
 - `orchestrator plan` 输出 ready queue、blocked queue 和并发度。
 - `orchestrator run <issue-id>` 后状态可查询、可恢复、可重试。
 - 下游 issue 只有在前置 accepted 后才能进入 ready。
+
+实现：
+
+- Issue state 写入 `.moyuan/orchestrator/issue-states/<issue-id>.json`。
+- Run state 写入 `.moyuan/orchestrator/run-states/<run-id>.json`。
+- `orchestrator status <issue-id>` 和 `orchestrator issue status <issue-id>` 可查询 issue 状态。
+- `orchestrator run status <run-id>` 可查询 run 状态。
+- 状态转移会同步 issue graph 和 schedule，并写入 run 日志。
 
 ### `phase1-017 quality-review-hardening`
 
@@ -189,7 +200,7 @@
 - `phase1-013` 已完成，作为后续实现的回归基线。
 - `phase1-014` 已完成，runtime、git、orchestrator 和 quality 的共同字段已有回归基线。
 - `phase1-015` 已完成，后续可在真实 CLI 安装环境中继续增强 session resume 和结构化输出解析。
-- `phase1-017` 和 `phase1-018` 可以并行，但写入范围必须隔离：前者写 `quality/review`，后者写 `memory`。
+- `phase1-017` 和 `phase1-018` 可以并行，但当前建议先做 `phase1-017`，让 quality/review 的阻断能力先接入状态机。
 - `phase1-019` 等 `phase1-016`、`phase1-017`、`phase1-018` 完成后再做。
 
 ## 6. 每轮实现门禁

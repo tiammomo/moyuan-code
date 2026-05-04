@@ -106,6 +106,8 @@ func exercisePhase1Lifecycle(t *testing.T, root string) {
 
 	orchestrated := runCLI(t, root, "orchestrator", "run", "phase1-001", "--runtime", "local_shell", "--prompt", "printf orchestrator-ok")
 	assertContains(t, orchestrated.stdout, "accepted")
+	assertContains(t, orchestrated.stdout, `"issue_state"`)
+	assertContains(t, orchestrated.stdout, `"run_state"`)
 
 	runCLI(t, root, "memory", "add", "--kind", "fact", "--summary", "phase1 memory fact")
 	search := runCLI(t, root, "memory", "search", "phase1")
@@ -120,6 +122,58 @@ func exercisePhase1Lifecycle(t *testing.T, root string) {
 	assertContains(t, logs.stdout, "runtime.completed")
 
 	assertLifecycleArtifacts(t, root)
+}
+
+func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	accepted := runCLI(t, root, "orchestrator", "run", "phase1-001", "--runtime", "local_shell", "--prompt", "printf accepted")
+	acceptedRunID := decodeRunID(t, accepted.stdout)
+	assertContains(t, accepted.stdout, `"status": "accepted"`)
+	assertContains(t, accepted.stdout, `"quality_report_id"`)
+
+	issueState := runCLI(t, root, "orchestrator", "status", "phase1-001")
+	assertContains(t, issueState.stdout, `"status": "accepted"`)
+	assertContains(t, issueState.stdout, acceptedRunID)
+
+	issueStateAlias := runCLI(t, root, "orchestrator", "issue", "status", "phase1-001")
+	assertContains(t, issueStateAlias.stdout, `"status": "accepted"`)
+
+	runState := runCLI(t, root, "orchestrator", "run", "status", acceptedRunID)
+	assertContains(t, runState.stdout, `"status": "completed"`)
+	assertContains(t, runState.stdout, `"runtime_status": "completed"`)
+	assertContains(t, runState.stdout, `"quality_status": "passed"`)
+
+	graph := runCLI(t, root, "issue", "graph", "phase1-epic")
+	assertContains(t, graph.stdout, `"id": "phase1-001"`)
+	assertContains(t, graph.stdout, `"status": "accepted"`)
+
+	plan := runCLI(t, root, "orchestrator", "plan", "phase1-epic")
+	assertContains(t, plan.stdout, `"ready_queue": []`)
+
+	needsRework := runCLIAllowFailure(t, root, "orchestrator", "run", "phase1-002", "--runtime", "local_shell", "--prompt", "printf blocked > .env")
+	if needsRework.code == 0 {
+		t.Fatalf("expected needs_rework to return non-zero: %s", needsRework.stdout)
+	}
+	needsReworkRunID := decodeRunID(t, needsRework.stdout)
+	assertContains(t, needsRework.stdout, `"status": "needs_rework"`)
+	assertContains(t, needsRework.stdout, "runtime_blocked")
+
+	needsReworkIssue := runCLI(t, root, "orchestrator", "status", "phase1-002")
+	assertContains(t, needsReworkIssue.stdout, `"status": "needs_rework"`)
+	assertContains(t, needsReworkIssue.stdout, "runtime_blocked")
+
+	needsReworkRun := runCLI(t, root, "orchestrator", "run", "status", needsReworkRunID)
+	assertContains(t, needsReworkRun.stdout, `"status": "failed"`)
+	assertContains(t, needsReworkRun.stdout, `"runtime_status": "blocked"`)
+
+	assertFileExists(t, root, ".moyuan/orchestrator/issue-states/phase1-001.json")
+	assertFileExists(t, root, ".moyuan/orchestrator/issue-states/phase1-002.json")
+	assertFileExists(t, root, ".moyuan/orchestrator/run-states/"+acceptedRunID+".json")
+	assertFileExists(t, root, ".moyuan/orchestrator/run-states/"+needsReworkRunID+".json")
+	assertFileContains(t, root, ".moyuan/logs/run.jsonl", "orchestrator.issue.transitioned")
+	assertFileContains(t, root, ".moyuan/logs/run.jsonl", "orchestrator.run.transitioned")
 }
 
 func TestRuntimeDiffCaptureTracksGeneratedFilesAndBlocksDirtyWorktree(t *testing.T) {
@@ -225,6 +279,20 @@ func decodeQualityReport(t *testing.T, raw string) qualityReport {
 		t.Fatalf("decode quality report: %v\n%s", err, raw)
 	}
 	return report
+}
+
+func decodeRunID(t *testing.T, raw string) string {
+	t.Helper()
+	var payload struct {
+		RunID string `json:"run_id"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode run id: %v\n%s", err, raw)
+	}
+	if payload.RunID == "" {
+		t.Fatalf("missing run_id in output: %s", raw)
+	}
+	return payload.RunID
 }
 
 func runCLI(t *testing.T, root string, args ...string) cliResult {

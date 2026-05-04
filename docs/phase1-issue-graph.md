@@ -27,8 +27,9 @@
 - `phase1-013 e2e-smoke`：已实现本地项目和本地 bare remote 模拟远程项目的端到端 CLI smoke，覆盖项目接入、阅读理解、issue graph、schedule、runtime、orchestrator、quality、memory、repair、logs 和关键 `.moyuan/` 产物断言。
 - `phase1-014 runtime-diff-capture`：已实现 runtime before/after git snapshot、changed files、diff summary Markdown、`.moyuan/` 控制区过滤、脏工作区阻断和保护路径变更阻断。
 - `phase1-015 native-runtime-adapters`：已实现 Claude CLI / Codex CLI 的 prompt file、cwd、env allowlist、stdout/stderr、result contract、fake CLI 回归测试和 unavailable/failed 分类。
+- `phase1-016 orchestrator-state-machine`：已实现 issue/run 状态文件、状态转移历史、accepted/needs_rework 持久化、状态查询 CLI、issue graph/schedule 同步和回归测试。
 
-下一轮进入 `phase1-016 orchestrator-state-machine`，持久化 issue/run 状态流转，并连接 runtime、quality、review、accepted 和 needs_rework。下一批任务的执行顺序、验收标准和 git 同步规则见 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)。
+下一轮进入 `phase1-017 quality-review-hardening`，强化 secret scan、protected path、diff size、重复度/复杂度提示和结构化 review finding。下一批任务的执行顺序、验收标准和 git 同步规则见 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)。
 
 ## 1. 目标
 
