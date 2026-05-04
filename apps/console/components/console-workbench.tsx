@@ -15,6 +15,7 @@ import {
   Network,
   Play,
   Rocket,
+  ScrollText,
   Search,
   Server,
   ShieldCheck,
@@ -695,6 +696,36 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
         </section>
 
+        <section className="auditGrid">
+          <div className="panel">
+            <PanelTitle icon={<ScrollText size={18} />} title="Audit Trail" meta={`${snapshot.audit_events.length} core events`} />
+            <div className="signalList auditList">
+              {snapshot.audit_events.length > 0 ? (
+                snapshot.audit_events.map((event) => (
+                  <div className="signalItem auditItem" key={event.id}>
+                    <div className="signalHeader">
+                      <strong>{event.event}</strong>
+                      <StatusPill tone={toneForStatus(event.status || event.decision || event.channel)} label={event.channel} />
+                    </div>
+                    <span>
+                      {event.decision || event.status || "recorded"} / {shortTimestamp(event.ts)}
+                    </span>
+                    <div className="signalMeta">
+                      {event.issue_id ? <code>issue {compactID(event.issue_id)}</code> : null}
+                      {event.run_id ? <code>run {compactID(event.run_id)}</code> : null}
+                      {event.subagent_id ? <code>subagent {compactID(event.subagent_id)}</code> : null}
+                      {event.trace_id ? <code>trace {compactID(event.trace_id)}</code> : null}
+                    </div>
+                    {event.reason ? <small>{event.reason}</small> : null}
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No audit events recorded</div>
+              )}
+            </div>
+          </div>
+        </section>
+
         <section className="bottomGrid">
           <div className="panel">
             <PanelTitle icon={<Sparkles size={18} />} title="Providers & Runtimes" meta={`${snapshot.providers.length} registered`} />
@@ -922,4 +953,15 @@ function shortPath(value?: string) {
   if (!value) return "path pending";
   const parts = value.split("/").filter(Boolean);
   return parts.slice(-3).join("/");
+}
+
+function shortTimestamp(value?: string) {
+  if (!value) return "time pending";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "time pending";
+  return new Intl.DateTimeFormat("en", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }

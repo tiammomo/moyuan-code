@@ -1,6 +1,6 @@
 # Phase 4 实现 Issue Graph
 
-状态：planned
+状态：in_progress
 责任角色：orchestrator_owner + api_owner + frontend_owner + security_owner + devops_owner + qa_owner
 最后更新：2026-05-05
 
@@ -18,7 +18,7 @@ Phase 4 的目标是把 Phase 3 已完成的单机受控执行能力推进到团
 
 | ID | Issue | 状态 | 主要范围 | 依赖 | 建议角色 | 退出条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `phase4-001` | `audit-log-query-api-console` | planned | 提供核心 JSONL/GORM 审计日志查询 API，并在 Console 增加 Audit 面板 | Phase 3 readiness | `api_owner` + `frontend_owner` | 能按 channel、issue、run、limit 查询脱敏后的核心日志 |
+| `phase4-001` | `audit-log-query-api-console` | completed | 提供核心 JSONL/GORM 审计日志查询 API，并在 Console 增加 Audit 面板 | Phase 3 readiness | `api_owner` + `frontend_owner` | 能按 channel、issue、run、limit 查询脱敏后的核心日志 |
 | `phase4-002` | `approval-record-store-api` | planned | 为 release、deploy、visual script、provider probe 等高风险动作建立 approval record | `phase4-001` | `security_owner` | 高风险动作有 request、decision、reason、actor 和 result |
 | `phase4-003` | `team-auth-session-token-baseline` | planned | 增加 local team session、API token、service account 的最小实现 | `phase4-002` | `security_owner` + `api_owner` | API 能区分 user/session/token/service account，并写入审计 |
 | `phase4-004` | `git-pr-mr-plan-sync` | planned | 建立 GitHub/Gitee PR/MR plan、remote link、status refresh 和失败降级 | `phase4-001` | `git_owner` | 系统能记录 PR/MR 计划和远程状态，不直接绕过 review |

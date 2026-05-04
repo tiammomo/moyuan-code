@@ -11,6 +11,7 @@ import (
 	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/gitprovider"
 	"moyuan-code/internal/issues"
+	"moyuan-code/internal/logging"
 	"moyuan-code/internal/memory"
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/providers"
@@ -226,6 +227,37 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"run": state})
+	})
+	router.GET("/v1/projects/:project_id/audit-events", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		stream := c.Query("channel")
+		if stream == "" {
+			stream = c.Query("stream")
+		}
+		events, err := logging.List(rootDir, logging.Query{
+			Stream:  stream,
+			IssueID: c.Query("issue_id"),
+			RunID:   c.Query("run_id"),
+			Event:   c.Query("event"),
+			Limit:   queryLimit(c, 20),
+		})
+		if err != nil {
+			if logging.IsInvalidStreamError(err) {
+				writeError(c, http.StatusBadRequest, err.Error())
+				return
+			}
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"audit_events": events})
 	})
 	router.GET("/v1/projects/:project_id/runtime-recoveries", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

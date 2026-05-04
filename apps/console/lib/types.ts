@@ -252,6 +252,21 @@ export type MemorySignal = {
   score: number;
 };
 
+export type AuditEventSummary = {
+  id: string;
+  channel: string;
+  stream: string;
+  event: string;
+  ts?: string;
+  issue_id?: string;
+  run_id?: string;
+  subagent_id?: string;
+  trace_id?: string;
+  status?: string;
+  decision?: string;
+  reason?: string;
+};
+
 export type ConsoleSnapshot = {
   mode: "live" | "demo";
   backendStatus: StatusTone;
@@ -283,6 +298,7 @@ export type ConsoleSnapshot = {
   visual_assets: VisualAssetSummary[];
   visual_render_executions: VisualRenderExecutionSummary[];
   quality_explanations: QualityExplanation[];
+  audit_events: AuditEventSummary[];
   timeline: TimelineEvent[];
   quality: QualitySignal[];
   memory: MemorySignal[];

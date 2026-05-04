@@ -660,11 +660,25 @@ dd {
 
 .lowerGrid,
 .observabilityGrid,
+.auditGrid,
 .bottomGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-top: 12px;
+}
+
+.lowerGrid,
+.observabilityGrid,
+.bottomGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.auditGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.auditList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .timeline,
@@ -1022,6 +1036,7 @@ meter {
   .opsGrid,
   .lowerGrid,
   .observabilityGrid,
+  .auditList,
   .bottomGrid {
     grid-template-columns: 1fr;
   }

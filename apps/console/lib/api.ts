@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { demoSnapshot } from "./demo-data";
 import type {
   ConsoleSnapshot,
+  AuditEventSummary,
   DeploymentExecutionSummary,
   DeploymentSummary,
   IssueNode,
@@ -67,6 +68,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     visualRenderExecutionsResponse,
     qualityReportsResponse,
     memoryResponse,
+    auditEventsResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
     apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: unknown[]; waiting_queue?: unknown[]; subagent_backlog?: unknown[] } }>>(
@@ -83,6 +85,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ visual_render_executions: unknown[] }>>(`/projects/${project.id}/visuals/render-executions?limit=6`),
     apiGet<ApiEnvelope<{ quality_reports: unknown[] }>>(`/projects/${project.id}/quality-reports?limit=8`),
     apiGet<ApiEnvelope<{ candidates: unknown[] }>>(`/projects/${project.id}/memory/candidates?limit=3`),
+    apiGet<ApiEnvelope<{ audit_events: unknown[] }>>(`/projects/${project.id}/audit-events?channel=all&limit=10`),
   ]);
 
   const schedule = [
@@ -100,6 +103,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const visualAssets = normalizeVisualAssets(visualAssetsResponse?.visual_assets ?? []);
   const visualRenderExecutions = normalizeVisualRenderExecutions(visualRenderExecutionsResponse?.visual_render_executions ?? []);
   const qualityReports = normalizeQualityReports(qualityReportsResponse?.quality_reports ?? []);
+  const auditEvents = normalizeAuditEvents(auditEventsResponse?.audit_events ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
   const timeline = liveTimeline(runs, executions, deployments);
@@ -136,6 +140,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     visual_assets: visualAssets,
     visual_render_executions: visualRenderExecutions,
     quality_explanations: qualityExplanations,
+    audit_events: auditEvents,
     timeline: timeline.length > 0 ? timeline : demoSnapshot.timeline,
     quality: qualitySignals.length > 0 ? qualitySignals : demoSnapshot.quality,
     memory:
@@ -406,6 +411,23 @@ function normalizeQualityReports(rawReports: unknown[]) {
     status: readString(raw, "status", "unknown"),
     review_status: readString(raw, "review_status", ""),
     findings_count: readObjectArray(raw, "findings").length,
+  }));
+}
+
+function normalizeAuditEvents(rawEvents: unknown[]): AuditEventSummary[] {
+  return rawEvents.map((raw, index) => ({
+    id: readString(raw, "id", `audit-event-${index + 1}`),
+    channel: readString(raw, "channel", readString(raw, "stream", "audit")),
+    stream: readString(raw, "stream", readString(raw, "channel", "audit")),
+    event: readString(raw, "event", "unknown.event"),
+    ts: readString(raw, "ts", ""),
+    issue_id: readString(raw, "issue_id", ""),
+    run_id: readString(raw, "run_id", ""),
+    subagent_id: readString(raw, "subagent_id", ""),
+    trace_id: readString(raw, "trace_id", ""),
+    status: readString(raw, "status", ""),
+    decision: readString(raw, "decision", ""),
+    reason: readString(raw, "reason", ""),
   }));
 }
 

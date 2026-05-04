@@ -145,3 +145,47 @@ interface ErrorEvent extends LogEvent {
 - secret 访问必须有 audit event。
 - 日志中出现明文 API key 时校验失败。
 - 状态变化必须生成 `state_changed` 事件。
+
+## 9. 当前查询接口
+
+Phase 4 第一批已提供核心日志查询视图：
+
+```http
+GET /v1/projects/:project_id/audit-events?channel=all&limit=20
+GET /v1/projects/:project_id/audit-events?channel=audit&issue_id=<issue-id>
+GET /v1/projects/:project_id/audit-events?channel=run&run_id=<run-id>
+```
+
+查询参数：
+
+- `channel` 或 `stream`：日志流名称，支持 `all` 聚合 `.moyuan/logs/*.jsonl`。
+- `issue_id`：按 issue 过滤。
+- `run_id`：按 run 过滤。
+- `event`：按事件名过滤。
+- `limit`：返回数量，最大 100。
+
+返回结构：
+
+```ts
+interface AuditEventView {
+  id: string;
+  stream: string;
+  channel: string;
+  event: string;
+  ts: string;
+  issue_id?: string;
+  run_id?: string;
+  subagent_id?: string;
+  trace_id?: string;
+  status?: string;
+  decision?: string;
+  reason?: string;
+  data: Record<string, unknown>;
+}
+```
+
+实现规则：
+
+- API 返回前必须脱敏 token、API key、password、secret、credential 和 private key。
+- `channel`/`stream` 只能是字母、数字、下划线和短横线，禁止路径穿越。
+- Console 只消费只读查询结果，不直接改写日志。
