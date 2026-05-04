@@ -23,7 +23,7 @@ Phase 6 已完成并通过 release readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase7-001` | `release-provider-approval-consumption` | completed | release provider 真实 publish 的 approval consumption 和 replay guard | 真实 publish 路径不能重复使用 approval |
 | P0 | `phase7-002` | `ssh-executor-guarded-runner` | completed | SSH executor 受控执行边界 | 默认阻断真实 SSH，启用后只执行白名单命令 |
-| P1 | `phase7-003` | `post-action-evidence-model` | planned | 发布/部署/烟测/监控/回滚证据链 | 每次操作能查询统一 evidence |
+| P1 | `phase7-003` | `post-action-evidence-model` | completed | 发布/部署/烟测/监控/回滚证据链 | 每次操作能查询统一 evidence |
 | P1 | `phase7-004` | `runtime-telemetry-feedback-loop` | planned | runtime/quality 结果反哺 provider telemetry | route decision 可读取执行反馈 |
 | P2 | `phase7-005` | `console-execution-detail-history` | planned | Console execution detail 和 operation history | 用户能追踪 preview、approval、publish、evidence |
 
@@ -122,7 +122,56 @@ Phase 6 已完成并通过 release readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 7. 验证要求
+## 7. 执行规划：`phase7-003 post-action-evidence-model`
+
+范围：
+
+- 新增统一 evidence record，用于记录 release provider execution、deployment execution、smoke、monitor、rollback 等后续动作的证据链。
+- Release provider execution 和 deployment execution 完成时自动写入 evidence。
+- CLI 增加 `moyuan evidence list/show`。
+- API 增加 `GET /v1/projects/:project_id/evidence` 和 `GET /v1/projects/:project_id/evidence/:evidence_id`。
+- evidence record 写入 audit log，后续 Console 和自修复可按 parent/subject 检索。
+
+非目标：
+
+- 不替代原始 execution JSON；evidence 只做统一索引和摘要。
+- 不读取任意文件内容，只记录 artifact reference。
+- 不接入外部 observability vendor。
+
+验收：
+
+- release provider execution 完成后能查到 evidence。
+- deployment execution 完成后能查到 evidence。
+- CLI/API 能按 parent type/id 查询 evidence。
+- `go test ./internal/evidence ./internal/release ./internal/deployment ./internal/cli ./internal/api` 通过。
+- `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
+
+## 8. 已完成任务：`phase7-003 post-action-evidence-model`
+
+范围：
+
+- 新增 `internal/evidence`，支持 `Add`、`List` 和 `Load`。
+- Evidence 存储位置为 `.moyuan/lifecycle/evidence/`，并追加 `evidence.jsonl`。
+- Release provider execution 和 deployment execution 都会写入 evidence artifact reference。
+- CLI 增加 `moyuan evidence list` 和 `moyuan evidence show`。
+- API 增加 evidence list/show 查询入口。
+- 审计日志新增 `evidence.recorded`。
+
+非目标：
+
+- 不复制 execution 原文内容。
+- 不记录 secret value 或远程响应正文。
+- 不改变 release/deploy 原有执行状态。
+
+验证：
+
+- `go test ./internal/evidence ./internal/release ./internal/deployment ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 9. 验证要求
 
 每完成一个 Phase 7 issue，至少运行：
 

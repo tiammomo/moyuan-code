@@ -14,6 +14,7 @@ import (
 	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/auth"
 	"moyuan-code/internal/controlplane"
+	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
 	gitadapter "moyuan-code/internal/git"
 	"moyuan-code/internal/issues"
@@ -280,6 +281,12 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/deployments", http.StatusOK, `"deployments"`, `"release_not_found"`)
 	assertPostContains(t, router, "/v1/projects/managed/deployments/missing-deployment/execute", `{}`, http.StatusAccepted, `"execution"`, `"deployment_not_found"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions", http.StatusOK, `"executions"`, `"deployment_not_found"`)
+	assertGETContains(t, router, "/v1/projects/managed/evidence?parent_type=deployment_execution&limit=5", http.StatusOK, `"evidence"`, `"deployment.execute.dry_run"`, `"deployment_not_found"`)
+	evidenceRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "deployment_execution", Limit: 1})
+	if err != nil || len(evidenceRecords) != 1 {
+		t.Fatalf("expected deployment evidence record, records=%+v err=%v", evidenceRecords, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"evidence"`, evidenceRecords[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/missing-execution", http.StatusNotFound, `"deployment execution not found"`)
 	assertGETContains(t, router, "/v1/projects/managed/requirements/"+reqPlan.ID, http.StatusOK, `"requirement"`, `"clarification_decision"`)
 	assertPostContains(t, router, "/v1/projects/managed/requirements/plan", `{"text":"add backend API to inspect requirements with go test verification"}`, http.StatusCreated, `"requirement"`, `"backend-implementation"`)

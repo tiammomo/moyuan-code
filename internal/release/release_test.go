@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"moyuan-code/internal/approvals"
+	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/workspace"
 )
@@ -58,6 +59,10 @@ func TestProviderPreviewAndPublishApprovalFlow(t *testing.T) {
 	loaded, found, err := LoadProviderExecution(root, previewOnly.ID)
 	if err != nil || !found || loaded.ID != previewOnly.ID {
 		t.Fatalf("expected persisted provider execution, found=%v err=%v loaded=%+v", found, err, loaded)
+	}
+	evidenceRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "release_provider_execution", ParentID: previewOnly.ID, Limit: 10})
+	if err != nil || len(evidenceRecords) != 1 || evidenceRecords[0].Decision != previewOnly.Decision {
+		t.Fatalf("expected provider execution evidence, records=%+v err=%v", evidenceRecords, err)
 	}
 	releaseLog, found, err := fsutil.ReadText(filepath.Join(workspace.ForRoot(root).LogsDir, "release.jsonl"))
 	if err != nil {

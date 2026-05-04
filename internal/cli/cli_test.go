@@ -559,6 +559,12 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	assertContains(t, releaseProviderShown.stdout, releaseProviderExecutionID)
 	assertFileExists(t, root, ".moyuan/lifecycle/releases/provider-executions/"+releaseProviderExecutionID+".json")
 	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "release.provider.previewed")
+	releaseEvidence := runCLI(t, root, "evidence", "list", "--parent-type", "release_provider_execution", "--parent-id", releaseProviderExecutionID)
+	assertContains(t, releaseEvidence.stdout, `"evidence"`)
+	assertContains(t, releaseEvidence.stdout, `"release.provider.preview"`)
+	releaseEvidenceID := decodeFirstEvidenceID(t, releaseEvidence.stdout)
+	releaseEvidenceShown := runCLI(t, root, "evidence", "show", releaseEvidenceID)
+	assertContains(t, releaseEvidenceShown.stdout, releaseProviderExecutionID)
 
 	releaseProviderPublish := runCLIAllowFailure(t, root, "release", "provider", "publish", releaseID)
 	if releaseProviderPublish.code == 0 {
@@ -607,6 +613,8 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	executionShown := runCLI(t, root, "deploy", "execution", executionID)
 	assertContains(t, executionShown.stdout, executionID)
 	assertContains(t, executionShown.stdout, `"local_shell"`)
+	deployEvidence := runCLI(t, root, "evidence", "list", "--parent-type", "deployment_execution", "--parent-id", executionID)
+	assertContains(t, deployEvidence.stdout, `"deployment.execute.local_shell"`)
 	assertFileContains(t, root, ".moyuan/lifecycle/deployments/executions.jsonl", executionID)
 	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "deployment.execution.created")
 
@@ -1011,6 +1019,22 @@ func decodeStringField(t *testing.T, raw string, field string) string {
 		t.Fatalf("missing %s in output: %s", field, raw)
 	}
 	return value
+}
+
+func decodeFirstEvidenceID(t *testing.T, raw string) string {
+	t.Helper()
+	var payload struct {
+		Evidence []struct {
+			ID string `json:"id"`
+		} `json:"evidence"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode evidence: %v\n%s", err, raw)
+	}
+	if len(payload.Evidence) == 0 || payload.Evidence[0].ID == "" {
+		t.Fatalf("missing evidence id in output: %s", raw)
+	}
+	return payload.Evidence[0].ID
 }
 
 func runCLI(t *testing.T, root string, args ...string) cliResult {

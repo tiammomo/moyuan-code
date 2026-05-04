@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/workspace"
@@ -35,6 +36,10 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	}
 	if okExecution.Decision != "DEPLOY_EXECUTION_COMPLETED" || okExecution.SmokeReport.Status != "passed" || okExecution.MonitorReport.Status != "passed" || okExecution.RollbackSuggestion.Required {
 		t.Fatalf("expected successful smoke and monitor, got %+v", okExecution)
+	}
+	evidenceRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "deployment_execution", ParentID: okExecution.ID, Limit: 10})
+	if err != nil || len(evidenceRecords) != 1 || evidenceRecords[0].Decision != okExecution.Decision {
+		t.Fatalf("expected deployment execution evidence, records=%+v err=%v", evidenceRecords, err)
 	}
 
 	failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

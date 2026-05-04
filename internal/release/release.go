@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"moyuan-code/internal/approvals"
+	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
 	gitadapter "moyuan-code/internal/git"
 	"moyuan-code/internal/logging"
@@ -351,6 +352,24 @@ func finishProviderExecution(rootDir string, execution ProviderExecution) (Provi
 		"status":       execution.Status,
 		"provider":     execution.Provider,
 	})
+	if _, err := evidence.Add(rootDir, evidence.AddOptions{
+		ParentType:  "release_provider_execution",
+		ParentID:    execution.ID,
+		SubjectType: "release",
+		SubjectID:   execution.ReleaseID,
+		Operation:   "release.provider." + execution.Mode,
+		Status:      execution.Status,
+		Decision:    execution.Decision,
+		Reasons:     execution.Reasons,
+		Source:      "release_provider",
+		Artifacts: []evidence.ArtifactRef{{
+			Kind: "provider_execution",
+			ID:   execution.ID,
+			Path: filepath.ToSlash(filepath.Join(".moyuan", "lifecycle", "releases", "provider-executions", execution.ID+".json")),
+		}},
+	}); err != nil {
+		return ProviderExecution{}, true, err
+	}
 	return execution, true, nil
 }
 

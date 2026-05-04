@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"moyuan-code/internal/approvals"
+	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/process"
@@ -481,6 +482,24 @@ func finishExecution(rootDir string, execution Execution) (Execution, error) {
 		"environment":   execution.Environment,
 		"mode":          execution.Mode,
 	})
+	if _, err := evidence.Add(rootDir, evidence.AddOptions{
+		ParentType:  "deployment_execution",
+		ParentID:    execution.ID,
+		SubjectType: "deployment",
+		SubjectID:   execution.DeploymentID,
+		Operation:   "deployment.execute." + execution.Mode,
+		Status:      execution.Status,
+		Decision:    execution.Decision,
+		Reasons:     execution.Reasons,
+		Source:      "deployment",
+		Artifacts: []evidence.ArtifactRef{{
+			Kind: "deployment_execution",
+			ID:   execution.ID,
+			Path: filepath.ToSlash(filepath.Join(".moyuan", "lifecycle", "deployments", "executions", execution.ID+".json")),
+		}},
+	}); err != nil {
+		return Execution{}, err
+	}
 	return execution, nil
 }
 

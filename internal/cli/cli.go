@@ -15,6 +15,7 @@ import (
 	"moyuan-code/internal/comprehension"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/deployment"
+	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/git"
 	"moyuan-code/internal/gitprovider"
 	"moyuan-code/internal/issues"
@@ -102,6 +103,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleResources(ctx, argv[1:], cwd)
 	case "deploy":
 		text, result, exitCode, err = handleDeploy(ctx, argv[1:], cwd)
+	case "evidence":
+		text, result, exitCode, err = handleEvidence(argv[1:], cwd)
 	case "visuals":
 		text, result, exitCode, err = handleVisuals(ctx, argv[1:], cwd)
 	case "logs":
@@ -222,6 +225,8 @@ func usage() string {
 		"moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell] [--approved] [--command <safe-command>]",
 		"moyuan deploy show <deployment-id>",
 		"moyuan deploy execution <execution-id>",
+		"moyuan evidence list [--parent-type <type>] [--parent-id <id>] [--limit 20]",
+		"moyuan evidence show <evidence-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -1537,6 +1542,38 @@ func handleDeploy(ctx context.Context, args []string, cwd string) (string, any, 
 		return "", execution, 0, nil
 	}
 	return "unknown deploy command\n", nil, 1, nil
+}
+
+func handleEvidence(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown evidence command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "list":
+		limit, _ := strconv.Atoi(flagValue(args, "--limit", "20"))
+		records, err := evidence.List(rootDir, evidence.ListOptions{
+			ParentType:  flagValue(args, "--parent-type", ""),
+			ParentID:    flagValue(args, "--parent-id", ""),
+			SubjectType: flagValue(args, "--subject-type", ""),
+			SubjectID:   flagValue(args, "--subject-id", ""),
+			Limit:       limit,
+		})
+		return "", map[string]any{"evidence": records}, 0, err
+	case "show":
+		if len(args) < 2 {
+			return "missing evidence id\n", nil, 1, nil
+		}
+		record, ok, err := evidence.Load(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", map[string]any{"evidence": record}, 0, nil
+	}
+	return "unknown evidence command\n", nil, 1, nil
 }
 
 func modelsFromCLI(args []string) []providers.Model {

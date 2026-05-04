@@ -11,6 +11,7 @@ import (
 	"moyuan-code/internal/auth"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/deployment"
+	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/gitprovider"
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
@@ -1538,6 +1539,50 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"execution": execution})
+	})
+	router.GET("/v1/projects/:project_id/evidence", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		records, err := evidence.List(rootDir, evidence.ListOptions{
+			ParentType:  c.Query("parent_type"),
+			ParentID:    c.Query("parent_id"),
+			SubjectType: c.Query("subject_type"),
+			SubjectID:   c.Query("subject_id"),
+			Limit:       queryLimit(c, 20),
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"evidence": records})
+	})
+	router.GET("/v1/projects/:project_id/evidence/:evidence_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		record, found, err := evidence.Load(rootDir, c.Param("evidence_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "evidence not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"evidence": record})
 	})
 	router.POST("/v1/projects/:project_id/requirements/plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
