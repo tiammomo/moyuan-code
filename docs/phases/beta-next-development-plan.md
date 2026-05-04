@@ -31,7 +31,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P1 | `beta-007` | `git-provider-pr-mr` | completed | GitHub/Gitee 分支、push、PR/MR 编排 | 任务分支可推送并形成 PR/MR 计划 |
 | P1 | `beta-008` | `release-branch-pipeline` | completed | 版本分支、tag 和 GitHub/Gitee 发布记录 | 可根据积累量生成 release plan |
 | P1 | `beta-009` | `server-resource-registry` | completed | 测试机/生产机资源纳管 | 可登记、查询、审计服务器资源 |
-| P1 | `beta-010` | `devops-deploy-smoke-monitor` | in_progress | 部署、线上冒烟和生产监控计划 | 可生成受控部署计划 |
+| P1 | `beta-010` | `devops-deploy-smoke-monitor` | completed | 部署、线上冒烟和生产监控计划 | 可生成受控部署计划 |
+| P2 | `beta-011` | `controlled-deploy-executor` | planned | 受控 SSH/云厂商部署执行器 | 在审批和 allowlist 下执行真实部署 |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -304,7 +305,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 当前不执行 SSH、云 API、部署或监控调用。
 - 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
 
-## 12. 当前任务：`beta-010 devops-deploy-smoke-monitor`
+## 12. 已完成任务：`beta-010 devops-deploy-smoke-monitor`
 
 范围：
 
@@ -324,3 +325,26 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - production 缺少审批时阻断。
 - test_dev 可生成 smoke/monitor plan。
 - `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 `internal/deployment` deploy/smoke/monitor plan 模块。
+- 已支持 CLI：`moyuan deploy plan <release-id> --environment <env> [--resource <host-id>]`、`moyuan deploy show <deployment-id>`。
+- 已支持 API：`POST /v1/projects/:project_id/deployments/plan`、`GET /v1/projects/:project_id/deployments/:deployment_id`。
+- Deployment plan 写入 `.moyuan/lifecycle/deployments/`，并记录 `deployment.plan.created` 日志。
+- 当前不执行 SSH、云 API、真实部署、真实冒烟或监控 API。
+- 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
+
+## 13. 下一步：`beta-011 controlled-deploy-executor`
+
+范围草案：
+
+- 在 deployment plan 基础上接入受控执行器。
+- 对 SSH、shell、云厂商 API、部署命令和监控查询建立 allowlist。
+- production 必须绑定 approval、rollback plan 和资源健康检查。
+
+非目标：
+
+- 不允许无审批生产部署。
+- 不允许仓库配置直接覆盖执行 allowlist。
+- 不允许把 secret value 写入日志、Memory 或模型上下文。

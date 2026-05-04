@@ -11,10 +11,12 @@ Release note、发版批次、覆盖率门禁、禁止发版条件和回退后 f
 当前 Beta 实现已落地 release suggestion 最小闭环：
 
 - CLI：`moyuan release suggest [--version <version>] [--min-issues <n>]`、`moyuan release show <release-id>`。
-- API：`POST /v1/projects/:project_id/releases/suggest`、`GET /v1/projects/:project_id/releases/:release_id`。
-- 输出位置：`.moyuan/lifecycle/releases/`。
-- 当前只生成 release suggestion、release branch plan、tag suggestion 和 release notes draft，不真实创建 branch、tag 或远程 release。
+- CLI：`moyuan deploy plan <release-id> --environment <env> [--resource <host-id>]`、`moyuan deploy show <deployment-id>`。
+- API：`POST /v1/projects/:project_id/releases/suggest`、`GET /v1/projects/:project_id/releases/:release_id`、`POST /v1/projects/:project_id/deployments/plan`、`GET /v1/projects/:project_id/deployments/:deployment_id`。
+- 输出位置：`.moyuan/lifecycle/releases/` 和 `.moyuan/lifecycle/deployments/`。
+- 当前只生成 release suggestion、release branch plan、tag suggestion、release notes draft、deploy/smoke/monitor/rollback plan，不真实创建 branch、tag、远程 release、SSH 或部署。
 - 已接入门禁：dirty worktree、remote 缺失、无 accepted issue、存在 unresolved issue 时阻断。
+- production deployment plan 缺少 approval 时阻断；test_dev 可生成演练计划。
 
 ## 2. 输入与输出
 

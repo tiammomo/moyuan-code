@@ -311,6 +311,8 @@ moyuan release suggest
 moyuan release show <release-id>
 moyuan release publish <release-id>
 moyuan deploy run <release-id> --env <env>
+moyuan deploy plan <release-id> --environment <env> [--resource <host-id>]
+moyuan deploy show <deployment-id>
 moyuan deploy status <release-id>
 moyuan deploy rollback <release-id>
 moyuan resources add

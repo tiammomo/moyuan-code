@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"moyuan-code/internal/controlplane"
+	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/gitprovider"
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/memory"
@@ -47,6 +48,13 @@ type routeRequest struct {
 type releaseSuggestRequest struct {
 	Version   string `json:"version"`
 	MinIssues int    `json:"min_issues"`
+}
+
+type deploymentPlanRequest struct {
+	ReleaseID   string   `json:"release_id"`
+	Environment string   `json:"environment"`
+	ResourceIDs []string `json:"resource_ids"`
+	Approved    bool     `json:"approved"`
 }
 
 func NewRouter(options Options) *gin.Engine {
@@ -394,6 +402,58 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"resource": resource})
+	})
+	router.POST("/v1/projects/:project_id/deployments/plan", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req deploymentPlanRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		plan, err := deployment.CreatePlan(rootDir, deployment.PlanOptions{
+			ReleaseID:   req.ReleaseID,
+			Environment: req.Environment,
+			ResourceIDs: req.ResourceIDs,
+			Approved:    req.Approved,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if plan.Status == "blocked" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"deployment": plan})
+	})
+	router.GET("/v1/projects/:project_id/deployments/:deployment_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plan, found, err := deployment.Load(rootDir, c.Param("deployment_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "deployment not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"deployment": plan})
 	})
 	router.POST("/v1/projects/:project_id/requirements/plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

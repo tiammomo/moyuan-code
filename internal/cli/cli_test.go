@@ -410,6 +410,47 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	assertFileExists(t, root, ".moyuan/lifecycle/releases/"+releaseID+".md")
 	assertFileContains(t, root, ".moyuan/lifecycle/releases/plans.jsonl", releaseID)
 	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "release.plan.created")
+
+	deployResource := runCLI(t, root, "resources", "add",
+		"--id", "deploy-dev",
+		"--environment", "test_dev",
+		"--host", "10.0.2.10",
+		"--provider", "local_vm",
+		"--owner", "dev-owner",
+		"--auth-ref", "env:DEV_SERVER_SSH_KEY",
+		"--expires-at", "2099-01-01",
+	)
+	assertContains(t, deployResource.stdout, `"deploy-dev"`)
+
+	deployPlan := runCLI(t, root, "deploy", "plan", releaseID, "--environment", "test_dev", "--resource", "deploy-dev")
+	assertContains(t, deployPlan.stdout, `"status": "planned"`)
+	assertContains(t, deployPlan.stdout, `"decision": "DEPLOY_PLAN_READY"`)
+	assertContains(t, deployPlan.stdout, `"smoke_plan"`)
+	assertContains(t, deployPlan.stdout, `"monitor_plan"`)
+	deploymentID := decodeStringField(t, deployPlan.stdout, "id")
+
+	deployShown := runCLI(t, root, "deploy", "show", deploymentID)
+	assertContains(t, deployShown.stdout, deploymentID)
+	assertContains(t, deployShown.stdout, `"rollback_plan"`)
+	assertFileExists(t, root, ".moyuan/lifecycle/deployments/"+deploymentID+".json")
+	assertFileContains(t, root, ".moyuan/lifecycle/deployments/plans.jsonl", deploymentID)
+	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "deployment.plan.created")
+
+	prodResource := runCLI(t, root, "resources", "add",
+		"--id", "deploy-prod",
+		"--environment", "production",
+		"--host", "prod.deploy.internal",
+		"--provider", "aliyun",
+		"--owner", "ops-owner",
+		"--auth-ref", "secret:prod_ssh_key",
+		"--expires-at", "2099-01-01",
+	)
+	assertContains(t, prodResource.stdout, `"deploy-prod"`)
+	prodBlocked := runCLIAllowFailure(t, root, "deploy", "plan", releaseID, "--environment", "production", "--resource", "deploy-prod")
+	if prodBlocked.code == 0 {
+		t.Fatalf("expected production deployment without approval to block: %s", prodBlocked.stdout)
+	}
+	assertContains(t, prodBlocked.stdout, "production_approval_required")
 }
 
 func TestServerResourcesCLIRegistersListsAndValidatesProductionHosts(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	"moyuan-code/internal/auth"
 	"moyuan-code/internal/comprehension"
 	"moyuan-code/internal/controlplane"
+	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/git"
 	"moyuan-code/internal/gitprovider"
 	"moyuan-code/internal/issues"
@@ -94,6 +95,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleRelease(ctx, argv[1:], cwd)
 	case "resources":
 		text, result, exitCode, err = handleResources(argv[1:], cwd)
+	case "deploy":
+		text, result, exitCode, err = handleDeploy(argv[1:], cwd)
 	case "logs":
 		text, result, exitCode, err = handleLogs(argv[1:], cwd)
 	default:
@@ -170,6 +173,8 @@ func usage() string {
 		"moyuan resources show <resource-id>",
 		"moyuan resources disable <resource-id>",
 		"moyuan resources expiration scan",
+		"moyuan deploy plan <release-id> --environment test_dev [--resource <resource-id>]",
+		"moyuan deploy show <deployment-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -968,6 +973,43 @@ func handleResources(args []string, cwd string) (string, any, int, error) {
 		}
 	}
 	return "unknown resources command\n", nil, 1, nil
+}
+
+func handleDeploy(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown deploy command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "plan":
+		if len(args) < 2 {
+			return "missing release id\n", nil, 1, nil
+		}
+		plan, err := deployment.CreatePlan(rootDir, deployment.PlanOptions{
+			ReleaseID:   args[1],
+			Environment: flagValue(args, "--environment", ""),
+			ResourceIDs: flagValues(args, "--resource"),
+			Approved:    hasFlag(args, "--approved"),
+		})
+		code := 0
+		if plan.Status == "blocked" {
+			code = 1
+		}
+		return "", plan, code, err
+	case "show", "status":
+		if len(args) < 2 {
+			return "missing deployment id\n", nil, 1, nil
+		}
+		plan, ok, err := deployment.Load(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", plan, 0, nil
+	}
+	return "unknown deploy command\n", nil, 1, nil
 }
 
 func modelsFromCLI(args []string) []providers.Model {

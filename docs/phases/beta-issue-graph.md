@@ -26,7 +26,8 @@
 | `beta-007` | `git-provider-pr-mr` | completed | GitHub/Gitee 认证、分支、push、PR/MR 创建和状态回读 | `beta-005` | `git_owner` | 可推送任务分支并创建 PR/MR |
 | `beta-008` | `release-branch-pipeline` | completed | 版本分支、release 建议、tag、GitHub/Gitee 发布记录 | `beta-007` | `release_owner` | 可按积累量建议发版并发布到 Git provider |
 | `beta-009` | `server-resource-registry` | completed | 测试机/生产机、到期时间、配置、权限、健康和维护记录 | `beta-001` | `infra_owner` | 服务器资源可登记、查询、审计 |
-| `beta-010` | `devops-deploy-smoke-monitor` | in_progress | 部署、线上冒烟、生产监控和后续更新维护 | `beta-008`,`beta-009` | `devops_owner` | 可对配置服务器执行受控发布和回滚 |
+| `beta-010` | `devops-deploy-smoke-monitor` | completed | 部署、线上冒烟、生产监控和后续更新维护 | `beta-008`,`beta-009` | `devops_owner` | 可对配置服务器执行受控发布和回滚 |
+| `beta-011` | `controlled-deploy-executor` | planned | 受控 SSH/云厂商部署执行器 | `beta-010` | `devops_owner` | 在审批和 allowlist 下执行真实部署 |
 
 ## 3. 推荐执行顺序
 
@@ -39,11 +40,11 @@
 
 ## 4. 当前执行入口
 
-当前执行 `beta-010 devops-deploy-smoke-monitor`。
+Beta 第一批计划层能力已完成。下一步准备 `beta-011 controlled-deploy-executor`。
 
 实现边界：
 
-- 先基于 release plan 和 server resource registry 生成 deploy/smoke/monitor plan。
-- production 必须审批，test_dev 可生成无审批演练计划。
-- 本阶段只做计划和状态记录，不真实连接服务器、不部署。
+- 先在 deployment plan 基础上建立受控执行器。
+- production 必须审批，test_dev 可先接入演练执行。
+- 执行器必须受 allowlist、secret ref、日志脱敏和 rollback plan 约束。
 - 状态事实仍以 `.moyuan/` 文件为准，云厂商和监控系统状态后续作为索引同步。

@@ -6,7 +6,7 @@
 
 Release note、发版前置条件、批次规则、禁止发版条件和覆盖率门禁由 [工程流程规范](../engineering-process-standards.md) 维护。
 
-当前 Beta 实现只做 `RELEASE_SUGGESTED` / `RELEASE_NOT_READY` / `RELEASE_BLOCKED` 的计划层判断，不执行真实 branch、tag、push 或部署。
+当前 Beta 实现只做 `RELEASE_SUGGESTED` / `RELEASE_NOT_READY` / `RELEASE_BLOCKED` / `DEPLOY_PLAN_READY` / `DEPLOY_BLOCKED` 的计划层判断，不执行真实 branch、tag、push、SSH 或部署。
 
 ## 2. 输入事实
 
