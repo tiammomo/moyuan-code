@@ -16,6 +16,7 @@ type Paths struct {
 	RepositoryYAML   string
 	AccessYAML       string
 	ProvidersYAML    string
+	RoutingYAML      string
 	PermissionsJSON  string
 	LoggingJSON      string
 	AuthDir          string
@@ -57,6 +58,7 @@ func ForRoot(rootDir string) Paths {
 		RepositoryYAML:   filepath.Join(moyuanDir, "repository.yaml"),
 		AccessYAML:       filepath.Join(moyuanDir, "policies", "access.yaml"),
 		ProvidersYAML:    filepath.Join(moyuanDir, "models", "providers.yaml"),
+		RoutingYAML:      filepath.Join(moyuanDir, "models", "routing.yaml"),
 		PermissionsJSON:  filepath.Join(moyuanDir, "policies", "permissions.json"),
 		LoggingJSON:      filepath.Join(moyuanDir, "policies", "logging.json"),
 		AuthDir:          filepath.Join(moyuanDir, "auth"),

@@ -313,6 +313,7 @@ func Validate(rootDir string) (ValidationReport, error) {
 		validateAccess(&report, access)
 	}
 	validateProvidersConfigFile(&report, paths.ProvidersYAML)
+	validateRoutingConfigFile(&report, paths.RoutingYAML)
 	if stateFound {
 		validateStateDrift(&report, state, project, projectFound, repository, repositoryFound, access, accessFound)
 	}
@@ -580,6 +581,66 @@ func validateProviderEntry(report *ValidationReport, provider map[string]any, in
 	}
 	if (providerType == "codex" || providerType == "claude-code") && mapField(provider, "capabilities") == nil {
 		report.add("error", "provider_capabilities_required", "provider.capabilities is required for local CLI providers", path+".capabilities")
+	}
+}
+
+func validateRoutingConfigFile(report *ValidationReport, path string) {
+	text, found, err := fsutil.ReadText(path)
+	if err != nil {
+		report.add("error", "routing_config_unreadable", err.Error(), path)
+		return
+	}
+	if !found {
+		return
+	}
+	if providersConfigContainsPlaintextSecret(text) {
+		report.add("error", "routing_plaintext_secret_forbidden", "models/routing.yaml must not contain plaintext API keys or tokens", path)
+	}
+	var raw map[string]any
+	if err := yaml.Unmarshal([]byte(text), &raw); err != nil {
+		report.add("error", "routing_config_unreadable", err.Error(), path)
+		return
+	}
+	if intField(raw, "schema_version") != 1 {
+		report.add("error", "routing_schema_version_invalid", "models/routing.yaml schema_version must be 1", "models/routing.yaml:schema_version")
+	}
+	policies := mapField(raw, "policies")
+	if len(policies) == 0 {
+		report.add("error", "routing_policies_required", "policies must contain at least one routing policy", "policies")
+		return
+	}
+	for name, value := range policies {
+		policy, ok := value.(map[string]any)
+		if !ok {
+			report.add("error", "routing_policy_invalid", "routing policy must be an object", "policies."+name)
+			continue
+		}
+		validateRoutingPolicy(report, policy, "policies."+name)
+	}
+}
+
+func validateRoutingPolicy(report *ValidationReport, policy map[string]any, path string) {
+	primary := mapField(policy, "primary")
+	if primary == nil {
+		report.add("error", "routing_primary_required", "routing policy primary provider is required", path+".primary")
+		return
+	}
+	if strings.TrimSpace(mapString(primary, "provider")) == "" {
+		report.add("error", "routing_primary_provider_required", "routing primary.provider is required", path+".primary.provider")
+	}
+	model := strings.TrimSpace(mapString(primary, "model"))
+	if model == "" {
+		report.add("warning", "routing_primary_model_empty", "routing primary.model is empty; CLI providers should explicitly use default", path+".primary.model")
+	}
+	for index, fallback := range arrayField(policy, "fallback") {
+		item, ok := fallback.(map[string]any)
+		if !ok {
+			report.add("error", "routing_fallback_invalid", "routing fallback item must be an object", fmt.Sprintf("%s.fallback[%d]", path, index))
+			continue
+		}
+		if strings.TrimSpace(mapString(item, "provider")) == "" {
+			report.add("error", "routing_fallback_provider_required", "routing fallback.provider is required", fmt.Sprintf("%s.fallback[%d].provider", path, index))
+		}
 	}
 }
 

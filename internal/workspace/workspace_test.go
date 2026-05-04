@@ -215,6 +215,51 @@ security:
 	}
 }
 
+func TestValidateRoutingYAMLConfig(t *testing.T) {
+	root := t.TempDir()
+	if _, err := Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	routingPath := filepath.Join(root, DirName, "models", "routing.yaml")
+	if err := fsutil.WriteText(routingPath, `schema_version: 1
+policies:
+  coding:
+    primary:
+      provider: codex_cli
+      model: default
+    fallback:
+      - provider: claude_cli
+        model: default
+`); err != nil {
+		t.Fatal(err)
+	}
+	report, err := Validate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "passed" {
+		t.Fatalf("expected valid routing config to pass, got %+v", report)
+	}
+
+	if err := fsutil.WriteText(routingPath, `schema_version: 1
+policies:
+  coding:
+    primary:
+      model: default
+    fallback:
+      - model: default
+`); err != nil {
+		t.Fatal(err)
+	}
+	report, err = Validate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || !hasValidationIssue(report, "routing_primary_provider_required") || !hasValidationIssue(report, "routing_fallback_provider_required") {
+		t.Fatalf("expected routing provider validation failure, got %+v", report)
+	}
+}
+
 func hasValidationIssue(report ValidationReport, code string) bool {
 	for _, issue := range report.Issues {
 		if issue.Code == code {
