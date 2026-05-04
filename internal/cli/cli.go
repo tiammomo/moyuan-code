@@ -28,6 +28,7 @@ import (
 	"moyuan-code/internal/review"
 	runrecord "moyuan-code/internal/run"
 	"moyuan-code/internal/runtime"
+	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
@@ -91,6 +92,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleModel(argv[1:], cwd)
 	case "release":
 		text, result, exitCode, err = handleRelease(ctx, argv[1:], cwd)
+	case "resources":
+		text, result, exitCode, err = handleResources(argv[1:], cwd)
 	case "logs":
 		text, result, exitCode, err = handleLogs(argv[1:], cwd)
 	default:
@@ -162,6 +165,11 @@ func usage() string {
 		"moyuan model route --role <role> [--task-type <type>] [--output-type <type>] [--repo-edit]",
 		"moyuan release suggest [--version v0.1.0] [--min-issues 3]",
 		"moyuan release show <release-id>",
+		"moyuan resources add --id <id> --environment test_dev --host <host>",
+		"moyuan resources list",
+		"moyuan resources show <resource-id>",
+		"moyuan resources disable <resource-id>",
+		"moyuan resources expiration scan",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -889,6 +897,77 @@ func handleRelease(ctx context.Context, args []string, cwd string) (string, any,
 		return "", plan, 0, nil
 	}
 	return "unknown release command\n", nil, 1, nil
+}
+
+func handleResources(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown resources command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "add":
+		cpu, _ := strconv.Atoi(flagValue(args, "--cpu", "0"))
+		memoryGB, _ := strconv.Atoi(flagValue(args, "--memory-gb", "0"))
+		diskGB, _ := strconv.Atoi(flagValue(args, "--disk-gb", "0"))
+		resource, err := serverresources.Add(rootDir, serverresources.Resource{
+			ID:                flagValue(args, "--id", ""),
+			Environment:       flagValue(args, "--environment", ""),
+			Host:              flagValue(args, "--host", ""),
+			Provider:          flagValue(args, "--provider", ""),
+			Region:            flagValue(args, "--region", ""),
+			InstanceID:        flagValue(args, "--instance-id", ""),
+			Owner:             flagValue(args, "--owner", ""),
+			Purpose:           flagValue(args, "--purpose", ""),
+			AuthRef:           flagValue(args, "--auth-ref", ""),
+			ExpiresAt:         flagValue(args, "--expires-at", ""),
+			MaintenanceWindow: flagValue(args, "--maintenance-window", ""),
+			Spec: serverresources.ServerSpec{
+				CPU:      cpu,
+				MemoryGB: memoryGB,
+				DiskGB:   diskGB,
+				OS:       flagValue(args, "--os", ""),
+			},
+			Healthcheck: serverresources.Healthcheck{
+				Type:       flagValue(args, "--health-type", ""),
+				Target:     flagValue(args, "--health-target", ""),
+				LastStatus: flagValue(args, "--health-status", ""),
+			},
+		})
+		return "", resource, 0, err
+	case "list":
+		resources, err := serverresources.List(rootDir)
+		return "", resources, 0, err
+	case "show":
+		if len(args) < 2 {
+			return "missing resource id\n", nil, 1, nil
+		}
+		resource, ok, err := serverresources.Show(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", resource, 0, nil
+	case "disable":
+		if len(args) < 2 {
+			return "missing resource id\n", nil, 1, nil
+		}
+		resource, ok, err := serverresources.Disable(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", resource, 0, nil
+	case "expiration":
+		if len(args) >= 2 && args[1] == "scan" {
+			resources, err := serverresources.ExpirationScan(rootDir)
+			return "", resources, 0, err
+		}
+	}
+	return "unknown resources command\n", nil, 1, nil
 }
 
 func modelsFromCLI(args []string) []providers.Model {

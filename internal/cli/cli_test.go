@@ -412,6 +412,72 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "release.plan.created")
 }
 
+func TestServerResourcesCLIRegistersListsAndValidatesProductionHosts(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	dev := runCLI(t, root, "resources", "add",
+		"--id", "dev-1",
+		"--environment", "test_dev",
+		"--host", "10.0.0.10",
+		"--provider", "local_vm",
+		"--owner", "dev-owner",
+		"--auth-ref", "env:DEV_SERVER_SSH_KEY",
+		"--expires-at", "2099-01-01",
+		"--cpu", "2",
+		"--memory-gb", "4",
+		"--disk-gb", "80",
+		"--health-type", "tcp",
+		"--health-target", "10.0.0.10:22",
+	)
+	assertContains(t, dev.stdout, `"id": "dev-1"`)
+	assertContains(t, dev.stdout, `"environment": "test_dev"`)
+	assertContains(t, dev.stdout, `"expiration_state": "ok"`)
+
+	badProduction := runCLIAllowFailure(t, root, "resources", "add",
+		"--id", "prod-bad",
+		"--environment", "production",
+		"--host", "10.0.1.10",
+		"--provider", "aliyun",
+		"--owner", "ops-owner",
+		"--auth-ref", "secret:prod_ssh_key",
+	)
+	if badProduction.code == 0 {
+		t.Fatalf("expected production resource without expiry to fail: %s", badProduction.stdout)
+	}
+	assertContains(t, badProduction.stderr, "production_expires_at_required")
+
+	prod := runCLI(t, root, "resources", "add",
+		"--id", "prod-1",
+		"--environment", "production",
+		"--host", "prod.example.internal",
+		"--provider", "aliyun",
+		"--owner", "ops-owner",
+		"--auth-ref", "secret:prod_ssh_key",
+		"--expires-at", "2099-01-01",
+		"--region", "cn-shanghai",
+		"--instance-id", "i-prod001",
+	)
+	assertContains(t, prod.stdout, `"id": "prod-1"`)
+
+	list := runCLI(t, root, "resources", "list")
+	assertContains(t, list.stdout, `"dev-1"`)
+	assertContains(t, list.stdout, `"prod-1"`)
+
+	shown := runCLI(t, root, "resources", "show", "prod-1")
+	assertContains(t, shown.stdout, `"environment": "production"`)
+	assertContains(t, shown.stdout, `"owner": "ops-owner"`)
+
+	scan := runCLI(t, root, "resources", "expiration", "scan")
+	assertContains(t, scan.stdout, "[]")
+
+	disabled := runCLI(t, root, "resources", "disable", "dev-1")
+	assertContains(t, disabled.stdout, `"status": "disabled"`)
+	assertFileContains(t, root, ".moyuan/resources/inventory.json", `"prod-1"`)
+	assertFileContains(t, root, ".moyuan/resources/events.jsonl", "resource.added")
+	assertFileContains(t, root, ".moyuan/logs/audit.jsonl", "server_resource.added")
+}
+
 func TestQualityReviewHardeningFindingsDriveNeedsRework(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)

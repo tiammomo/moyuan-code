@@ -316,6 +316,7 @@ moyuan deploy rollback <release-id>
 moyuan resources add
 moyuan resources list
 moyuan resources show <host-id>
+moyuan resources disable <host-id>
 moyuan resources check --group <group-id>
 moyuan resources expiration scan
 moyuan resources renewal record <host-id>

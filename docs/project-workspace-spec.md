@@ -68,6 +68,11 @@
     archive/
     runtime/
     reflections/
+  resources/
+    inventory.json
+    events.jsonl
+    checks/
+    maintenance/
   logs/
     runs/
     agents/
@@ -148,6 +153,8 @@
 | `models/routing.yaml` | 模型路由、fallback、成本策略 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `visuals/architecture-visuals.yaml` | gpt-image-2 架构流程图生成、编辑、讲解和复核策略 | [配置方案](./configuration-guide.md) |
 | `visuals/` | 架构图 spec、prompt、图片资产、讲解文档和索引 | [配置方案](./configuration-guide.md) |
+| `resources/inventory.json` | Beta 运行期服务器资源 registry，记录测试机、预发和生产机 | [服务器资源管理主线](./mainlines/server-resource-management.md) |
+| `resources/events.jsonl` | 服务器资源登记、禁用、维护和到期扫描事件 | [服务器资源管理主线](./mainlines/server-resource-management.md) |
 | `runtimes/agent-runtimes.yaml` | Claude CLI、Codex CLI 等原生 Agent Runtime 调用、会话、隔离和审计 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `runtimes/` | 原生 Agent Runtime 会话、输出和上下文文件 | [配置方案](./configuration-guide.md) |
 | `model-ops/` | 模型服务商快照、用量、健康检查、成本和故障记录 | [配置方案](./configuration-guide.md) |

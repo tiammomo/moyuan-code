@@ -1,5 +1,13 @@
 # 服务器资源管理主线
 
+当前 Beta 实现已落地服务器资源 registry 最小闭环：
+
+- CLI：`moyuan resources add/list/show/disable`、`moyuan resources expiration scan`。
+- API：`GET/POST /v1/projects/:project_id/resources`、`GET /v1/projects/:project_id/resources/:resource_id`、`POST /v1/projects/:project_id/resources/:resource_id/disable`、`GET /v1/projects/:project_id/resources/expiration-scan`。
+- 输出位置：`.moyuan/resources/inventory.json` 和 `.moyuan/resources/events.jsonl`。
+- 当前只做登记、查询、禁用和到期扫描，不连接 SSH、不部署、不修改云资源。
+- 生产机必须显式声明 `environment=production`，并填写 owner、auth_ref 和 expires_at。
+
 ## 1. 目标
 
 服务器资源管理主线负责把测试开发机、预发机和生产机纳入统一资源清单，长期维护云资产、到期时间、规格、owner、资源组、健康检查、巡检和维护 issue。
