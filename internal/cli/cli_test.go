@@ -412,6 +412,10 @@ func TestProviderRegistryCLIManagesProvidersAndRoutesRoles(t *testing.T) {
 	assertContains(t, memoryRoute.stdout, `"provider_id": "glm-main"`)
 	assertContains(t, memoryRoute.stdout, `"model_id": "glm-4"`)
 
+	strategyRoute := runCLI(t, root, "model", "route", "--strategy", "low-cost-memory", "--includes-project-memory")
+	assertContains(t, strategyRoute.stdout, `"strategy": "low_cost_memory"`)
+	assertContains(t, strategyRoute.stdout, `"provider_id": "glm-main"`)
+
 	ops := runCLI(t, root, "model", "provider", "ops", "glm-main", "--health", "ok", "--quota-status", "ok", "--limit-tokens", "1000", "--used-tokens", "250", "--requests", "3", "--currency", "usd", "--estimated-cost", "0.4", "--budget", "5", "--cost-status", "ok")
 	assertContains(t, ops.stdout, `"remaining_tokens": 750`)
 	assertContains(t, ops.stdout, `"currency": "USD"`)

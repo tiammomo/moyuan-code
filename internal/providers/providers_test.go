@@ -185,3 +185,57 @@ func TestProviderOpsSnapshotBlocksUnavailableRoutes(t *testing.T) {
 		t.Fatal("expected negative usage values to be rejected")
 	}
 }
+
+func TestModelStrategySwitchesRouteWithoutBypassingPolicy(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Upsert(root, Provider{
+		ID:              "glm-low-cost",
+		Vendor:          "zhipu",
+		APIType:         "openai-compatible",
+		AuthRef:         "env:GLM_API_KEY",
+		Enabled:         true,
+		AllowedUseCases: []string{"memory_extraction"},
+		Models:          []Model{{ID: "glm-4"}},
+		DataPolicy:      DataPolicy{AllowProjectMemory: true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	imageProvider, ok, err := Show(root, "gpt_image_2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("missing gpt image provider")
+	}
+	imageProvider.Enabled = true
+	if _, err := Upsert(root, imageProvider); err != nil {
+		t.Fatal(err)
+	}
+
+	memory, err := Route(root, RouteRequest{ModelStrategy: "low-cost-memory", IncludesProjectMemory: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if memory.Decision != DecisionAllowed || memory.ProviderID != "glm-low-cost" || memory.Strategy != "low_cost_memory" {
+		t.Fatalf("unexpected low-cost memory route: %+v", memory)
+	}
+
+	image, err := Route(root, RouteRequest{ModelStrategy: "image-diagram"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image.Decision != DecisionAllowed || image.ProviderID != "gpt_image_2" || image.Strategy != "image_diagram" {
+		t.Fatalf("unexpected image strategy route: %+v", image)
+	}
+
+	secret, err := Route(root, RouteRequest{ModelStrategy: "low-cost-memory", IncludesSecrets: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !secret.Blocked || secret.Reason != "contains_secret_context" || secret.Strategy != "low_cost_memory" {
+		t.Fatalf("strategy should not bypass secret policy: %+v", secret)
+	}
+}

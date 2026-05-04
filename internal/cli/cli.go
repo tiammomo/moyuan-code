@@ -176,7 +176,7 @@ func usage() string {
 		"moyuan model provider show <provider>",
 		"moyuan model provider ops <provider> [--health ok] [--quota-status ok] [--used-tokens 1000]",
 		"moyuan model provider disable <provider>",
-		"moyuan model route --role <role> [--task-type <type>] [--output-type <type>] [--repo-edit]",
+		"moyuan model route [--role <role>] [--strategy low-cost-memory] [--task-type <type>] [--output-type <type>] [--repo-edit]",
 		"moyuan skills add --id <id> --source <source> [--role backend] [--tag tdd]",
 		"moyuan skills list",
 		"moyuan skills recommend --role backend [--task-type testing] [--risk medium]",
@@ -858,9 +858,10 @@ func handleModel(args []string, cwd string) (string, any, int, error) {
 	case "provider":
 		return handleModelProvider(args[1:], rootDir)
 	case "route":
-		role := flagValue(args, "--role", "backend")
+		role := flagValue(args, "--role", "")
 		decision, err := providers.Route(rootDir, providers.RouteRequest{
 			Role:                  role,
+			ModelStrategy:         flagValue(args, "--strategy", ""),
 			TaskType:              flagValue(args, "--task-type", ""),
 			OutputType:            flagValue(args, "--output-type", ""),
 			RequiresRepoEdit:      hasFlag(args, "--repo-edit"),

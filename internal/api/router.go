@@ -39,6 +39,7 @@ type requirementPlanRequest struct {
 
 type routeRequest struct {
 	Role                  string `json:"role"`
+	ModelStrategy         string `json:"model_strategy"`
 	TaskType              string `json:"task_type"`
 	OutputType            string `json:"output_type"`
 	RequiresRepoEdit      bool   `json:"requires_repo_edit"`

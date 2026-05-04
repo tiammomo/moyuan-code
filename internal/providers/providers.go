@@ -100,6 +100,7 @@ type OpsSnapshot struct {
 
 type RouteRequest struct {
 	Role                  string `json:"role"`
+	ModelStrategy         string `json:"model_strategy,omitempty"`
 	TaskType              string `json:"task_type,omitempty"`
 	OutputType            string `json:"output_type,omitempty"`
 	RequiresRepoEdit      bool   `json:"requires_repo_edit"`
@@ -111,6 +112,7 @@ type RouteRequest struct {
 type RouteDecision struct {
 	Decision   string `json:"decision"`
 	Blocked    bool   `json:"blocked"`
+	Strategy   string `json:"strategy,omitempty"`
 	ProviderID string `json:"provider_id,omitempty"`
 	RuntimeID  string `json:"runtime_id,omitempty"`
 	ModelID    string `json:"model_id,omitempty"`
@@ -303,6 +305,7 @@ func Route(rootDir string, request RouteRequest) (RouteDecision, error) {
 		"provider_id": decision.ProviderID,
 		"runtime_id":  decision.RuntimeID,
 		"role":        request.Role,
+		"strategy":    decision.Strategy,
 		"task_type":   request.TaskType,
 		"output_type": request.OutputType,
 		"reason":      decision.Reason,
@@ -312,33 +315,35 @@ func Route(rootDir string, request RouteRequest) (RouteDecision, error) {
 
 func Decide(registry Registry, request RouteRequest) RouteDecision {
 	request.Role = normalizeToken(request.Role)
+	request.ModelStrategy = normalizeToken(request.ModelStrategy)
 	request.TaskType = normalizeToken(request.TaskType)
 	request.OutputType = normalizeToken(request.OutputType)
+	request = applyModelStrategy(request)
 	if request.IncludesSecrets {
-		return blocked("contains_secret_context")
+		return withStrategy(blocked("contains_secret_context"), request.ModelStrategy)
 	}
 	if request.OutputType == "architecture_diagram" || request.OutputType == "image" || request.TaskType == "image_generation" {
-		return providerDecision(registry, request, "gpt_image_2", "architecture_diagram")
+		return withStrategy(providerDecision(registry, request, "gpt_image_2", "architecture_diagram"), request.ModelStrategy)
 	}
 	if request.RequiresRepoEdit {
 		runtimeID := defaultRuntimeForRole(request.Role)
 		if decision, ok := firstMatchingRuntimeProvider(registry, request, runtimeID, "role_provider_override"); ok {
-			return decision
+			return withStrategy(decision, request.ModelStrategy)
 		}
-		return providerDecision(registry, request, runtimeID, "role_runtime_default")
+		return withStrategy(providerDecision(registry, request, runtimeID, "role_runtime_default"), request.ModelStrategy)
 	}
 	if request.TaskType == "memory_extraction" || request.TaskType == "memory_compaction" {
 		if decision, ok := firstMatchingAPIProvider(registry, request, []string{"glm", "minimax", "dashscope", "deepseek", "zhipu"}, "memory_low_cost_provider"); ok {
-			return decision
+			return withStrategy(decision, request.ModelStrategy)
 		}
 	}
 	if request.TaskType == "architecture_planning" || request.TaskType == "requirement_planning" {
 		if decision, ok := firstMatchingAPIProvider(registry, request, []string{"anthropic", "openai", "third_party"}, "planning_provider"); ok {
-			return decision
+			return withStrategy(decision, request.ModelStrategy)
 		}
-		return providerDecision(registry, request, "claude_cli", "planning_fallback_runtime")
+		return withStrategy(providerDecision(registry, request, "claude_cli", "planning_fallback_runtime"), request.ModelStrategy)
 	}
-	return providerDecision(registry, request, defaultRuntimeForRole(request.Role), "default_runtime")
+	return withStrategy(providerDecision(registry, request, defaultRuntimeForRole(request.Role), "default_runtime"), request.ModelStrategy)
 }
 
 func DefaultRegistry() Registry {
@@ -690,6 +695,43 @@ func blocked(reason string) RouteDecision {
 		Blocked:  true,
 		Reason:   reason,
 	}
+}
+
+func withStrategy(decision RouteDecision, strategy string) RouteDecision {
+	if strategy != "" {
+		decision.Strategy = strategy
+	}
+	return decision
+}
+
+func applyModelStrategy(request RouteRequest) RouteRequest {
+	switch request.ModelStrategy {
+	case "frontend_first":
+		if request.Role == "" {
+			request.Role = "frontend"
+		}
+		request.RequiresRepoEdit = true
+	case "backend_safe":
+		if request.Role == "" {
+			request.Role = "backend"
+		}
+		request.RequiresRepoEdit = true
+	case "low_cost_memory":
+		if request.TaskType == "" {
+			request.TaskType = "memory_extraction"
+		}
+	case "image_diagram":
+		request.OutputType = "architecture_diagram"
+		request.TaskType = "image_generation"
+	case "planning":
+		if request.TaskType == "" {
+			request.TaskType = "architecture_planning"
+		}
+		if request.Role == "" {
+			request.Role = "architect"
+		}
+	}
+	return request
 }
 
 func now() string {

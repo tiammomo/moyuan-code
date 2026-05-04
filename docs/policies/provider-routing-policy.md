@@ -120,6 +120,15 @@ Phase 2 当前实现：
 - API provider 选择会跳过不可用 provider；如果没有可用 API provider，会回到默认 runtime 路由。
 - 直接命中的 provider，例如 `gpt_image_2` 图像路由，会返回明确 blocked decision。
 
+模型策略当前实现：
+
+- `frontend-first`：将任务按前端代码路径路由，默认进入 `claude_cli` 或其 provider profile。
+- `backend-safe`：将任务按后端代码路径路由，默认进入 `codex_cli`。
+- `low-cost-memory`：将任务路由到允许项目 Memory 的低成本国产/API provider。
+- `image-diagram`：将任务路由到 `gpt_image_2` 图像生成 provider。
+- `planning`：将任务路由到架构/需求规划 provider 或 `claude_cli` fallback。
+- 策略只改变候选方向，不绕过 secret、sensitive code、project memory、provider health、quota 或 cost 阻断。
+
 ## 7. 图像生成路由
 
 ```text

@@ -32,6 +32,7 @@ Adapter 统一解决：
 - 已实现默认路由：前端和架构类代码任务路由到 `claude_cli`，后端、调优、测试、review 和修复类任务路由到 `codex_cli`，启用后的 API provider 可承担 memory 抽取、规划或图像类任务。
 - 已实现 provider env profile：绑定到 `claude_cli` 或 `codex_cli` 的 provider 可在 Native Runtime 调用时注入 `base_url`、模型名和 `auth_ref` 对应的环境变量；runtime metadata 只记录 `env_keys`，不记录 token 值。
 - 已实现 ops snapshot：provider 可记录 `health`、`quota`、`usage` 和 `cost`，路由会因 `unhealthy/down`、`quota.exhausted`、`cost.exceeded` 给出明确阻断原因。
+- 已实现 task model strategy：`model route --strategy <strategy>` 和 `provider-route` API 可指定 `frontend-first`、`backend-safe`、`low-cost-memory`、`image-diagram`、`planning` 策略。
 
 `providers.json` 是 Beta 运行状态快照；后续 schema validator 完成后，再把同字段收敛到 `models/providers.yaml`，并保留 snapshot 用于审计。
 
@@ -60,6 +61,14 @@ Phase 2 当前运行期 ops 字段：
 - `quota.status`：`ok`、`warning`、`exhausted`、`unknown`。
 - `usage`：请求数、输入/输出/总 token、统计窗口和更新时间。
 - `cost`：币种、预估成本、预算和 `ok`、`warning`、`exceeded` 状态。
+
+Phase 2 当前模型策略：
+
+- `frontend-first`：优先按前端代码任务选择 `claude_cli` 或绑定到 `claude_cli` 的 provider profile。
+- `backend-safe`：优先按后端代码任务选择 `codex_cli`。
+- `low-cost-memory`：优先选择允许项目 Memory 的低成本国产/API provider。
+- `image-diagram`：强制走 `gpt_image_2` 图像生成路由。
+- `planning`：按架构/需求规划任务选择 Claude/GPT/可信第三方 provider 或 `claude_cli` fallback。
 
 第三方 API 必须额外声明：
 
