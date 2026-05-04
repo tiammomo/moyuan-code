@@ -21,7 +21,7 @@ Phase 6 已完成并通过 release readiness：
 
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase7-001` | `release-provider-approval-consumption` | planned | release provider 真实 publish 的 approval consumption 和 replay guard | 真实 publish 路径不能重复使用 approval |
+| P0 | `phase7-001` | `release-provider-approval-consumption` | completed | release provider 真实 publish 的 approval consumption 和 replay guard | 真实 publish 路径不能重复使用 approval |
 | P0 | `phase7-002` | `ssh-executor-guarded-runner` | planned | SSH executor 受控执行边界 | 默认阻断真实 SSH，启用后只执行白名单命令 |
 | P1 | `phase7-003` | `post-action-evidence-model` | planned | 发布/部署/烟测/监控/回滚证据链 | 每次操作能查询统一 evidence |
 | P1 | `phase7-004` | `runtime-telemetry-feedback-loop` | planned | runtime/quality 结果反哺 provider telemetry | route decision 可读取执行反馈 |
@@ -51,7 +51,31 @@ Phase 6 已完成并通过 release readiness：
 - `go test ./internal/release ./internal/approvals ./internal/cli ./internal/api` 通过。
 - `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
 
-## 4. 验证要求
+## 4. 已完成任务：`phase7-001 release-provider-approval-consumption`
+
+范围：
+
+- `ProviderExecution` 新增 `write_enabled` 和 `approval_consumed`，明确记录 release provider publish 的写开关和审批消费状态。
+- `MOYUAN_ALLOW_RELEASE_PROVIDER_WRITE=1` 作为真实 release provider write 的显式开关；默认关闭时继续返回 `RELEASE_PROVIDER_PUBLISH_PREVIEW_ONLY`，且不消费 approval。
+- 写开关开启且 approval 已通过时，publish 会先消费 approval，再进入远程 adapter 边界。
+- 已消费 approval 再次用于 publish 会被 `approval_not_approved` 阻断。
+- 测试覆盖 preview-only 不消费 approval、写开关开启消费 approval、重复使用 approval 被阻断。
+
+非目标：
+
+- 不真实调用 GitHub/Gitee release、tag 或 workflow API。
+- 不执行 `git push`、`git tag` 或 workflow dispatch。
+- 不把 token、secret 或远程响应写入 execution。
+
+验证：
+
+- `go test ./internal/release ./internal/approvals ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 5. 验证要求
 
 每完成一个 Phase 7 issue，至少运行：
 

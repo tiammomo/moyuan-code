@@ -49,6 +49,12 @@ func TestProviderPreviewAndPublishApprovalFlow(t *testing.T) {
 	if !containsReleaseReason(previewOnly.Reasons, "release_provider_write_not_enabled") {
 		t.Fatalf("expected write gate reason, got %+v", previewOnly.Reasons)
 	}
+	if previewOnly.WriteEnabled || previewOnly.ApprovalConsumed {
+		t.Fatalf("expected preview-only publish to leave approval unconsumed and write disabled, got %+v", previewOnly)
+	}
+	if _, found, err := approvals.VerifyApproved(root, blocked.ApprovalID, approvals.RequestOptions{TargetType: "release_provider_publish", TargetID: plan.ID, Action: "release.provider.publish"}); err != nil || !found {
+		t.Fatalf("expected preview-only publish to keep approval reusable for a later real write, found=%v err=%v", found, err)
+	}
 	loaded, found, err := LoadProviderExecution(root, previewOnly.ID)
 	if err != nil || !found || loaded.ID != previewOnly.ID {
 		t.Fatalf("expected persisted provider execution, found=%v err=%v loaded=%+v", found, err, loaded)
@@ -59,6 +65,52 @@ func TestProviderPreviewAndPublishApprovalFlow(t *testing.T) {
 	}
 	if !found || !strings.Contains(releaseLog, "release.provider.previewed") || !strings.Contains(releaseLog, "release.provider.execution.created") {
 		t.Fatalf("expected provider release logs, found=%v log=%s", found, releaseLog)
+	}
+}
+
+func TestProviderPublishConsumesApprovalWhenWriteSwitchEnabled(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("MOYUAN_ALLOW_RELEASE_PROVIDER_WRITE", "1")
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	plan := createSuggestedReleasePlan(t, root)
+
+	blocked, found, err := ProviderPublish(root, ProviderOptions{ReleaseID: plan.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found || blocked.ApprovalID == "" {
+		t.Fatalf("expected approval requirement, found=%v execution=%+v", found, blocked)
+	}
+	_, found, err = approvals.Decide(root, blocked.ApprovalID, approvals.DecisionOptions{Decision: "approved", DecidedBy: "release-manager", Reason: "release gates passed"})
+	if err != nil || !found {
+		t.Fatalf("expected approval decision, found=%v err=%v", found, err)
+	}
+
+	execution, found, err := ProviderPublish(root, ProviderOptions{ReleaseID: plan.ID, Approved: true, ApprovalID: blocked.ApprovalID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found || execution.Decision != "RELEASE_PROVIDER_PUBLISH_NOT_IMPLEMENTED" {
+		t.Fatalf("expected write-enabled publish to reach guarded adapter boundary, found=%v execution=%+v", found, execution)
+	}
+	if !execution.WriteEnabled || !execution.ApprovalConsumed {
+		t.Fatalf("expected approval consumption with write switch enabled, got %+v", execution)
+	}
+	if !containsReleaseReason(execution.Reasons, "approval_consumed_before_remote_release_write") {
+		t.Fatalf("expected approval consumed reason, got %+v", execution.Reasons)
+	}
+	if _, _, err := approvals.VerifyApproved(root, blocked.ApprovalID, approvals.RequestOptions{TargetType: "release_provider_publish", TargetID: plan.ID, Action: "release.provider.publish"}); err == nil {
+		t.Fatal("expected consumed release provider approval to fail verification")
+	}
+
+	replayed, found, err := ProviderPublish(root, ProviderOptions{ReleaseID: plan.ID, Approved: true, ApprovalID: blocked.ApprovalID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found || replayed.Decision != "RELEASE_PROVIDER_PUBLISH_APPROVAL_REQUIRED" || !containsReleaseReason(replayed.Reasons, "approval_not_approved") {
+		t.Fatalf("expected replayed approval to be blocked, found=%v execution=%+v", found, replayed)
 	}
 }
 

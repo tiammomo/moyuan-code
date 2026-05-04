@@ -63,11 +63,14 @@
 
 ## 当前实施入口
 
-Phase 1 本地 CLI MVP、Beta 第一批控制面能力、Phase 2、Phase 3 和 Phase 4 第一批能力已完成主要闭环。当前验收和状态入口：
+Phase 1 本地 CLI MVP、Beta 第一批控制面能力、Phase 2、Phase 3、Phase 4、Phase 5 和 Phase 6 第一批能力已完成主要闭环。当前验收和状态入口：
 
+- [Phase 7 实现 Issue Graph](./phases/phase7-issue-graph.md)：Phase 7 受控真实外部执行准备的依赖图。
+- [Phase 7 实施记录](./phases/phase7-next-development-plan.md)：Phase 7 当前任务范围、验收标准和执行入口。
+- [Phase 6 Release Readiness](./phases/phase6-release-readiness.md)：Phase 6 approval、adapter、telemetry 和 Console schema forms 的收口验证。
+- [Phase 6 实现 Issue Graph](./phases/phase6-issue-graph.md)：Phase 6 approval consumption、部署 adapter、CI/CD provider、Provider telemetry 和 Console schema forms 的完成记录。
+- [Phase 6 实施记录](./phases/phase6-next-development-plan.md)：Phase 6 任务范围、验收标准和完成记录。
 - [Phase 5 Release Readiness](./phases/phase5-release-readiness.md)：Phase 5 鉴权、Secret、PR/MR、部署检查和 Console 受控表单的收口验证。
-- [Phase 6 实现 Issue Graph](./phases/phase6-issue-graph.md)：Phase 6 approval consumption、部署 adapter、CI/CD provider、Provider telemetry 和 Console schema forms 的依赖图。
-- [Phase 6 实施记录](./phases/phase6-next-development-plan.md)：Phase 6 当前任务范围、验收标准和执行入口。
 - [Phase 5 实现 Issue Graph](./phases/phase5-issue-graph.md)：Phase 5 鉴权强制门禁、Secret resolver、真实外部 adapter preview/dry-run 和 Console 表单的依赖图。
 - [Phase 5 实施记录](./phases/phase5-next-development-plan.md)：Phase 5 任务范围、验收标准和完成记录。
 - [Phase 4 Release Readiness](./phases/phase4-release-readiness.md)：Phase 4 团队协作、审计、审批、Git PR/MR plan 和服务器维护的验证命令、产物、边界和剩余风险。

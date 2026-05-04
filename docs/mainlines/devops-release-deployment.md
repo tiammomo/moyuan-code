@@ -16,6 +16,7 @@ Release note、发版批次、覆盖率门禁、禁止发版条件和回退后 f
 - Console：Deployment Executions 面板可触发 `Suggest Release`、最新 deployment `Dry Run` 和 `test_dev` `Health Scan`；Release Pipeline 面板可触发 release provider `Preview`/`Publish`，所有动作都走后端受控 API。
 - 输出位置：`.moyuan/lifecycle/releases/` 和 `.moyuan/lifecycle/deployments/`。
 - 当前生成 release suggestion、release branch plan、tag suggestion、release notes draft、provider release/tag/workflow action preview、deploy/smoke/monitor/rollback plan，并在受控 `local_shell` 执行后自动记录 smoke/monitor 结果；`ssh_preview` 可生成远程目标执行预览，`ssh_execute` 仍默认阻断，不真实创建 branch、tag、远程 release、SSH 或生产部署。
+- Release provider publish 已具备写开关语义：默认返回 preview-only 且不消费 approval；设置 `MOYUAN_ALLOW_RELEASE_PROVIDER_WRITE=1` 后，publish 会在远程 adapter 边界前消费 approval，同一 approval 不能重复使用。
 - 已接入门禁：dirty worktree、remote 缺失、无 accepted issue、存在 unresolved issue 时阻断。
 - production deployment plan 缺少 approval 时阻断；test_dev 可生成演练计划。
 

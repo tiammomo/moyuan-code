@@ -58,18 +58,20 @@ type ProviderOptions struct {
 }
 
 type ProviderExecution struct {
-	ID         string     `json:"id"`
-	ReleaseID  string     `json:"release_id"`
-	Version    string     `json:"version,omitempty"`
-	Provider   string     `json:"provider,omitempty"`
-	Mode       string     `json:"mode"`
-	Status     string     `json:"status"`
-	Decision   string     `json:"decision"`
-	Reasons    []string   `json:"reasons"`
-	RemotePlan RemotePlan `json:"remote_plan"`
-	ApprovalID string     `json:"approval_id,omitempty"`
-	StartedAt  string     `json:"started_at"`
-	FinishedAt string     `json:"finished_at,omitempty"`
+	ID               string     `json:"id"`
+	ReleaseID        string     `json:"release_id"`
+	Version          string     `json:"version,omitempty"`
+	Provider         string     `json:"provider,omitempty"`
+	Mode             string     `json:"mode"`
+	Status           string     `json:"status"`
+	Decision         string     `json:"decision"`
+	Reasons          []string   `json:"reasons"`
+	RemotePlan       RemotePlan `json:"remote_plan"`
+	ApprovalID       string     `json:"approval_id,omitempty"`
+	ApprovalConsumed bool       `json:"approval_consumed"`
+	WriteEnabled     bool       `json:"write_enabled"`
+	StartedAt        string     `json:"started_at"`
+	FinishedAt       string     `json:"finished_at,omitempty"`
 }
 
 type RemotePlan struct {
@@ -270,12 +272,35 @@ func ProviderPublish(rootDir string, options ProviderOptions) (ProviderExecution
 		return finishProviderExecution(rootDir, execution)
 	}
 	execution.ApprovalID = approval.ID
-	if os.Getenv("MOYUAN_ALLOW_RELEASE_PROVIDER_WRITE") != "1" {
+	execution.WriteEnabled = releaseProviderWriteEnabled()
+	if !execution.WriteEnabled {
 		execution.Status = "blocked"
 		execution.Decision = "RELEASE_PROVIDER_PUBLISH_PREVIEW_ONLY"
 		execution.Reasons = append(execution.Reasons, "release_provider_write_not_enabled")
 		return finishProviderExecution(rootDir, execution)
 	}
+	consumed, consumedFound, err := approvals.ConsumeApproved(rootDir, approval.ID, approvals.ConsumeOptions{
+		TargetType: "release_provider_publish",
+		TargetID:   plan.ID,
+		Action:     "release.provider.publish",
+		ConsumedBy: "release-provider-adapter",
+		Reason:     "remote release provider publish",
+	})
+	if err != nil {
+		execution.Status = "blocked"
+		execution.Decision = "RELEASE_PROVIDER_PUBLISH_APPROVAL_REQUIRED"
+		execution.Reasons = append(execution.Reasons, err.Error())
+		return finishProviderExecution(rootDir, execution)
+	}
+	if !consumedFound {
+		execution.Status = "blocked"
+		execution.Decision = "RELEASE_PROVIDER_PUBLISH_APPROVAL_REQUIRED"
+		execution.Reasons = append(execution.Reasons, "approval_not_found")
+		return finishProviderExecution(rootDir, execution)
+	}
+	execution.ApprovalID = consumed.ID
+	execution.ApprovalConsumed = true
+	execution.Reasons = append(execution.Reasons, "approval_consumed_before_remote_release_write")
 	execution.Status = "blocked"
 	execution.Decision = "RELEASE_PROVIDER_PUBLISH_NOT_IMPLEMENTED"
 	execution.Reasons = append(execution.Reasons, "remote_release_write_adapter_not_enabled")
@@ -348,6 +373,10 @@ func newProviderExecution(plan Plan, mode string) ProviderExecution {
 		},
 		StartedAt: now.Format(time.RFC3339Nano),
 	}
+}
+
+func releaseProviderWriteEnabled() bool {
+	return os.Getenv("MOYUAN_ALLOW_RELEASE_PROVIDER_WRITE") == "1"
 }
 
 func releaseReady(plan Plan) bool {
