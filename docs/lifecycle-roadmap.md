@@ -557,9 +557,10 @@ Phase 1 第一批实现模块：
 | 3 | `logging` | run、audit、error JSONL 事件 |
 | 4 | `git` | 本地仓库接入、状态读取、diff、branch、dirty worktree 保护 |
 | 5 | `runtime-adapters` | Codex CLI 和 Claude CLI 的最小调用封装、超时、输出和错误捕获 |
-| 6 | `orchestrator` | Epic、Issue、Run、状态流转和失败恢复入口 |
-| 7 | `scheduler` | blocked、ready、running、review 队列，先支持串行执行 |
-| 8 | `quality` | build、lint、test、typecheck 的基础 gate 和质量报告 |
+| 6 | `comprehension` | full/incremental/diff comprehension、project profile、module map、commands、risk files、memory candidates |
+| 7 | `orchestrator` | Epic、Issue、Run、状态流转和失败恢复入口 |
+| 8 | `scheduler` | blocked、ready、running、review 队列，先支持串行执行 |
+| 9 | `quality` | build、lint、test、typecheck 的基础 gate 和质量报告 |
 
 Phase 1 暂不进入第一批的能力：
 

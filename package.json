@@ -1,0 +1,19 @@
+{
+  "name": "moyuan-code",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "moyuan": "./bin/moyuan.js"
+  },
+  "scripts": {
+    "start": "node ./bin/moyuan.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "yaml": "^2.8.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
