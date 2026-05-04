@@ -23,6 +23,7 @@ Phase 2 第一批能力已完成并通过 release readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase3-001` | `workspace-yaml-schema-validator` | completed | 让 `.moyuan/project.yaml`、`repository.yaml`、`policies/access.yaml` 成为可读取、可校验的配置事实源 | `workspace validate` 能发现 YAML 解析错误、条件必填、必须为空和 state drift |
 | P0 | `phase3-002` | `workspace-schema-coverage-expansion` | planned | 扩展到 providers、routing、visuals、runtimes、server、release 和 budget | 核心配置域均有字段级 issue code |
+| P0 | `phase3-002a` | `providers-yaml-schema-validator` | completed | 将 `models/providers.yaml` 纳入 workspace validate | provider schema、auth_ref 引用和明文密钥禁用可被阻断 |
 | P1 | `phase3-003` | `console-operation-actions` | planned | Console 增加受控操作入口和后端 preview/dry-run 对齐 | 高风险动作不能绕过 approval/authz |
 | P1 | `phase3-003a` | `visual-render-dry-run-console-action` | completed | Visual Assets 面板触发后端 dry-run render | dry-run action 可见、可反馈 execution id，不调用真实图片 API |
 | P1 | `phase3-004` | `runtime-log-diff-viewer` | completed | Console 展开 runtime 日志、diff summary 和 resume hint | 失败排查证据链可见 |
@@ -60,7 +61,23 @@ Phase 2 第一批能力已完成并通过 release readiness：
 - 已补充测试覆盖 YAML 覆盖读取、`remote_git` 与 `local_path` 互斥、 malformed YAML。
 - 验证通过：`go test ./internal/workspace`、`go test ./...`、`npm run typecheck`、`npm run build`。
 
-## 4. 已完成增量：`phase3-003a visual-render-dry-run-console-action`
+## 4. 已完成增量：`phase3-002a providers-yaml-schema-validator`
+
+范围：
+
+- 新增 `.moyuan/models/providers.yaml` 路径索引。
+- `workspace validate` 会在文件存在时校验 provider 配置。
+- 校验内容包括 `schema_version`、`model_provider_management`、`accounts`、`providers`、`security.forbid_plaintext_api_key`。
+- Account 校验覆盖 `vendor`、`api_type`、`auth_ref`、API 型 `base_url`、`enabled`、`data_policy`。
+- Provider 校验覆盖 `type`、`account`、`enabled`、API 型 `models` 和 CLI 型 `capabilities/models` 互斥。
+- 发现 `sk-`、非 `env:`/`secret:` auth_ref、疑似 token/api_key 明文时阻断。
+
+验证：
+
+- `go test ./internal/workspace` 通过。
+- `go test ./...` 通过。
+
+## 5. 已完成增量：`phase3-003a visual-render-dry-run-console-action`
 
 范围：
 
@@ -75,7 +92,7 @@ Phase 2 第一批能力已完成并通过 release readiness：
 - `npm run typecheck` 通过。
 - `npm run build` 通过。
 
-## 5. 已完成任务：`phase3-004 runtime-log-diff-viewer`
+## 6. 已完成任务：`phase3-004 runtime-log-diff-viewer`
 
 范围：
 
@@ -90,7 +107,7 @@ Phase 2 第一批能力已完成并通过 release readiness：
 - `npm run typecheck` 通过。
 - `npm run build` 通过。
 
-## 6. Phase 3 收口规则
+## 7. Phase 3 收口规则
 
 - 每完成一个 Phase 3 issue，必须同步本实施记录和 issue graph。
 - 配置 validator 新增 issue code 时，必须能追溯到 [配置 Schema 规则](../configuration-schema-spec.md)。

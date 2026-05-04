@@ -204,7 +204,7 @@
 
 - CLI：`moyuan workspace validate`、`moyuan workspace doctor`。
 - Validator 输出 `status=passed|warning|failed` 和结构化 `issues[]`。
-- 校验范围包括 `.moyuan/workspace.json`、`project.yaml`、`repository.yaml`、`policies/access.yaml` 的存在性、YAML 解析、核心必填字段、条件必填、必须为空和关键字段漂移。
+- 校验范围包括 `.moyuan/workspace.json`、`project.yaml`、`repository.yaml`、`policies/access.yaml` 的存在性、YAML 解析、核心必填字段、条件必填、必须为空和关键字段漂移；`.moyuan/models/providers.yaml` 存在时也会校验 provider schema 和 secret 引用规则。
 - `Load` 优先读取用户可编辑的 YAML 配置，再回退到 `workspace.json` 或默认值；`workspace.json` 保持运行期状态索引职责。
 - `workspace doctor` 同时输出 `.moyuan/state.db` 路径、可用性和项目索引数量。
 - `.moyuan/state.db` 的项目表已对 `source_type`、`provider`、`owner_id`、`status`、`registered_at` 建索引，用于后续控制台和 API 查询。

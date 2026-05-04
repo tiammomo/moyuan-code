@@ -667,6 +667,7 @@ Phase 3 当前落地：
 
 - `moyuan workspace validate` 已开始读取用户可编辑的 `.moyuan/project.yaml`、`.moyuan/repository.yaml` 和 `.moyuan/policies/access.yaml`。
 - 当前 validator 会检查 YAML 解析错误、`schema_version`、核心必填字段、`local_path`/`remote_git` 互斥、`local_single_user`/`team_server` 条件必填、`workspace.json` 与 YAML 的关键字段漂移。
+- `.moyuan/models/providers.yaml` 已纳入可选校验：当文件存在时会校验 provider 管理开关、accounts、providers、`auth_ref` 引用、API 型 `base_url` 和明文密钥禁用。
 - 后续 `phase3-002` 继续扩展到 provider、routing、visual、runtime、server、release 和 budget 配置域。
 
 机器校验必须能输出：

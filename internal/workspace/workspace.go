@@ -312,6 +312,7 @@ func Validate(rootDir string) (ValidationReport, error) {
 	if accessFound && err == nil {
 		validateAccess(&report, access)
 	}
+	validateProvidersConfigFile(&report, paths.ProvidersYAML)
 	if stateFound {
 		validateStateDrift(&report, state, project, projectFound, repository, repositoryFound, access, accessFound)
 	}
@@ -477,6 +478,111 @@ func validateAccess(report *ValidationReport, cfg AccessConfig) {
 	}
 }
 
+func validateProvidersConfigFile(report *ValidationReport, path string) {
+	text, found, err := fsutil.ReadText(path)
+	if err != nil {
+		report.add("error", "providers_config_unreadable", err.Error(), path)
+		return
+	}
+	if !found {
+		return
+	}
+	if providersConfigContainsPlaintextSecret(text) {
+		report.add("error", "providers_plaintext_secret_forbidden", "models/providers.yaml must not contain plaintext API keys or tokens", path)
+	}
+	var raw map[string]any
+	if err := yaml.Unmarshal([]byte(text), &raw); err != nil {
+		report.add("error", "providers_config_unreadable", err.Error(), path)
+		return
+	}
+	if intField(raw, "schema_version") != 1 {
+		report.add("error", "providers_schema_version_invalid", "models/providers.yaml schema_version must be 1", "models/providers.yaml:schema_version")
+	}
+	if mapField(raw, "model_provider_management") == nil {
+		report.add("error", "providers_management_required", "model_provider_management is required", "model_provider_management")
+	}
+	if len(arrayField(raw, "accounts")) == 0 {
+		report.add("error", "provider_accounts_required", "accounts must contain at least one account", "accounts")
+	}
+	for index, item := range arrayField(raw, "accounts") {
+		account, ok := item.(map[string]any)
+		if !ok {
+			report.add("error", "provider_account_invalid", "account must be an object", fmt.Sprintf("accounts[%d]", index))
+			continue
+		}
+		validateProviderAccount(report, account, index)
+	}
+	if len(arrayField(raw, "providers")) == 0 {
+		report.add("error", "providers_required", "providers must contain at least one provider", "providers")
+	}
+	for index, item := range arrayField(raw, "providers") {
+		provider, ok := item.(map[string]any)
+		if !ok {
+			report.add("error", "provider_entry_invalid", "provider must be an object", fmt.Sprintf("providers[%d]", index))
+			continue
+		}
+		validateProviderEntry(report, provider, index)
+	}
+	security := mapField(raw, "security")
+	if security == nil || !mapBool(security, "forbid_plaintext_api_key") {
+		report.add("error", "providers_forbid_plaintext_api_key_required", "security.forbid_plaintext_api_key must be true", "security.forbid_plaintext_api_key")
+	}
+}
+
+func validateProviderAccount(report *ValidationReport, account map[string]any, index int) {
+	path := fmt.Sprintf("accounts[%d]", index)
+	vendor := strings.TrimSpace(mapString(account, "vendor"))
+	apiType := strings.TrimSpace(mapString(account, "api_type"))
+	authRef := strings.TrimSpace(mapString(account, "auth_ref"))
+	baseURL := strings.TrimSpace(mapString(account, "base_url"))
+	if vendor == "" {
+		report.add("error", "provider_account_vendor_required", "account.vendor is required", path+".vendor")
+	}
+	if apiType == "" {
+		report.add("error", "provider_account_api_type_required", "account.api_type is required", path+".api_type")
+	}
+	if authRef == "" {
+		report.add("error", "provider_account_auth_ref_required", "account.auth_ref is required", path+".auth_ref")
+	} else if !isConfigReference(authRef) {
+		report.add("error", "provider_account_auth_ref_must_be_reference", "account.auth_ref must use env: or secret: reference", path+".auth_ref")
+	}
+	if requiresProviderBaseURL(apiType) && baseURL == "" {
+		report.add("error", "provider_account_base_url_required", "account.base_url is required for API provider accounts", path+".base_url")
+	}
+	if !requiresProviderBaseURL(apiType) && baseURL != "" {
+		report.add("error", "provider_account_base_url_must_be_empty", "account.base_url must be empty for local CLI accounts", path+".base_url")
+	}
+	if _, ok := account["enabled"]; !ok {
+		report.add("error", "provider_account_enabled_required", "account.enabled is required", path+".enabled")
+	}
+	if mapField(account, "data_policy") == nil {
+		report.add("error", "provider_account_data_policy_required", "account.data_policy is required", path+".data_policy")
+	}
+}
+
+func validateProviderEntry(report *ValidationReport, provider map[string]any, index int) {
+	path := fmt.Sprintf("providers[%d]", index)
+	providerType := strings.TrimSpace(mapString(provider, "type"))
+	if providerType == "" {
+		report.add("error", "provider_type_required", "provider.type is required", path+".type")
+	}
+	if strings.TrimSpace(mapString(provider, "account")) == "" {
+		report.add("error", "provider_account_required", "provider.account is required", path+".account")
+	}
+	if _, ok := provider["enabled"]; !ok {
+		report.add("error", "provider_enabled_required", "provider.enabled is required", path+".enabled")
+	}
+	if (providerType == "llm-api" || providerType == "image-generation-api") && len(arrayField(provider, "models")) == 0 {
+		report.add("error", "provider_models_required", "provider.models is required for API providers", path+".models")
+	}
+	if (providerType == "codex" || providerType == "claude-code") && len(arrayField(provider, "models")) > 0 {
+		report.add("error", "provider_models_must_be_empty_for_cli", "provider.models must be empty for local CLI providers", path+".models")
+	}
+	if (providerType == "codex" || providerType == "claude-code") && mapField(provider, "capabilities") == nil {
+		report.add("error", "provider_capabilities_required", "provider.capabilities is required for local CLI providers", path+".capabilities")
+	}
+}
+
 func validateStateDrift(report *ValidationReport, state StateFile, project ProjectConfig, projectFound bool, repository RepositoryConfig, repositoryFound bool, access AccessConfig, accessFound bool) {
 	if projectFound && state.Project.Project.ID != "" && project.Project.ID != "" && state.Project.Project.ID != project.Project.ID {
 		report.add("warning", "project_yaml_state_drift", "project.yaml and workspace.json project.id differ", "project.id")
@@ -504,6 +610,86 @@ func mapBool(values map[string]any, key string) bool {
 	}
 	boolean, ok := value.(bool)
 	return ok && boolean
+}
+
+func mapField(values map[string]any, key string) map[string]any {
+	value, ok := values[key]
+	if !ok || value == nil {
+		return nil
+	}
+	nested, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	return nested
+}
+
+func arrayField(values map[string]any, key string) []any {
+	value, ok := values[key]
+	if !ok || value == nil {
+		return nil
+	}
+	items, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	return items
+}
+
+func intField(values map[string]any, key string) int {
+	value, ok := values[key]
+	if !ok {
+		return 0
+	}
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	default:
+		return 0
+	}
+}
+
+func requiresProviderBaseURL(apiType string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(apiType))
+	if normalized == "" {
+		return false
+	}
+	if normalized == "claude-code" || normalized == "codex" || normalized == "local-cli" {
+		return false
+	}
+	return strings.Contains(normalized, "api") || strings.Contains(normalized, "compatible") || strings.Contains(normalized, "openai") || strings.Contains(normalized, "anthropic")
+}
+
+func isConfigReference(value string) bool {
+	value = strings.TrimSpace(value)
+	return strings.HasPrefix(value, "env:") || strings.HasPrefix(value, "secret:")
+}
+
+func providersConfigContainsPlaintextSecret(text string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		lower := strings.ToLower(trimmed)
+		if strings.Contains(lower, "sk-") {
+			return true
+		}
+		if strings.Contains(lower, "auth_ref:") {
+			value := strings.Trim(strings.TrimSpace(strings.SplitN(trimmed, ":", 2)[1]), `"'`)
+			if !isConfigReference(value) {
+				return true
+			}
+		}
+		if (strings.Contains(lower, "api_key:") || strings.Contains(lower, "token:")) && !strings.Contains(lower, "env:") && !strings.Contains(lower, "secret:") && !strings.Contains(lower, "forbid_plaintext") {
+			return true
+		}
+	}
+	return false
 }
 
 func (report *ValidationReport) add(severity string, code string, message string, path string) {
