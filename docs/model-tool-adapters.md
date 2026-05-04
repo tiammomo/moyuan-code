@@ -291,6 +291,15 @@ Image Adapter 负责图像生成和图像编辑能力。首个目标是接入 Op
 - 保存图片、prompt、spec 和 Markdown 讲解。
 - 检查图片可读性、节点一致性和敏感信息泄露。
 
+Phase 2 当前落地：
+
+- CLI：`moyuan visuals diagram plan`、`moyuan visuals assets`、`moyuan visuals asset show <asset-id>`。
+- API：`POST /v1/projects/:project_id/visuals/diagrams/plan`、`GET /v1/projects/:project_id/visuals/assets`、`GET /v1/projects/:project_id/visuals/assets/:asset_id`。
+- 运行期产物：`.moyuan/visuals/specs/`、`.moyuan/visuals/prompts/`、`.moyuan/visuals/assets/`。
+- Diagram plan 会生成脱敏后的 `diagram_spec`、prompt 和 asset record。
+- Provider Route 使用 `image-diagram` 策略检查 `gpt_image_2`；provider 不可用时保留 `route_blocked` asset record。
+- 当前不直接调用图像 API；真实生成仍由 `scripts/generate-architecture-image.js` 和 `scripts/generate-multi-agent-flow-image.js` 执行。
+
 注意：
 
 - `gpt-image-2` 不参与代码生成、代码审查和合入决策。

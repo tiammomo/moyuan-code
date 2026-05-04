@@ -25,6 +25,7 @@ import (
 	"moyuan-code/internal/skills"
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/subagent"
+	"moyuan-code/internal/visuals"
 )
 
 const Version = "phase1-gin-gorm"
@@ -71,6 +72,13 @@ type resourceHealthScanRequest struct {
 	Environment string   `json:"environment"`
 	ResourceIDs []string `json:"resource_ids"`
 	Approved    bool     `json:"approved"`
+}
+
+type visualDiagramPlanRequest struct {
+	DiagramType string `json:"diagram_type"`
+	Title       string `json:"title"`
+	Scope       string `json:"scope"`
+	Size        string `json:"size"`
 }
 
 func NewRouter(options Options) *gin.Engine {
@@ -315,6 +323,71 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"quality_policy": quality.CurrentPolicy()})
+	})
+	router.POST("/v1/projects/:project_id/visuals/diagrams/plan", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req visualDiagramPlanRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		plan, err := visuals.GeneratePlan(rootDir, visuals.DiagramOptions{
+			DiagramType: req.DiagramType,
+			Title:       req.Title,
+			Scope:       req.Scope,
+			Size:        req.Size,
+		})
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"visual_plan": plan})
+	})
+	router.GET("/v1/projects/:project_id/visuals/assets", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		assets, err := visuals.ListAssets(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"visual_assets": assets})
+	})
+	router.GET("/v1/projects/:project_id/visuals/assets/:asset_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		asset, found, err := visuals.LoadAsset(rootDir, c.Param("asset_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "visual asset not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"visual_asset": asset})
 	})
 	router.GET("/v1/projects/:project_id/quality-reports", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

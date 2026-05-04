@@ -34,6 +34,7 @@ import (
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/subagent"
 	"moyuan-code/internal/textutil"
+	"moyuan-code/internal/visuals"
 	"moyuan-code/internal/workspace"
 )
 
@@ -101,6 +102,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleResources(ctx, argv[1:], cwd)
 	case "deploy":
 		text, result, exitCode, err = handleDeploy(ctx, argv[1:], cwd)
+	case "visuals":
+		text, result, exitCode, err = handleVisuals(argv[1:], cwd)
 	case "logs":
 		text, result, exitCode, err = handleLogs(argv[1:], cwd)
 	default:
@@ -179,6 +182,9 @@ func usage() string {
 		"moyuan model provider ops <provider> [--health ok] [--quota-status ok] [--used-tokens 1000]",
 		"moyuan model provider disable <provider>",
 		"moyuan model route [--role <role>] [--strategy low-cost-memory] [--task-type <type>] [--output-type <type>] [--repo-edit]",
+		"moyuan visuals diagram plan [--type architecture] [--title <title>] [--scope <text>]",
+		"moyuan visuals assets [--limit 20]",
+		"moyuan visuals asset show <asset-id>",
 		"moyuan skills add --id <id> --source <source> [--role backend] [--tag tdd]",
 		"moyuan skills list",
 		"moyuan skills recommend --role backend [--task-type testing] [--risk medium]",
@@ -1110,6 +1116,40 @@ func handleSkills(args []string, cwd string) (string, any, int, error) {
 		return "", skill, 0, nil
 	}
 	return "unknown skills command\n", nil, 1, nil
+}
+
+func handleVisuals(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown visuals command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "diagram":
+		if len(args) >= 2 && args[1] == "plan" {
+			plan, err := visuals.GeneratePlan(rootDir, visuals.DiagramOptions{
+				DiagramType: flagValue(args, "--type", "architecture"),
+				Title:       flagValue(args, "--title", ""),
+				Scope:       flagValue(args, "--scope", ""),
+				Size:        flagValue(args, "--size", ""),
+			})
+			return "", plan, 0, err
+		}
+	case "assets":
+		assets, err := visuals.ListAssets(rootDir, flagInt(args, "--limit", 20))
+		return "", assets, 0, err
+	case "asset":
+		if len(args) >= 3 && args[1] == "show" {
+			asset, ok, err := visuals.LoadAsset(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", asset, 0, nil
+		}
+	}
+	return "unknown visuals command\n", nil, 1, nil
 }
 
 func handleRelease(ctx context.Context, args []string, cwd string) (string, any, int, error) {

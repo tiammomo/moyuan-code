@@ -22,6 +22,7 @@ import (
 	"moyuan-code/internal/requirement"
 	runtimemgr "moyuan-code/internal/runtime"
 	"moyuan-code/internal/store"
+	"moyuan-code/internal/visuals"
 	"moyuan-code/internal/workspace"
 )
 
@@ -162,6 +163,16 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/subagents/"+result.SubagentID, http.StatusOK, `"subagent"`, `"output_contract"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality/"+result.QualityReport.ID, http.StatusOK, `"quality_report"`, `"accepted"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality-policy", http.StatusOK, `"quality_policy"`, `"required_checks"`)
+	assertPostContains(t, router, "/v1/projects/managed/visuals/diagrams/plan", `{"diagram_type":"multi-agent","scope":"password=plain 192.168.1.2"}`, http.StatusCreated, `"visual_plan"`, `"multi_agent"`, `[REDACTED_PRIVATE_IP]`)
+	visualAssets, err := visuals.ListAssets(root, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(visualAssets) != 1 {
+		t.Fatalf("expected visual asset from API plan")
+	}
+	assertGETContains(t, router, "/v1/projects/managed/visuals/assets?limit=1", http.StatusOK, `"visual_assets"`, visualAssets[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/visuals/assets/"+visualAssets[0].ID, http.StatusOK, `"visual_asset"`, `"prompt_path"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality-reports?limit=1", http.StatusOK, `"quality_reports"`, `"review_status"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality/"+result.QualityReport.ID+"/explain", http.StatusOK, `"quality_explanation"`, `"QUALITY_ACCEPTED"`)
 	assertPostContains(t, router, "/v1/projects/managed/issues/phase1-001/merge-decision", `{}`, http.StatusOK, `"merge_decision"`, `"MERGE_ALLOWED"`)

@@ -227,6 +227,32 @@ func TestSkillsCLIRegistersListsAndDisablesSkillDefinitions(t *testing.T) {
 	assertContains(t, rejected.stderr, "auth_ref_must_be_reference")
 }
 
+func TestVisualsDiagramPlanSanitizesAndIndexesAssets(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	plan := runCLI(t, root, "visuals", "diagram", "plan", "--type", "multi-agent", "--scope", "token=plain-secret 10.0.0.1")
+	assertContains(t, plan.stdout, `"diagram_type": "multi_agent"`)
+	assertContains(t, plan.stdout, `"prompt_path"`)
+	assertContains(t, plan.stdout, `"spec_path"`)
+	assetID := decodeVisualAssetID(t, plan.stdout)
+
+	asset := runCLI(t, root, "visuals", "asset", "show", assetID)
+	assertContains(t, asset.stdout, assetID)
+	assertContains(t, asset.stdout, `"size": "3072x2048"`)
+	assets := runCLI(t, root, "visuals", "assets", "--limit", "1")
+	assertContains(t, assets.stdout, assetID)
+
+	assertGlob(t, root, ".moyuan/visuals/specs/*.json")
+	assertGlob(t, root, ".moyuan/visuals/prompts/*.prompt.md")
+	assertGlobFileContains(t, root, ".moyuan/visuals/specs/*.json", "[REDACTED_PRIVATE_IP]")
+	assertGlobFileContains(t, root, ".moyuan/visuals/specs/*.json", "token=[REDACTED]")
+	assertGlobFileNotContains(t, root, ".moyuan/visuals/specs/*.json", "10.0.0.1")
+	assertGlobFileNotContains(t, root, ".moyuan/visuals/prompts/*.prompt.md", "plain-secret")
+	assertFileContains(t, root, ".moyuan/visuals/assets/assets.jsonl", assetID)
+	assertFileContains(t, root, ".moyuan/logs/model.jsonl", "visual.diagram.planned")
+}
+
 func TestRepairControlledLoopRunsQualityAndStopsAfterMaxAttempts(t *testing.T) {
 	root := createTempRepo(t)
 	brokenSource := "package phase1smoke\n\nfunc Ready() bool { return false }\n"
@@ -882,6 +908,22 @@ func decodeRepairAttemptID(t *testing.T, raw string) string {
 	return payload.ID
 }
 
+func decodeVisualAssetID(t *testing.T, raw string) string {
+	t.Helper()
+	var payload struct {
+		Asset struct {
+			ID string `json:"id"`
+		} `json:"asset"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode visual asset id: %v\n%s", err, raw)
+	}
+	if payload.Asset.ID == "" {
+		t.Fatalf("missing asset.id in output: %s", raw)
+	}
+	return payload.Asset.ID
+}
+
 func decodeStringField(t *testing.T, raw string, field string) string {
 	t.Helper()
 	var payload map[string]any
@@ -1086,6 +1128,47 @@ func assertGlob(t *testing.T, root string, pattern string) {
 	}
 	if len(matches) == 0 {
 		t.Fatalf("expected at least one match for %s", filepath.Join(root, filepath.FromSlash(pattern)))
+	}
+}
+
+func assertGlobFileContains(t *testing.T, root string, pattern string, needle string) {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
+	if err != nil {
+		t.Fatalf("bad glob %s: %v", pattern, err)
+	}
+	if len(matches) == 0 {
+		t.Fatalf("expected at least one match for %s", filepath.Join(root, filepath.FromSlash(pattern)))
+	}
+	for _, match := range matches {
+		data, err := os.ReadFile(match)
+		if err != nil {
+			t.Fatalf("read %s: %v", match, err)
+		}
+		if strings.Contains(string(data), needle) {
+			return
+		}
+	}
+	t.Fatalf("expected one file matching %s to contain %q", pattern, needle)
+}
+
+func assertGlobFileNotContains(t *testing.T, root string, pattern string, needle string) {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
+	if err != nil {
+		t.Fatalf("bad glob %s: %v", pattern, err)
+	}
+	if len(matches) == 0 {
+		t.Fatalf("expected at least one match for %s", filepath.Join(root, filepath.FromSlash(pattern)))
+	}
+	for _, match := range matches {
+		data, err := os.ReadFile(match)
+		if err != nil {
+			t.Fatalf("read %s: %v", match, err)
+		}
+		if strings.Contains(string(data), needle) {
+			t.Fatalf("%s leaked %q", match, needle)
+		}
 	}
 }
 

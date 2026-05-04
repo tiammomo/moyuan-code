@@ -1,0 +1,325 @@
+package visuals
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
+
+	"moyuan-code/internal/fsutil"
+	"moyuan-code/internal/logging"
+	"moyuan-code/internal/providers"
+	"moyuan-code/internal/textutil"
+	"moyuan-code/internal/workspace"
+)
+
+type DiagramOptions struct {
+	DiagramType string `json:"diagram_type"`
+	Title       string `json:"title"`
+	Scope       string `json:"scope,omitempty"`
+	Size        string `json:"size,omitempty"`
+}
+
+type DiagramSpec struct {
+	ID          string        `json:"id"`
+	DiagramType string        `json:"diagram_type"`
+	Title       string        `json:"title"`
+	Scope       string        `json:"scope,omitempty"`
+	Nodes       []DiagramNode `json:"nodes"`
+	Edges       []DiagramEdge `json:"edges"`
+	Safety      SafetyPolicy  `json:"safety"`
+	PromptPath  string        `json:"prompt_path,omitempty"`
+	SpecPath    string        `json:"spec_path,omitempty"`
+	CreatedAt   string        `json:"created_at"`
+}
+
+type DiagramNode struct {
+	ID      string   `json:"id"`
+	Label   string   `json:"label"`
+	Kind    string   `json:"kind"`
+	Details []string `json:"details"`
+}
+
+type DiagramEdge struct {
+	From  string `json:"from"`
+	To    string `json:"to"`
+	Label string `json:"label,omitempty"`
+}
+
+type SafetyPolicy struct {
+	StripSecrets      bool     `json:"strip_secrets"`
+	StripPrivateIPs   bool     `json:"strip_private_ips"`
+	ForbiddenPatterns []string `json:"forbidden_patterns"`
+}
+
+type AssetRecord struct {
+	ID              string                  `json:"id"`
+	DiagramSpecID   string                  `json:"diagram_spec_id"`
+	DiagramType     string                  `json:"diagram_type"`
+	Title           string                  `json:"title"`
+	Status          string                  `json:"status"`
+	ProviderID      string                  `json:"provider_id,omitempty"`
+	ModelID         string                  `json:"model_id,omitempty"`
+	RouteDecision   providers.RouteDecision `json:"route_decision"`
+	Size            string                  `json:"size"`
+	ImagePath       string                  `json:"image_path,omitempty"`
+	PromptPath      string                  `json:"prompt_path"`
+	SpecPath        string                  `json:"spec_path"`
+	ExplanationPath string                  `json:"explanation_path,omitempty"`
+	CreatedAt       string                  `json:"created_at"`
+	UpdatedAt       string                  `json:"updated_at"`
+}
+
+type Plan struct {
+	DiagramSpec DiagramSpec `json:"diagram_spec"`
+	Asset       AssetRecord `json:"asset"`
+}
+
+var (
+	credentialPattern = regexp.MustCompile(`(?i)(api[_-]?key|token|password|secret)\s*[:=]\s*[^,\s]+`)
+	openAIKeyPattern  = regexp.MustCompile(`sk-[A-Za-z0-9_-]{12,}`)
+	privateIPPattern  = regexp.MustCompile(`\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})\b`)
+)
+
+func GeneratePlan(rootDir string, options DiagramOptions) (Plan, error) {
+	if err := workspace.EnsureDirs(workspace.ForRoot(rootDir)); err != nil {
+		return Plan{}, err
+	}
+	diagramType := normalizeDiagramType(options.DiagramType)
+	if diagramType == "" {
+		return Plan{}, errors.New("diagram_type_required")
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	id := "diagram-" + textutil.Slugify(diagramType+"-"+time.Now().UTC().Format("20060102150405"))
+	title := strings.TrimSpace(options.Title)
+	if title == "" {
+		title = defaultTitle(diagramType)
+	}
+	spec := DiagramSpec{
+		ID:          id,
+		DiagramType: diagramType,
+		Title:       sanitize(options.TitleOr(title)),
+		Scope:       sanitize(options.Scope),
+		Nodes:       nodesFor(diagramType),
+		Edges:       edgesFor(diagramType),
+		Safety: SafetyPolicy{
+			StripSecrets:      true,
+			StripPrivateIPs:   true,
+			ForbiddenPatterns: []string{"api_key", "token", "password", "secret", "private_ip"},
+		},
+		CreatedAt: now,
+	}
+	prompt := buildPrompt(spec)
+	specPath := filepath.Join(visualsDir(rootDir), "specs", spec.ID+".json")
+	promptPath := filepath.Join(visualsDir(rootDir), "prompts", spec.ID+".prompt.md")
+	spec.SpecPath = specPath
+	spec.PromptPath = promptPath
+	if err := fsutil.WriteJSON(specPath, spec); err != nil {
+		return Plan{}, err
+	}
+	if err := fsutil.WriteText(promptPath, prompt); err != nil {
+		return Plan{}, err
+	}
+	route, err := providers.Route(rootDir, providers.RouteRequest{ModelStrategy: "image-diagram"})
+	if err != nil {
+		return Plan{}, err
+	}
+	size := strings.TrimSpace(options.Size)
+	if size == "" {
+		size = "3072x2048"
+	}
+	status := "planned"
+	if route.Blocked {
+		status = "route_blocked"
+	}
+	asset := AssetRecord{
+		ID:            "visual-" + textutil.Slugify(spec.ID),
+		DiagramSpecID: spec.ID,
+		DiagramType:   diagramType,
+		Title:         spec.Title,
+		Status:        status,
+		ProviderID:    route.ProviderID,
+		ModelID:       route.ModelID,
+		RouteDecision: route,
+		Size:          size,
+		PromptPath:    promptPath,
+		SpecPath:      specPath,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := writeAsset(rootDir, asset); err != nil {
+		return Plan{}, err
+	}
+	_ = logging.Log(rootDir, "model", "visual.diagram.planned", map[string]any{"asset_id": asset.ID, "diagram_spec_id": spec.ID, "status": asset.Status, "provider_id": asset.ProviderID})
+	return Plan{DiagramSpec: spec, Asset: asset}, nil
+}
+
+func ListAssets(rootDir string, limit int) ([]AssetRecord, error) {
+	dir := assetsDir(rootDir)
+	if err := fsutil.EnsureDir(dir); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	assets := []AssetRecord{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var asset AssetRecord
+		found, err := fsutil.ReadJSON(filepath.Join(dir, entry.Name()), &asset)
+		if err != nil {
+			return nil, err
+		}
+		if found && asset.ID != "" {
+			assets = append(assets, asset)
+		}
+	}
+	sort.SliceStable(assets, func(i, j int) bool {
+		return assets[i].UpdatedAt > assets[j].UpdatedAt
+	})
+	if limit > 0 && len(assets) > limit {
+		return assets[:limit], nil
+	}
+	return assets, nil
+}
+
+func LoadAsset(rootDir string, id string) (AssetRecord, bool, error) {
+	var asset AssetRecord
+	found, err := fsutil.ReadJSON(filepath.Join(assetsDir(rootDir), textutil.Slugify(id)+".json"), &asset)
+	return asset, found, err
+}
+
+func writeAsset(rootDir string, asset AssetRecord) error {
+	if err := fsutil.WriteJSON(filepath.Join(assetsDir(rootDir), asset.ID+".json"), asset); err != nil {
+		return err
+	}
+	return fsutil.AppendJSONL(filepath.Join(assetsDir(rootDir), "assets.jsonl"), asset)
+}
+
+func visualsDir(rootDir string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).MoyuanDir, "visuals")
+}
+
+func assetsDir(rootDir string) string {
+	return filepath.Join(visualsDir(rootDir), "assets")
+}
+
+func normalizeDiagramType(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	value = strings.ReplaceAll(value, "-", "_")
+	if value == "" {
+		value = "architecture"
+	}
+	switch value {
+	case "architecture", "issue_graph", "multi_agent", "deployment_topology", "release_flow":
+		return value
+	default:
+		return ""
+	}
+}
+
+func defaultTitle(diagramType string) string {
+	switch diagramType {
+	case "issue_graph":
+		return "Moyuan Issue Graph Diagram"
+	case "multi_agent":
+		return "Moyuan Multi-Agent Orchestration Diagram"
+	case "deployment_topology":
+		return "Moyuan Deployment Topology Diagram"
+	case "release_flow":
+		return "Moyuan Release Flow Diagram"
+	default:
+		return "Moyuan Architecture Diagram"
+	}
+}
+
+func (options DiagramOptions) TitleOr(fallback string) string {
+	if strings.TrimSpace(options.Title) == "" {
+		return fallback
+	}
+	return options.Title
+}
+
+func sanitize(value string) string {
+	value = credentialPattern.ReplaceAllString(value, "$1=[REDACTED]")
+	value = openAIKeyPattern.ReplaceAllString(value, "sk-[REDACTED]")
+	value = privateIPPattern.ReplaceAllString(value, "[REDACTED_PRIVATE_IP]")
+	return strings.TrimSpace(value)
+}
+
+func nodesFor(diagramType string) []DiagramNode {
+	switch diagramType {
+	case "multi_agent":
+		return []DiagramNode{
+			node("requirement", "Requirement Refiner", "process", "clarification", "scope", "acceptance"),
+			node("issue_graph", "Issue Graph", "state", "DAG", "dependencies", "write scopes"),
+			node("scheduler", "Scheduler", "process", "ready/blocked/running/review", "parallelism", "runtime slots"),
+			node("subagent", "Subagent Plan", "agent", "role", "skills", "memory scope", "output contract"),
+			node("runtime", "Runtime Adapter", "runtime", "Claude CLI", "Codex CLI", "provider route"),
+			node("quality", "Quality Gate", "gate", "build", "lint", "test", "review"),
+			node("learning", "Learning Loop", "feedback", "memory", "skill effectiveness", "compact"),
+		}
+	case "deployment_topology":
+		return []DiagramNode{
+			node("release", "Release Plan", "process", "branch", "tag", "GitHub/Gitee"),
+			node("resources", "Server Resources", "state", "test_dev", "production", "expires_at"),
+			node("deployment", "Deployment", "process", "dry-run", "controlled execute", "audit"),
+			node("smoke", "Smoke Test", "gate", "health", "endpoint", "rollback trigger"),
+			node("monitor", "Monitor", "feedback", "logs", "metrics", "incidents"),
+		}
+	default:
+		return []DiagramNode{
+			node("repository", "Repository", "source", "local path", "GitHub/Gitee", ".moyuan"),
+			node("comprehension", "Project Comprehension", "process", "profile", "module map", "commands"),
+			node("planning", "Requirement Planning", "process", "clarification", "Issue Graph", "schedule"),
+			node("agents", "Multi-Agent Execution", "agent", "Subagent", "Skills Registry", "Model Routing"),
+			node("quality", "Quality & Review", "gate", "diff", "tests", "review"),
+			node("memory", "Agent Memory", "state", "record gate", "retrieve", "compact"),
+			node("release", "Release & Deploy", "process", "branch", "push", "smoke", "monitor"),
+		}
+	}
+}
+
+func edgesFor(diagramType string) []DiagramEdge {
+	nodes := nodesFor(diagramType)
+	edges := []DiagramEdge{}
+	for idx := 0; idx < len(nodes)-1; idx++ {
+		edges = append(edges, DiagramEdge{From: nodes[idx].ID, To: nodes[idx+1].ID, Label: "main_flow"})
+	}
+	return edges
+}
+
+func node(id string, label string, kind string, details ...string) DiagramNode {
+	return DiagramNode{ID: id, Label: label, Kind: kind, Details: details}
+}
+
+func buildPrompt(spec DiagramSpec) string {
+	lines := []string{
+		"# Diagram Prompt",
+		"",
+		"请生成一张横版 2K 技术流程图。",
+		"",
+		"- Title: " + spec.Title,
+		"- Diagram Type: " + spec.DiagramType,
+		"- Scope: " + spec.Scope,
+		"- Style: white background, dark blue section headers, light cards, clear arrows, technical but readable.",
+		"- Keep Chinese explanations concise; preserve English technical terms such as Issue Graph, Subagent, Scheduler, Runtime Adapter, Quality Gate, Agent Memory.",
+		"- Do not include API keys, tokens, private IPs, passwords, account names, or raw environment values.",
+		"",
+		"## Nodes",
+	}
+	for _, item := range spec.Nodes {
+		lines = append(lines, "- "+item.ID+": "+item.Label+" ("+item.Kind+") - "+strings.Join(item.Details, ", "))
+	}
+	lines = append(lines, "", "## Edges")
+	for _, edge := range spec.Edges {
+		lines = append(lines, "- "+edge.From+" -> "+edge.To+" ["+edge.Label+"]")
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
