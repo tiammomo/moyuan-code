@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"strings"
 	"testing"
 
 	"moyuan-code/internal/workspace"
@@ -183,6 +184,80 @@ func TestProviderOpsSnapshotBlocksUnavailableRoutes(t *testing.T) {
 	}
 	if _, _, err := UpdateOps(root, "gpt_image_2", OpsSnapshot{Quota: Quota{UsedTokens: -1}}); err == nil {
 		t.Fatal("expected negative usage values to be rejected")
+	}
+}
+
+func TestProviderOpsRefreshUpdatesLocalSignals(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GLM_REFRESH_KEY", "present")
+
+	if _, err := Upsert(root, Provider{
+		ID:      "glm-refresh",
+		Vendor:  "zhipu",
+		APIType: "openai-compatible",
+		BaseURL: "https://example.invalid/v1",
+		AuthRef: "env:GLM_REFRESH_KEY",
+		Enabled: true,
+		Models:  []Model{{ID: "glm-4"}},
+		Quota:   Quota{LimitTokens: 100, UsedTokens: 85},
+		Usage:   Usage{Window: "daily", Requests: 2},
+		Cost:    Cost{Currency: "usd", EstimatedAmount: 9, BudgetAmount: 10},
+		DataPolicy: DataPolicy{
+			AllowProjectMemory: true,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Upsert(root, Provider{
+		ID:      "missing-auth",
+		Vendor:  "zhipu",
+		APIType: "openai-compatible",
+		BaseURL: "https://example.invalid/v1",
+		AuthRef: "env:GLM_REFRESH_MISSING",
+		Enabled: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := RefreshOps(root, OpsRefreshOptions{ProviderID: "glm-refresh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Updated != 1 || len(result.Providers) != 1 {
+		t.Fatalf("unexpected refresh result: %+v", result)
+	}
+	refreshed := result.Providers[0]
+	if refreshed.Health.Status != "ok" || refreshed.Quota.Status != "warning" || refreshed.Quota.RemainingTokens != 15 || refreshed.Cost.Status != "warning" {
+		t.Fatalf("unexpected refreshed provider: %+v", refreshed)
+	}
+	if refreshed.Usage.UpdatedAt == "" {
+		t.Fatalf("expected usage updated_at to be refreshed: %+v", refreshed.Usage)
+	}
+
+	result, err = RefreshOps(root, OpsRefreshOptions{ProviderID: "missing-auth"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Updated != 1 || result.Providers[0].Health.Status != "unhealthy" || !strings.Contains(result.Providers[0].Health.Reason, "auth_ref_env_missing") {
+		t.Fatalf("expected missing env auth to mark provider unhealthy: %+v", result)
+	}
+
+	disabled, ok, err := Disable(root, "missing-auth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || disabled.Enabled {
+		t.Fatalf("expected provider disabled: ok=%v provider=%+v", ok, disabled)
+	}
+	result, err = RefreshOps(root, OpsRefreshOptions{ProviderID: "missing-auth"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Updated != 0 || result.Skipped != 1 || result.Decisions[0].Reason != "provider_disabled" {
+		t.Fatalf("expected disabled provider to be skipped: %+v", result)
 	}
 }
 

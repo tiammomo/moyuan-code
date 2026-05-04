@@ -50,6 +50,11 @@ type routeRequest struct {
 	IncludesProjectMemory bool   `json:"includes_project_memory"`
 }
 
+type providerOpsRefreshRequest struct {
+	ProviderID      string `json:"provider_id"`
+	IncludeDisabled bool   `json:"include_disabled"`
+}
+
 type releaseSuggestRequest struct {
 	Version   string `json:"version"`
 	MinIssues int    `json:"min_issues"`
@@ -961,6 +966,31 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"provider": provider})
+	})
+	router.POST("/v1/projects/:project_id/providers/ops/refresh", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req providerOpsRefreshRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		result, err := providers.RefreshOps(rootDir, providers.OpsRefreshOptions{
+			ProviderID:      req.ProviderID,
+			IncludeDisabled: req.IncludeDisabled,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"provider_ops_refresh": result})
 	})
 	router.POST("/v1/projects/:project_id/providers/:provider_id/ops", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

@@ -3,6 +3,8 @@ package providers
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -96,6 +98,29 @@ type OpsSnapshot struct {
 	Quota  Quota  `json:"quota"`
 	Usage  Usage  `json:"usage"`
 	Cost   Cost   `json:"cost"`
+}
+
+type OpsRefreshOptions struct {
+	ProviderID      string `json:"provider_id,omitempty"`
+	IncludeDisabled bool   `json:"include_disabled,omitempty"`
+}
+
+type OpsRefreshResult struct {
+	UpdatedAt  string               `json:"updated_at"`
+	Updated    int                  `json:"updated"`
+	Skipped    int                  `json:"skipped"`
+	Decisions  []OpsRefreshDecision `json:"decisions"`
+	Providers  []Provider           `json:"providers"`
+	ProviderID string               `json:"provider_id,omitempty"`
+}
+
+type OpsRefreshDecision struct {
+	ProviderID   string `json:"provider_id"`
+	Status       string `json:"status"`
+	Reason       string `json:"reason"`
+	HealthStatus string `json:"health_status,omitempty"`
+	QuotaStatus  string `json:"quota_status,omitempty"`
+	CostStatus   string `json:"cost_status,omitempty"`
 }
 
 type RouteRequest struct {
@@ -292,6 +317,56 @@ func UpdateOps(rootDir string, id string, snapshot OpsSnapshot) (Provider, bool,
 		return provider, true, nil
 	}
 	return Provider{}, false, nil
+}
+
+func RefreshOps(rootDir string, options OpsRefreshOptions) (OpsRefreshResult, error) {
+	registry, err := Load(rootDir)
+	if err != nil {
+		return OpsRefreshResult{}, err
+	}
+	options.ProviderID = normalizeID(options.ProviderID)
+	result := OpsRefreshResult{
+		UpdatedAt:  now(),
+		Decisions:  []OpsRefreshDecision{},
+		Providers:  []Provider{},
+		ProviderID: options.ProviderID,
+	}
+	for _, provider := range registry.Providers {
+		if options.ProviderID != "" && provider.ID != options.ProviderID {
+			continue
+		}
+		if !provider.Enabled && !options.IncludeDisabled {
+			result.Skipped++
+			result.Decisions = append(result.Decisions, OpsRefreshDecision{ProviderID: provider.ID, Status: "skipped", Reason: "provider_disabled"})
+			continue
+		}
+		snapshot := refreshSnapshotFor(provider)
+		updated, ok, err := UpdateOps(rootDir, provider.ID, snapshot)
+		if err != nil {
+			return OpsRefreshResult{}, err
+		}
+		if !ok {
+			result.Skipped++
+			result.Decisions = append(result.Decisions, OpsRefreshDecision{ProviderID: provider.ID, Status: "skipped", Reason: "provider_not_found"})
+			continue
+		}
+		result.Updated++
+		result.Providers = append(result.Providers, updated)
+		result.Decisions = append(result.Decisions, OpsRefreshDecision{
+			ProviderID:   updated.ID,
+			Status:       "updated",
+			Reason:       updated.Health.Reason,
+			HealthStatus: updated.Health.Status,
+			QuotaStatus:  updated.Quota.Status,
+			CostStatus:   updated.Cost.Status,
+		})
+	}
+	_ = logging.Log(rootDir, "audit", "provider.ops.refreshed", map[string]any{
+		"provider_id": options.ProviderID,
+		"updated":     result.Updated,
+		"skipped":     result.Skipped,
+	})
+	return result, nil
 }
 
 func Route(rootDir string, request RouteRequest) (RouteDecision, error) {
@@ -642,6 +717,136 @@ func availabilityViolation(provider Provider) string {
 	return ""
 }
 
+func refreshSnapshotFor(provider Provider) OpsSnapshot {
+	snapshot := OpsSnapshot{
+		Health: refreshHealth(provider),
+		Quota:  refreshQuota(provider.Quota),
+		Usage:  refreshUsage(provider.Usage),
+		Cost:   refreshCost(provider.Cost),
+	}
+	return snapshot
+}
+
+func refreshHealth(provider Provider) Health {
+	health := Health{Status: "ok", Reason: "configuration_present", LastCheckedAt: now()}
+	if !provider.Enabled {
+		return Health{Status: "unknown", Reason: "provider_disabled", LastCheckedAt: health.LastCheckedAt}
+	}
+	if provider.NativeRuntime {
+		command := runtimeCommand(provider.RuntimeID)
+		if command == "" {
+			return Health{Status: "unknown", Reason: "native_runtime_command_unknown", LastCheckedAt: health.LastCheckedAt}
+		}
+		if _, err := exec.LookPath(command); err != nil {
+			return Health{Status: "unhealthy", Reason: "native_runtime_missing:" + command, LastCheckedAt: health.LastCheckedAt}
+		}
+		return Health{Status: "ok", Reason: "native_runtime_found:" + command, LastCheckedAt: health.LastCheckedAt}
+	}
+	authStatus, authReason := authRefStatus(provider.AuthRef)
+	if authStatus != "ok" {
+		return Health{Status: "unhealthy", Reason: authReason, LastCheckedAt: health.LastCheckedAt}
+	}
+	if requiresBaseURL(provider) && strings.TrimSpace(provider.BaseURL) == "" {
+		return Health{Status: "unhealthy", Reason: "base_url_missing", LastCheckedAt: health.LastCheckedAt}
+	}
+	return health
+}
+
+func refreshQuota(existing Quota) Quota {
+	quota := existing
+	if quota.LimitTokens <= 0 {
+		if quota.Status == "" {
+			quota.Status = "unknown"
+		}
+		return quota
+	}
+	if quota.LimitTokens >= quota.UsedTokens {
+		quota.RemainingTokens = quota.LimitTokens - quota.UsedTokens
+	} else {
+		quota.RemainingTokens = 0
+	}
+	switch {
+	case quota.UsedTokens >= quota.LimitTokens || quota.RemainingTokens <= 0:
+		quota.Status = "exhausted"
+	case float64(quota.UsedTokens)/float64(quota.LimitTokens) >= 0.8:
+		quota.Status = "warning"
+	default:
+		quota.Status = "ok"
+	}
+	return quota
+}
+
+func refreshUsage(existing Usage) Usage {
+	usage := existing
+	if usage.UpdatedAt == "" && hasUsage(usage) {
+		usage.UpdatedAt = now()
+	}
+	return usage
+}
+
+func refreshCost(existing Cost) Cost {
+	cost := existing
+	if cost.BudgetAmount <= 0 {
+		if cost.Status == "" {
+			cost.Status = "unknown"
+		}
+		return cost
+	}
+	switch {
+	case cost.EstimatedAmount >= cost.BudgetAmount:
+		cost.Status = "exceeded"
+	case cost.EstimatedAmount/cost.BudgetAmount >= 0.8:
+		cost.Status = "warning"
+	default:
+		cost.Status = "ok"
+	}
+	return cost
+}
+
+func authRefStatus(authRef string) (string, string) {
+	authRef = strings.TrimSpace(authRef)
+	if authRef == "" {
+		return "missing", "auth_ref_missing"
+	}
+	if strings.HasPrefix(authRef, "env:") {
+		key := strings.TrimSpace(strings.TrimPrefix(authRef, "env:"))
+		if key == "" {
+			return "missing", "auth_ref_env_required"
+		}
+		if os.Getenv(key) == "" {
+			return "missing", "auth_ref_env_missing:" + key
+		}
+		return "ok", "auth_ref_env_present:" + key
+	}
+	if strings.HasPrefix(authRef, "secret:") {
+		return "ok", "auth_ref_secret_reference_present"
+	}
+	return "invalid", "auth_ref_unsupported"
+}
+
+func requiresBaseURL(provider Provider) bool {
+	if provider.BaseURL != "" {
+		return false
+	}
+	if provider.NativeRuntime || provider.Vendor == "openai" || provider.APIType == "image" {
+		return false
+	}
+	return strings.Contains(provider.APIType, "compatible") || isThirdParty(provider)
+}
+
+func runtimeCommand(runtimeID string) string {
+	switch normalizeToken(runtimeID) {
+	case "claude_cli":
+		return "claude"
+	case "codex_cli":
+		return "codex"
+	case "local_shell":
+		return "sh"
+	default:
+		return ""
+	}
+}
+
 func contains(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
@@ -800,7 +1005,7 @@ func mergeQuota(existing Quota, incoming Quota) Quota {
 	if incoming.UsedTokens != 0 {
 		existing.UsedTokens = incoming.UsedTokens
 	}
-	if incoming.RemainingTokens != 0 {
+	if incoming.RemainingTokens != 0 || incoming.LimitTokens > 0 {
 		existing.RemainingTokens = incoming.RemainingTokens
 	}
 	if incoming.ResetAt != "" {

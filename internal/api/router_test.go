@@ -211,6 +211,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"backend","requires_repo_edit":true}`, http.StatusOK, `"route"`, `"codex_cli"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"memory_curator","task_type":"memory_extraction","includes_project_memory":true}`, http.StatusOK, `"route"`, `"glm-api"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"model_strategy":"low-cost-memory","includes_project_memory":true}`, http.StatusOK, `"route"`, `"low_cost_memory"`, `"glm-api"`)
+	t.Setenv("GLM_API_KEY", "")
+	assertPostContains(t, router, "/v1/projects/managed/providers/ops/refresh", `{"provider_id":"glm-api"}`, http.StatusOK, `"provider_ops_refresh"`, `"updated":1`, `"auth_ref_env_missing:GLM_API_KEY"`)
 	assertPostContains(t, router, "/v1/projects/managed/providers/glm-api/ops", `{"quota":{"status":"exhausted"}}`, http.StatusOK, `"quota"`, `"exhausted"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"memory_curator","task_type":"memory_extraction","includes_project_memory":true}`, http.StatusOK, `"route"`, `"codex_cli"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"backend","requires_repo_edit":true,"includes_secrets":true}`, http.StatusAccepted, `"ROUTE_BLOCKED"`, `"contains_secret_context"`)

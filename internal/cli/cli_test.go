@@ -459,6 +459,11 @@ func TestProviderRegistryCLIManagesProvidersAndRoutesRoles(t *testing.T) {
 	assertContains(t, ops.stdout, `"remaining_tokens": 750`)
 	assertContains(t, ops.stdout, `"currency": "USD"`)
 
+	t.Setenv("GLM_API_KEY", "")
+	refresh := runCLI(t, root, "model", "provider", "refresh", "--provider", "glm-main")
+	assertContains(t, refresh.stdout, `"updated": 1`)
+	assertContains(t, refresh.stdout, `"auth_ref_env_missing:GLM_API_KEY"`)
+
 	exhausted := runCLI(t, root, "model", "provider", "ops", "glm-main", "--quota-status", "exhausted")
 	assertContains(t, exhausted.stdout, `"status": "exhausted"`)
 

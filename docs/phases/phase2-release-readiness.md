@@ -65,6 +65,7 @@ Provider：
 
 ```bash
 moyuan model provider ops <provider-id> --health ok --quota-status ok
+moyuan model provider refresh --provider <provider-id>
 moyuan model route --strategy low-cost-memory
 moyuan model route --strategy image-diagram
 ```
@@ -110,7 +111,7 @@ moyuan visuals renders
 
 ## 6. 剩余风险
 
-- Provider health/usage 目前是受控 snapshot，不是自动探测。
+- Provider refresh 已支持本地可验证信号，不外呼云厂商账单或模型 API。
 - Skill recommendation 当前是本地规则 fallback，不是真实外部 marketplace adapter。
 - Runtime recovery 只归档上下文和建议 fallback candidate，不自动 resume。
 - Subagent retry/archive 已进入调度输入，但还没有生产级队列和 worker。
@@ -121,8 +122,8 @@ moyuan visuals renders
 
 优先级建议：
 
-1. Provider 自动健康检查和 quota refresh。
-2. Workspace schema validator 和 `.moyuan/state.db` 索引深化。
-3. Skills 外部 adapter 接入和 recommendation score 与 effectiveness 闭环。
-4. Console 深化日志流、diff 展开、visual asset 图片预览和人工审批动作。
-5. Visual script mode 接入 auth ref、密钥注入审计和图片结果质量检查。
+1. Workspace schema validator 和 `.moyuan/state.db` 索引深化。
+2. Skills 外部 adapter 接入和 recommendation score 与 effectiveness 闭环。
+3. Console 深化日志流、diff 展开、visual asset 图片预览和人工审批动作。
+4. Visual script mode 接入 auth ref、密钥注入审计和图片结果质量检查。
+5. Provider refresh 后续接真实服务商轻量探测 adapter。
