@@ -572,3 +572,22 @@ Phase 1 暂不进入第一批的能力：
 - release/deployment 投产流水线。
 
 这些能力可以在第一批模块稳定后按 [实现模块拆分](./implementation-module-map.md) 的第二批扩展继续拆分。
+
+## 10. 进入实施前的冻结清单
+
+在正式拆 issue 和写代码前，以下内容视为冻结，不再改动口径，除非出现新的架构决策：
+
+- `Go` 作为控制面后端，`Python` 作为 worker/helper。
+- `Phase 1` 只做本地 CLI MVP。
+- `README` 只保留导航和边界。
+- `CLI` 命令以本路线图为唯一权威。
+- `Phase 1` issue graph 以 [Phase 1 实现 Issue Graph](./phase1-issue-graph.md) 为唯一执行图。
+- `design-readiness-checklist.md` 的风险项只允许补齐，不允许借口绕过门禁。
+- `workspace`、`auth_context`、`logging`、`git`、`runtime-adapters`、`comprehension`、`orchestrator`、`scheduler`、`quality`、`memory`、`repair` 的边界不再重新拆分定义。
+
+进入实施阶段的最低条件：
+
+- `phase1-issue-graph.md` 已作为执行图确定。
+- 所有 Phase 1 issue 的依赖关系已经可读。
+- 每个 issue 都有明确的写入范围、验收条件和 owner。
+- 第一批实现模块与 Phase 1 入口顺序一致。
