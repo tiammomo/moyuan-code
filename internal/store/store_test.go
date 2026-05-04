@@ -46,4 +46,20 @@ func TestGORMStoreMigratesAndUpsertsProjects(t *testing.T) {
 	if projects[0].Status != "archived" || projects[0].Provider != "github" {
 		t.Fatalf("unexpected project: %+v", projects[0])
 	}
+
+	found, ok, err := db.FindProject("sample")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || found.Root != project.Root {
+		t.Fatalf("expected to find sample project, ok=%v project=%+v", ok, found)
+	}
+
+	_, ok, err = db.FindProject("missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		t.Fatalf("expected missing project to return ok=false")
+	}
 }

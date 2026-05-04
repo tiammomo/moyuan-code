@@ -538,7 +538,7 @@ Adapter 路线：
 
 ## 9. Phase 1 收口状态
 
-文档规划阶段已完成收口。Phase 1 本地 CLI MVP 已完成主要闭环，验收入口见 [Phase 1 Release Readiness](./phase1-release-readiness.md)。[设计就绪门禁](./design-readiness-checklist.md) 中的风险项继续作为后续实现期设计债务跟踪。
+文档规划阶段已完成收口。Phase 1 本地 CLI MVP 已完成主要闭环，验收入口见 [Phase 1 Release Readiness](./phases/phase1-release-readiness.md)。[设计就绪门禁](./design-readiness-checklist.md) 中的风险项继续作为后续实现期设计债务跟踪。
 
 Phase 1 的执行结果：
 
@@ -589,8 +589,8 @@ Phase 1 仍不覆盖的能力：
 - `Phase 1` 只做本地 CLI MVP。
 - `README` 只保留导航和边界。
 - `CLI` 命令以本路线图为唯一权威。
-- `Phase 1` issue graph 以 [Phase 1 实现 Issue Graph](./phase1-issue-graph.md) 为唯一执行图。
-- `Phase 1` 验收以 [Phase 1 Release Readiness](./phase1-release-readiness.md) 为当前入口。
+- `Phase 1` issue graph 以 [Phase 1 实现 Issue Graph](./phases/phase1-issue-graph.md) 为唯一执行图。
+- `Phase 1` 验收以 [Phase 1 Release Readiness](./phases/phase1-release-readiness.md) 为当前入口。
 - `design-readiness-checklist.md` 的风险项只允许补齐，不允许借口绕过门禁。
 - `workspace`、`auth_context`、`logging`、`git`、`runtime-adapters`、`comprehension`、`orchestrator`、`scheduler`、`quality`、`memory`、`repair` 的边界不再重新拆分定义。
 

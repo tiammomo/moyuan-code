@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"path/filepath"
 	"time"
 
@@ -68,6 +69,18 @@ func (s Store) ListProjects() ([]Project, error) {
 		return nil, err
 	}
 	return projects, nil
+}
+
+func (s Store) FindProject(id string) (Project, bool, error) {
+	var project Project
+	err := s.DB.Where("id = ?", id).First(&project).Error
+	if err == nil {
+		return project, true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Project{}, false, nil
+	}
+	return Project{}, false, err
 }
 
 func (s Store) Close() error {

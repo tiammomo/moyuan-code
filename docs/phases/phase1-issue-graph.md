@@ -34,7 +34,7 @@ Phase 1 本地 CLI MVP 已完成主要闭环，控制面已切换为 Go。
 - `phase1-019 repair-controlled-loop`：已实现受控 repair attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
 - `phase1-020 docs-release-readiness`：已收口 README、CLI help、e2e 说明、Phase 1 验收记录和剩余风险。
 
-Phase 1 已完成。后续进入 Beta/Production 前，应先基于 [Phase 1 Release Readiness](./phase1-release-readiness.md) 和 [生命周期路线图](./lifecycle-roadmap.md) 拆下一阶段 issue graph。
+Phase 1 已完成。后续进入 Beta/Production 前，应先基于 [Phase 1 Release Readiness](./phase1-release-readiness.md) 和 [生命周期路线图](../lifecycle-roadmap.md) 拆下一阶段 issue graph。
 
 ## 1. 目标
 
