@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
+	runtimemgr "moyuan-code/internal/runtime"
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/workspace"
 )
@@ -96,6 +98,21 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	if _, _, err := issues.GeneratePhase1(root); err != nil {
 		t.Fatal(err)
 	}
+	restoreRuntimePath := prependAPIFailingCodex(t)
+	recoveryResult, err := runtimemgr.Invoke(context.Background(), root, runtimemgr.Invocation{
+		RunID:        "api-runtime-fail",
+		RuntimeID:    "codex_cli",
+		IssueID:      "api-recovery",
+		Prompt:       "noop",
+		WorktreePath: root,
+	})
+	restoreRuntimePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recoveryResult.RecoveryID == "" {
+		t.Fatalf("expected API fixture runtime failure to create recovery: %+v", recoveryResult)
+	}
 
 	result, err := orchestrator.RunIssue(context.Background(), root, "phase1-001", "local_shell", "printf api-state")
 	if err != nil {
@@ -139,6 +156,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)
 	assertGETContains(t, router, "/v1/projects/managed/runs?limit=1", http.StatusOK, `"runs"`, result.RunID)
 	assertGETContains(t, router, "/v1/projects/managed/runs/"+result.RunID, http.StatusOK, `"run"`, `"completed"`)
+	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries?limit=1", http.StatusOK, `"runtime_recoveries"`, recoveryResult.RecoveryID, `"runtime_failed"`)
+	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries/"+recoveryResult.RecoveryID, http.StatusOK, `"runtime_recovery"`, `"fallback_candidate"`)
 	assertGETContains(t, router, "/v1/projects/managed/subagents?limit=1", http.StatusOK, `"subagents"`, result.SubagentID)
 	assertGETContains(t, router, "/v1/projects/managed/subagents/"+result.SubagentID, http.StatusOK, `"subagent"`, `"output_contract"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality/"+result.QualityReport.ID, http.StatusOK, `"quality_report"`, `"accepted"`)
@@ -287,5 +306,21 @@ func runGit(t *testing.T, root string, args ...string) {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, string(output))
+	}
+}
+
+func prependAPIFailingCodex(t *testing.T) func() {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "codex")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf 'api codex failed\\n' >&2\nexit 42\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	previous := os.Getenv("PATH")
+	if err := os.Setenv("PATH", dir+string(os.PathListSeparator)+previous); err != nil {
+		t.Fatal(err)
+	}
+	return func() {
+		_ = os.Setenv("PATH", previous)
 	}
 }

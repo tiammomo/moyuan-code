@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -28,15 +29,20 @@ type nativeSpec struct {
 	EnvKeys    []string
 }
 
-func runNativeCLI(ctx context.Context, rootDir string, invocation Invocation, command string) (CommandResult, string, string, string, string, error) {
+var (
+	runtimeCredentialPattern = regexp.MustCompile(`(?i)(api[_-]?key|token|password|secret)\s*[:=]\s*[^,\s]+`)
+	runtimeKeyPattern        = regexp.MustCompile(`sk-[A-Za-z0-9_-]{12,}`)
+)
+
+func runNativeCLI(ctx context.Context, rootDir string, invocation Invocation, command string) (CommandResult, string, string, string, nativeArtifacts, error) {
 	promptPath, err := writePromptFile(rootDir, invocation)
 	if err != nil {
-		return CommandResult{}, "", "", "", "", err
+		return CommandResult{}, "", "", "", nativeArtifacts{}, err
 	}
 	spec := nativeInvocationSpec(invocation, command, promptPath)
 	env, err := nativeEnv(rootDir, invocation, &spec)
 	if err != nil {
-		return CommandResult{}, "", "", "", "", err
+		return CommandResult{}, "", "", "", nativeArtifacts{}, err
 	}
 	startedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	res := process.RunCommandInput(ctx, invocation.WorktreePath, spec.Stdin, env, spec.Command, spec.Args...)
@@ -50,32 +56,53 @@ func runNativeCLI(ctx context.Context, rootDir string, invocation Invocation, co
 		Status:   status,
 		ExitCode: res.Code,
 	}
+	sessionID := nativeSessionID(invocation, spec.RuntimeID)
+	sessionDir := nativeSessionDir(rootDir, sessionID)
+	stdoutPath := filepath.Join(sessionDir, "stdout.txt")
+	stderrPath := filepath.Join(sessionDir, "stderr.txt")
+	if err := fsutil.WriteText(stdoutPath, redactRuntimeOutput(res.Stdout)); err != nil {
+		return CommandResult{}, "", "", "", nativeArtifacts{}, err
+	}
+	if err := fsutil.WriteText(stderrPath, redactRuntimeOutput(res.Stderr)); err != nil {
+		return CommandResult{}, "", "", "", nativeArtifacts{}, err
+	}
 	metadata := map[string]any{
-		"runtime_id":  invocation.RuntimeID,
-		"provider":    spec.Provider,
-		"provider_id": spec.ProviderID,
-		"model_id":    spec.ModelID,
-		"command":     spec.Command,
-		"args":        spec.Args,
-		"cwd":         invocation.WorktreePath,
-		"env_keys":    spec.EnvKeys,
-		"prompt_path": promptPath,
-		"started_at":  startedAt,
-		"finished_at": time.Now().UTC().Format(time.RFC3339Nano),
-		"exit_code":   res.Code,
-		"status":      status,
-		"stdout":      res.Stdout,
-		"stderr":      res.Stderr,
+		"runtime_id":        invocation.RuntimeID,
+		"provider":          spec.Provider,
+		"provider_id":       spec.ProviderID,
+		"model_id":          spec.ModelID,
+		"native_session_id": sessionID,
+		"command":           spec.Command,
+		"args":              spec.Args,
+		"cwd":               invocation.WorktreePath,
+		"env_keys":          spec.EnvKeys,
+		"prompt_path":       promptPath,
+		"stdout_path":       stdoutPath,
+		"stderr_path":       stderrPath,
+		"started_at":        startedAt,
+		"finished_at":       time.Now().UTC().Format(time.RFC3339Nano),
+		"exit_code":         res.Code,
+		"status":            status,
+		"stdout":            redactRuntimeOutput(res.Stdout),
+		"stderr":            redactRuntimeOutput(res.Stderr),
 	}
 	metadataPath := nativeMetadataPath(rootDir, invocation, spec)
 	if err := fsutil.WriteJSON(metadataPath, metadata); err != nil {
-		return CommandResult{}, "", "", "", "", err
+		return CommandResult{}, "", "", "", nativeArtifacts{}, err
 	}
-	summary := strings.TrimSpace(res.Stdout)
+	summary := strings.TrimSpace(redactRuntimeOutput(res.Stdout))
 	if summary == "" {
-		summary = strings.TrimSpace(res.Stderr)
+		summary = strings.TrimSpace(redactRuntimeOutput(res.Stderr))
 	}
-	return result, summary, spec.ProviderID, spec.ModelID, promptPath, nil
+	artifacts := nativeArtifacts{
+		SessionID:    sessionID,
+		Command:      commandLine,
+		PromptPath:   promptPath,
+		MetadataPath: metadataPath,
+		StdoutPath:   stdoutPath,
+		StderrPath:   stderrPath,
+	}
+	return result, summary, spec.ProviderID, spec.ModelID, artifacts, nil
 }
 
 func writePromptFile(rootDir string, invocation Invocation) (string, error) {
@@ -277,4 +304,10 @@ func sortedKeys(keys map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func redactRuntimeOutput(value string) string {
+	value = runtimeCredentialPattern.ReplaceAllString(value, "$1=[REDACTED]")
+	value = runtimeKeyPattern.ReplaceAllString(value, "sk-[REDACTED]")
+	return value
 }

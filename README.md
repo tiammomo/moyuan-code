@@ -20,7 +20,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - API/State Store 已建立 Gin router 和 GORM SQLite 基线，项目注册会同步 `.moyuan/state.db`。
 - Memory 已具备 record gate、staging、dedup、敏感信息阻断和 compact 自动摘要。
 - Repair 已具备受控 attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
-- 下一批实现重点：Phase 2 `native-runtime-session-recovery`，随后进入 Subagent 调度深化和 `gpt-image-2` diagram pipeline。
+- 下一批实现重点：Phase 2 `subagent-scheduler-retry-archive`，并行准备 `gpt-image-2` diagram pipeline。
 
 ## 本地运行
 
@@ -56,6 +56,7 @@ Web Console 本地端口为 `127.0.0.1:3000`，Go/Gin API 本地端口为 `127.0
 ./bin/moyuan model route --role backend --repo-edit --root /path/to/repo
 ./bin/moyuan model provider add --id minimax-m27-claude --vendor minimax --api-type anthropic-compatible --base-url https://api.minimaxi.com/anthropic --auth-ref env:MINIMAX_API_KEY --runtime claude_cli --model MiniMax-M2.7 --use-case frontend --allow-sensitive-code --allow-project-memory --root /path/to/repo
 ./bin/moyuan runtime invoke claude_cli --provider minimax-m27-claude --prompt "实现前端 issue" --root /path/to/repo
+./bin/moyuan runtime recovery list --root /path/to/repo
 ./bin/moyuan git provider plan phase1-001 --root /path/to/repo
 ./bin/moyuan release suggest --version v0.1.0 --root /path/to/repo
 ./bin/moyuan resources add --id dev-1 --environment test_dev --host 10.0.0.10 --provider local_vm --owner dev --auth-ref env:DEV_SERVER_SSH_KEY --root /path/to/repo

@@ -33,6 +33,7 @@ Adapter 统一解决：
 - 已实现 provider env profile：绑定到 `claude_cli` 或 `codex_cli` 的 provider 可在 Native Runtime 调用时注入 `base_url`、模型名和 `auth_ref` 对应的环境变量；runtime metadata 只记录 `env_keys`，不记录 token 值。
 - 已实现 ops snapshot：provider 可记录 `health`、`quota`、`usage` 和 `cost`，路由会因 `unhealthy/down`、`quota.exhausted`、`cost.exceeded` 给出明确阻断原因。
 - 已实现 task model strategy：`model route --strategy <strategy>` 和 `provider-route` API 可指定 `frontend-first`、`backend-safe`、`low-cost-memory`、`image-diagram`、`planning` 策略。
+- 已实现 Native Runtime recovery：Claude/Codex CLI 失败后会生成 `recovery_id`、`native_session_id`、stdout/stderr 归档、diff summary 引用和 fallback candidate。
 
 `providers.json` 是 Beta 运行状态快照；后续 schema validator 完成后，再把同字段收敛到 `models/providers.yaml`，并保留 snapshot 用于审计。
 

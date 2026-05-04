@@ -46,6 +46,34 @@
 | `cancelled` | 用户取消 |
 | `failed_final` | 无法恢复，保留失败记录 |
 
+## Native Runtime Recovery 当前实现
+
+Claude CLI 和 Codex CLI 失败后，系统不会直接丢弃上下文，也不会自动绕过门禁切换执行。当前已落地的恢复记录包括：
+
+- `recovery_id` 和 `native_session_id`。
+- runtime、provider、model、run、issue 和 subagent 引用。
+- `failure_category`、`fallback_candidate`、`resume_hint`。
+- prompt、native metadata、stdout、stderr 和 diff summary 路径。
+- changed files、runtime risks 和审计日志。
+
+落盘位置：
+
+- `.moyuan/runtimes/recoveries/<recovery-id>.json`
+- `.moyuan/runtimes/recoveries/events.jsonl`
+- `.moyuan/runtimes/sessions/<session-id>/stdout.txt`
+- `.moyuan/runtimes/sessions/<session-id>/stderr.txt`
+
+查询入口：
+
+- CLI：`moyuan runtime recovery list`、`moyuan runtime recovery show <recovery-id>`。
+- API：`GET /v1/projects/:project_id/runtime-recoveries`、`GET /v1/projects/:project_id/runtime-recoveries/:recovery_id`。
+
+限制：
+
+- 当前不自动执行真实 resume。
+- 当前不自动切换 fallback runtime。
+- Recovery 只能把失败上下文带回调度器，后续仍必须经过 quality gate、review 和合入策略。
+
 ## 用户与鉴权失败
 
 触发条件：

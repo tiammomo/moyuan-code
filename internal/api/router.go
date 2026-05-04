@@ -19,6 +19,7 @@ import (
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
 	"moyuan-code/internal/review"
+	runtimemgr "moyuan-code/internal/runtime"
 	"moyuan-code/internal/scheduler"
 	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/skills"
@@ -205,6 +206,44 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"run": state})
+	})
+	router.GET("/v1/projects/:project_id/runtime-recoveries", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		records, err := runtimemgr.ListRecoveries(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"runtime_recoveries": records})
+	})
+	router.GET("/v1/projects/:project_id/runtime-recoveries/:recovery_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		record, found, err := runtimemgr.LoadRecovery(rootDir, c.Param("recovery_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "runtime recovery not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"runtime_recovery": record})
 	})
 	router.GET("/v1/projects/:project_id/subagents", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

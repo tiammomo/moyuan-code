@@ -776,6 +776,21 @@ func TestNativeRuntimeAdaptersClassifyUnavailableAndFailedCLI(t *testing.T) {
 	}
 	assertContains(t, failed.stdout, "runtime_failed")
 	assertContains(t, failed.stdout, "codex failed")
+	assertContains(t, failed.stdout, `"recovery_id"`)
+	assertContains(t, failed.stdout, `"native_session_id"`)
+
+	recoveryID := decodeStringField(t, failed.stdout, "recovery_id")
+	recovery := runCLI(t, root, "runtime", "recovery", "show", recoveryID)
+	assertContains(t, recovery.stdout, `"failure_category": "runtime_failed"`)
+	assertContains(t, recovery.stdout, `"fallback_candidate": "claude_cli"`)
+	assertContains(t, recovery.stdout, `"stdout_path"`)
+	assertContains(t, recovery.stdout, `"stderr_path"`)
+
+	recoveries := runCLI(t, root, "runtime", "recovery", "list", "--limit", "1")
+	assertContains(t, recoveries.stdout, recoveryID)
+	assertGlob(t, root, ".moyuan/runtimes/sessions/*/stderr.txt")
+	assertFileContains(t, root, ".moyuan/runtimes/recoveries/events.jsonl", recoveryID)
+	assertFileContains(t, root, ".moyuan/logs/run.jsonl", "runtime.recovery.archived")
 }
 
 type qualityReport struct {

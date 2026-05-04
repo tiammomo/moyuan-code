@@ -68,6 +68,7 @@ type Result struct {
 	RuntimeSignals   []string               `json:"runtime_signals"`
 	MemoryCandidates []string               `json:"memory_candidates"`
 	NativeSessionID  string                 `json:"native_session_id,omitempty"`
+	RecoveryID       string                 `json:"recovery_id,omitempty"`
 	CreatedAt        string                 `json:"created_at"`
 }
 
@@ -121,17 +122,28 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 	summary := "runtime invocation recorded"
 	commands := []CommandResult{}
 	risks := []string{}
+	failureCategory := ""
+	nativeArtifacts := nativeArtifacts{}
 	command := commandFor(invocation.RuntimeID)
 	if command == "" {
 		status = "failed"
 		risks = appendRisk(risks, "unknown runtime")
+		if isNativeRuntime(invocation.RuntimeID) {
+			failureCategory = "runtime_unavailable"
+		}
 	} else if _, err := exec.LookPath(command); err != nil {
 		status = "failed"
 		risks = appendRisk(risks, "runtime_unavailable: "+command)
+		if isNativeRuntime(invocation.RuntimeID) {
+			failureCategory = "runtime_unavailable"
+		}
 	} else if before.UserDirty {
 		status = "blocked"
 		summary = "runtime blocked because worktree has pre-existing user changes"
 		risks = appendRisk(risks, "pre_existing_dirty_worktree")
+		if isNativeRuntime(invocation.RuntimeID) {
+			failureCategory = "pre_existing_dirty_worktree"
+		}
 	} else if invocation.RuntimeID == "local_shell" && strings.TrimSpace(invocation.Prompt) != "" {
 		res := process.RunShell(ctx, invocation.WorktreePath, invocation.Prompt)
 		cmdStatus := "passed"
@@ -145,13 +157,15 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 			summary = strings.TrimSpace(res.Stderr)
 		}
 	} else if isNativeRuntime(invocation.RuntimeID) {
-		cmd, nativeSummary, nativeProviderID, nativeModelID, _, err := runNativeCLI(ctx, rootDir, invocation, command)
+		cmd, nativeSummary, nativeProviderID, nativeModelID, artifacts, err := runNativeCLI(ctx, rootDir, invocation, command)
 		if err != nil {
 			return Result{}, err
 		}
+		nativeArtifacts = artifacts
 		if cmd.Status == "failed" {
 			status = "failed"
 			risks = appendRisk(risks, "runtime_failed")
+			failureCategory = "runtime_failed"
 		}
 		commands = append(commands, cmd)
 		summary = nativeSummary
@@ -183,6 +197,9 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 			status = "blocked"
 			summary = "runtime changed protected paths"
 		}
+		if isNativeRuntime(invocation.RuntimeID) && failureCategory == "" {
+			failureCategory = "protected_paths_changed"
+		}
 	}
 	result := Result{
 		RunID:            invocation.RunID,
@@ -202,7 +219,18 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 		Risks:            risks,
 		RuntimeSignals:   []string{},
 		MemoryCandidates: []string{},
+		NativeSessionID:  nativeArtifacts.SessionID,
 		CreatedAt:        time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if isNativeRuntime(invocation.RuntimeID) && result.Status != "completed" {
+		recovery, err := recordNativeRecovery(rootDir, invocation, result, nativeArtifacts, failureCategory)
+		if err != nil {
+			return Result{}, err
+		}
+		result.RecoveryID = recovery.ID
+		if result.NativeSessionID == "" {
+			result.NativeSessionID = recovery.NativeSessionID
+		}
 	}
 	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(rootDir).RuntimeDir, invocation.RunID+"-"+invocation.RuntimeID+".json"), result); err != nil {
 		return Result{}, err

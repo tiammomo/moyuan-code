@@ -96,6 +96,7 @@ interface RuntimeResult {
   }>;
   memory_candidates: string[];
   native_session_id?: string;
+  recovery_id?: string;
   env_keys?: string[];
 }
 ```
@@ -106,6 +107,39 @@ Provider env profile 规则：
 - `provider_id` 指向 Provider Registry；`auth_ref` 在执行前解析为子进程环境变量，结果文件和日志只记录 `env_keys`。
 - `claude_cli` 可注入 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN` 和模型相关变量，用于 MiniMax-M2.7 等 Anthropic-compatible provider。
 - Runtime Adapter 不负责决定代码是否可合入，所有 diff 必须回到质量门禁和 review。
+
+Native Runtime recovery 输出：
+
+```ts
+interface RuntimeRecovery {
+  id: string;
+  run_id: string;
+  subagent_id?: string;
+  issue_id?: string;
+  runtime_id: "claude_cli" | "codex_cli";
+  provider_id?: string;
+  model_id?: string;
+  native_session_id: string;
+  status: "archived" | "blocked";
+  failure_category:
+    | "runtime_failed"
+    | "runtime_unavailable"
+    | "pre_existing_dirty_worktree"
+    | "protected_paths_changed"
+    | "diff_unavailable";
+  fallback_candidate?: "claude_cli" | "codex_cli";
+  resume_hint: string;
+  prompt_path?: string;
+  metadata_path?: string;
+  stdout_path?: string;
+  stderr_path?: string;
+  diff_summary_path?: string;
+  changed_files: string[];
+  risks: string[];
+}
+```
+
+当前实现只归档恢复上下文和建议 fallback candidate，不自动执行真实 resume，也不自动切换 runtime。
 
 ## 5. 执行约束
 
@@ -160,6 +194,7 @@ interface RuntimeHealth {
 - command started/completed/failed。
 - diff before/after。
 - native session id。
+- recovery id。
 - fallback decision。
 - permission denied。
 
@@ -179,3 +214,4 @@ interface RuntimeHealth {
 - Runtime 输出缺少 changed files 时返回 `invalid_output`。
 - Runtime 完成后必须进入质量门禁。
 - Runtime 不允许直接 push。
+- Native Runtime 失败后能通过 CLI/API 查询 recovery 记录、stdout/stderr、diff summary 和 fallback candidate。

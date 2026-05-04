@@ -30,7 +30,7 @@
 | `phase2-004` | `skill-effectiveness-feedback` | completed | 记录 skill 对质量、返工、耗时和 review 的影响 | `phase2-003` | `qa_owner` | Skill 效果能影响后续推荐、降权和禁用 |
 | `phase2-005` | `provider-health-quota-usage` | completed | Provider 健康、额度、用量、成本、第三方标识和数据策略扩展 | `beta-006` | `adapter_owner` | Provider 可展示可用性、额度风险和路由阻断原因 |
 | `phase2-006` | `task-model-strategy-switch` | completed | 同一任务按策略切换模型、Runtime 和 fallback | `phase2-005` | `orchestrator_owner` | 同一 issue 可审计地切换模型策略且不绕过质量门禁 |
-| `phase2-007` | `native-runtime-session-recovery` | planned | Claude CLI/Codex CLI session resume、失败降级、diff capture 增强 | `beta-015`,`phase2-006` | `runtime_owner` | CLI runtime 失败后可恢复、归档或安全降级 |
+| `phase2-007` | `native-runtime-session-recovery` | completed | Claude CLI/Codex CLI session resume、失败降级、diff capture 增强 | `beta-015`,`phase2-006` | `runtime_owner` | CLI runtime 失败后可恢复、归档或安全降级 |
 | `phase2-008` | `gpt-image-2-diagram-pipeline` | planned | 架构图/流程图/部署拓扑图的 diagram spec、讲解文档和资产索引 | `phase2-005` | `visualization_owner` | 可读取项目理解和 Issue Graph 生成可追踪图像资产 |
 | `phase2-009` | `subagent-scheduler-retry-archive` | planned | Subagent 调度、重试、归档、输出收敛和审计增强 | `phase2-003`,`phase2-007` | `orchestrator_owner` | Subagent 可被调度、重试、归档、审计和聚合输出 |
 
@@ -45,7 +45,7 @@
 
 ## 5. 当前执行入口
 
-下一步执行 `phase2-007 native-runtime-session-recovery`。
+下一步执行 `phase2-009 subagent-scheduler-retry-archive`。
 
 实现边界：
 

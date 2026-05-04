@@ -155,6 +155,8 @@ func usage() string {
 		"moyuan quality policy",
 		"moyuan runtime health <runtime-id>",
 		"moyuan runtime invoke <runtime-id> --prompt <command> [--provider <provider-id>] [--model <model-id>]",
+		"moyuan runtime recovery list [--limit 20]",
+		"moyuan runtime recovery show <recovery-id>",
 		"moyuan orchestrator plan <epic-id>",
 		"moyuan orchestrator run <issue-id> [--role backend] [--runtime local_shell] [--provider <provider-id>] [--prompt <command>]",
 		"moyuan orchestrator run list [--limit 20]",
@@ -623,6 +625,28 @@ func handleRuntime(ctx context.Context, args []string, cwd string) (string, any,
 			code = 1
 		}
 		return "", result, code, nil
+	case "recovery":
+		if len(args) >= 2 && args[1] == "list" {
+			records, err := runtime.ListRecoveries(rootDir, flagInt(args, "--limit", 20))
+			return "", records, 0, err
+		}
+		recoveryID := ""
+		if len(args) >= 3 && args[1] == "show" {
+			recoveryID = args[2]
+		} else if len(args) >= 2 {
+			recoveryID = args[1]
+		}
+		if recoveryID == "" {
+			return "missing recovery id\n", nil, 1, nil
+		}
+		record, ok, err := runtime.LoadRecovery(rootDir, recoveryID)
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", record, 0, nil
 	}
 	return "unknown runtime command\n", nil, 1, nil
 }
