@@ -3,6 +3,7 @@ import { demoSnapshot } from "./demo-data";
 import type {
   ConsoleSnapshot,
   AuditEventSummary,
+  ApprovalRecordSummary,
   DeploymentExecutionSummary,
   DeploymentSummary,
   IssueNode,
@@ -69,6 +70,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     qualityReportsResponse,
     memoryResponse,
     auditEventsResponse,
+    approvalsResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
     apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: unknown[]; waiting_queue?: unknown[]; subagent_backlog?: unknown[] } }>>(
@@ -86,6 +88,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ quality_reports: unknown[] }>>(`/projects/${project.id}/quality-reports?limit=8`),
     apiGet<ApiEnvelope<{ candidates: unknown[] }>>(`/projects/${project.id}/memory/candidates?limit=3`),
     apiGet<ApiEnvelope<{ audit_events: unknown[] }>>(`/projects/${project.id}/audit-events?channel=all&limit=10`),
+    apiGet<ApiEnvelope<{ approvals: unknown[] }>>(`/projects/${project.id}/approvals?limit=6`),
   ]);
 
   const schedule = [
@@ -104,6 +107,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const visualRenderExecutions = normalizeVisualRenderExecutions(visualRenderExecutionsResponse?.visual_render_executions ?? []);
   const qualityReports = normalizeQualityReports(qualityReportsResponse?.quality_reports ?? []);
   const auditEvents = normalizeAuditEvents(auditEventsResponse?.audit_events ?? []);
+  const approvals = normalizeApprovals(approvalsResponse?.approvals ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
   const timeline = liveTimeline(runs, executions, deployments);
@@ -140,6 +144,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     visual_assets: visualAssets,
     visual_render_executions: visualRenderExecutions,
     quality_explanations: qualityExplanations,
+    approvals,
     audit_events: auditEvents,
     timeline: timeline.length > 0 ? timeline : demoSnapshot.timeline,
     quality: qualitySignals.length > 0 ? qualitySignals : demoSnapshot.quality,
@@ -428,6 +433,24 @@ function normalizeAuditEvents(rawEvents: unknown[]): AuditEventSummary[] {
     status: readString(raw, "status", ""),
     decision: readString(raw, "decision", ""),
     reason: readString(raw, "reason", ""),
+  }));
+}
+
+function normalizeApprovals(rawApprovals: unknown[]): ApprovalRecordSummary[] {
+  return rawApprovals.map((raw, index) => ({
+    id: readString(raw, "id", `approval-${index + 1}`),
+    target_type: readString(raw, "target_type", "unknown"),
+    target_id: readString(raw, "target_id", ""),
+    action: readString(raw, "action", "unknown.action"),
+    risk_level: readString(raw, "risk_level", "high"),
+    status: readString(raw, "status", "pending"),
+    decision: readString(raw, "decision", "APPROVAL_PENDING"),
+    requested_by: readString(raw, "requested_by", "system"),
+    request_reason: readString(raw, "request_reason", ""),
+    decided_by: readString(raw, "decided_by", ""),
+    decision_reason: readString(raw, "decision_reason", ""),
+    requested_at: readString(raw, "requested_at", ""),
+    decided_at: readString(raw, "decided_at", ""),
   }));
 }
 

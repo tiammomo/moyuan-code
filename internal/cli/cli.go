@@ -181,7 +181,7 @@ func usage() string {
 		"moyuan model provider list",
 		"moyuan model provider show <provider>",
 		"moyuan model provider ops <provider> [--health ok] [--quota-status ok] [--used-tokens 1000]",
-		"moyuan model provider refresh [--provider <provider>] [--include-disabled] [--probe] [--probe-timeout-ms 3000]",
+		"moyuan model provider refresh [--provider <provider>] [--include-disabled] [--probe] [--approved] [--probe-timeout-ms 3000]",
 		"moyuan model provider disable <provider>",
 		"moyuan model route [--role <role>] [--strategy low-cost-memory] [--task-type <type>] [--output-type <type>] [--repo-edit]",
 		"moyuan visuals diagram plan [--type architecture] [--title <title>] [--scope <text>]",
@@ -1036,6 +1036,7 @@ func handleModelProvider(args []string, rootDir string) (string, any, int, error
 			IncludeDisabled: hasFlag(args, "--include-disabled"),
 			Probe:           hasFlag(args, "--probe"),
 			ProbeTimeoutMS:  flagInt(args, "--probe-timeout-ms", 0),
+			Approved:        hasFlag(args, "--approved"),
 		})
 		return "", result, 0, err
 	case "disable":

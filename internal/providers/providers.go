@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/workspace"
@@ -107,6 +108,7 @@ type OpsRefreshOptions struct {
 	IncludeDisabled bool   `json:"include_disabled,omitempty"`
 	Probe           bool   `json:"probe,omitempty"`
 	ProbeTimeoutMS  int    `json:"probe_timeout_ms,omitempty"`
+	Approved        bool   `json:"approved,omitempty"`
 }
 
 type OpsRefreshResult struct {
@@ -116,6 +118,7 @@ type OpsRefreshResult struct {
 	Decisions  []OpsRefreshDecision `json:"decisions"`
 	Providers  []Provider           `json:"providers"`
 	ProviderID string               `json:"provider_id,omitempty"`
+	ApprovalID string               `json:"approval_id,omitempty"`
 }
 
 type OpsRefreshDecision struct {
@@ -337,6 +340,35 @@ func RefreshOps(rootDir string, options OpsRefreshOptions) (OpsRefreshResult, er
 		Providers:  []Provider{},
 		ProviderID: options.ProviderID,
 	}
+	if options.Probe && !options.Approved {
+		targetID := options.ProviderID
+		if targetID == "" {
+			targetID = "all"
+		}
+		approval, err := approvals.Request(rootDir, approvals.RequestOptions{
+			TargetType:  "provider_ops",
+			TargetID:    targetID,
+			Action:      "provider.probe",
+			RiskLevel:   "high",
+			RequestedBy: "system",
+			Reason:      "provider probe can call external model provider endpoints",
+			Metadata: map[string]any{
+				"provider_id": options.ProviderID,
+			},
+		})
+		if err != nil {
+			return OpsRefreshResult{}, err
+		}
+		result.ApprovalID = approval.ID
+		result.Skipped = countRefreshTargets(registry, options.ProviderID)
+		result.Decisions = append(result.Decisions, OpsRefreshDecision{ProviderID: targetID, Status: "blocked", Reason: "provider_probe_approval_required"})
+		_ = logging.Log(rootDir, "audit", "provider.ops.refresh.blocked", map[string]any{
+			"provider_id": options.ProviderID,
+			"approval_id": approval.ID,
+			"probe":       options.Probe,
+		})
+		return result, nil
+	}
 	for _, provider := range registry.Providers {
 		if options.ProviderID != "" && provider.ID != options.ProviderID {
 			continue
@@ -379,6 +411,16 @@ func RefreshOps(rootDir string, options OpsRefreshOptions) (OpsRefreshResult, er
 		"probe":       options.Probe,
 	})
 	return result, nil
+}
+
+func countRefreshTargets(registry Registry, providerID string) int {
+	count := 0
+	for _, provider := range registry.Providers {
+		if providerID == "" || provider.ID == providerID {
+			count++
+		}
+	}
+	return count
 }
 
 func Route(rootDir string, request RouteRequest) (RouteDecision, error) {

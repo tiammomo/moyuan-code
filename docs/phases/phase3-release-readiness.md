@@ -72,8 +72,10 @@ Provider：
 
 ```bash
 moyuan model provider refresh --probe
-moyuan model provider refresh --provider <provider-id> --probe --probe-timeout-ms 1500
+moyuan model provider refresh --provider <provider-id> --probe --approved --probe-timeout-ms 1500
 ```
+
+Phase 4 起，`--probe` 未带 `--approved` 时不会外呼上游，会生成 approval record。
 
 Visual：
 

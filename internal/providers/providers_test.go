@@ -296,7 +296,15 @@ func TestProviderOpsRefreshCanRunOptionalHTTPProbe(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := RefreshOps(root, OpsRefreshOptions{ProviderID: "glm-probe", Probe: true, ProbeTimeoutMS: 1000})
+	blocked, err := RefreshOps(root, OpsRefreshOptions{ProviderID: "glm-probe", Probe: true, ProbeTimeoutMS: 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blocked.Updated != 0 || blocked.ApprovalID == "" || blocked.Decisions[0].Reason != "provider_probe_approval_required" || probeHits != 0 {
+		t.Fatalf("expected unapproved probe to request approval without hitting upstream: hits=%d result=%+v", probeHits, blocked)
+	}
+
+	result, err := RefreshOps(root, OpsRefreshOptions{ProviderID: "glm-probe", Probe: true, ProbeTimeoutMS: 1000, Approved: true})
 	if err != nil {
 		t.Fatal(err)
 	}

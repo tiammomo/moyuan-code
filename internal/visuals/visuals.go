@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/process"
@@ -105,6 +106,7 @@ type RenderExecution struct {
 	ScriptPath       string         `json:"script_path,omitempty"`
 	AuthRef          string         `json:"auth_ref,omitempty"`
 	EnvKeys          []string       `json:"env_keys,omitempty"`
+	ApprovalID       string         `json:"approval_id,omitempty"`
 	Quality          *RenderQuality `json:"quality,omitempty"`
 	PreviewIndexPath string         `json:"preview_index_path,omitempty"`
 	Steps            []RenderStep   `json:"steps"`
@@ -327,6 +329,23 @@ func RenderAsset(ctx context.Context, rootDir string, options RenderOptions) (Re
 	case "script":
 		if !options.Approved {
 			execution.Reasons = append(execution.Reasons, "visual_render_approval_required")
+			approval, err := approvals.Request(rootDir, approvals.RequestOptions{
+				TargetType:  "visual_render",
+				TargetID:    execution.ID,
+				Action:      "visual.render.script",
+				RiskLevel:   "high",
+				RequestedBy: "system",
+				Reason:      "script render requires approval before image API credential injection",
+				Metadata: map[string]any{
+					"asset_id":    execution.AssetID,
+					"provider_id": execution.ProviderID,
+					"model_id":    execution.ModelID,
+				},
+			})
+			if err != nil {
+				return RenderExecution{}, err
+			}
+			execution.ApprovalID = approval.ID
 			return finishRenderExecution(rootDir, execution)
 		}
 		if asset.Status == "route_blocked" {

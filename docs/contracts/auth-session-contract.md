@@ -141,6 +141,51 @@ export interface AuthProvider {
 - `revokeSession` 和 `revokeApiToken` 必须使后续请求立即失效。
 - API Server、CLI 和 Orchestrator 不能各自实现分叉鉴权逻辑，必须调用同一契约。
 
+## 3.1 当前 Approval Record 接口
+
+Phase 4 第一批已提供 approval record store/API，作为后续团队鉴权和 approver role 校验的落点：
+
+```http
+GET /v1/projects/:project_id/approvals?status=pending&limit=20
+POST /v1/projects/:project_id/approvals
+GET /v1/projects/:project_id/approvals/:approval_id
+POST /v1/projects/:project_id/approvals/:approval_id/decide
+```
+
+审批记录结构：
+
+```ts
+interface ApprovalRecord {
+  id: string;
+  target_type: string;
+  target_id: string;
+  action: string;
+  risk_level: "low" | "medium" | "high" | "critical";
+  status: "pending" | "approved" | "rejected";
+  decision: "APPROVAL_PENDING" | "APPROVAL_APPROVED" | "APPROVAL_REJECTED";
+  requested_by: string;
+  request_reason?: string;
+  decided_by?: string;
+  decision_reason?: string;
+  metadata?: Record<string, unknown>;
+  requested_at: string;
+  decided_at?: string;
+}
+```
+
+当前接入的高风险动作：
+
+- production deployment plan。
+- 非 dry-run deployment execution。
+- Visual script render。
+- Provider probe。
+
+当前边界：
+
+- 已能创建、查询、通过和拒绝 approval record，并写入 audit log。
+- 未实现团队登录、approver role、禁止自审批和审批过期校验；这些进入 `phase4-003 team-auth-session-token-baseline`。
+- 审批 reason/metadata 禁止携带 token、API key、password、secret、credential 和 private key。
+
 ## 4. 错误类型
 
 | 错误 | 含义 |

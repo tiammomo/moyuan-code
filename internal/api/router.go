@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/gitprovider"
@@ -56,6 +57,7 @@ type providerOpsRefreshRequest struct {
 	IncludeDisabled bool   `json:"include_disabled"`
 	Probe           bool   `json:"probe"`
 	ProbeTimeoutMS  int    `json:"probe_timeout_ms"`
+	Approved        bool   `json:"approved"`
 }
 
 type releaseSuggestRequest struct {
@@ -80,6 +82,22 @@ type resourceHealthScanRequest struct {
 	Environment string   `json:"environment"`
 	ResourceIDs []string `json:"resource_ids"`
 	Approved    bool     `json:"approved"`
+}
+
+type approvalRequest struct {
+	TargetType  string         `json:"target_type"`
+	TargetID    string         `json:"target_id"`
+	Action      string         `json:"action"`
+	RiskLevel   string         `json:"risk_level"`
+	RequestedBy string         `json:"requested_by"`
+	Reason      string         `json:"reason"`
+	Metadata    map[string]any `json:"metadata"`
+}
+
+type approvalDecisionRequest struct {
+	Decision  string `json:"decision"`
+	DecidedBy string `json:"decided_by"`
+	Reason    string `json:"reason"`
 }
 
 type visualDiagramPlanRequest struct {
@@ -258,6 +276,112 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"audit_events": events})
+	})
+	router.GET("/v1/projects/:project_id/approvals", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		records, err := approvals.List(rootDir, approvals.ListOptions{Status: c.Query("status"), Limit: queryLimit(c, 20)})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"approvals": records})
+	})
+	router.POST("/v1/projects/:project_id/approvals", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req approvalRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		record, err := approvals.Request(rootDir, approvals.RequestOptions{
+			TargetType:  req.TargetType,
+			TargetID:    req.TargetID,
+			Action:      req.Action,
+			RiskLevel:   req.RiskLevel,
+			RequestedBy: req.RequestedBy,
+			Reason:      req.Reason,
+			Metadata:    req.Metadata,
+		})
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"approval": record})
+	})
+	router.GET("/v1/projects/:project_id/approvals/:approval_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		record, found, err := approvals.Load(rootDir, c.Param("approval_id"))
+		if err != nil {
+			if approvals.IsInvalidIDError(err) {
+				writeError(c, http.StatusBadRequest, err.Error())
+				return
+			}
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "approval not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"approval": record})
+	})
+	router.POST("/v1/projects/:project_id/approvals/:approval_id/decide", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req approvalDecisionRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		record, found, err := approvals.Decide(rootDir, c.Param("approval_id"), approvals.DecisionOptions{
+			Decision:  req.Decision,
+			DecidedBy: req.DecidedBy,
+			Reason:    req.Reason,
+		})
+		if err != nil {
+			if approvals.IsInvalidIDError(err) {
+				writeError(c, http.StatusBadRequest, err.Error())
+				return
+			}
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "approval not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"approval": record})
 	})
 	router.GET("/v1/projects/:project_id/runtime-recoveries", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
@@ -1042,6 +1166,7 @@ func NewRouter(options Options) *gin.Engine {
 			IncludeDisabled: req.IncludeDisabled,
 			Probe:           req.Probe,
 			ProbeTimeoutMS:  req.ProbeTimeoutMS,
+			Approved:        req.Approved,
 		})
 		if err != nil {
 			writeError(c, http.StatusInternalServerError, err.Error())

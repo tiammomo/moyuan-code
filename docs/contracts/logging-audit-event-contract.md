@@ -69,6 +69,7 @@ interface StateChangedEvent extends LogEvent {
 - role changed。
 - auth decision allow/deny/require approval。
 - approval requested/granted/rejected。
+- `approval.requested`、`approval.decided`。
 - protected path access denied。
 - secret access requested/granted/denied。
 - high risk command blocked。

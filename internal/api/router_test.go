@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/auth"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/fsutil"
@@ -159,6 +160,11 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/runs/"+result.RunID, http.StatusOK, `"run"`, `"completed"`)
 	assertGETContains(t, router, "/v1/projects/managed/audit-events?channel=audit&limit=20", http.StatusOK, `"audit_events"`, `"channel":"audit"`, `"auth.owner.initialized"`)
 	assertGETContains(t, router, "/v1/projects/managed/audit-events?channel=../audit", http.StatusBadRequest, `"invalid_log_stream"`)
+	approval := assertPostApproval(t, router, "/v1/projects/managed/approvals", `{"target_type":"deployment","target_id":"deployment-api","action":"deploy.production","risk_level":"critical","requested_by":"owner","reason":"production gate"}`, http.StatusCreated)
+	assertGETContains(t, router, "/v1/projects/managed/approvals?status=pending", http.StatusOK, `"approvals"`, approval.ID, `"APPROVAL_PENDING"`)
+	assertGETContains(t, router, "/v1/projects/managed/approvals/"+approval.ID, http.StatusOK, `"approval"`, `"deploy.production"`)
+	assertPostContains(t, router, "/v1/projects/managed/approvals/"+approval.ID+"/decide", `{"decision":"approved","decided_by":"reviewer","reason":"release gates passed"}`, http.StatusOK, `"approval"`, `"APPROVAL_APPROVED"`)
+	assertPostContains(t, router, "/v1/projects/managed/approvals", `{"target_type":"provider","target_id":"glm-api","action":"provider.probe","reason":"token=plain"}`, http.StatusBadRequest, `"approval_payload_must_not_contain_secret"`)
 	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries?limit=1", http.StatusOK, `"runtime_recoveries"`, recoveryResult.RecoveryID, `"runtime_failed"`)
 	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries/"+recoveryResult.RecoveryID, http.StatusOK, `"runtime_recovery"`, `"fallback_candidate"`)
 	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries/"+recoveryResult.RecoveryID+"/artifacts", http.StatusOK, `"runtime_recovery_artifacts"`, `"stderr"`, "api codex failed")
@@ -306,6 +312,27 @@ func assertPostContains(t *testing.T, router http.Handler, path string, body str
 			t.Fatalf("POST %s missing %q in body=%s", path, value, recorder.Body.String())
 		}
 	}
+}
+
+func assertPostApproval(t *testing.T, router http.Handler, path string, body string, status int) approvals.Record {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != status {
+		t.Fatalf("POST %s status = %d body=%s", path, recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		Approval approvals.Record `json:"approval"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode approval response failed: %v body=%s", err, recorder.Body.String())
+	}
+	if payload.Approval.ID == "" {
+		t.Fatalf("approval response missing id: %s", recorder.Body.String())
+	}
+	return payload.Approval
 }
 
 func initGitRepo(t *testing.T, root string) {

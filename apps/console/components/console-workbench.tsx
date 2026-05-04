@@ -698,6 +698,32 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
 
         <section className="auditGrid">
           <div className="panel">
+            <PanelTitle icon={<Lock size={18} />} title="Approval Queue" meta={`${snapshot.approvals.length} records`} />
+            <div className="signalList">
+              {snapshot.approvals.length > 0 ? (
+                snapshot.approvals.map((approval) => (
+                  <div className="signalItem" key={approval.id}>
+                    <div className="signalHeader">
+                      <strong>{approval.action}</strong>
+                      <StatusPill tone={toneForStatus(approval.status)} label={approval.status} />
+                    </div>
+                    <span>
+                      {approval.target_type} / {compactID(approval.target_id)}
+                    </span>
+                    <div className="signalMeta">
+                      <code>{approval.risk_level}</code>
+                      <code>{approval.decision}</code>
+                      <code>{shortTimestamp(approval.requested_at)}</code>
+                    </div>
+                    <small>{approval.request_reason || approval.decision_reason || `requested by ${approval.requested_by}`}</small>
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No approval records</div>
+              )}
+            </div>
+          </div>
+          <div className="panel">
             <PanelTitle icon={<ScrollText size={18} />} title="Audit Trail" meta={`${snapshot.audit_events.length} core events`} />
             <div className="signalList auditList">
               {snapshot.audit_events.length > 0 ? (

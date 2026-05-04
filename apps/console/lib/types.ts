@@ -267,6 +267,22 @@ export type AuditEventSummary = {
   reason?: string;
 };
 
+export type ApprovalRecordSummary = {
+  id: string;
+  target_type: string;
+  target_id: string;
+  action: string;
+  risk_level: string;
+  status: string;
+  decision: string;
+  requested_by: string;
+  request_reason?: string;
+  decided_by?: string;
+  decision_reason?: string;
+  requested_at?: string;
+  decided_at?: string;
+};
+
 export type ConsoleSnapshot = {
   mode: "live" | "demo";
   backendStatus: StatusTone;
@@ -298,6 +314,7 @@ export type ConsoleSnapshot = {
   visual_assets: VisualAssetSummary[];
   visual_render_executions: VisualRenderExecutionSummary[];
   quality_explanations: QualityExplanation[];
+  approvals: ApprovalRecordSummary[];
   audit_events: AuditEventSummary[];
   timeline: TimelineEvent[];
   quality: QualitySignal[];

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/process"
@@ -37,6 +38,7 @@ type Plan struct {
 	MonitorPlan    StepPlan          `json:"monitor_plan"`
 	RollbackPlan   StepPlan          `json:"rollback_plan"`
 	ManualRequired bool              `json:"manual_required"`
+	ApprovalID     string            `json:"approval_id,omitempty"`
 	CreatedAt      string            `json:"created_at"`
 }
 
@@ -72,6 +74,7 @@ type Execution struct {
 	Reasons      []string          `json:"reasons"`
 	Resources    []ResourceSummary `json:"resources"`
 	Steps        []ExecutionStep   `json:"steps"`
+	ApprovalID   string            `json:"approval_id,omitempty"`
 	StartedAt    string            `json:"started_at"`
 	FinishedAt   string            `json:"finished_at,omitempty"`
 }
@@ -148,6 +151,22 @@ func CreatePlan(rootDir string, options PlanOptions) (Plan, error) {
 	if options.Environment == "production" && !options.Approved {
 		plan.ManualRequired = true
 		plan.Reasons = append(plan.Reasons, "production_approval_required")
+		approval, err := approvals.Request(rootDir, approvals.RequestOptions{
+			TargetType:  "deployment_plan",
+			TargetID:    plan.ID,
+			Action:      "deploy.production.plan",
+			RiskLevel:   "critical",
+			RequestedBy: "system",
+			Reason:      "production deployment plan requires approval",
+			Metadata: map[string]any{
+				"release_id":  plan.ReleaseID,
+				"environment": plan.Environment,
+			},
+		})
+		if err != nil {
+			return Plan{}, err
+		}
+		plan.ApprovalID = approval.ID
 		return finish(rootDir, plan)
 	}
 	plan.Status = "planned"
@@ -242,6 +261,24 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 	}
 	if options.Mode != "dry_run" && !options.Approved {
 		execution.Reasons = append(execution.Reasons, "execution_approval_required")
+		approval, err := approvals.Request(rootDir, approvals.RequestOptions{
+			TargetType:  "deployment_execution",
+			TargetID:    execution.ID,
+			Action:      "deploy.execute." + options.Mode,
+			RiskLevel:   riskForExecution(plan.Environment),
+			RequestedBy: "system",
+			Reason:      "non dry-run deployment execution requires approval",
+			Metadata: map[string]any{
+				"deployment_id": execution.DeploymentID,
+				"release_id":    execution.ReleaseID,
+				"environment":   execution.Environment,
+				"mode":          execution.Mode,
+			},
+		})
+		if err != nil {
+			return Execution{}, err
+		}
+		execution.ApprovalID = approval.ID
 		return finishExecution(rootDir, execution)
 	}
 	if plan.Environment == "production" && options.Mode != "dry_run" {
@@ -410,6 +447,13 @@ func normalizeCommands(values []string) []string {
 func normalizeToken(value string) string {
 	value = strings.TrimSpace(strings.ToLower(value))
 	return strings.ReplaceAll(value, "-", "_")
+}
+
+func riskForExecution(environment string) string {
+	if environment == "production" {
+		return "critical"
+	}
+	return "high"
 }
 
 func dryRunSteps(plan Plan, commands []string) []ExecutionStep {
