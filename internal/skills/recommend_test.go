@@ -44,10 +44,57 @@ func TestRecommendScoresEnabledCompatibleSkillsAndSkipsDisabled(t *testing.T) {
 	if len(candidate.Reasons) == 0 || candidate.Reasons[0] != "enabled_skill" {
 		t.Fatalf("missing reasons: %+v", candidate)
 	}
-	assertFileContains(t, filepath.Join(root, ".moyuan/skills/recommendations.jsonl"), report.ID)
+	assertRecommendFileContains(t, filepath.Join(root, ".moyuan/skills/recommendations.jsonl"), report.ID)
 }
 
-func assertFileContains(t *testing.T, path string, expected string) {
+func TestRecommendUsesEffectivenessSignals(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Upsert(root, Definition{
+		ID:              "tdd",
+		Source:          "github:mattpocock/skills",
+		Enabled:         true,
+		RiskLevel:       "low",
+		CompatibleRoles: []string{"backend"},
+		Tags:            []string{"quality"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := Recommend(root, RecommendOptions{Role: "backend", TaskType: "quality", RiskLevel: "medium"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(before.Candidates) != 1 {
+		t.Fatalf("expected one recommendation, got %+v", before)
+	}
+
+	if _, err := RecordEffectiveness(root, Effectiveness{
+		SkillID:       "tdd",
+		IssueID:       "phase1-001",
+		Outcome:       "helped",
+		QualityImpact: "improved",
+		ReworkReduced: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	after, err := Recommend(root, RecommendOptions{Role: "backend", TaskType: "quality", RiskLevel: "medium"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after.Candidates) != 1 {
+		t.Fatalf("expected one recommendation after effectiveness, got %+v", after)
+	}
+	if after.Candidates[0].Score <= before.Candidates[0].Score {
+		t.Fatalf("expected effectiveness to increase score: before=%+v after=%+v", before.Candidates[0], after.Candidates[0])
+	}
+	if !contains(after.Candidates[0].Reasons, "effectiveness_helped") || !contains(after.Candidates[0].Reasons, "quality_improved") || !contains(after.Candidates[0].Reasons, "rework_reduced") {
+		t.Fatalf("expected effectiveness reasons, got %+v", after.Candidates[0])
+	}
+}
+
+func assertRecommendFileContains(t *testing.T, path string, expected string) {
 	t.Helper()
 	content, found, err := fsutil.ReadText(path)
 	if err != nil {

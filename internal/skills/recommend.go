@@ -67,7 +67,7 @@ func Recommend(rootDir string, options RecommendOptions) (RecommendationReport, 
 		if !skill.Enabled {
 			continue
 		}
-		candidate, ok := scoreCandidate(skill, options)
+		candidate, ok := scoreCandidate(rootDir, skill, options)
 		if ok {
 			report.Candidates = append(report.Candidates, candidate)
 		}
@@ -88,7 +88,7 @@ func Recommend(rootDir string, options RecommendOptions) (RecommendationReport, 
 	return report, nil
 }
 
-func scoreCandidate(skill Definition, options RecommendOptions) (RecommendationCandidate, bool) {
+func scoreCandidate(rootDir string, skill Definition, options RecommendOptions) (RecommendationCandidate, bool) {
 	score := 0.35
 	reasons := []string{"enabled_skill"}
 	risks := []string{}
@@ -121,6 +121,10 @@ func scoreCandidate(skill Definition, options RecommendOptions) (RecommendationC
 	if len(skill.RequiredTools) > 0 {
 		reasons = append(reasons, "requires_tools")
 	}
+	adjustment, effectivenessReasons, effectivenessRisks := effectivenessAdjustment(rootDir, skill.ID)
+	score += adjustment
+	reasons = append(reasons, effectivenessReasons...)
+	risks = append(risks, effectivenessRisks...)
 	if score <= 0 {
 		return RecommendationCandidate{}, false
 	}
@@ -135,6 +139,66 @@ func scoreCandidate(skill Definition, options RecommendOptions) (RecommendationC
 		Reasons: reasons,
 		Risks:   risks,
 	}, true
+}
+
+func effectivenessAdjustment(rootDir string, skillID string) (float64, []string, []string) {
+	records, err := ListEffectiveness(rootDir, skillID, 20)
+	if err != nil || len(records) == 0 {
+		return 0, []string{}, []string{}
+	}
+	helped := 0
+	improved := 0
+	reworkReduced := 0
+	harmful := 0
+	worsened := 0
+	blocked := 0
+	for _, record := range records {
+		switch record.Outcome {
+		case "helped":
+			helped++
+		case "harmful":
+			harmful++
+		case "blocked":
+			blocked++
+		}
+		switch record.QualityImpact {
+		case "improved":
+			improved++
+		case "worsened":
+			worsened++
+		}
+		if record.ReworkReduced {
+			reworkReduced++
+		}
+	}
+	score := float64(helped)*0.04 + float64(improved)*0.04 + float64(reworkReduced)*0.03 - float64(harmful)*0.12 - float64(worsened)*0.1 - float64(blocked)*0.05
+	if score > 0.18 {
+		score = 0.18
+	}
+	if score < -0.3 {
+		score = -0.3
+	}
+	reasons := []string{}
+	risks := []string{}
+	if helped > 0 {
+		reasons = append(reasons, "effectiveness_helped")
+	}
+	if improved > 0 {
+		reasons = append(reasons, "quality_improved")
+	}
+	if reworkReduced > 0 {
+		reasons = append(reasons, "rework_reduced")
+	}
+	if harmful > 0 {
+		risks = append(risks, "effectiveness_harmful")
+	}
+	if worsened > 0 {
+		risks = append(risks, "quality_worsened")
+	}
+	if blocked > 0 {
+		risks = append(risks, "effectiveness_blocked")
+	}
+	return score, reasons, risks
 }
 
 func recommendationsPath(rootDir string) string {

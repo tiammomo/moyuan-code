@@ -130,7 +130,7 @@ moyuan visuals renders
 
 优先级建议：
 
-1. Skills 外部 adapter 接入和 recommendation score 与 effectiveness 闭环。
+1. Skills 外部 `find-skills` adapter 接入。
 2. Console 深化日志流、diff 展开、visual asset 图片预览和人工审批动作。
 3. Visual script mode 接入 auth ref、密钥注入审计和图片结果质量检查。
 4. Provider refresh 后续接真实服务商轻量探测 adapter。
