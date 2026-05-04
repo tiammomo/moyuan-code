@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/process"
 	"moyuan-code/internal/providers"
+	"moyuan-code/internal/secrets"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
 )
@@ -214,7 +214,7 @@ func nativeEnv(rootDir string, invocation Invocation, spec *nativeSpec) ([]strin
 	case "claude_cli":
 		add("ANTHROPIC_BASE_URL", provider.BaseURL)
 		if provider.AuthRef != "" {
-			auth, err := resolveAuthRef(provider.AuthRef)
+			auth, err := resolveProviderAuth(rootDir, provider, "runtime.invoke")
 			if err != nil {
 				return nil, err
 			}
@@ -231,7 +231,7 @@ func nativeEnv(rootDir string, invocation Invocation, spec *nativeSpec) ([]strin
 	case "codex_cli":
 		add("OPENAI_BASE_URL", provider.BaseURL)
 		if provider.AuthRef != "" {
-			auth, err := resolveAuthRef(provider.AuthRef)
+			auth, err := resolveProviderAuth(rootDir, provider, "runtime.invoke")
 			if err != nil {
 				return nil, err
 			}
@@ -266,23 +266,15 @@ func modelIDForInvocation(invocation Invocation, provider providers.Provider) st
 	return provider.Models[0].ID
 }
 
-func resolveAuthRef(authRef string) (string, error) {
-	authRef = strings.TrimSpace(authRef)
-	if strings.HasPrefix(authRef, "env:") {
-		key := strings.TrimSpace(strings.TrimPrefix(authRef, "env:"))
-		if key == "" {
-			return "", errors.New("provider_auth_ref_env_required")
-		}
-		value := os.Getenv(key)
-		if value == "" {
-			return "", fmt.Errorf("provider_auth_ref_env_missing:%s", key)
-		}
-		return value, nil
+func resolveProviderAuth(rootDir string, provider providers.Provider, purpose string) (string, error) {
+	resolved, err := secrets.Resolve(rootDir, provider.AuthRef, secrets.ResolveOptions{Purpose: purpose, AdapterID: provider.ID, Required: true})
+	if err != nil {
+		return "", err
 	}
-	if strings.HasPrefix(authRef, "secret:") {
-		return "", errors.New("provider_secret_ref_not_supported_for_native_env")
+	if resolved.Status != "ok" {
+		return "", fmt.Errorf("provider_auth_ref_%s:%s", resolved.Status, resolved.Reason)
 	}
-	return "", errors.New("provider_auth_ref_unsupported")
+	return resolved.Value(), nil
 }
 
 func setEnvValue(env []string, key string, value string) []string {

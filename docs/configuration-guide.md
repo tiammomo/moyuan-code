@@ -84,7 +84,7 @@
 | `policies/comprehension.yaml` | full/incremental/diff 项目阅读理解触发 | 是 | 是 | [项目接入与阅读理解主线](./mainlines/project-comprehension.md) |
 | `policies/memory.yaml` | Memory record、retrieve、compact 和维护策略入口 | 否 | 建议 | [Agent Memory 系统方案](./agent-memory-system.md) |
 | `policies/logging.yaml` | run、agent、model、git、quality、release、memory、audit、error 日志 | 是 | 是 | [日志与审计事件契约](./contracts/logging-audit-event-contract.md) |
-| `policies/secrets.yaml` | secret provider、引用规则、轮换策略 | 否 | 是 | [权限模型](./foundations/permission-model.md) |
+| `policies/secrets.yaml` | secret provider、引用规则、用途校验和轮换策略 | 否 | 是 | [Secret Resolver 契约](./contracts/secret-resolver-contract.md) |
 | `policies/budget.yaml` | 模型、Runtime、并发和成本预算 | 否 | 建议 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `policies/release.yaml` | release branch、tag、PR/MR、发布批次和审批 | 否 | 是 | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
 | `policies/server-resources.yaml` | 测试开发机、生产机、云资产、到期和巡检 | 否 | 是 | [服务器资源管理主线](./mainlines/server-resource-management.md) |
@@ -146,6 +146,19 @@
 auth_ref: env:OPENAI_API_KEY
 ssh_key_ref: secret:prod_ssh_key
 registry_auth_ref: secret:registry_token
+```
+
+`secret:` 引用必须在 `.moyuan/policies/secrets.yaml` 登记，并声明允许用途：
+
+```yaml
+schema_version: 1
+secrets:
+  minimax_runtime_token:
+    type: token
+    ref: env:MINIMAX_API_KEY
+    usage:
+      - runtime.invoke
+      - model.provider.*
 ```
 
 第三方 API 默认不得接收敏感代码、项目 Memory、secret 和生产事故上下文，除非项目策略显式批准。

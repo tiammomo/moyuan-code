@@ -13,7 +13,7 @@
 3. [参考架构](./reference-architecture.md)：系统分层、核心模块、运行链路、上下文装配和安全边界。
 4. [主线文档](./mainlines/README.md)：按真实生命周期阅读平台用户、项目接入、需求规划、代码开发、运行反馈、代码管理、服务器资源和 DevOps 发布投产。
 5. [策略决策树](./policies/README.md)：阅读鉴权、阅读理解、调度、质量、Bug 判断、Git、服务器、发布、Provider 和 Memory 的判断规则。
-6. [契约文档](./contracts/README.md)：确认 auth、subagent/skill、self-repair、schema、runtime、logging 和 workspace migration 的接口边界。
+6. [契约文档](./contracts/README.md)：确认 auth、secret resolver、subagent/skill、self-repair、schema、runtime、logging 和 workspace migration 的接口边界。
 7. [项目工作空间规范](./project-workspace-spec.md)、[配置方案](./configuration-guide.md)、[配置 Schema 规则](./configuration-schema-spec.md)：理解每个被管理项目的 `.moyuan/` 工作空间和配置校验边界。
 8. [Agent Memory 系统方案](./agent-memory-system.md)、[Subagent 与 Skills 系统方案](./subagents-skills-system.md)、[模型与工具适配规划](./model-tool-adapters.md)、[后端技术栈与本地环境](./backend-tech-stack.md)、[前端控制台文档](./frontend/README.md)：阅读关键横切能力和前后端职责边界。
 9. [实现模块拆分](./implementation-module-map.md)、[框架自身测试策略](./framework-testing-strategy.md)、[持久化与并发一致性](./persistence-concurrency-consistency.md)：确认模块、测试、状态和锁。
@@ -47,6 +47,7 @@
 | commit、issue、fix、release 和覆盖率规范 | [工程流程规范](./engineering-process-standards.md) |
 | Git Provider 能力、认证和降级 | [Git Provider 接入配置](./git-provider-integration.md) |
 | 仓库接入与 Git Provider Adapter 触发点 | [仓库接入与 Git Provider Adapter](./repository-onboarding-git-management.md) |
+| Secret 引用、用途校验、注入和审计 | [Secret Resolver 契约](./contracts/secret-resolver-contract.md) |
 
 ## 设计边界
 

@@ -15,6 +15,7 @@
 | 契约 | 文档 | 作用 |
 | --- | --- | --- |
 | 身份会话契约 | [auth-session-contract.md](./auth-session-contract.md) | 统一用户身份、会话、API Token、服务账号和鉴权决策接口 |
+| Secret Resolver 契约 | [secret-resolver-contract.md](./secret-resolver-contract.md) | 统一 `env:` / `secret:` 引用解析、用途校验、注入和审计边界 |
 | Subagent 与 Skill 契约 | [subagent-skill-contract.md](./subagent-skill-contract.md) | 定义 Subagent、Skill Registry、Skill 绑定和效果反馈接口 |
 | 自我修复契约 | [self-repair-contract.md](./self-repair-contract.md) | 定义 Runtime Signal、Bug Candidate、Repair Attempt 和能力增强接口 |
 | Schema 校验契约 | [schema-validation-contract.md](./schema-validation-contract.md) | 将配置规则转成机器可校验 schema 和 runtime validator |
@@ -27,11 +28,12 @@
 后续实现顺序建议：
 
 1. 身份会话契约。
-2. Schema 校验契约。
-3. 日志与审计事件契约。
-4. Runtime Adapter 契约。
-5. Subagent 与 Skill 契约。
-6. 自我修复契约。
-7. Workspace 迁移契约。
+2. Secret Resolver 契约。
+3. Schema 校验契约。
+4. 日志与审计事件契约。
+5. Runtime Adapter 契约。
+6. Subagent 与 Skill 契约。
+7. 自我修复契约。
+8. Workspace 迁移契约。
 
-原因：身份会话决定谁能执行操作，配置校验和日志是所有主线的基础，Runtime Adapter 是代码开发闭环的基础，Subagent 与 Skill 契约决定多 Agent 能否稳定调度，自我修复依赖前面的运行、质量和日志能力，Workspace 迁移可在 Phase 1 MVP 稳定后逐步完善。
+原因：身份会话决定谁能执行操作，Secret Resolver 决定凭证是否可被安全注入，配置校验和日志是所有主线的基础，Runtime Adapter 是代码开发闭环的基础，Subagent 与 Skill 契约决定多 Agent 能否稳定调度，自我修复依赖前面的运行、质量和日志能力，Workspace 迁移可在 Phase 1 MVP 稳定后逐步完善。

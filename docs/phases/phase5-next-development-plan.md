@@ -20,7 +20,7 @@ Phase 4 已完成并通过 readiness：
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase5-001` | `auth-context-rbac-middleware` | completed | API middleware 解析身份并执行最小 RBAC | 受保护 API 有 allow/deny 决策和 audit event |
-| P0 | `phase5-002` | `secret-ref-resolver` | planned | 安全解析 `secret:`/`env:` 引用并注入 adapter | Secret 明文不出现在响应、日志、Memory、prompt 或测试 fixture |
+| P0 | `phase5-002` | `secret-ref-resolver` | completed | 安全解析 `secret:`/`env:` 引用并注入 adapter | Secret 明文不出现在响应、日志、Memory、prompt 或测试 fixture |
 | P1 | `phase5-003` | `github-gitee-pr-mr-adapter` | planned | PR/MR preview/create/status adapter | 默认 preview，真实 create 需 authz + approval |
 | P1 | `phase5-004` | `deployment-smoke-monitor-adapters` | planned | smoke/monitor 结果记录和 rollback 建议 | production 必须 approval，结果可审计 |
 | P1 | `phase5-005` | `console-controlled-forms` | planned | Console 增加受控操作表单 | 表单只调用后端受控 API，状态以后端为准 |
@@ -71,7 +71,32 @@ Phase 4 已完成并通过 readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 5. 验证要求
+## 5. 已完成任务：`phase5-002 secret-ref-resolver`
+
+范围：
+
+- 新增 `internal/secrets`，统一解析 `env:` 和 `secret:` 引用。
+- `secret:` 通过 `.moyuan/policies/secrets.yaml` 间接指向 `env:KEY`，并按 `usage` 校验用途。
+- 每次真实取值写入 `secret.access.granted` / `secret.access.denied` audit event。
+- Provider ops probe、Native Runtime env profile 和 Visual script render 已改用 Secret Resolver。
+- Runtime metadata、provider registry、render execution 和审计日志只保存 `auth_ref`、`env_keys`、secret id、用途和状态，不保存明文值。
+- `.gitignore` 收窄为只忽略仓库根部 `/secrets/`，避免忽略 `internal/secrets` 代码包。
+
+非目标：
+
+- 不实现 Vault/KMS 真实 backend。
+- 不支持 `secret:` 嵌套解析。
+- 不在 Console 暴露 secret 明文查看或编辑能力。
+
+验证：
+
+- `go test ./internal/secrets ./internal/providers ./internal/runtime ./internal/visuals` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 6. 验证要求
 
 每完成一个 Phase 5 issue，至少运行：
 

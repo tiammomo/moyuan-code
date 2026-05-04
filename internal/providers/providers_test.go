@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/workspace"
 )
 
@@ -283,13 +285,22 @@ func TestProviderOpsRefreshCanRunOptionalHTTPProbe(t *testing.T) {
 	}))
 	defer server.Close()
 	t.Setenv("PROBE_API_KEY", "probe-token")
+	writeProviderSecretPolicy(t, root, `
+schema_version: 1
+secrets:
+  probe_api_token:
+    type: token
+    ref: env:PROBE_API_KEY
+    usage:
+      - model.provider.*
+`)
 
 	if _, err := Upsert(root, Provider{
 		ID:      "glm-probe",
 		Vendor:  "zhipu",
 		APIType: "openai-compatible",
 		BaseURL: server.URL + "/v1",
-		AuthRef: "env:PROBE_API_KEY",
+		AuthRef: "secret:probe_api_token",
 		Enabled: true,
 		Models:  []Model{{ID: "glm-4"}},
 	}); err != nil {
@@ -323,6 +334,16 @@ func TestProviderOpsRefreshCanRunOptionalHTTPProbe(t *testing.T) {
 	}
 	if strings.Contains(fmt.Sprintf("%+v", registry), "probe-token") {
 		t.Fatalf("provider registry leaked probe token")
+	}
+	auditText, found, err := fsutil.ReadText(filepath.Join(workspace.ForRoot(root).LogsDir, "audit.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found || !strings.Contains(auditText, "secret.access.granted") {
+		t.Fatalf("expected secret access audit, found=%v text=%s", found, auditText)
+	}
+	if strings.Contains(auditText, "probe-token") {
+		t.Fatalf("audit log leaked probe token: %s", auditText)
 	}
 }
 
@@ -377,5 +398,13 @@ func TestModelStrategySwitchesRouteWithoutBypassingPolicy(t *testing.T) {
 	}
 	if !secret.Blocked || secret.Reason != "contains_secret_context" || secret.Strategy != "low_cost_memory" {
 		t.Fatalf("strategy should not bypass secret policy: %+v", secret)
+	}
+}
+
+func writeProviderSecretPolicy(t *testing.T, root string, text string) {
+	t.Helper()
+	path := filepath.Join(workspace.ForRoot(root).MoyuanDir, "policies", "secrets.yaml")
+	if err := fsutil.WriteText(path, strings.TrimSpace(text)+"\n"); err != nil {
+		t.Fatal(err)
 	}
 }

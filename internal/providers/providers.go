@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -15,6 +14,7 @@ import (
 	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
+	"moyuan-code/internal/secrets"
 	"moyuan-code/internal/workspace"
 )
 
@@ -378,7 +378,7 @@ func RefreshOps(rootDir string, options OpsRefreshOptions) (OpsRefreshResult, er
 			result.Decisions = append(result.Decisions, OpsRefreshDecision{ProviderID: provider.ID, Status: "skipped", Reason: "provider_disabled"})
 			continue
 		}
-		snapshot := refreshSnapshotFor(provider, options)
+		snapshot := refreshSnapshotFor(rootDir, provider, options)
 		updated, ok, err := UpdateOps(rootDir, provider.ID, snapshot)
 		if err != nil {
 			return OpsRefreshResult{}, err
@@ -771,10 +771,10 @@ func availabilityViolation(provider Provider) string {
 	return ""
 }
 
-func refreshSnapshotFor(provider Provider, options OpsRefreshOptions) OpsSnapshot {
-	health := refreshHealth(provider)
+func refreshSnapshotFor(rootDir string, provider Provider, options OpsRefreshOptions) OpsSnapshot {
+	health := refreshHealth(rootDir, provider)
 	if options.Probe && provider.Enabled && !provider.NativeRuntime && health.Status == "ok" {
-		health = probeProviderHealth(provider, options.ProbeTimeoutMS)
+		health = probeProviderHealth(rootDir, provider, options.ProbeTimeoutMS)
 	}
 	snapshot := OpsSnapshot{
 		Health: health,
@@ -785,7 +785,7 @@ func refreshSnapshotFor(provider Provider, options OpsRefreshOptions) OpsSnapsho
 	return snapshot
 }
 
-func refreshHealth(provider Provider) Health {
+func refreshHealth(rootDir string, provider Provider) Health {
 	health := Health{Status: "ok", Reason: "configuration_present", LastCheckedAt: now()}
 	if !provider.Enabled {
 		return Health{Status: "unknown", Reason: "provider_disabled", LastCheckedAt: health.LastCheckedAt}
@@ -800,7 +800,7 @@ func refreshHealth(provider Provider) Health {
 		}
 		return Health{Status: "ok", Reason: "native_runtime_found:" + command, LastCheckedAt: health.LastCheckedAt}
 	}
-	authStatus, authReason := authRefStatus(provider.AuthRef)
+	authStatus, authReason := authRefStatus(rootDir, provider.AuthRef)
 	if authStatus != "ok" {
 		return Health{Status: "unhealthy", Reason: authReason, LastCheckedAt: health.LastCheckedAt}
 	}
@@ -810,13 +810,13 @@ func refreshHealth(provider Provider) Health {
 	return health
 }
 
-func probeProviderHealth(provider Provider, timeoutMS int) Health {
+func probeProviderHealth(rootDir string, provider Provider, timeoutMS int) Health {
 	checkedAt := now()
 	probeURL, adapter, ok := providerProbeURL(provider)
 	if !ok {
 		return Health{Status: "degraded", Reason: "probe_adapter_unsupported", LastCheckedAt: checkedAt}
 	}
-	authToken, authStatus, authReason := probeAuthToken(provider.AuthRef)
+	authToken, authStatus, authReason := probeAuthToken(rootDir, provider)
 	switch authStatus {
 	case "ok":
 	case "skipped":
@@ -890,26 +890,12 @@ func appendProbePath(base *url.URL, segment string) {
 	base.Path = path + "/" + segment
 }
 
-func probeAuthToken(authRef string) (string, string, string) {
-	authRef = strings.TrimSpace(authRef)
-	if authRef == "" {
-		return "", "missing", "auth_ref_missing"
+func probeAuthToken(rootDir string, provider Provider) (string, string, string) {
+	resolved, err := secrets.Resolve(rootDir, provider.AuthRef, secrets.ResolveOptions{Purpose: "model.provider.probe", AdapterID: provider.ID, Required: true})
+	if err != nil {
+		return "", "invalid", "auth_ref_resolver_error"
 	}
-	if strings.HasPrefix(authRef, "env:") {
-		key := strings.TrimSpace(strings.TrimPrefix(authRef, "env:"))
-		if key == "" {
-			return "", "missing", "auth_ref_env_required"
-		}
-		token := os.Getenv(key)
-		if token == "" {
-			return "", "missing", "auth_ref_env_missing:" + key
-		}
-		return token, "ok", "auth_ref_env_present:" + key
-	}
-	if strings.HasPrefix(authRef, "secret:") {
-		return "", "skipped", "probe_secret_ref_not_resolved"
-	}
-	return "", "invalid", "auth_ref_unsupported"
+	return resolved.Value(), authRefStatusFromResolution(resolved), authRefReasonFromResolution(resolved)
 }
 
 func refreshQuota(existing Quota) Quota {
@@ -963,25 +949,49 @@ func refreshCost(existing Cost) Cost {
 	return cost
 }
 
-func authRefStatus(authRef string) (string, string) {
-	authRef = strings.TrimSpace(authRef)
-	if authRef == "" {
-		return "missing", "auth_ref_missing"
+func authRefStatus(rootDir string, authRef string) (string, string) {
+	resolved, err := secrets.Status(rootDir, authRef, secrets.ResolveOptions{Purpose: "model.provider.status", AdapterID: "provider_ops"})
+	if err != nil {
+		return "invalid", "auth_ref_resolver_error"
 	}
-	if strings.HasPrefix(authRef, "env:") {
-		key := strings.TrimSpace(strings.TrimPrefix(authRef, "env:"))
-		if key == "" {
-			return "missing", "auth_ref_env_required"
-		}
-		if os.Getenv(key) == "" {
-			return "missing", "auth_ref_env_missing:" + key
-		}
-		return "ok", "auth_ref_env_present:" + key
+	return authRefStatusFromResolution(resolved), authRefReasonFromResolution(resolved)
+}
+
+func authRefStatusFromResolution(resolved secrets.Resolution) string {
+	switch resolved.Status {
+	case "ok":
+		return "ok"
+	case "missing":
+		return "missing"
+	case "denied":
+		return "invalid"
+	default:
+		return resolved.Status
 	}
-	if strings.HasPrefix(authRef, "secret:") {
-		return "ok", "auth_ref_secret_reference_present"
+}
+
+func authRefReasonFromResolution(resolved secrets.Resolution) string {
+	if resolved.Reference == "" {
+		return "auth_ref_missing"
 	}
-	return "invalid", "auth_ref_unsupported"
+	switch {
+	case strings.HasPrefix(resolved.Reason, "secret_env_missing:"):
+		return strings.Replace(resolved.Reason, "secret_env_missing:", "auth_ref_env_missing:", 1)
+	case strings.HasPrefix(resolved.Reason, "secret_env_key_invalid:"):
+		return strings.Replace(resolved.Reason, "secret_env_key_invalid:", "auth_ref_env_invalid:", 1)
+	case strings.HasPrefix(resolved.Reason, "secret_env_present:"):
+		return strings.Replace(resolved.Reason, "secret_env_present:", "auth_ref_env_present:", 1)
+	case strings.HasPrefix(resolved.Reason, "secret_entry_env_missing:"):
+		return strings.Replace(resolved.Reason, "secret_entry_env_missing:", "auth_ref_secret_env_missing:", 1)
+	case strings.HasPrefix(resolved.Reason, "secret_resolved_from_env:"):
+		return strings.Replace(resolved.Reason, "secret_resolved_from_env:", "auth_ref_secret_resolved:", 1)
+	case strings.HasPrefix(resolved.Reason, "secret_ref_unsupported:"):
+		return "auth_ref_unsupported"
+	case resolved.Reason == "secret_ref_invalid":
+		return "auth_ref_unsupported"
+	default:
+		return resolved.Reason
+	}
 }
 
 func requiresBaseURL(provider Provider) bool {

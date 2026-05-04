@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/providers"
 	"moyuan-code/internal/workspace"
 )
@@ -25,11 +26,12 @@ func TestRenderAssetScriptUsesProviderAuthAndWritesQualityPreview(t *testing.T) 
 		t.Fatal("missing gpt_image_2 provider")
 	}
 	imageProvider.Enabled = true
-	imageProvider.AuthRef = "env:IMAGE_TEST_KEY"
+	imageProvider.AuthRef = "secret:image_test_key"
 	imageProvider.BaseURL = "https://image.example/v1"
 	if _, err := providers.Upsert(root, imageProvider); err != nil {
 		t.Fatal(err)
 	}
+	writeVisualSecretPolicy(t, root)
 
 	plan, err := GeneratePlan(root, DiagramOptions{DiagramType: "multi_agent"})
 	if err != nil {
@@ -50,7 +52,7 @@ func TestRenderAssetScriptUsesProviderAuthAndWritesQualityPreview(t *testing.T) 
 	if execution.Decision != "VISUAL_RENDER_COMPLETED" || execution.Status != "completed" {
 		t.Fatalf("expected completed render execution, got %+v", execution)
 	}
-	if execution.AuthRef != "env:IMAGE_TEST_KEY" || !hasString(execution.EnvKeys, "OPENAI_API_KEY") || !hasString(execution.EnvKeys, "OPENAI_BASE_URL") {
+	if execution.AuthRef != "secret:image_test_key" || !hasString(execution.EnvKeys, "OPENAI_API_KEY") || !hasString(execution.EnvKeys, "OPENAI_BASE_URL") {
 		t.Fatalf("expected auth ref and injected env key audit, got auth=%q env=%v", execution.AuthRef, execution.EnvKeys)
 	}
 	if execution.Quality == nil || execution.Quality.Status != "passed" {
@@ -79,6 +81,33 @@ func TestRenderAssetScriptUsesProviderAuthAndWritesQualityPreview(t *testing.T) 
 	}
 	if !found || asset.Status != "rendered" || asset.ImagePath == "" || asset.ExplanationPath == "" {
 		t.Fatalf("expected rendered asset with image/explanation paths, found=%v asset=%+v", found, asset)
+	}
+	auditText, found, err := fsutil.ReadText(filepath.Join(workspace.ForRoot(root).LogsDir, "audit.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found || !strings.Contains(auditText, "secret.access.granted") {
+		t.Fatalf("expected secret audit event, found=%v text=%s", found, auditText)
+	}
+	if strings.Contains(auditText, "render-token") {
+		t.Fatalf("audit log leaked API token")
+	}
+}
+
+func writeVisualSecretPolicy(t *testing.T, root string) {
+	t.Helper()
+	path := filepath.Join(workspace.ForRoot(root).MoyuanDir, "policies", "secrets.yaml")
+	err := fsutil.WriteText(path, strings.TrimSpace(`
+schema_version: 1
+secrets:
+  image_test_key:
+    type: token
+    ref: env:IMAGE_TEST_KEY
+    usage:
+      - visual.render.script
+`)+"\n")
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

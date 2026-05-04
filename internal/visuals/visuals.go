@@ -15,6 +15,7 @@ import (
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/process"
 	"moyuan-code/internal/providers"
+	"moyuan-code/internal/secrets"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
 )
@@ -436,25 +437,34 @@ func resolveScriptAuth(rootDir string, providerID string) (scriptAuth, string, e
 	if !provider.Enabled {
 		return scriptAuth{}, "visual_provider_disabled:" + provider.ID, nil
 	}
-	authRef := strings.TrimSpace(provider.AuthRef)
-	if authRef == "" {
-		return scriptAuth{}, "image_provider_auth_ref_missing", nil
+	resolved, err := secrets.Resolve(rootDir, provider.AuthRef, secrets.ResolveOptions{Purpose: "visual.render.script", AdapterID: provider.ID, Required: true})
+	if err != nil {
+		return scriptAuth{}, "", err
 	}
-	if strings.HasPrefix(authRef, "secret:") {
-		return scriptAuth{}, "image_provider_secret_ref_not_supported_for_script", nil
+	if resolved.Status != "ok" {
+		return scriptAuth{}, imageAuthReason(resolved), nil
 	}
-	if !strings.HasPrefix(authRef, "env:") {
-		return scriptAuth{}, "image_provider_auth_ref_unsupported", nil
+	return scriptAuth{AuthRef: resolved.Reference, APIKey: resolved.Value(), BaseURL: strings.TrimSpace(provider.BaseURL)}, "", nil
+}
+
+func imageAuthReason(resolved secrets.Resolution) string {
+	if resolved.Reference == "" {
+		return "image_provider_auth_ref_missing"
 	}
-	key := strings.TrimSpace(strings.TrimPrefix(authRef, "env:"))
-	if key == "" {
-		return scriptAuth{}, "image_provider_auth_env_required", nil
+	switch {
+	case strings.HasPrefix(resolved.Reason, "secret_env_missing:"):
+		return strings.Replace(resolved.Reason, "secret_env_missing:", "image_provider_auth_env_missing:", 1)
+	case strings.HasPrefix(resolved.Reason, "secret_env_key_invalid:"):
+		return strings.Replace(resolved.Reason, "secret_env_key_invalid:", "image_provider_auth_env_invalid:", 1)
+	case strings.HasPrefix(resolved.Reason, "secret_entry_env_missing:"):
+		return strings.Replace(resolved.Reason, "secret_entry_env_missing:", "image_provider_secret_env_missing:", 1)
+	case strings.HasPrefix(resolved.Reason, "secret_ref_unsupported:"):
+		return "image_provider_auth_ref_unsupported"
+	case resolved.Reason == "secret_ref_invalid":
+		return "image_provider_auth_ref_unsupported"
+	default:
+		return resolved.Reason
 	}
-	value := os.Getenv(key)
-	if value == "" {
-		return scriptAuth{}, "image_provider_auth_env_missing:" + key, nil
-	}
-	return scriptAuth{AuthRef: authRef, APIKey: value, BaseURL: strings.TrimSpace(provider.BaseURL)}, "", nil
 }
 
 func runScript(ctx context.Context, rootDir string, execution RenderExecution, asset AssetRecord, scriptPath string, auth scriptAuth) RenderExecution {

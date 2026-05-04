@@ -9,7 +9,7 @@ apps/console/out/
 .env
 .env.*
 !.env.example
-secrets/
+/secrets/
 *.pem
 *.key
 
