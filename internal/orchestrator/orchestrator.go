@@ -47,15 +47,16 @@ func RunIssue(ctx context.Context, rootDir string, issueID string, runtimeID str
 		return Result{}, err
 	}
 	rt, err := runtime.Invoke(ctx, rootDir, runtime.Invocation{
-		RunID:         run.ID,
-		ProjectID:     workspace.ForRoot(rootDir).RootDir,
-		IssueID:       issueID,
-		Role:          "backend",
-		RuntimeID:     runtimeID,
-		Mode:          "code",
-		WorkspaceRoot: rootDir,
-		WorktreePath:  rootDir,
-		Prompt:        prompt,
+		RunID:          run.ID,
+		ProjectID:      workspace.ForRoot(rootDir).RootDir,
+		IssueID:        issueID,
+		Role:           "backend",
+		RuntimeID:      runtimeID,
+		Mode:           "code",
+		WorkspaceRoot:  rootDir,
+		WorktreePath:   rootDir,
+		Prompt:         prompt,
+		ProtectedPaths: protectedPaths(rootDir),
 	})
 	if err != nil {
 		return Result{}, err
@@ -81,4 +82,12 @@ func RunIssue(ctx context.Context, rootDir string, issueID string, runtimeID str
 	}
 	_ = logging.Log(rootDir, "run", "orchestrator.issue.completed", map[string]any{"issue_id": issueID, "run_id": run.ID, "status": status})
 	return result, nil
+}
+
+func protectedPaths(rootDir string) []string {
+	ws, err := workspace.Load(rootDir)
+	if err != nil {
+		return []string{}
+	}
+	return ws.Project.Workspace.ProtectedPaths
 }

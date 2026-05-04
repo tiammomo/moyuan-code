@@ -25,8 +25,9 @@
 - `phase1-011 memory-basics`：已实现 memory add/search/compact 的最小闭环。
 - `phase1-012 repair-basics`：已实现 runtime signal、bug candidate 分类和 repair plan 生成。
 - `phase1-013 e2e-smoke`：已实现本地项目和本地 bare remote 模拟远程项目的端到端 CLI smoke，覆盖项目接入、阅读理解、issue graph、schedule、runtime、orchestrator、quality、memory、repair、logs 和关键 `.moyuan/` 产物断言。
+- `phase1-014 runtime-diff-capture`：已实现 runtime before/after git snapshot、changed files、diff summary Markdown、`.moyuan/` 控制区过滤、脏工作区阻断和保护路径变更阻断。
 
-下一轮进入 `phase1-014 runtime-diff-capture`，为 runtime run 捕获 before/after git 状态、changed files、diff summary 和 dirty worktree 风险。下一批任务的执行顺序、验收标准和 git 同步规则见 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)。
+下一轮进入 `phase1-015 native-runtime-adapters`，补齐 Claude CLI / Codex CLI 的 prompt file、cwd、env allowlist、timeout、stdout/stderr、result contract 和失败降级。下一批任务的执行顺序、验收标准和 git 同步规则见 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)。
 
 ## 1. 目标
 

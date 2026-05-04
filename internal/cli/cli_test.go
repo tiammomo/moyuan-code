@@ -86,6 +86,8 @@ func exercisePhase1Lifecycle(t *testing.T, root string) {
 
 	runtimeResult := runCLI(t, root, "runtime", "invoke", "local_shell", "--prompt", "printf runtime-ok")
 	assertContains(t, runtimeResult.stdout, "runtime-ok")
+	assertContains(t, runtimeResult.stdout, "diff_summary_path")
+	assertContains(t, runtimeResult.stdout, `"git_before"`)
 
 	qualityResult := runCLI(t, root, "quality", "check", "phase1-001")
 	report := decodeQualityReport(t, qualityResult.stdout)
@@ -120,6 +122,38 @@ func exercisePhase1Lifecycle(t *testing.T, root string) {
 	assertLifecycleArtifacts(t, root)
 }
 
+func TestRuntimeDiffCaptureTracksGeneratedFilesAndBlocksDirtyWorktree(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	generated := "generated-by-runtime.txt"
+	result := runCLI(t, root, "runtime", "invoke", "local_shell", "--prompt", "printf generated > "+generated)
+	assertContains(t, result.stdout, generated)
+	assertContains(t, result.stdout, `"new_dirty": true`)
+	assertGlob(t, root, ".moyuan/runtime/*-local_shell-diff.md")
+	assertFileContains(t, root, ".moyuan/logs/run.jsonl", "diff_summary_path")
+
+	blocked := runCLIAllowFailure(t, root, "runtime", "invoke", "local_shell", "--prompt", "printf should-not-run")
+	if blocked.code == 0 {
+		t.Fatalf("expected dirty worktree runtime invoke to fail, stdout=%s", blocked.stdout)
+	}
+	assertContains(t, blocked.stdout, "pre_existing_dirty_worktree")
+}
+
+func TestRuntimeDiffCaptureBlocksProtectedPathChanges(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	result := runCLIAllowFailure(t, root, "runtime", "invoke", "local_shell", "--prompt", "printf secret > .env")
+	if result.code == 0 {
+		t.Fatalf("expected protected path runtime invoke to fail, stdout=%s", result.stdout)
+	}
+	assertContains(t, result.stdout, `"status": "blocked"`)
+	assertContains(t, result.stdout, "protected_paths_changed")
+	assertContains(t, result.stdout, ".env")
+	assertGlob(t, root, ".moyuan/runtime/*-local_shell-diff.md")
+}
+
 type qualityReport struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
@@ -150,6 +184,15 @@ func decodeQualityReport(t *testing.T, raw string) qualityReport {
 
 func runCLI(t *testing.T, root string, args ...string) cliResult {
 	t.Helper()
+	result := runCLIAllowFailure(t, root, args...)
+	if result.code != 0 {
+		t.Fatalf("moyuan %s failed: code=%d stdout=%s stderr=%s", strings.Join(args, " "), result.code, result.stdout, result.stderr)
+	}
+	return result
+}
+
+func runCLIAllowFailure(t *testing.T, root string, args ...string) cliResult {
+	t.Helper()
 	argv := append([]string{}, args...)
 	if root != "" {
 		argv = append(argv, "--root", root)
@@ -157,9 +200,6 @@ func runCLI(t *testing.T, root string, args ...string) cliResult {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	code := Run(context.Background(), argv, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("moyuan %s failed: code=%d stdout=%s stderr=%s", strings.Join(args, " "), code, stdout.String(), stderr.String())
-	}
 	return cliResult{stdout: stdout.String(), stderr: stderr.String(), code: code}
 }
 

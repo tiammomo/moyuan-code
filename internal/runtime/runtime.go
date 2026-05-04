@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"moyuan-code/internal/fsutil"
+	gitadapter "moyuan-code/internal/git"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/process"
 	"moyuan-code/internal/workspace"
@@ -47,19 +48,23 @@ type CommandResult struct {
 }
 
 type Result struct {
-	RunID            string          `json:"run_id"`
-	SubagentID       string          `json:"subagent_id,omitempty"`
-	RuntimeID        string          `json:"runtime_id"`
-	Status           string          `json:"status"`
-	Summary          string          `json:"summary"`
-	ChangedFiles     []string        `json:"changed_files"`
-	Commands         []CommandResult `json:"commands"`
-	Tests            []CommandResult `json:"tests"`
-	Risks            []string        `json:"risks"`
-	RuntimeSignals   []string        `json:"runtime_signals"`
-	MemoryCandidates []string        `json:"memory_candidates"`
-	NativeSessionID  string          `json:"native_session_id,omitempty"`
-	CreatedAt        string          `json:"created_at"`
+	RunID            string                 `json:"run_id"`
+	SubagentID       string                 `json:"subagent_id,omitempty"`
+	RuntimeID        string                 `json:"runtime_id"`
+	Status           string                 `json:"status"`
+	Summary          string                 `json:"summary"`
+	ChangedFiles     []string               `json:"changed_files"`
+	DiffSummaryPath  string                 `json:"diff_summary_path,omitempty"`
+	GitBefore        gitadapter.Snapshot    `json:"git_before"`
+	GitAfter         gitadapter.Snapshot    `json:"git_after"`
+	Diff             gitadapter.DiffCapture `json:"diff"`
+	Commands         []CommandResult        `json:"commands"`
+	Tests            []CommandResult        `json:"tests"`
+	Risks            []string               `json:"risks"`
+	RuntimeSignals   []string               `json:"runtime_signals"`
+	MemoryCandidates []string               `json:"memory_candidates"`
+	NativeSessionID  string                 `json:"native_session_id,omitempty"`
+	CreatedAt        string                 `json:"created_at"`
 }
 
 func HealthCheck(rootDir string, runtimeID string) Health {
@@ -101,7 +106,13 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 	if invocation.RuntimeID == "" {
 		invocation.RuntimeID = "local_shell"
 	}
+	if len(invocation.ProtectedPaths) == 0 {
+		if ws, err := workspace.Load(rootDir); err == nil {
+			invocation.ProtectedPaths = ws.Project.Workspace.ProtectedPaths
+		}
+	}
 	_ = logging.Log(rootDir, "run", "runtime.started", map[string]any{"run_id": invocation.RunID, "runtime_id": invocation.RuntimeID, "issue_id": invocation.IssueID})
+	before := gitadapter.CaptureSnapshot(ctx, invocation.WorktreePath)
 	status := "completed"
 	summary := "runtime invocation recorded"
 	commands := []CommandResult{}
@@ -109,10 +120,14 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 	command := commandFor(invocation.RuntimeID)
 	if command == "" {
 		status = "failed"
-		risks = append(risks, "unknown runtime")
+		risks = appendRisk(risks, "unknown runtime")
 	} else if _, err := exec.LookPath(command); err != nil {
 		status = "failed"
-		risks = append(risks, "runtime unavailable: "+command)
+		risks = appendRisk(risks, "runtime unavailable: "+command)
+	} else if before.UserDirty {
+		status = "blocked"
+		summary = "runtime blocked because worktree has pre-existing user changes"
+		risks = appendRisk(risks, "pre_existing_dirty_worktree")
 	} else if invocation.RuntimeID == "local_shell" && strings.TrimSpace(invocation.Prompt) != "" {
 		res := process.RunShell(ctx, invocation.WorktreePath, invocation.Prompt)
 		cmdStatus := "passed"
@@ -126,13 +141,36 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 			summary = strings.TrimSpace(res.Stderr)
 		}
 	}
+	after := gitadapter.CaptureSnapshot(ctx, invocation.WorktreePath)
+	diffSummaryPath := filepath.Join(workspace.ForRoot(rootDir).RuntimeDir, invocation.RunID+"-"+invocation.RuntimeID+"-diff.md")
+	diff, err := gitadapter.CaptureDiff(ctx, invocation.WorktreePath, before, after, diffSummaryPath, invocation.ProtectedPaths)
+	if err != nil {
+		return Result{}, err
+	}
+	if diff.Status == "diff_unavailable" {
+		risks = appendRisk(risks, "diff_unavailable")
+	}
+	if diff.PreExistingDirty {
+		risks = appendRisk(risks, "pre_existing_dirty_worktree")
+	}
+	if len(diff.ProtectedFiles) > 0 {
+		risks = appendRisk(risks, "protected_paths_changed")
+		if status == "completed" {
+			status = "blocked"
+			summary = "runtime changed protected paths"
+		}
+	}
 	result := Result{
 		RunID:            invocation.RunID,
 		SubagentID:       invocation.SubagentID,
 		RuntimeID:        invocation.RuntimeID,
 		Status:           status,
 		Summary:          summary,
-		ChangedFiles:     []string{},
+		ChangedFiles:     diff.ChangedFiles,
+		DiffSummaryPath:  diff.DiffSummaryPath,
+		GitBefore:        before,
+		GitAfter:         after,
+		Diff:             diff,
 		Commands:         commands,
 		Tests:            []CommandResult{},
 		Risks:            risks,
@@ -143,8 +181,17 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(rootDir).RuntimeDir, invocation.RunID+"-"+invocation.RuntimeID+".json"), result); err != nil {
 		return Result{}, err
 	}
-	_ = logging.Log(rootDir, "run", "runtime.completed", map[string]any{"run_id": invocation.RunID, "runtime_id": invocation.RuntimeID, "status": result.Status})
+	_ = logging.Log(rootDir, "run", "runtime.completed", map[string]any{"run_id": invocation.RunID, "runtime_id": invocation.RuntimeID, "status": result.Status, "changed_files": result.ChangedFiles, "diff_summary_path": result.DiffSummaryPath})
 	return result, nil
+}
+
+func appendRisk(risks []string, risk string) []string {
+	for _, existing := range risks {
+		if existing == risk {
+			return risks
+		}
+	}
+	return append(risks, risk)
 }
 
 func commandFor(runtimeID string) string {
