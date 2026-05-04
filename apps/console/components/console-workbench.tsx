@@ -47,13 +47,17 @@ const nav = [
   { label: "Providers", icon: Sparkles },
   { label: "Deployments", icon: Rocket },
   { label: "Audit", icon: Lock },
-];
+] as const;
+
+type ConsoleView = (typeof nav)[number]["label"];
 
 export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const router = useRouter();
+  const [activeView, setActiveView] = useState<ConsoleView>("Projects");
   const [selectedIssueID, setSelectedIssueID] = useState(snapshot.issues[0]?.id ?? "");
   const [requirementText, setRequirementText] = useState("");
   const [requirementState, setRequirementState] = useState<RequirementSubmitState>({ status: "idle" });
+  const [schemaErrors, setSchemaErrors] = useState<Record<string, string[]>>({});
   const [recoveryArtifactState, setRecoveryArtifactState] = useState<Record<string, RecoveryArtifactState>>({});
   const [visualActionState, setVisualActionState] = useState<Record<string, VisualActionState>>({});
   const [deploymentActionState, setDeploymentActionState] = useState<DeploymentActionState>({ status: "idle" });
@@ -68,6 +72,12 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [gitActionState, setGitActionState] = useState<Record<string, ActionState>>({});
   const [gitCreateApproved, setGitCreateApproved] = useState(false);
   const [gitCreateApprovalID, setGitCreateApprovalID] = useState("");
+  const [releaseProviderForm, setReleaseProviderForm] = useState({
+    releaseID: snapshot.deployments[0]?.release_id ?? "",
+    approved: false,
+    approvalID: "",
+  });
+  const [releaseProviderActionState, setReleaseProviderActionState] = useState<ActionState>({ status: "idle" });
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
   const latestDeployment = snapshot.deployments[0];
@@ -75,10 +85,20 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const activeTokens = snapshot.api_tokens.filter((token) => token.status === "active");
   const activeServiceAccounts = snapshot.service_accounts.filter((account) => account.status === "active");
 
+  function setSchemaResult(key: string, errors: string[]) {
+    setSchemaErrors((current) => ({ ...current, [key]: errors }));
+  }
+
+  function requireFields(key: string, fields: Array<[string, string]>) {
+    const errors = fields.filter(([, value]) => value.trim() === "").map(([label]) => `${label} is required`);
+    setSchemaResult(key, errors);
+    return errors.length === 0;
+  }
+
   async function submitRequirement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = requirementText.trim();
-    if (!text) {
+    if (!requireFields("requirement", [["Requirement", text]])) {
       setRequirementState({ status: "error", message: "Requirement text is required." });
       return;
     }
@@ -188,8 +208,48 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
         id: release.id,
         message: `${release.decision ?? release.status ?? "release decision recorded"}${release.reasons?.[0] ? ` / ${release.reasons[0]}` : ""}`,
       });
+      if (release.id) {
+        setReleaseProviderForm((current) => ({ ...current, releaseID: release.id ?? current.releaseID }));
+      }
     } catch (error) {
       setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Release suggestion failed." });
+    }
+  }
+
+  async function runReleaseProviderAction(action: "preview" | "publish") {
+    const releaseID = releaseProviderForm.releaseID.trim();
+    const schemaKey = "releaseProvider";
+    const fields: Array<[string, string]> = [["Release ID", releaseID]];
+    if (action === "publish" && releaseProviderForm.approved) {
+      fields.push(["Approval ID", releaseProviderForm.approvalID]);
+    }
+    if (!requireFields(schemaKey, fields)) {
+      setReleaseProviderActionState({ status: "error", message: "Schema validation failed." });
+      return;
+    }
+    setReleaseProviderActionState({ status: "running", message: `${action} release provider...` });
+    try {
+      const payload = await postJSON<ReleaseProviderExecutionEnvelope>(
+        `/api/projects/${snapshot.project.id}/releases/${encodeURIComponent(releaseID)}/provider-${action}`,
+        action === "publish"
+          ? { approved: releaseProviderForm.approved, approval_id: releaseProviderForm.approvalID }
+          : {},
+      );
+      const execution = payload.release_provider_execution;
+      if (!execution) {
+        throw new Error(payload.error ?? "Release provider action returned no execution.");
+      }
+      setReleaseProviderActionState({
+        status: execution.status === "completed" ? "completed" : "blocked",
+        id: execution.id,
+        message: execution.decision ?? execution.status,
+      });
+      router.refresh();
+    } catch (error) {
+      setReleaseProviderActionState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Release provider action failed.",
+      });
     }
   }
 
@@ -244,6 +304,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   }
 
   async function decideApproval(approvalID: string, decision: "approved" | "rejected") {
+    if (!requireFields("approval", [["Decider", approvalForm.decidedBy], ["Reason", approvalForm.reason]])) {
+      return;
+    }
     setApprovalActionState((current) => ({
       ...current,
       [approvalID]: { status: "running", message: `${decision === "approved" ? "Approving" : "Rejecting"} approval...` },
@@ -273,6 +336,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
 
   async function createSession(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!requireFields("session", [["User", sessionForm.userID], ["Display", sessionForm.displayName], ["Roles", sessionForm.roles]])) {
+      return;
+    }
     setAccessActionState((current) => ({ ...current, session: { status: "running", message: "Creating session..." } }));
     try {
       const payload = await postJSON<AuthSessionEnvelope>(`/api/projects/${snapshot.project.id}/auth/sessions`, {
@@ -298,6 +364,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
 
   async function createAPIToken(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!requireFields("token", [["Name", tokenForm.name], ["Actor", tokenForm.actorID], ["Scopes", tokenForm.scopes]])) {
+      return;
+    }
     setAccessActionState((current) => ({ ...current, token: { status: "running", message: "Creating API token..." } }));
     try {
       const payload = await postJSON<APITokenCreateEnvelope>(`/api/projects/${snapshot.project.id}/auth/api-tokens`, {
@@ -351,6 +420,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
 
   async function createServiceAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!requireFields("service", [["Name", serviceAccountForm.name], ["Roles", serviceAccountForm.roles]])) {
+      return;
+    }
     setAccessActionState((current) => ({ ...current, service: { status: "running", message: "Creating service account..." } }));
     try {
       const payload = await postJSON<ServiceAccountEnvelope>(`/api/projects/${snapshot.project.id}/auth/service-accounts`, {
@@ -375,6 +447,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   }
 
   async function runGitProviderAction(planID: string, action: "preview" | "sync" | "create") {
+    if (action === "create" && gitCreateApproved && !requireFields("gitCreate", [["Approval ID", gitCreateApprovalID]])) {
+      return;
+    }
     setGitActionState((current) => ({ ...current, [planID]: { status: "running", message: `${action} PR/MR...` } }));
     try {
       const payload = await postJSON<GitProviderActionEnvelope>(`/api/projects/${snapshot.project.id}/git-provider-plans/${encodeURIComponent(planID)}/${action}`, {
@@ -409,6 +484,13 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   }
 
   async function runResourceAction(resourceID: string, action: "renew" | "retire") {
+    const fields: Array<[string, string]> = [["Actor", resourceForm.actorID], ["Reason", resourceForm.reason]];
+    if (action === "renew") {
+      fields.push(["Expires", resourceForm.expiresAt]);
+    }
+    if (!requireFields("resource", fields)) {
+      return;
+    }
     setResourceActionState((current) => ({ ...current, [resourceID]: { status: "running", message: `${action} resource...` } }));
     try {
       const body =
@@ -448,7 +530,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
 
         <nav className="navList">
           {nav.map((item) => (
-            <button className="navItem" key={item.label} type="button">
+            <button className={`navItem ${activeView === item.label ? "active" : ""}`} key={item.label} onClick={() => setActiveView(item.label)} type="button">
               <item.icon size={17} />
               <span>{item.label}</span>
             </button>
@@ -489,7 +571,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           <MetricCard label="Deploys" value={snapshot.stats.executions} tone="neutral" detail={`${snapshot.stats.deployments} plans`} />
         </section>
 
-        <section className="opsGrid">
+        <section className="opsGrid" hidden={!viewVisible(activeView, ["Projects", "Deployments"])}>
           <div className="panel requirementPanel">
             <PanelTitle icon={<Sparkles size={18} />} title="Requirement Intake" meta="plan to issue graph" />
             <form className="requirementForm" onSubmit={submitRequirement}>
@@ -513,6 +595,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   </div>
                 ) : null}
               </div>
+              <SchemaFeedback errors={schemaErrors.requirement} />
             </form>
           </div>
 
@@ -571,7 +654,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
         </section>
 
-        <section className="mainGrid">
+        <section className="mainGrid" hidden={!viewVisible(activeView, ["Projects", "Issue Graph"])}>
           <div className="panel graphPanel">
             <PanelTitle icon={<Network size={18} />} title="Issue Graph" meta="dependency aware" />
             <div className="graphCanvas">
@@ -705,7 +788,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </aside>
         </section>
 
-        <section className="lowerGrid">
+        <section className="lowerGrid" hidden={!viewVisible(activeView, ["Projects", "Runs", "Quality", "Memory"])}>
           <div className="panel">
             <PanelTitle icon={<Activity size={18} />} title="Run Timeline" meta={`${snapshot.runs.length} runs`} />
             <div className="timeline">
@@ -752,7 +835,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
         </section>
 
-        <section className="observabilityGrid">
+        <section className="observabilityGrid" hidden={!viewVisible(activeView, ["Projects", "Runs", "Providers"])}>
           <div className="panel">
             <PanelTitle icon={<TerminalSquare size={18} />} title="Runtime Recoveries" meta={`${snapshot.runtime_recoveries.length} archived`} />
             <div className="signalList">
@@ -906,7 +989,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
         </section>
 
-        <section className="auditGrid">
+        <section className="auditGrid" hidden={!viewVisible(activeView, ["Projects", "Audit"])}>
           <div className="panel">
             <PanelTitle icon={<Lock size={18} />} title="Approval Queue" meta={`${snapshot.approvals.length} records`} />
             <div className="controlForm compact">
@@ -922,6 +1005,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <input onChange={(event) => setApprovalForm((current) => ({ ...current, reason: event.target.value }))} value={approvalForm.reason} />
               </label>
             </div>
+            <SchemaFeedback errors={schemaErrors.approval} />
             <div className="signalList">
               {snapshot.approvals.length > 0 ? (
                 snapshot.approvals.map((approval) => (
@@ -1000,7 +1084,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
         </section>
 
-        <section className="accessGrid">
+        <section className="accessGrid" hidden={!viewVisible(activeView, ["Projects", "Audit"])}>
           <div className="panel">
             <PanelTitle
               icon={<ShieldCheck size={18} />}
@@ -1035,6 +1119,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   </button>
                   <ActionFeedback state={accessActionState.session} />
                 </div>
+                <SchemaFeedback errors={schemaErrors.session} />
               </form>
 
               <form className="controlForm" onSubmit={createAPIToken}>
@@ -1061,6 +1146,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   </button>
                   <ActionFeedback state={accessActionState.token} />
                 </div>
+                <SchemaFeedback errors={schemaErrors.token} />
               </form>
 
               <form className="controlForm" onSubmit={createServiceAccount}>
@@ -1093,6 +1179,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   </button>
                   <ActionFeedback state={accessActionState.service} />
                 </div>
+                <SchemaFeedback errors={schemaErrors.service} />
               </form>
             </div>
             <div className="accessList">
@@ -1163,7 +1250,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
         </section>
 
-        <section className="bottomGrid">
+        <section className="bottomGrid" hidden={!viewVisible(activeView, ["Projects", "Providers", "Deployments"])}>
           <div className="panel">
             <PanelTitle icon={<Sparkles size={18} />} title="Providers & Runtimes" meta={`${snapshot.providers.length} registered`} />
             <div className="providerMatrix">
@@ -1177,8 +1264,25 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                     </span>
                   </div>
                   <code>{provider.model || provider.id}</code>
+                  <StatusPill tone={toneForStatus(provider.health_status || (provider.enabled ? "ok" : "unknown"))} label={provider.health_status || "unknown"} />
                 </div>
               ))}
+            </div>
+            <div className="telemetryList">
+              {snapshot.provider_telemetry.length > 0 ? (
+                snapshot.provider_telemetry.slice(0, 4).map((record) => (
+                  <div className="telemetryItem" key={record.id}>
+                    <div>
+                      <strong>{record.provider_id}</strong>
+                      <span>{record.source}</span>
+                    </div>
+                    <StatusPill tone={toneForStatus(record.health_status || record.decision)} label={record.health_status || record.decision} />
+                    <code>{record.quota_status || record.cost_status || "ops"}</code>
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No provider telemetry</div>
+              )}
             </div>
           </div>
 
@@ -1202,6 +1306,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <input onChange={(event) => setResourceForm((current) => ({ ...current, reason: event.target.value }))} value={resourceForm.reason} />
               </label>
             </div>
+            <SchemaFeedback errors={schemaErrors.resource} />
             <div className="resourceList">
               {snapshot.resources.length > 0 ? (
                 snapshot.resources.map((resource) => (
@@ -1269,6 +1374,54 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
               <ChevronRight size={15} />
               <span>deploy plan</span>
             </div>
+            <div className="releaseProviderBox">
+              <div className="controlForm compact">
+                <label>
+                  <span>Release ID</span>
+                  <input
+                    onChange={(event) => setReleaseProviderForm((current) => ({ ...current, releaseID: event.target.value }))}
+                    value={releaseProviderForm.releaseID}
+                  />
+                </label>
+                <label className="checkboxLine">
+                  <input
+                    checked={releaseProviderForm.approved}
+                    onChange={(event) => setReleaseProviderForm((current) => ({ ...current, approved: event.target.checked }))}
+                    type="checkbox"
+                  />
+                  <span>Approved publish</span>
+                </label>
+                <label>
+                  <span>Approval ID</span>
+                  <input
+                    onChange={(event) => setReleaseProviderForm((current) => ({ ...current, approvalID: event.target.value }))}
+                    value={releaseProviderForm.approvalID}
+                  />
+                </label>
+              </div>
+              <div className="rowActions wide">
+                <button
+                  className="inlineActionButton"
+                  disabled={releaseProviderActionState.status === "running"}
+                  onClick={() => void runReleaseProviderAction("preview")}
+                  type="button"
+                >
+                  <Search size={13} />
+                  <span>Provider Preview</span>
+                </button>
+                <button
+                  className="inlineActionButton"
+                  disabled={releaseProviderActionState.status === "running"}
+                  onClick={() => void runReleaseProviderAction("publish")}
+                  type="button"
+                >
+                  <Rocket size={13} />
+                  <span>Provider Publish</span>
+                </button>
+                <ActionFeedback state={releaseProviderActionState} />
+              </div>
+              <SchemaFeedback errors={schemaErrors.releaseProvider} />
+            </div>
             <div className="releaseControls">
               <label className="checkboxLine">
                 <input checked={gitCreateApproved} onChange={(event) => setGitCreateApproved(event.target.checked)} type="checkbox" />
@@ -1279,6 +1432,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <input onChange={(event) => setGitCreateApprovalID(event.target.value)} value={gitCreateApprovalID} />
               </label>
             </div>
+            <SchemaFeedback errors={schemaErrors.gitCreate} />
             <div className="prmrList">
               {snapshot.git_provider_plans.length > 0 ? (
                 snapshot.git_provider_plans.slice(0, 3).map((plan) => (
@@ -1410,6 +1564,15 @@ type ReleaseSuggestEnvelope = {
   };
 };
 
+type ReleaseProviderExecutionEnvelope = {
+  error?: string;
+  release_provider_execution?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
 type DeploymentExecutionEnvelope = {
   error?: string;
   execution?: {
@@ -1526,6 +1689,10 @@ function splitCSV(value: string) {
     .filter(Boolean);
 }
 
+function viewVisible(activeView: ConsoleView, views: ConsoleView[]) {
+  return views.includes(activeView);
+}
+
 function isGitActionCompleted(plan: NonNullable<GitProviderActionEnvelope["git_provider_plan"]>) {
   const decision = plan.pr_mr?.create_decision || plan.pr_mr?.preview_decision || plan.pr_mr?.sync_decision || plan.decision || "";
   const remoteStatus = plan.pr_mr?.remote_status || "";
@@ -1543,6 +1710,20 @@ function ActionFeedback({ state }: { state?: ActionState }) {
       {state.message}
       {state.secretPreview ? ` / ${state.secretPreview}` : ""}
     </small>
+  );
+}
+
+function SchemaFeedback({ errors }: { errors?: string[] }) {
+  if (!errors || errors.length === 0) return null;
+  return (
+    <div className="schemaFeedback">
+      <AlertTriangle size={14} />
+      <div>
+        {errors.map((error) => (
+          <span key={error}>{error}</span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1597,10 +1778,13 @@ function groupIssues(issues: IssueNode[]) {
 }
 
 function toneForStatus(status: string): StatusTone {
-  if (status === "accepted" || status === "passed" || status === "ready" || status === "completed" || status === "planned") return "ok";
+  if (status === "accepted" || status === "passed" || status === "ready" || status === "completed" || status === "planned" || status === "ok" || status === "healthy")
+    return "ok";
   if (status === "running" || status === "dispatch" || status === "retrying") return "running";
-  if (status === "blocked" || status === "rejected" || status === "failed" || status === "route_blocked") return "blocked";
-  if (status === "waiting" || status === "pending" || status === "archived" || status === "open") return "warning";
+  if (status === "blocked" || status === "rejected" || status === "failed" || status === "route_blocked" || status === "unhealthy" || status === "down")
+    return "blocked";
+  if (status === "waiting" || status === "pending" || status === "archived" || status === "open" || status === "warning" || status === "degraded")
+    return "warning";
   return "neutral";
 }
 

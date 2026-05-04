@@ -13,6 +13,7 @@ import type {
   MaintenanceRecordSummary,
   ProjectSummary,
   ProviderSummary,
+  ProviderTelemetrySummary,
   QualityExplanation,
   QualitySignal,
   RuntimeRecoverySummary,
@@ -64,6 +65,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     graphResponse,
     scheduleResponse,
     providersResponse,
+    providerTelemetryResponse,
     resourcesResponse,
     maintenanceResponse,
     deploymentsResponse,
@@ -87,6 +89,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       `/projects/${project.id}/epics/phase1-epic/schedule?limit=4`,
     ),
     apiGet<ApiEnvelope<{ providers: unknown[] }>>(`/projects/${project.id}/providers`),
+    apiGet<ApiEnvelope<{ provider_telemetry: unknown[] }>>(`/projects/${project.id}/providers/telemetry?limit=6`),
     apiGet<ApiEnvelope<{ resources: unknown[] }>>(`/projects/${project.id}/resources`),
     apiGet<ApiEnvelope<{ maintenance_records: unknown[] }>>(`/projects/${project.id}/resources/maintenance?limit=5`),
     apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
@@ -112,6 +115,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   ];
   const subagentBacklog = normalizeSubagentBacklog(scheduleResponse?.schedule.subagent_backlog ?? []);
   const providers = normalizeProviders(providersResponse?.providers ?? []);
+  const providerTelemetry = normalizeProviderTelemetry(providerTelemetryResponse?.provider_telemetry ?? []);
   const resources = normalizeResources(resourcesResponse?.resources ?? []);
   const maintenanceRecords = normalizeMaintenanceRecords(maintenanceResponse?.maintenance_records ?? []);
   const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
@@ -155,6 +159,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
     subagent_backlog: subagentBacklog,
     providers: providers.length > 0 ? providers : demoSnapshot.providers,
+    provider_telemetry: providerTelemetry,
     resources,
     maintenance_records: maintenanceRecords,
     deployments,
@@ -275,8 +280,27 @@ function normalizeProviders(rawProviders: unknown[]): ProviderSummary[] {
       runtime_id: readString(raw, "runtime_id", ""),
       model,
       use_cases: readArray(raw, "allowed_use_cases"),
+      health_status: readString(readUnknown(raw, "health"), "status", ""),
+      quota_status: readString(readUnknown(raw, "quota"), "status", ""),
+      cost_status: readString(readUnknown(raw, "cost"), "status", ""),
     };
   });
+}
+
+function normalizeProviderTelemetry(rawRecords: unknown[]): ProviderTelemetrySummary[] {
+  return rawRecords.map((raw, index) => ({
+    id: readString(raw, "id", `provider-telemetry-${index + 1}`),
+    provider_id: readString(raw, "provider_id", ""),
+    source: readString(raw, "source", "unknown"),
+    decision: readString(raw, "decision", "PROVIDER_TELEMETRY_UNKNOWN"),
+    reason: readString(raw, "reason", ""),
+    health_status: readString(raw, "health_status", ""),
+    quota_status: readString(raw, "quota_status", ""),
+    cost_status: readString(raw, "cost_status", ""),
+    usage_tokens: readNumber(raw, "usage_tokens"),
+    estimated_cost: readNumber(raw, "estimated_cost"),
+    created_at: readString(raw, "created_at", ""),
+  }));
 }
 
 function normalizeResources(rawResources: unknown[]): ResourceSummary[] {

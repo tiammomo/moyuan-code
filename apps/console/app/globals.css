@@ -112,7 +112,7 @@ button {
   cursor: pointer;
 }
 
-.navItem:first-child,
+.navItem.active,
 .navItem:hover {
   background: #eaf1fb;
   color: #102033;
@@ -616,6 +616,35 @@ dd {
   color: var(--muted);
 }
 
+.schemaFeedback {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 14px 12px;
+  padding: 9px 10px;
+  border: 1px solid #f1b9b2;
+  border-radius: 7px;
+  background: #fff4f3;
+  color: var(--red);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.schemaFeedback div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.schemaFeedback span {
+  overflow-wrap: anywhere;
+}
+
+.controlForm + .schemaFeedback,
+.releaseProviderBox .schemaFeedback {
+  margin-top: -4px;
+}
+
 .executionList {
   display: grid;
   gap: 10px;
@@ -1097,6 +1126,52 @@ meter {
   white-space: nowrap;
 }
 
+.telemetryList {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.telemetryItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.telemetryItem div {
+  min-width: 0;
+}
+
+.telemetryItem strong,
+.telemetryItem span {
+  display: block;
+}
+
+.telemetryItem strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.telemetryItem span,
+.telemetryItem code {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.telemetryItem code {
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .releasePanel {
   padding-bottom: 14px;
 }
@@ -1127,6 +1202,28 @@ meter {
 .releaseControls {
   justify-content: flex-end;
   padding: 0 14px 12px;
+}
+
+.releaseProviderBox {
+  display: grid;
+  gap: 10px;
+  margin: 0 14px 14px;
+  padding: 12px;
+  border: 1px solid #e6ebf2;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.releaseProviderBox .controlForm.compact {
+  padding: 0;
+}
+
+.rowActions.wide {
+  justify-content: space-between;
+}
+
+.rowActions.wide .actionMessage {
+  margin-left: auto;
 }
 
 .checkboxLine,

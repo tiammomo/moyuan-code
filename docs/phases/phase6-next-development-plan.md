@@ -24,7 +24,7 @@ Phase 5 已完成并通过 readiness：
 | P1 | `phase6-002` | `deployment-ssh-preview-adapter` | completed | 部署 adapter preview/dry-run/execute 状态模型 | 生产真实执行继续默认关闭 |
 | P1 | `phase6-003` | `ci-cd-release-provider-adapter` | completed | release/tag/workflow provider adapter | 远程发布动作可审计且可降级 |
 | P1 | `phase6-004` | `provider-cost-health-telemetry` | completed | Provider quota/cost/health 反馈 | 路由能读取 provider 健康和预算信号 |
-| P2 | `phase6-005` | `console-routes-schema-forms` | planned | Console 多页面和 schema-aware forms | 表单错误和 execution 状态以后端为准 |
+| P2 | `phase6-005` | `console-routes-schema-forms` | completed | Console 多视图和 schema-aware forms | 表单预检、后端结果和 execution 状态可追踪 |
 
 ## 3. 执行规划：`phase6-001 approval-consumption-replay-guard`
 
@@ -214,7 +214,52 @@ Phase 5 已完成并通过 readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 11. 验证要求
+## 11. 执行规划：`phase6-005 console-routes-schema-forms`
+
+范围：
+
+- Console 侧边栏从静态导航升级为多视图工作台，可按 Projects、Issue Graph、Runs、Quality、Memory、Providers、Deployments 和 Audit 聚焦不同工作域。
+- Requirement、Approval、Access、Resource、Git PR/MR 和 Release Provider 操作增加 schema-aware 前端预检，空必填字段在调用 API 前给出字段级错误。
+- Console 接入 provider telemetry，展示 provider health/quota/cost 状态和近期 telemetry 记录。
+- Release Pipeline 增加 release provider preview/publish 操作入口，结果以后端 provider execution 为准。
+
+非目标：
+
+- 不引入独立前端路由状态机或复杂客户端状态库。
+- 不在前端绕过 approval、authz、secret resolver 或真实外部写开关。
+- 不把 schema 校验作为最终权限判断；后端仍是权威门禁。
+
+验收：
+
+- 侧边栏切换能收敛当前视图展示范围。
+- 必填字段为空时，Console 显示字段级 schema error 且不调用对应 API。
+- Provider 面板能显示 health 和 telemetry 摘要。
+- Release provider preview/publish 只能通过后端受控 API 返回 execution 状态。
+- `npm run typecheck`、`npm run build`、`go test ./...`、`git diff --check` 通过。
+
+## 12. 已完成任务：`phase6-005 console-routes-schema-forms`
+
+范围：
+
+- Console sidebar 已支持多视图切换，保留 Projects 作为全量工作台视图。
+- 新增 `SchemaFeedback`，对 Requirement、Approval、Session、API Token、Service Account、Server Resource、Git PR/MR create 和 Release Provider 操作做必填字段预检。
+- Console snapshot 接入 `/providers/telemetry`，Providers & Runtimes 面板展示 provider health 和 telemetry 摘要。
+- Release Pipeline 增加 provider preview/publish 表单，调用 `/releases/:release_id/provider-preview` 和 `/provider-publish`，并展示 provider execution id/status。
+
+非目标：
+
+- 不真实发布 GitHub/Gitee release 或 workflow。
+- 不在 Console 展示 secret 明文。
+- 不改变后端 authz、approval 和 preview-only 降级规则。
+
+验证：
+
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 13. 验证要求
 
 每完成一个 Phase 6 issue，至少运行：
 

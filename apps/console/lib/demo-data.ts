@@ -145,6 +145,9 @@ export const demoSnapshot: ConsoleSnapshot = {
       runtime_id: "claude_cli",
       model: "MiniMax-M2.7",
       use_cases: ["frontend", "planning", "review"],
+      health_status: "ok",
+      quota_status: "ok",
+      cost_status: "warning",
     },
     {
       id: "codex_cli",
@@ -154,6 +157,7 @@ export const demoSnapshot: ConsoleSnapshot = {
       enabled: true,
       runtime_id: "codex_cli",
       use_cases: ["backend", "testing", "review", "repair"],
+      health_status: "ok",
     },
     {
       id: "gpt_image_2",
@@ -163,6 +167,22 @@ export const demoSnapshot: ConsoleSnapshot = {
       enabled: false,
       model: "gpt-image-2",
       use_cases: ["architecture_diagram"],
+      health_status: "unknown",
+    },
+  ],
+  provider_telemetry: [
+    {
+      id: "provider-telemetry-minimax",
+      provider_id: "minimax-m27-claude",
+      source: "ops_refresh",
+      decision: "PROVIDER_TELEMETRY_WARNING",
+      reason: "provider_degraded_or_budget_warning",
+      health_status: "ok",
+      quota_status: "ok",
+      cost_status: "warning",
+      usage_tokens: 18400,
+      estimated_cost: 4.2,
+      created_at: "2026-05-05T00:30:00.000Z",
     },
   ],
   resources: [

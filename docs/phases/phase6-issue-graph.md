@@ -22,14 +22,14 @@ Phase 6 的目标是在 Phase 5 的强制门禁基础上，推进真实外部执
 | `phase6-002` | `deployment-ssh-preview-adapter` | completed | SSH/云厂商 deployment adapter 的 preview/dry-run/execute 状态模型 | `phase6-001` | `devops_owner` | 生产执行仍需 approval，test_dev/staging 可形成可审计 dry-run |
 | `phase6-003` | `ci-cd-release-provider-adapter` | completed | GitHub/Gitee release、tag、workflow run 和回归状态同步 | `phase6-001` | `git_owner` + `release_manager` | release 发布只在质量门禁和审批满足时生成远程动作 |
 | `phase6-004` | `provider-cost-health-telemetry` | completed | Provider quota/cost/health 采集、预算状态和路由反馈 | Phase 5 readiness | `provider_owner` | Provider 路由能读取健康、额度和成本信号 |
-| `phase6-005` | `console-routes-schema-forms` | planned | Console 多页面化、schema-aware forms、操作结果追踪 | `phase6-001` | `frontend_owner` | 高风险表单能展示后端 schema 错误和最新 execution 状态 |
+| `phase6-005` | `console-routes-schema-forms` | completed | Console 多视图导航、schema-aware forms、操作结果追踪 | `phase6-001` | `frontend_owner` | 高风险表单能展示前端 schema 错误、后端结果和最新 execution 状态 |
 
 ## 3. 建议执行顺序
 
 1. 先做 `phase6-001`，因为真实外部写操作必须先具备审批消费和重放防护。
 2. `phase6-002` 和 `phase6-003` 都依赖审批消费，否则部署和 release 远程动作无法安全打开。
 3. `phase6-004` 可与 DevOps/Git 工作并行，作为 Provider routing 的质量输入。
-4. `phase6-005` 在后端状态对象稳定后推进，避免前端提前固化错误表单。
+4. `phase6-005` 已在后端状态对象稳定后推进，Console 只做 schema 预检和受控 API 调用。
 
 ## 4. 收口规则
 

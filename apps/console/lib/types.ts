@@ -64,6 +64,23 @@ export type ProviderSummary = {
   runtime_id?: string;
   model?: string;
   use_cases: string[];
+  health_status?: string;
+  quota_status?: string;
+  cost_status?: string;
+};
+
+export type ProviderTelemetrySummary = {
+  id: string;
+  provider_id: string;
+  source: string;
+  decision: string;
+  reason?: string;
+  health_status?: string;
+  quota_status?: string;
+  cost_status?: string;
+  usage_tokens?: number;
+  estimated_cost?: number;
+  created_at?: string;
 };
 
 export type ResourceSummary = {
@@ -367,6 +384,7 @@ export type ConsoleSnapshot = {
   schedule: ScheduleItem[];
   subagent_backlog: SubagentBacklogItem[];
   providers: ProviderSummary[];
+  provider_telemetry: ProviderTelemetrySummary[];
   resources: ResourceSummary[];
   maintenance_records: MaintenanceRecordSummary[];
   deployments: DeploymentSummary[];
