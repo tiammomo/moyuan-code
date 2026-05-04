@@ -22,7 +22,7 @@ Phase 4 已完成并通过 readiness：
 | P0 | `phase5-001` | `auth-context-rbac-middleware` | completed | API middleware 解析身份并执行最小 RBAC | 受保护 API 有 allow/deny 决策和 audit event |
 | P0 | `phase5-002` | `secret-ref-resolver` | completed | 安全解析 `secret:`/`env:` 引用并注入 adapter | Secret 明文不出现在响应、日志、Memory、prompt 或测试 fixture |
 | P1 | `phase5-003` | `github-gitee-pr-mr-adapter` | completed | PR/MR preview/create/status adapter | 默认 preview，真实 create 需 authz + approval |
-| P1 | `phase5-004` | `deployment-smoke-monitor-adapters` | planned | smoke/monitor 结果记录和 rollback 建议 | production 必须 approval，结果可审计 |
+| P1 | `phase5-004` | `deployment-smoke-monitor-adapters` | completed | smoke/monitor 结果记录和 rollback 建议 | production 必须 approval，结果可审计 |
 | P1 | `phase5-005` | `console-controlled-forms` | planned | Console 增加受控操作表单 | 表单只调用后端受控 API，状态以后端为准 |
 
 ## 3. 执行规划：`phase5-001 auth-context-rbac-middleware`
@@ -121,7 +121,32 @@ Phase 4 已完成并通过 readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 7. 验证要求
+## 7. 已完成任务：`phase5-004 deployment-smoke-monitor-adapters`
+
+范围：
+
+- Deployment execution 增加 `smoke_report`、`monitor_report` 和 `rollback_suggestion`。
+- `local_shell` 部署命令成功后自动执行资源 healthcheck 作为 smoke，再执行 monitor 检查。
+- HTTP/HTTPS healthcheck 仅允许 `127.0.0.1` 和 `localhost`，避免误扫外部或生产内网。
+- smoke 或 monitor 失败时 execution 标记失败，并写入 rollback suggestion。
+- 记录 `deployment.smoke.completed`、`deployment.monitor.completed`、`deployment.rollback.suggested` 日志。
+- production 真实执行仍保持阻断；test_dev 可执行 dry-run 或受限 local_shell。
+
+非目标：
+
+- 不实现 SSH/云厂商真实部署。
+- 不读取外部监控系统。
+- 不自动执行 rollback command，只给出受控建议和审计记录。
+
+验证：
+
+- `go test ./internal/deployment ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 8. 验证要求
 
 每完成一个 Phase 5 issue，至少运行：
 

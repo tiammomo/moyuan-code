@@ -3,6 +3,9 @@ package deployment
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -64,19 +67,22 @@ type ExecuteOptions struct {
 }
 
 type Execution struct {
-	ID           string            `json:"id"`
-	DeploymentID string            `json:"deployment_id"`
-	ReleaseID    string            `json:"release_id"`
-	Environment  string            `json:"environment"`
-	Mode         string            `json:"mode"`
-	Status       string            `json:"status"`
-	Decision     string            `json:"decision"`
-	Reasons      []string          `json:"reasons"`
-	Resources    []ResourceSummary `json:"resources"`
-	Steps        []ExecutionStep   `json:"steps"`
-	ApprovalID   string            `json:"approval_id,omitempty"`
-	StartedAt    string            `json:"started_at"`
-	FinishedAt   string            `json:"finished_at,omitempty"`
+	ID                 string             `json:"id"`
+	DeploymentID       string             `json:"deployment_id"`
+	ReleaseID          string             `json:"release_id"`
+	Environment        string             `json:"environment"`
+	Mode               string             `json:"mode"`
+	Status             string             `json:"status"`
+	Decision           string             `json:"decision"`
+	Reasons            []string           `json:"reasons"`
+	Resources          []ResourceSummary  `json:"resources"`
+	Steps              []ExecutionStep    `json:"steps"`
+	SmokeReport        CheckReport        `json:"smoke_report,omitempty"`
+	MonitorReport      CheckReport        `json:"monitor_report,omitempty"`
+	RollbackSuggestion RollbackSuggestion `json:"rollback_suggestion,omitempty"`
+	ApprovalID         string             `json:"approval_id,omitempty"`
+	StartedAt          string             `json:"started_at"`
+	FinishedAt         string             `json:"finished_at,omitempty"`
 }
 
 type ExecutionStep struct {
@@ -88,6 +94,28 @@ type ExecutionStep struct {
 	Allowlist  []string `json:"allowlist,omitempty"`
 	StartedAt  string   `json:"started_at,omitempty"`
 	FinishedAt string   `json:"finished_at,omitempty"`
+}
+
+type CheckReport struct {
+	Status    string        `json:"status,omitempty"`
+	Decision  string        `json:"decision,omitempty"`
+	Results   []CheckResult `json:"results,omitempty"`
+	CheckedAt string        `json:"checked_at,omitempty"`
+}
+
+type CheckResult struct {
+	ResourceID string `json:"resource_id"`
+	Target     string `json:"target,omitempty"`
+	Status     string `json:"status"`
+	Reason     string `json:"reason,omitempty"`
+	HTTPStatus int    `json:"http_status,omitempty"`
+}
+
+type RollbackSuggestion struct {
+	Required bool     `json:"required,omitempty"`
+	Decision string   `json:"decision,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
+	Actions  []string `json:"actions,omitempty"`
 }
 
 func CreatePlan(rootDir string, options PlanOptions) (Plan, error) {
@@ -300,11 +328,27 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 		execution.Steps = steps
 		execution.Reasons = append(execution.Reasons, reasons...)
 		if ok {
-			execution.Status = "completed"
-			execution.Decision = "DEPLOY_EXECUTION_COMPLETED"
+			smoke, monitor, rollback, postSteps, postOK, postReasons := runPostDeploymentChecks(ctx, rootDir, plan)
+			execution.SmokeReport = smoke
+			execution.MonitorReport = monitor
+			execution.RollbackSuggestion = rollback
+			execution.Steps = append(execution.Steps, postSteps...)
+			execution.Reasons = append(execution.Reasons, postReasons...)
+			switch {
+			case !postOK && smoke.Status == "failed":
+				execution.Status = "failed"
+				execution.Decision = "DEPLOY_SMOKE_FAILED"
+			case !postOK && monitor.Status == "failed":
+				execution.Status = "failed"
+				execution.Decision = "DEPLOY_MONITOR_FAILED"
+			default:
+				execution.Status = "completed"
+				execution.Decision = "DEPLOY_EXECUTION_COMPLETED"
+			}
 		} else {
 			execution.Status = "failed"
 			execution.Decision = "DEPLOY_EXECUTION_FAILED"
+			execution.RollbackSuggestion = rollbackFor(plan, "deploy_command_failed")
 		}
 	default:
 		execution.Reasons = append(execution.Reasons, "execution_mode_not_allowed:"+options.Mode)
@@ -467,6 +511,192 @@ func dryRunSteps(plan Plan, commands []string) []ExecutionStep {
 		steps = append(steps, ExecutionStep{Name: "command_preview", Status: "dry_run", Command: command, Allowlist: safeShellPrefixes()})
 	}
 	return steps
+}
+
+func runPostDeploymentChecks(ctx context.Context, rootDir string, plan Plan) (CheckReport, CheckReport, RollbackSuggestion, []ExecutionStep, bool, []string) {
+	smoke := runCheckReport(ctx, rootDir, plan, "smoke")
+	steps := []ExecutionStep{stepFromReport("smoke", smoke)}
+	reasons := []string{}
+	ok := smoke.Status != "failed"
+	if ok {
+		reasons = append(reasons, "smoke_"+smoke.Status)
+	} else {
+		reasons = append(reasons, "smoke_failed")
+		rollback := rollbackFor(plan, "smoke_failed")
+		steps = append(steps, stepFromRollback(rollback))
+		logPostDeploymentChecks(rootDir, plan, smoke, CheckReport{}, rollback)
+		return smoke, CheckReport{}, rollback, steps, false, reasons
+	}
+	monitor := runCheckReport(ctx, rootDir, plan, "monitor")
+	steps = append(steps, stepFromReport("monitor", monitor))
+	if monitor.Status == "failed" {
+		reasons = append(reasons, "monitor_failed")
+		rollback := rollbackFor(plan, "monitor_failed")
+		steps = append(steps, stepFromRollback(rollback))
+		logPostDeploymentChecks(rootDir, plan, smoke, monitor, rollback)
+		return smoke, monitor, rollback, steps, false, reasons
+	}
+	reasons = append(reasons, "monitor_"+monitor.Status)
+	rollback := RollbackSuggestion{Required: false, Decision: "ROLLBACK_NOT_REQUIRED", Reason: "smoke_and_monitor_not_failed"}
+	logPostDeploymentChecks(rootDir, plan, smoke, monitor, rollback)
+	return smoke, monitor, rollback, steps, true, reasons
+}
+
+func runCheckReport(ctx context.Context, rootDir string, plan Plan, checkType string) CheckReport {
+	report := CheckReport{
+		Status:    "passed",
+		Decision:  strings.ToUpper(checkType) + "_PASSED",
+		Results:   []CheckResult{},
+		CheckedAt: time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	for _, summary := range plan.Resources {
+		resource, found, err := serverresources.Show(rootDir, summary.ID)
+		if err != nil || !found {
+			report.Results = append(report.Results, CheckResult{ResourceID: summary.ID, Status: "failed", Reason: "resource_not_found"})
+			report.Status = "failed"
+			report.Decision = strings.ToUpper(checkType) + "_FAILED"
+			continue
+		}
+		result := runResourceCheck(ctx, resource)
+		report.Results = append(report.Results, result)
+		if result.Status == "failed" || result.Status == "blocked" {
+			report.Status = "failed"
+			report.Decision = strings.ToUpper(checkType) + "_FAILED"
+		}
+	}
+	if len(report.Results) == 0 {
+		report.Status = "failed"
+		report.Decision = strings.ToUpper(checkType) + "_FAILED"
+		report.Results = append(report.Results, CheckResult{Status: "failed", Reason: "deployment_resources_missing"})
+	}
+	if report.Status == "passed" && allManualOrSkipped(report.Results) {
+		report.Status = "manual_required"
+		report.Decision = strings.ToUpper(checkType) + "_MANUAL_REQUIRED"
+	}
+	return report
+}
+
+func runResourceCheck(ctx context.Context, resource serverresources.Resource) CheckResult {
+	result := CheckResult{ResourceID: resource.ID, Target: resource.Healthcheck.Target, Status: "manual_required", Reason: "manual_healthcheck"}
+	checkType := normalizeToken(resource.Healthcheck.Type)
+	if checkType == "" || checkType == "manual" {
+		return result
+	}
+	if checkType != "http" && checkType != "https" {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_type_not_allowed:" + checkType
+		return result
+	}
+	target := strings.TrimSpace(resource.Healthcheck.Target)
+	if target == "" {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_target_required"
+		return result
+	}
+	parsed, err := url.Parse(target)
+	if err != nil || parsed.Hostname() == "" {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_target_invalid"
+		return result
+	}
+	scheme := normalizeToken(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_scheme_not_allowed"
+		return result
+	}
+	if scheme != checkType {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_scheme_mismatch"
+		return result
+	}
+	if parsed.Hostname() != "127.0.0.1" && parsed.Hostname() != "localhost" {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_target_not_allowed"
+		return result
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_request_invalid"
+		return result
+	}
+	response, err := (&http.Client{Timeout: 3 * time.Second}).Do(request)
+	if err != nil {
+		result.Status = "failed"
+		result.Reason = "healthcheck_request_failed"
+		return result
+	}
+	defer response.Body.Close()
+	result.HTTPStatus = response.StatusCode
+	if response.StatusCode >= 200 && response.StatusCode < 400 {
+		result.Status = "passed"
+		result.Reason = "healthcheck_ok"
+		return result
+	}
+	result.Status = "failed"
+	result.Reason = fmt.Sprintf("healthcheck_http_status:%d", response.StatusCode)
+	return result
+}
+
+func stepFromReport(name string, report CheckReport) ExecutionStep {
+	outputs := []string{}
+	for _, result := range report.Results {
+		output := result.ResourceID + ":" + result.Status
+		if result.Reason != "" {
+			output += ":" + result.Reason
+		}
+		outputs = append(outputs, output)
+	}
+	return ExecutionStep{
+		Name:       name,
+		Status:     report.Status,
+		Output:     strings.Join(outputs, "; "),
+		StartedAt:  report.CheckedAt,
+		FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
+	}
+}
+
+func stepFromRollback(rollback RollbackSuggestion) ExecutionStep {
+	return ExecutionStep{
+		Name:       "rollback",
+		Status:     "suggested",
+		Output:     strings.Join(rollback.Actions, "; "),
+		StartedAt:  time.Now().UTC().Format(time.RFC3339Nano),
+		FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
+	}
+}
+
+func rollbackFor(plan Plan, reason string) RollbackSuggestion {
+	actions := append([]string{}, plan.RollbackPlan.Actions...)
+	if len(actions) == 0 {
+		actions = []string{"restore previous release", "rerun smoke checks", "keep incident record open"}
+	}
+	return RollbackSuggestion{Required: true, Decision: "ROLLBACK_RECOMMENDED", Reason: reason, Actions: actions}
+}
+
+func allManualOrSkipped(results []CheckResult) bool {
+	if len(results) == 0 {
+		return false
+	}
+	for _, result := range results {
+		if result.Status != "manual_required" && result.Status != "skipped" {
+			return false
+		}
+	}
+	return true
+}
+
+func logPostDeploymentChecks(rootDir string, plan Plan, smoke CheckReport, monitor CheckReport, rollback RollbackSuggestion) {
+	if smoke.Status != "" {
+		_ = logging.Log(rootDir, "release", "deployment.smoke.completed", map[string]any{"deployment_id": plan.ID, "release_id": plan.ReleaseID, "status": smoke.Status, "decision": smoke.Decision})
+	}
+	if monitor.Status != "" {
+		_ = logging.Log(rootDir, "release", "deployment.monitor.completed", map[string]any{"deployment_id": plan.ID, "release_id": plan.ReleaseID, "status": monitor.Status, "decision": monitor.Decision})
+	}
+	if rollback.Required {
+		_ = logging.Log(rootDir, "release", "deployment.rollback.suggested", map[string]any{"deployment_id": plan.ID, "release_id": plan.ReleaseID, "reason": rollback.Reason, "decision": rollback.Decision})
+	}
 }
 
 func runLocalShell(ctx context.Context, rootDir string, commands []string) ([]ExecutionStep, bool, []string) {
