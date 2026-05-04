@@ -31,6 +31,7 @@ import (
 	"moyuan-code/internal/runtime"
 	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/store"
+	"moyuan-code/internal/subagent"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
 )
@@ -151,6 +152,8 @@ func usage() string {
 		"moyuan orchestrator plan <epic-id>",
 		"moyuan orchestrator run <issue-id> [--role backend] [--runtime local_shell] [--provider <provider-id>] [--prompt <command>]",
 		"moyuan orchestrator run list [--limit 20]",
+		"moyuan orchestrator subagent list [--limit 20]",
+		"moyuan orchestrator subagent show <subagent-id>",
 		"moyuan orchestrator status <issue-id>",
 		"moyuan orchestrator issue status <issue-id>",
 		"moyuan orchestrator run status <run-id>",
@@ -659,6 +662,21 @@ func handleOrchestrator(ctx context.Context, args []string, cwd string) (string,
 				return "", map[string]any{}, 1, nil
 			}
 			return "", state, 0, nil
+		}
+	case "subagent":
+		if len(args) >= 2 && args[1] == "list" {
+			instances, err := subagent.List(rootDir, flagInt(args, "--limit", 20))
+			return "", instances, 0, err
+		}
+		if len(args) >= 3 && args[1] == "show" {
+			instance, ok, err := subagent.Load(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", instance, 0, nil
 		}
 	}
 	return "unknown orchestrator command\n", nil, 1, nil

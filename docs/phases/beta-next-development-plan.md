@@ -37,6 +37,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P1 | `beta-012` | `console-api-integration` | completed | Web Console 接入更多真实 API | 控制台可展示 live requirement、deploy execution、resource health |
 | P1 | `beta-013` | `subagent-run-visibility` | completed | Subagent/run 过程可视化 | 运行队列、等待原因、review/quality 结果可追踪 |
 | P2 | `beta-014` | `server-health-check-executor` | completed | 服务器健康检查执行器 | test_dev/staging 资源可执行受控 health check 并回写资源状态 |
+| P1 | `beta-015` | `subagent-model` | completed | 显式 Subagent Instance 模型 | 每个 run 都有 role/runtime/scope/skills/memory 的可审计 subagent |
+| P1 | `beta-016` | `quality-policy-api` | planned | 质量门禁策略和 findings 可解释 API | 控制台可查看 accepted/blocked/needs_rework 的证据 |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -460,15 +462,32 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 
 ### `beta-015 subagent-model`
 
-范围草案：
+状态：completed
+
+范围：
 
 - 显式建模 Subagent Instance，连接 issue、role、runtime、provider、skills、memory scope、read/write scope 和 output contract。
 - Run State 引用 subagent id，控制台可从 issue 追踪到 subagent 和 runtime session。
 
-退出条件：
+非目标：
+
+- 不新增无限层级子任务。
+- 不让 Subagent 绕过 Orchestrator、Runtime Adapter、Quality Gate 或 Reviewer。
+- 不实现完整 Skill 推荐评分，只先记录 skills 绑定。
+
+验收：
 
 - 每个 orchestrator run 都有可审计 subagent instance。
 - Subagent 不能自行越权扩大 scope 或绕过 quality/review。
+- `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 `internal/subagent`。
+- Orchestrator run 会创建 Subagent Instance，并把 `subagent_id` 写入 run state 和 result。
+- 已支持 CLI：`moyuan orchestrator subagent list`、`moyuan orchestrator subagent show <subagent-id>`。
+- 已支持 API：`GET /v1/projects/:project_id/subagents`、`GET /v1/projects/:project_id/subagents/:subagent_id`。
+- Subagent 写入 `.moyuan/agents/subagents/`，并记录 `subagent.created` / `subagent.finished` 日志。
 
 ### `beta-016 quality-policy-api`
 

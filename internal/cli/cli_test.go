@@ -225,8 +225,10 @@ func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 
 	accepted := runCLI(t, root, "orchestrator", "run", "phase1-001", "--runtime", "local_shell", "--prompt", "printf accepted")
 	acceptedRunID := decodeRunID(t, accepted.stdout)
+	acceptedSubagentID := decodeStringField(t, accepted.stdout, "subagent_id")
 	assertContains(t, accepted.stdout, `"status": "accepted"`)
 	assertContains(t, accepted.stdout, `"quality_report_id"`)
+	assertContains(t, accepted.stdout, `"subagent_id"`)
 
 	issueState := runCLI(t, root, "orchestrator", "status", "phase1-001")
 	assertContains(t, issueState.stdout, `"status": "accepted"`)
@@ -237,8 +239,15 @@ func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 
 	runState := runCLI(t, root, "orchestrator", "run", "status", acceptedRunID)
 	assertContains(t, runState.stdout, `"status": "completed"`)
+	assertContains(t, runState.stdout, acceptedSubagentID)
 	assertContains(t, runState.stdout, `"runtime_status": "completed"`)
 	assertContains(t, runState.stdout, `"quality_status": "passed"`)
+
+	subagentShown := runCLI(t, root, "orchestrator", "subagent", "show", acceptedSubagentID)
+	assertContains(t, subagentShown.stdout, `"role": "backend"`)
+	assertContains(t, subagentShown.stdout, `"output_contract"`)
+	subagentList := runCLI(t, root, "orchestrator", "subagent", "list", "--limit", "1")
+	assertContains(t, subagentList.stdout, acceptedSubagentID)
 
 	runList := runCLI(t, root, "orchestrator", "run", "list", "--limit", "1")
 	assertContains(t, runList.stdout, acceptedRunID)

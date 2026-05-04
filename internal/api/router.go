@@ -22,6 +22,7 @@ import (
 	"moyuan-code/internal/scheduler"
 	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/store"
+	"moyuan-code/internal/subagent"
 )
 
 const Version = "phase1-gin-gorm"
@@ -202,6 +203,44 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"run": state})
+	})
+	router.GET("/v1/projects/:project_id/subagents", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		instances, err := subagent.List(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"subagents": instances})
+	})
+	router.GET("/v1/projects/:project_id/subagents/:subagent_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		instance, found, err := subagent.Load(rootDir, c.Param("subagent_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "subagent not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"subagent": instance})
 	})
 	router.GET("/v1/projects/:project_id/quality/:report_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

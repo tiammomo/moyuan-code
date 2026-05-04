@@ -31,7 +31,7 @@
 | `beta-012` | `console-api-integration` | completed | Web Console 接入更多真实 API 和状态视图 | `beta-011` | `frontend` | 控制台可展示 live requirement、deployment execution 和资源健康 |
 | `beta-013` | `subagent-run-visibility` | completed | Subagent/run 过程可视化 | `beta-004`,`beta-005` | `orchestrator_owner` | 用户能追踪运行队列、等待原因、质量和 review |
 | `beta-014` | `server-health-check-executor` | completed | 服务器健康检查执行器和历史记录 | `beta-009`,`beta-011` | `infra_owner` | test_dev/staging 可执行 health scan 并回写资源状态 |
-| `beta-015` | `subagent-model` | planned | 显式 Subagent Instance 数据模型 | `beta-013` | `orchestrator_owner` | 每个 run 都有 role/runtime/scope/skills/memory 的可审计 subagent |
+| `beta-015` | `subagent-model` | completed | 显式 Subagent Instance 数据模型 | `beta-013` | `orchestrator_owner` | 每个 run 都有 role/runtime/scope/skills/memory 的可审计 subagent |
 | `beta-016` | `quality-policy-api` | planned | 质量门禁策略和 findings 可解释 API | `beta-005`,`beta-013` | `quality_owner` | 控制台可查看 accepted/blocked/needs_rework 的证据 |
 
 ## 3. 推荐执行顺序
@@ -48,7 +48,7 @@
 
 ## 4. 当前执行入口
 
-Beta 第一批计划层能力已完成，`beta-011 controlled-deploy-executor`、`beta-012 console-api-integration`、`beta-013 subagent-run-visibility` 和 `beta-014 server-health-check-executor` 已完成。下一步准备 `beta-015 subagent-model`。
+Beta 第一批计划层能力已完成，`beta-011 controlled-deploy-executor`、`beta-012 console-api-integration`、`beta-013 subagent-run-visibility`、`beta-014 server-health-check-executor` 和 `beta-015 subagent-model` 已完成。下一步准备 `beta-016 quality-policy-api`。
 
 实现边界：
 

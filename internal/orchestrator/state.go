@@ -29,6 +29,7 @@ type RunState struct {
 	RunID           string       `json:"run_id"`
 	IssueID         string       `json:"issue_id"`
 	Status          string       `json:"status"`
+	SubagentID      string       `json:"subagent_id,omitempty"`
 	RuntimeID       string       `json:"runtime_id,omitempty"`
 	RuntimeStatus   string       `json:"runtime_status,omitempty"`
 	QualityStatus   string       `json:"quality_status,omitempty"`

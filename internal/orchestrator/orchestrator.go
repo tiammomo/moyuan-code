@@ -14,12 +14,14 @@ import (
 	runrecord "moyuan-code/internal/run"
 	"moyuan-code/internal/runtime"
 	"moyuan-code/internal/scheduler"
+	"moyuan-code/internal/subagent"
 	"moyuan-code/internal/workspace"
 )
 
 type Result struct {
 	IssueID       string         `json:"issue_id"`
 	RunID         string         `json:"run_id"`
+	SubagentID    string         `json:"subagent_id"`
 	RuntimeResult runtime.Result `json:"runtime_result"`
 	QualityReport quality.Report `json:"quality_report"`
 	Status        string         `json:"status"`
@@ -87,10 +89,30 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	if err != nil {
 		return Result{}, err
 	}
+	instance, err := subagent.Create(rootDir, subagent.CreateOptions{
+		ParentType:     "issue",
+		ParentID:       issueID,
+		IssueID:        issueID,
+		RunID:          run.ID,
+		Role:           options.Role,
+		RuntimeID:      options.RuntimeID,
+		ProviderID:     options.ProviderID,
+		ModelID:        options.ModelID,
+		Skills:         []string{"quality-gate", "diff-review"},
+		MemoryScope:    []string{"project", "issue", "recent-runs"},
+		ReadScope:      []string{"project:" + workspace.ForRoot(rootDir).RootDir},
+		WriteScope:     []string{"issue:" + issueID},
+		OutputContract: []string{"runtime_result", "quality_report", "review_status"},
+	})
+	if err != nil {
+		return Result{}, err
+	}
 	if _, err := transitionIssue(rootDir, "phase1-epic", issueID, "running", "", run.ID, nil); err != nil {
 		return Result{}, err
 	}
-	if _, err := transitionRun(rootDir, issueID, run.ID, "running", "", nil); err != nil {
+	if _, err := transitionRun(rootDir, issueID, run.ID, "running", "", func(state *RunState) {
+		state.SubagentID = instance.ID
+	}); err != nil {
 		return Result{}, err
 	}
 	rt, err := runtime.Invoke(ctx, rootDir, runtime.Invocation{
@@ -110,9 +132,11 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	if err != nil {
 		_, _ = transitionIssue(rootDir, "phase1-epic", issueID, "failed", "runtime_error", run.ID, nil)
 		_, _ = transitionRun(rootDir, issueID, run.ID, "failed", "runtime_error", nil)
+		_, _, _ = subagent.Finish(rootDir, instance.ID, "failed")
 		return Result{}, err
 	}
 	if _, err := transitionRun(rootDir, issueID, run.ID, "collecting_outputs", "", func(state *RunState) {
+		state.SubagentID = instance.ID
 		state.RuntimeID = options.RuntimeID
 		state.RuntimeStatus = rt.Status
 	}); err != nil {
@@ -130,6 +154,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	if err != nil {
 		_, _ = transitionIssue(rootDir, "phase1-epic", issueID, "failed", "quality_error", run.ID, nil)
 		_, _ = transitionRun(rootDir, issueID, run.ID, "failed", "quality_error", nil)
+		_, _, _ = subagent.Finish(rootDir, instance.ID, "failed")
 		return Result{}, err
 	}
 	status := "accepted"
@@ -141,6 +166,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		runStatus = "failed"
 	}
 	runState, err := transitionRun(rootDir, issueID, run.ID, runStatus, status, func(state *RunState) {
+		state.SubagentID = instance.ID
 		state.RuntimeID = options.RuntimeID
 		state.RuntimeStatus = rt.Status
 		state.QualityStatus = report.Status
@@ -149,6 +175,11 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	if err != nil {
 		return Result{}, err
 	}
+	subagentStatus := "completed"
+	if status != "accepted" {
+		subagentStatus = "needs_rework"
+	}
+	_, _, _ = subagent.Finish(rootDir, instance.ID, subagentStatus)
 	issueState, err := transitionIssue(rootDir, "phase1-epic", issueID, status, statusReason(status, rt.Status, report.Status), run.ID, func(state *IssueState) {
 		state.QualityReportID = report.ID
 	})
@@ -158,6 +189,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	result := Result{
 		IssueID:       issueID,
 		RunID:         run.ID,
+		SubagentID:    instance.ID,
 		RuntimeResult: rt,
 		QualityReport: report,
 		Status:        status,
