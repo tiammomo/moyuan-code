@@ -536,25 +536,38 @@ Adapter 路线：
 - Beta：DashScope、DeepSeek、Zhipu、MCP。
 - Production：GitHub/Gitee/GitLab PR/MR、CI/CD、Observability、Enterprise SSO/Policy。
 
-## 9. 文档迭代计划
+## 9. Phase 1 执行入口
 
-当前阶段先继续完善文档规格，不拆分实现 issue 清单。
+文档规划阶段已完成收口。当前 [设计就绪门禁](./design-readiness-checklist.md) 结论为 `READY_WITH_RISKS`，可以进入 Phase 1 本地 CLI MVP 的实现拆分和第一批代码开发。
 
-优先级：
+Phase 1 的执行原则：
 
-1. 同步路线图、README、设计门禁和文档治理，使 8 条主线和策略层成为正式结构。
-2. 补充用户与鉴权设计，使平台用户、组织、会话、API Token、角色、审批和审计有唯一权威入口。
-3. 补充运行反馈与自我修复设计，使 Runtime Signal、Bug Candidate、Repair Attempt 和 Improvement Record 有唯一权威入口。
-4. 补充术语表中的 Mainline、Policy、Decision Tree、Ready Issue、Blocked Reason、Contract 等概念。
-5. 新增状态机总表，统一 User、Project、Epic、Issue、Run、Subagent、Skill、Bug Candidate、Repair Attempt、Release、Deployment、Memory、Server Resource 的状态来源。
-6. 新增契约层文档，至少包含 auth session、subagent skill、self-repair、schema validation、runtime adapter、logging audit event 和 workspace migration。
-7. 补充 Gitee、GitLab、generic Git 的独立接入字段表。
-8. 补充安全威胁模型，覆盖 prompt injection、模型外发、仓库恶意文件、远程命令、密钥泄露、账号接管、错误自动修复和生产误操作。
-9. 补充 Moyuan 框架自身测试策略，覆盖 fixture repos、mock runtime、Git sandbox、schema golden tests、auth tests、self-repair tests 和 E2E。
-10. 完成一次文档就绪巡检，再决定是否进入实现 issue 拆分。
+- 只实现本地 CLI MVP，不启动 Web Console 和 team_server。
+- 只使用文件化 `.moyuan/` 状态、JSONL 日志和 schema_version 1。
+- 所有入口先建立 `auth_context`，再执行项目、Git、Runtime、质量或写入操作。
+- Native Runtime 只能通过 Runtime Adapter 调用，不能绕过 Orchestrator、Workspace、Logging 和 Quality Gate。
+- 设计债务记录在 [设计就绪门禁](./design-readiness-checklist.md)，跟随对应模块实现补齐。
 
-进入实现拆分前必须满足：
+Phase 1 第一批实现模块：
 
-- [设计就绪门禁](./design-readiness-checklist.md) 没有 `NOT_READY` 项。
-- 主线、策略、契约、配置、对象、权限和失败恢复互相不冲突。
-- 关键实现契约能直接转成代码接口、schema 或测试用例。
+| 顺序 | 模块 | 最小交付 |
+| --- | --- | --- |
+| 1 | `workspace` | 初始化 `.moyuan/`、读取配置、原子写、基础目录和日志路径 |
+| 2 | `auth` | `local_single_user`、Auth Context、基础权限判断 |
+| 3 | `logging` | run、audit、error JSONL 事件 |
+| 4 | `git` | 本地仓库接入、状态读取、diff、branch、dirty worktree 保护 |
+| 5 | `runtime-adapters` | Codex CLI 和 Claude CLI 的最小调用封装、超时、输出和错误捕获 |
+| 6 | `orchestrator` | Epic、Issue、Run、状态流转和失败恢复入口 |
+| 7 | `scheduler` | blocked、ready、running、review 队列，先支持串行执行 |
+| 8 | `quality` | build、lint、test、typecheck 的基础 gate 和质量报告 |
+
+Phase 1 暂不进入第一批的能力：
+
+- 并发 worktree。
+- Skill Registry 自动推荐。
+- Memory 长期存储和 compact 的完整实现。
+- GitHub/Gitee/GitLab PR/MR 自动创建。
+- self-repair 自动修复闭环。
+- release/deployment 投产流水线。
+
+这些能力可以在第一批模块稳定后按 [实现模块拆分](./implementation-module-map.md) 的第二批扩展继续拆分。

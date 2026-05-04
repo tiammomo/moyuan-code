@@ -1,6 +1,6 @@
 # ADR 架构决策记录
 
-状态：planned
+状态：ready
 责任角色：architect
 最后更新：2026-05-03
 

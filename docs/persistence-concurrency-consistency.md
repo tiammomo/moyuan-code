@@ -1,6 +1,6 @@
 # 持久化与并发一致性
 
-状态：planned
+状态：ready
 责任角色：core_engineer + orchestrator_owner
 最后更新：2026-05-03
 

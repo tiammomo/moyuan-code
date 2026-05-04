@@ -11,6 +11,12 @@
 
 ## 门禁结论
 
+当前结论：`READY_WITH_RISKS`
+
+结论日期：2026-05-04
+
+说明：当前文档已经覆盖进入 Phase 1 本地 CLI MVP 的核心链路，可以开始实现拆分和第一批代码开发。剩余风险属于实现期设计债务，必须在对应模块落地前补齐，不能用于绕过鉴权、质量门禁、密钥保护、失败恢复或生产审批。
+
 设计评审只能输出三类结论：
 
 | 结论 | 含义 |
@@ -429,15 +435,36 @@
 如果允许 `READY_WITH_RISKS`，必须记录：
 
 ```yaml
-design_debt:
-  id: debt-001
-  title: schema 迁移策略需在 Phase 1 前确认
-  affected_docs:
-    - configuration-guide.md
-  risk: 中
-  mitigation: Phase 1 只支持 schema_version 1
-  owner: core
-  due_phase: Phase 1
+design_debts:
+  - id: debt-001
+    title: 配置 Schema 规则需要转换为机器可校验 schema
+    affected_docs:
+      - configuration-schema-spec.md
+      - contracts/schema-validation-contract.md
+    risk: 中
+    mitigation: Phase 1 只支持 schema_version 1，并优先实现 runtime validator
+    owner: core_engineer
+    due_phase: Phase 1
+  - id: debt-002
+    title: Git Provider 和 Model Provider 的 adapter contract 需要在实现前细化
+    affected_docs:
+      - git-provider-integration.md
+      - model-tool-adapters.md
+      - contracts/runtime-adapter-contract.md
+    risk: 中
+    mitigation: MVP 先支持最小能力集合，缺失能力必须显式降级
+    owner: adapter_owner
+    due_phase: Phase 1
+  - id: debt-003
+    title: 用户、组织、成员、Token 和审批的持久化迁移细则需要随 auth 模块实现补齐
+    affected_docs:
+      - mainlines/platform-user-access.md
+      - contracts/auth-session-contract.md
+      - project-workspace-spec.md
+    risk: 中
+    mitigation: local_single_user 先走文件化状态，team_server 延后
+    owner: identity_owner
+    due_phase: Phase 1
 ```
 
 设计债务不得用于绕过：
@@ -471,12 +498,11 @@ design_debt:
 
 ## 后续文档补强项
 
-当前文档已经覆盖主要能力。进入实现前仍建议补强以下文档规格：
+当前文档已经覆盖主要能力。以下内容作为实现期设计债务跟随模块落地，不阻塞 Phase 1 启动：
 
 - 将 [配置 Schema 规则](./configuration-schema-spec.md) 转成可机器校验的 schema。
-- 为 Git Adapter、Model Provider 补充更细的 adapter contract。
-- 为 GitHub 之外的 Gitee、GitLab、generic git 补充独立接入字段表。
+- 为 Git Provider、Model Provider 补充更细的 adapter contract 和字段 schema。
 - 为配置项补充统一的 required/optional/nullable 机器可读标记。
-- 为用户、组织、成员、Token 和审批补充配置/数据库迁移细则。
+- 为用户、组织、成员、Token 和审批补充持久化迁移细则。
 - 为自我修复补充 fixture、mock signal、repair sandbox 和回归测试模板。
 - 对配置示例做一次冗余和敏感信息审计。

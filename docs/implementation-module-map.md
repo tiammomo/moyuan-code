@@ -1,6 +1,6 @@
 # 实现模块拆分
 
-状态：planned
+状态：ready
 责任角色：architect + core_engineer
 最后更新：2026-05-03
 
@@ -310,9 +310,9 @@ src/
 
 恢复规则见 [失败恢复设计](./foundations/failure-recovery.md) 和 [持久化与并发一致性](./persistence-concurrency-consistency.md)。
 
-## 10. 验收标准
+## 10. Phase 1 实现拆分验收标准
 
-进入实现拆分前，本文必须满足：
+进入 Phase 1 实现拆分时，本文必须满足：
 
 - 每个核心能力都能映射到一个代码模块。
 - 模块依赖方向清楚，没有循环依赖要求。

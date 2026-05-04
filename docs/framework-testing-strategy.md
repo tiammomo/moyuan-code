@@ -1,6 +1,6 @@
 # 框架自身测试策略
 
-状态：planned
+状态：ready
 责任角色：quality_owner + core_engineer
 最后更新：2026-05-03
 
