@@ -22,6 +22,7 @@ import (
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/providers"
 	"moyuan-code/internal/quality"
+	"moyuan-code/internal/release"
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
 	"moyuan-code/internal/review"
@@ -88,6 +89,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleReview(argv[1:], cwd)
 	case "model":
 		text, result, exitCode, err = handleModel(argv[1:], cwd)
+	case "release":
+		text, result, exitCode, err = handleRelease(ctx, argv[1:], cwd)
 	case "logs":
 		text, result, exitCode, err = handleLogs(argv[1:], cwd)
 	default:
@@ -157,6 +160,8 @@ func usage() string {
 		"moyuan model provider show <provider>",
 		"moyuan model provider disable <provider>",
 		"moyuan model route --role <role> [--task-type <type>] [--output-type <type>] [--repo-edit]",
+		"moyuan release suggest [--version v0.1.0] [--min-issues 3]",
+		"moyuan release show <release-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -851,6 +856,39 @@ func handleModelProvider(args []string, rootDir string) (string, any, int, error
 		return "", provider, 0, nil
 	}
 	return "unknown model provider command\n", nil, 1, nil
+}
+
+func handleRelease(ctx context.Context, args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown release command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "suggest":
+		minIssues, _ := strconv.Atoi(flagValue(args, "--min-issues", "3"))
+		plan, err := release.Suggest(ctx, rootDir, release.SuggestOptions{
+			Version:   flagValue(args, "--version", ""),
+			MinIssues: minIssues,
+		})
+		code := 0
+		if plan.Status == "blocked" {
+			code = 1
+		}
+		return "", plan, code, err
+	case "show":
+		if len(args) < 2 {
+			return "missing release id\n", nil, 1, nil
+		}
+		plan, ok, err := release.Load(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", plan, 0, nil
+	}
+	return "unknown release command\n", nil, 1, nil
 }
 
 func modelsFromCLI(args []string) []providers.Model {

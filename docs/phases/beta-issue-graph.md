@@ -24,8 +24,8 @@
 | `beta-005` | `review-merge-pipeline` | completed | issue 完成后执行复核、风格检查、门禁、合入或返工 | `beta-004` | `quality_owner` | review 通过后才允许合入任务分支 |
 | `beta-006` | `provider-registry-runtime-routing` | completed | 管理 GPT、Claude、GLM、MiniMax、第三方 API 和 CLI agent runtime | `beta-001` | `adapter_owner` | Provider 可配置、校验、路由和审计 |
 | `beta-007` | `git-provider-pr-mr` | completed | GitHub/Gitee 认证、分支、push、PR/MR 创建和状态回读 | `beta-005` | `git_owner` | 可推送任务分支并创建 PR/MR |
-| `beta-008` | `release-branch-pipeline` | in_progress | 版本分支、release 建议、tag、GitHub/Gitee 发布记录 | `beta-007` | `release_owner` | 可按积累量建议发版并发布到 Git provider |
-| `beta-009` | `server-resource-registry` | planned | 测试机/生产机、到期时间、配置、权限、健康和维护记录 | `beta-001` | `infra_owner` | 服务器资源可登记、查询、审计 |
+| `beta-008` | `release-branch-pipeline` | completed | 版本分支、release 建议、tag、GitHub/Gitee 发布记录 | `beta-007` | `release_owner` | 可按积累量建议发版并发布到 Git provider |
+| `beta-009` | `server-resource-registry` | in_progress | 测试机/生产机、到期时间、配置、权限、健康和维护记录 | `beta-001` | `infra_owner` | 服务器资源可登记、查询、审计 |
 | `beta-010` | `devops-deploy-smoke-monitor` | planned | 部署、线上冒烟、生产监控和后续更新维护 | `beta-008`,`beta-009` | `devops_owner` | 可对配置服务器执行受控发布和回滚 |
 
 ## 3. 推荐执行顺序
@@ -39,11 +39,11 @@
 
 ## 4. 当前执行入口
 
-当前执行 `beta-008 release-branch-pipeline`。
+当前执行 `beta-009 server-resource-registry`。
 
 实现边界：
 
-- 先基于已 accepted 的 issue 和 Git Provider plan 生成 release suggestion。
-- 未合入、未 review 或 remote 不可用时阻断 release plan。
-- 本阶段只发布到 Git provider 的 branch/tag/release 计划层，不做服务器部署。
-- 状态事实仍以 `.moyuan/` 文件为准，远程平台状态后续作为索引同步。
+- 先建立服务器资源 registry，区分测试开发机、预发和生产机。
+- 记录 provider、region、规格、到期时间、owner、用途、健康和维护窗口。
+- 本阶段只做登记、查询和审计，不连接服务器、不部署。
+- 状态事实仍以 `.moyuan/` 文件为准，云厂商状态后续作为索引同步。

@@ -14,6 +14,7 @@ import (
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/providers"
 	"moyuan-code/internal/quality"
+	"moyuan-code/internal/release"
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
 	"moyuan-code/internal/review"
@@ -40,6 +41,11 @@ type routeRequest struct {
 	IncludesSecrets       bool   `json:"includes_secrets"`
 	IncludesSensitiveCode bool   `json:"includes_sensitive_code"`
 	IncludesProjectMemory bool   `json:"includes_project_memory"`
+}
+
+type releaseSuggestRequest struct {
+	Version   string `json:"version"`
+	MinIssues int    `json:"min_issues"`
 }
 
 func NewRouter(options Options) *gin.Engine {
@@ -242,6 +248,53 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"git_provider_plan": plan})
+	})
+	router.POST("/v1/projects/:project_id/releases/suggest", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req releaseSuggestRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		plan, err := release.Suggest(c.Request.Context(), rootDir, release.SuggestOptions{Version: req.Version, MinIssues: req.MinIssues})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if plan.Status == "blocked" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"release": plan})
+	})
+	router.GET("/v1/projects/:project_id/releases/:release_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plan, found, err := release.Load(rootDir, c.Param("release_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "release not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"release": plan})
 	})
 	router.POST("/v1/projects/:project_id/requirements/plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

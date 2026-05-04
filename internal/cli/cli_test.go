@@ -394,6 +394,22 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	assertFileExists(t, root, ".moyuan/lifecycle/pull-requests/"+planID+".json")
 	assertFileContains(t, root, ".moyuan/lifecycle/pull-requests/plans.jsonl", planID)
 	assertFileContains(t, root, ".moyuan/logs/git.jsonl", "git_provider.plan.created")
+	commitAll(t, root, "git provider plan")
+
+	releasePlan := runCLI(t, root, "release", "suggest", "--version", "v0.1.0", "--min-issues", "1")
+	assertContains(t, releasePlan.stdout, `"status": "suggested"`)
+	assertContains(t, releasePlan.stdout, `"decision": "RELEASE_SUGGESTED"`)
+	assertContains(t, releasePlan.stdout, `"release_branch": "release/v0.1.0"`)
+	assertContains(t, releasePlan.stdout, `"phase1-001"`)
+	releaseID := decodeStringField(t, releasePlan.stdout, "id")
+
+	releaseShown := runCLI(t, root, "release", "show", releaseID)
+	assertContains(t, releaseShown.stdout, releaseID)
+	assertContains(t, releaseShown.stdout, `"notes_path"`)
+	assertFileExists(t, root, ".moyuan/lifecycle/releases/"+releaseID+".json")
+	assertFileExists(t, root, ".moyuan/lifecycle/releases/"+releaseID+".md")
+	assertFileContains(t, root, ".moyuan/lifecycle/releases/plans.jsonl", releaseID)
+	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "release.plan.created")
 }
 
 func TestQualityReviewHardeningFindingsDriveNeedsRework(t *testing.T) {

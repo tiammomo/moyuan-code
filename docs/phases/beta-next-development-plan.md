@@ -29,7 +29,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P1 | `beta-005` | `review-merge-pipeline` | completed | 复核通过后合入任务分支 | review gate 阻断未达标代码 |
 | P1 | `beta-006` | `provider-registry-runtime-routing` | completed | Provider 和 Runtime 路由基线 | Provider 可配置、校验、路由和审计 |
 | P1 | `beta-007` | `git-provider-pr-mr` | completed | GitHub/Gitee 分支、push、PR/MR 编排 | 任务分支可推送并形成 PR/MR 计划 |
-| P1 | `beta-008` | `release-branch-pipeline` | in_progress | 版本分支、tag 和 GitHub/Gitee 发布记录 | 可根据积累量生成 release plan |
+| P1 | `beta-008` | `release-branch-pipeline` | completed | 版本分支、tag 和 GitHub/Gitee 发布记录 | 可根据积累量生成 release plan |
+| P1 | `beta-009` | `server-resource-registry` | in_progress | 测试机/生产机资源纳管 | 可登记、查询、审计服务器资源 |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -242,7 +243,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 当前只生成计划，不执行 push、PR/MR 创建或 merge。
 - 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
 
-## 10. 当前任务：`beta-008 release-branch-pipeline`
+## 10. 已完成任务：`beta-008 release-branch-pipeline`
 
 范围：
 
@@ -261,4 +262,34 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 可根据 accepted issue 数量和风险给出是否发版建议。
 - 可生成 release branch plan 和 release notes draft。
 - 缺失 remote 或存在未合入 issue 时阻断。
+- `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 `internal/release` release suggestion 模块。
+- 已支持 CLI：`moyuan release suggest [--version <version>] [--min-issues <n>]`、`moyuan release show <release-id>`。
+- 已支持 API：`POST /v1/projects/:project_id/releases/suggest`、`GET /v1/projects/:project_id/releases/:release_id`。
+- Release plan 和 release notes 写入 `.moyuan/lifecycle/releases/`，并记录 `release.plan.created` 日志。
+- 当前只生成 release branch/tag/push 建议，不执行真实发布动作。
+- 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
+
+## 11. 当前任务：`beta-009 server-resource-registry`
+
+范围：
+
+- 新增服务器资源 registry，区分 `test_dev`、`staging`、`production`。
+- 管理 host、provider、region、规格、到期时间、owner、用途、健康检查和维护记录。
+- 提供 CLI/API 查询和登记入口，为后续部署、冒烟和监控做基础。
+
+非目标：
+
+- 不执行 SSH 连接。
+- 不部署应用。
+- 不修改云服务商资源。
+
+验收：
+
+- 可添加、列出、查看和禁用服务器资源。
+- 到期时间、环境、资源规格和 owner 可查询。
+- 生产资源必须显式标记 environment，不能默认为生产。
 - `go test ./...` 通过。

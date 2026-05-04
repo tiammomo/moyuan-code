@@ -308,6 +308,7 @@ moyuan repair status <repair-id>
 moyuan repair approve <repair-id>
 moyuan release prepare
 moyuan release suggest
+moyuan release show <release-id>
 moyuan release publish <release-id>
 moyuan deploy run <release-id> --env <env>
 moyuan deploy status <release-id>
