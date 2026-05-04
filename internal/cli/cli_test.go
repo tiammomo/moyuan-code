@@ -547,6 +547,23 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	assertFileContains(t, root, ".moyuan/lifecycle/releases/plans.jsonl", releaseID)
 	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "release.plan.created")
 
+	releaseProviderPreview := runCLI(t, root, "release", "provider", "preview", releaseID)
+	assertContains(t, releaseProviderPreview.stdout, `"decision": "RELEASE_PROVIDER_PREVIEW_READY"`)
+	assertContains(t, releaseProviderPreview.stdout, `"create_release"`)
+	assertContains(t, releaseProviderPreview.stdout, `"trigger_workflow"`)
+	releaseProviderExecutionID := decodeStringField(t, releaseProviderPreview.stdout, "id")
+	releaseProviderShown := runCLI(t, root, "release", "provider", "execution", releaseProviderExecutionID)
+	assertContains(t, releaseProviderShown.stdout, releaseProviderExecutionID)
+	assertFileExists(t, root, ".moyuan/lifecycle/releases/provider-executions/"+releaseProviderExecutionID+".json")
+	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "release.provider.previewed")
+
+	releaseProviderPublish := runCLIAllowFailure(t, root, "release", "provider", "publish", releaseID)
+	if releaseProviderPublish.code == 0 {
+		t.Fatalf("expected release provider publish to require approval: %s", releaseProviderPublish.stdout)
+	}
+	assertContains(t, releaseProviderPublish.stdout, `"RELEASE_PROVIDER_PUBLISH_APPROVAL_REQUIRED"`)
+	assertContains(t, releaseProviderPublish.stdout, `"approval_id"`)
+
 	deployResource := runCLI(t, root, "resources", "add",
 		"--id", "deploy-dev",
 		"--environment", "test_dev",

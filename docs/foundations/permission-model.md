@@ -72,7 +72,7 @@ Moyuan 支持的 actor：
 | 角色 | 典型能力 |
 | --- | --- |
 | `ci_runner` | 执行 CI、回归和只读报告上传 |
-| `release_bot` | 按审批结果推送 release branch、tag 或 PR/MR |
+| `release_bot` | 按审批结果预览或推送 release branch、tag、远程 release 和 PR/MR |
 | `deploy_bot` | 按 deployment plan 执行受控投产 |
 
 ## 权限资源

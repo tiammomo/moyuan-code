@@ -22,7 +22,7 @@ Phase 5 已完成并通过 readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase6-001` | `approval-consumption-replay-guard` | completed | approval record 消费和重放防护 | 已消费 approval 不能再次触发真实外部写入 |
 | P1 | `phase6-002` | `deployment-ssh-preview-adapter` | completed | 部署 adapter preview/dry-run/execute 状态模型 | 生产真实执行继续默认关闭 |
-| P1 | `phase6-003` | `ci-cd-release-provider-adapter` | planned | release/tag/workflow provider adapter | 远程发布动作可审计且可降级 |
+| P1 | `phase6-003` | `ci-cd-release-provider-adapter` | completed | release/tag/workflow provider adapter | 远程发布动作可审计且可降级 |
 | P1 | `phase6-004` | `provider-cost-health-telemetry` | planned | Provider quota/cost/health 反馈 | 路由能读取 provider 健康和预算信号 |
 | P2 | `phase6-005` | `console-routes-schema-forms` | planned | Console 多页面和 schema-aware forms | 表单错误和 execution 状态以后端为准 |
 
@@ -120,7 +120,55 @@ Phase 5 已完成并通过 readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 7. 验证要求
+## 7. 执行规划：`phase6-003 ci-cd-release-provider-adapter`
+
+范围：
+
+- Release 增加 provider execution，用于记录 GitHub/Gitee release、tag 和 workflow dispatch 的 preview/publish 状态。
+- `release provider preview` 生成 `push_branch`、`create_tag`、`push_tag`、`create_release` 和 `trigger_workflow` action plan。
+- `release provider publish` 必须要求 approval proof；默认不真实写远程，返回 preview-only 降级结果。
+- API 增加 release provider preview/publish/execution 查询入口，publish 受 `release:write` scope 保护。
+- 发布 provider execution 写入 `.moyuan/lifecycle/releases/provider-executions/`，并记录 release 日志。
+
+非目标：
+
+- 不在本任务中真实调用 GitHub/Gitee release 或 workflow API。
+- 不执行 `git push`、`git tag` 或 workflow dispatch。
+- 不消费 approval record，因为本任务默认不触发真实远程写入。
+
+验收：
+
+- preview 能形成远程 release/tag/workflow action plan。
+- publish 未审批时生成 approval record。
+- publish 已审批但写开关未开启时返回 `RELEASE_PROVIDER_PUBLISH_PREVIEW_ONLY`。
+- API publish 入口要求 `release:write`。
+- `go test ./internal/release ./internal/cli ./internal/api` 通过。
+- `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
+
+## 8. 已完成任务：`phase6-003 ci-cd-release-provider-adapter`
+
+范围：
+
+- `internal/release` 增加 `ProviderExecution`，记录 release provider preview/publish 执行结果。
+- CLI 增加 `moyuan release provider preview|publish|execution`。
+- API 增加 `/releases/:release_id/provider-preview`、`/provider-publish` 和 `/release-provider-executions/:execution_id`。
+- Authz middleware 将 provider publish 归入 `release.provider.publish`，要求 `release:write`。
+- 测试覆盖 provider preview、approval required 和 preview-only 降级。
+
+非目标：
+
+- 不打开真实 release provider write。
+- 不把 token 或 secret value 写入 execution/log。
+
+验证：
+
+- `go test ./internal/release ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 9. 验证要求
 
 每完成一个 Phase 6 issue，至少运行：
 

@@ -205,6 +205,9 @@ func usage() string {
 		"moyuan skills disable <skill-id>",
 		"moyuan release suggest [--version v0.1.0] [--min-issues 3]",
 		"moyuan release show <release-id>",
+		"moyuan release provider preview <release-id>",
+		"moyuan release provider publish <release-id> [--approved] [--approval-id <approval-id>]",
+		"moyuan release provider execution <execution-id>",
 		"moyuan resources add --id <id> --environment test_dev --host <host>",
 		"moyuan resources list",
 		"moyuan resources show <resource-id>",
@@ -1293,6 +1296,51 @@ func handleRelease(ctx context.Context, args []string, cwd string) (string, any,
 			return "", map[string]any{}, 1, nil
 		}
 		return "", plan, 0, nil
+	case "provider":
+		if len(args) < 3 {
+			return "missing release provider command\n", nil, 1, nil
+		}
+		switch args[1] {
+		case "preview":
+			execution, ok, err := release.ProviderPreview(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			code := 0
+			if execution.Status == "blocked" || execution.Status == "failed" {
+				code = 1
+			}
+			return "", execution, code, nil
+		case "publish":
+			execution, ok, err := release.ProviderPublish(rootDir, release.ProviderOptions{
+				ReleaseID:  args[2],
+				Approved:   hasFlag(args, "--approved"),
+				ApprovalID: flagValue(args, "--approval-id", ""),
+			})
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			code := 0
+			if execution.Status == "blocked" || execution.Status == "failed" {
+				code = 1
+			}
+			return "", execution, code, nil
+		case "execution":
+			execution, ok, err := release.LoadProviderExecution(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", execution, 0, nil
+		}
 	}
 	return "unknown release command\n", nil, 1, nil
 }

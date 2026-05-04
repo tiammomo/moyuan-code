@@ -261,6 +261,11 @@ moyuan git provider show <plan-id>
 moyuan quality check <task-id>
 moyuan quality report <run-id>
 moyuan review merge-decision <issue-id>
+moyuan release suggest [--version <version>] [--min-issues <n>]
+moyuan release provider preview <release-id>
+moyuan release provider publish <release-id> [--approved] [--approval-id <approval-id>]
+moyuan deploy plan <release-id> --environment <env> [--resource <resource-id>]
+moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell]
 moyuan bug list
 moyuan bug show <bug-id>
 moyuan logs tail

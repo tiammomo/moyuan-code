@@ -119,7 +119,7 @@ interface StateChangedEvent extends LogEvent {
 | 运行反馈与自我修复 | self_repair.signal.captured、self_repair.bug.classified、self_repair.repair.planned、self_repair.repair.completed |
 | 代码管理 | branch_created、worktree_created、commit.created、commit.blocked、merge_attempted、merge_completed、git_provider.plan.created、git_provider.status.synced、git_provider.pr_mr.previewed、git_provider.pr_mr.create |
 | 服务器资源管理 | host_added、resource_check_completed、expiration_alert_created、server_resource.maintenance_scan、server_resource.renewed、server_resource.retired |
-| DevOps 发布投产 | release_suggested、release_branch_created、release.coverage_checked、release_note.generated、deploy_started、deployment.ssh.previewed、deployment.smoke.completed、deployment.monitor.completed、deployment.rollback.suggested、rollback_started |
+| DevOps 发布投产 | release_suggested、release_branch_created、release.coverage_checked、release_note.generated、release.provider.previewed、release.provider.execution.created、deploy_started、deployment.ssh.previewed、deployment.smoke.completed、deployment.monitor.completed、deployment.rollback.suggested、rollback_started |
 
 ## 7. 错误事件
 

@@ -10,12 +10,12 @@ Release note、发版批次、覆盖率门禁、禁止发版条件和回退后 f
 
 当前 Beta 实现已落地 release suggestion 最小闭环：
 
-- CLI：`moyuan release suggest [--version <version>] [--min-issues <n>]`、`moyuan release show <release-id>`。
+- CLI：`moyuan release suggest [--version <version>] [--min-issues <n>]`、`moyuan release show <release-id>`、`moyuan release provider preview <release-id>`、`moyuan release provider publish <release-id> [--approved] [--approval-id <approval-id>]`。
 - CLI：`moyuan deploy plan <release-id> --environment <env> [--resource <host-id>]`、`moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell]`、`moyuan deploy show <deployment-id>`。
-- API：`POST /v1/projects/:project_id/releases/suggest`、`GET /v1/projects/:project_id/releases/:release_id`、`POST /v1/projects/:project_id/deployments/plan`、`GET /v1/projects/:project_id/deployments/:deployment_id`、`POST /v1/projects/:project_id/deployments/:deployment_id/execute`。
+- API：`POST /v1/projects/:project_id/releases/suggest`、`GET /v1/projects/:project_id/releases/:release_id`、`POST /v1/projects/:project_id/releases/:release_id/provider-preview`、`POST /v1/projects/:project_id/releases/:release_id/provider-publish`、`GET /v1/projects/:project_id/release-provider-executions/:execution_id`、`POST /v1/projects/:project_id/deployments/plan`、`GET /v1/projects/:project_id/deployments/:deployment_id`、`POST /v1/projects/:project_id/deployments/:deployment_id/execute`。
 - Console：Deployment Executions 面板可触发 `Suggest Release`、最新 deployment `Dry Run` 和 `test_dev` `Health Scan`，所有动作都走后端受控 API。
 - 输出位置：`.moyuan/lifecycle/releases/` 和 `.moyuan/lifecycle/deployments/`。
-- 当前生成 release suggestion、release branch plan、tag suggestion、release notes draft、deploy/smoke/monitor/rollback plan，并在受控 `local_shell` 执行后自动记录 smoke/monitor 结果；`ssh_preview` 可生成远程目标执行预览，`ssh_execute` 仍默认阻断，不真实创建 branch、tag、远程 release、SSH 或生产部署。
+- 当前生成 release suggestion、release branch plan、tag suggestion、release notes draft、provider release/tag/workflow action preview、deploy/smoke/monitor/rollback plan，并在受控 `local_shell` 执行后自动记录 smoke/monitor 结果；`ssh_preview` 可生成远程目标执行预览，`ssh_execute` 仍默认阻断，不真实创建 branch、tag、远程 release、SSH 或生产部署。
 - 已接入门禁：dirty worktree、remote 缺失、无 accepted issue、存在 unresolved issue 时阻断。
 - production deployment plan 缺少 approval 时阻断；test_dev 可生成演练计划。
 

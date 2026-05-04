@@ -244,6 +244,7 @@ Phase 5 第一批已提供最小 API 鉴权中间件：
 - `visual.render`：需要 `visual:render`。
 - `resource.renew` / `resource.retire`：需要 `resource:write`。
 - `git.provider.sync` / `git.provider.create`：需要 `git:write`。
+- `release.provider.publish`：需要 `release:write`。
 
 当前边界：
 
