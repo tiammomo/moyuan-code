@@ -622,6 +622,14 @@ dd {
   padding: 14px;
 }
 
+.deploymentControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 14px 14px 0;
+}
+
 .executionItem {
   display: flex;
   align-items: center;

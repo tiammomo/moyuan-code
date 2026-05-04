@@ -33,7 +33,7 @@ Phase 2 第一批能力已完成并通过 release readiness：
 | P1 | `phase3-004` | `runtime-log-diff-viewer` | completed | Console 展开 runtime 日志、diff summary 和 resume hint | 失败排查证据链可见 |
 | P1 | `phase3-005` | `provider-probe-adapters` | completed | Provider refresh 接入可选轻量探测 adapter | 探测失败可解释，密钥不落盘 |
 | P2 | `phase3-006` | `visual-script-auth-quality` | completed | Visual script mode 接入 auth ref、审计和图片质量检查 | 图片生成可执行且可复核 |
-| P2 | `phase3-007` | `release-deploy-control-actions` | planned | Release/deploy/smoke/monitor 动作在 Console 可控 | 发布与部署流水线状态可见 |
+| P2 | `phase3-007` | `release-deploy-control-actions` | completed | Release/deploy/smoke/monitor 动作在 Console 可控 | 发布与部署流水线状态可见 |
 
 ## 3. 已完成任务：`phase3-001 workspace-yaml-schema-validator`
 
@@ -207,7 +207,23 @@ Phase 2 第一批能力已完成并通过 release readiness：
 - `go test ./internal/api` 通过。
 - `go test ./...` 通过。
 
-## 13. Phase 3 收口规则
+## 13. 已完成任务：`phase3-007 release-deploy-control-actions`
+
+范围：
+
+- Console `Deployment Executions` 面板增加受控操作条。
+- `Suggest Release` 调用后端 `POST /releases/suggest`，展示 release decision、release id 和首个 reason。
+- `Dry Run` 调用最新 deployment 的 `POST /deployments/:deployment_id/execute`，请求固定为 `mode=dry_run`，不执行真实远程命令。
+- `Health Scan` 调用 `POST /resources/health-scan`，默认扫描 `test_dev` 资源，展示 scan decision 和资源数量。
+- 操作结果只更新前端动作状态；权威 release、deployment、health scan 记录仍由后端写入 `.moyuan`。
+
+验证：
+
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `go test ./...` 通过。
+
+## 14. Phase 3 收口规则
 
 - 每完成一个 Phase 3 issue，必须同步本实施记录和 issue graph。
 - 配置 validator 新增 issue code 时，必须能追溯到 [配置 Schema 规则](../configuration-schema-spec.md)。

@@ -49,8 +49,10 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [requirementState, setRequirementState] = useState<RequirementSubmitState>({ status: "idle" });
   const [recoveryArtifactState, setRecoveryArtifactState] = useState<Record<string, RecoveryArtifactState>>({});
   const [visualActionState, setVisualActionState] = useState<Record<string, VisualActionState>>({});
+  const [deploymentActionState, setDeploymentActionState] = useState<DeploymentActionState>({ status: "idle" });
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
+  const latestDeployment = snapshot.deployments[0];
 
   async function submitRequirement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,6 +149,79 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
     }
   }
 
+  async function suggestRelease() {
+    setDeploymentActionState({ status: "running", message: "Creating release suggestion..." });
+    try {
+      const response = await fetch(`/api/projects/${snapshot.project.id}/releases/suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ min_issues: 1 }),
+      });
+      const payload = (await response.json()) as ReleaseSuggestEnvelope;
+      const release = payload.release;
+      if (!response.ok || !release) {
+        throw new Error(payload.error ?? "Release suggestion failed.");
+      }
+      setDeploymentActionState({
+        status: release.status === "suggested" ? "completed" : "blocked",
+        id: release.id,
+        message: `${release.decision ?? release.status ?? "release decision recorded"}${release.reasons?.[0] ? ` / ${release.reasons[0]}` : ""}`,
+      });
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Release suggestion failed." });
+    }
+  }
+
+  async function runDeploymentDryRun(deploymentID?: string) {
+    if (!deploymentID) {
+      setDeploymentActionState({ status: "error", message: "No deployment plan available for dry-run." });
+      return;
+    }
+    setDeploymentActionState({ status: "running", message: "Creating deployment dry-run..." });
+    try {
+      const response = await fetch(`/api/projects/${snapshot.project.id}/deployments/${encodeURIComponent(deploymentID)}/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "dry_run" }),
+      });
+      const payload = (await response.json()) as DeploymentExecutionEnvelope;
+      const execution = payload.execution;
+      if (!response.ok || !execution) {
+        throw new Error(payload.error ?? "Deployment dry-run failed.");
+      }
+      setDeploymentActionState({
+        status: execution.status === "completed" ? "completed" : "blocked",
+        id: execution.id,
+        message: `${execution.decision ?? execution.status ?? "deployment decision recorded"}${execution.reasons?.[0] ? ` / ${execution.reasons[0]}` : ""}`,
+      });
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Deployment dry-run failed." });
+    }
+  }
+
+  async function runResourceHealthScan() {
+    setDeploymentActionState({ status: "running", message: "Running test_dev health scan..." });
+    try {
+      const response = await fetch(`/api/projects/${snapshot.project.id}/resources/health-scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ environment: "test_dev" }),
+      });
+      const payload = (await response.json()) as ResourceHealthScanEnvelope;
+      const scan = payload.health_scan;
+      if (!response.ok || !scan) {
+        throw new Error(payload.error ?? "Resource health scan failed.");
+      }
+      setDeploymentActionState({
+        status: scan.status === "healthy" || scan.status === "completed" ? "completed" : "blocked",
+        id: scan.id,
+        message: `${scan.decision ?? scan.status ?? "health scan recorded"}${scan.results?.length ? ` / ${scan.results.length} resources` : ""}`,
+      });
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Resource health scan failed." });
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -232,6 +307,31 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
 
           <div className="panel executionPanel">
             <PanelTitle icon={<Rocket size={18} />} title="Deployment Executions" meta={`${snapshot.executions.length} recent`} />
+            <div className="deploymentControls">
+              <button className="inlineActionButton" disabled={deploymentActionState.status === "running"} onClick={() => void suggestRelease()} type="button">
+                <GitBranch size={13} />
+                <span>Suggest Release</span>
+              </button>
+              <button
+                className="inlineActionButton"
+                disabled={deploymentActionState.status === "running" || !latestDeployment}
+                onClick={() => void runDeploymentDryRun(latestDeployment?.id)}
+                type="button"
+              >
+                <Rocket size={13} />
+                <span>Dry Run</span>
+              </button>
+              <button className="inlineActionButton" disabled={deploymentActionState.status === "running"} onClick={() => void runResourceHealthScan()} type="button">
+                <Server size={13} />
+                <span>Health Scan</span>
+              </button>
+              {deploymentActionState.message ? (
+                <small className={`actionMessage ${deploymentActionState.status}`}>
+                  {deploymentActionState.id ? `${compactID(deploymentActionState.id)} / ` : ""}
+                  {deploymentActionState.message}
+                </small>
+              ) : null}
+            </div>
             <div className="executionList">
               {snapshot.executions.length > 0 ? (
                 snapshot.executions.map((execution) => (
@@ -711,6 +811,42 @@ type VisualRenderEnvelope = {
     id?: string;
     status?: string;
     decision?: string;
+  };
+};
+
+type DeploymentActionState = {
+  status: "idle" | "running" | "completed" | "blocked" | "error";
+  id?: string;
+  message?: string;
+};
+
+type ReleaseSuggestEnvelope = {
+  error?: string;
+  release?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+    reasons?: string[];
+  };
+};
+
+type DeploymentExecutionEnvelope = {
+  error?: string;
+  execution?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+    reasons?: string[];
+  };
+};
+
+type ResourceHealthScanEnvelope = {
+  error?: string;
+  health_scan?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+    results?: unknown[];
   };
 };
 
