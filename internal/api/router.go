@@ -63,6 +63,12 @@ type deploymentExecuteRequest struct {
 	Commands []string `json:"commands"`
 }
 
+type resourceHealthScanRequest struct {
+	Environment string   `json:"environment"`
+	ResourceIDs []string `json:"resource_ids"`
+	Approved    bool     `json:"approved"`
+}
+
 func NewRouter(options Options) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -383,6 +389,36 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"resources": resources})
+	})
+	router.POST("/v1/projects/:project_id/resources/health-scan", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req resourceHealthScanRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		report, err := serverresources.HealthScan(c.Request.Context(), rootDir, serverresources.HealthScanOptions{
+			Environment: req.Environment,
+			ResourceIDs: req.ResourceIDs,
+			Approved:    req.Approved,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if report.Status == "blocked" || report.Status == "attention_required" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"health_scan": report})
 	})
 	router.GET("/v1/projects/:project_id/resources/:resource_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

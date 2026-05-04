@@ -1,7 +1,10 @@
 package serverresources
 
 import (
+	"context"
 	"errors"
+	"net/http"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -49,6 +52,31 @@ type Healthcheck struct {
 	Type       string `json:"type,omitempty"`
 	Target     string `json:"target,omitempty"`
 	LastStatus string `json:"last_status,omitempty"`
+}
+
+type HealthScanOptions struct {
+	Environment string   `json:"environment"`
+	ResourceIDs []string `json:"resource_ids"`
+	Approved    bool     `json:"approved"`
+}
+
+type HealthScanReport struct {
+	ID          string             `json:"id"`
+	Status      string             `json:"status"`
+	Decision    string             `json:"decision"`
+	Environment string             `json:"environment,omitempty"`
+	Results     []HealthScanResult `json:"results"`
+	Reasons     []string           `json:"reasons"`
+	CreatedAt   string             `json:"created_at"`
+}
+
+type HealthScanResult struct {
+	ResourceID  string `json:"resource_id"`
+	Environment string `json:"environment"`
+	Target      string `json:"target,omitempty"`
+	Status      string `json:"status"`
+	Reason      string `json:"reason,omitempty"`
+	HTTPStatus  int    `json:"http_status,omitempty"`
 }
 
 func List(rootDir string) ([]Resource, error) {
@@ -174,6 +202,63 @@ func ExpirationScan(rootDir string) ([]Resource, error) {
 	return normalizeOrder(result), nil
 }
 
+func HealthScan(ctx context.Context, rootDir string, options HealthScanOptions) (HealthScanReport, error) {
+	registry, err := Load(rootDir)
+	if err != nil {
+		return HealthScanReport{}, err
+	}
+	options.Environment = normalizeToken(options.Environment)
+	options.ResourceIDs = normalizeIDs(options.ResourceIDs)
+	report := HealthScanReport{
+		ID:          "health-scan-" + time.Now().UTC().Format("20060102150405"),
+		Status:      "completed",
+		Decision:    "HEALTH_SCAN_COMPLETED",
+		Environment: options.Environment,
+		Results:     []HealthScanResult{},
+		Reasons:     []string{},
+		CreatedAt:   now(),
+	}
+	changed := false
+	for idx, resource := range registry.Resources {
+		if len(options.ResourceIDs) > 0 && !contains(options.ResourceIDs, resource.ID) {
+			continue
+		}
+		if options.Environment != "" && resource.Environment != options.Environment {
+			continue
+		}
+		result := scanResource(ctx, resource, options.Approved)
+		report.Results = append(report.Results, result)
+		if result.Status == "blocked" || result.Status == "failed" {
+			report.Status = "attention_required"
+			report.Decision = "HEALTH_SCAN_ATTENTION_REQUIRED"
+			report.Reasons = append(report.Reasons, result.Reason)
+		}
+		if result.Status == "healthy" || result.Status == "failed" || result.Status == "blocked" || result.Status == "unknown" {
+			registry.Resources[idx].Healthcheck.LastStatus = result.Status
+			registry.Resources[idx].UpdatedAt = now()
+			changed = true
+		}
+	}
+	if len(report.Results) == 0 {
+		report.Status = "blocked"
+		report.Decision = "HEALTH_SCAN_BLOCKED"
+		report.Reasons = append(report.Reasons, "resource_not_found")
+	}
+	if changed {
+		if err := save(rootDir, registry); err != nil {
+			return HealthScanReport{}, err
+		}
+	}
+	if err := fsutil.WriteJSON(healthScanPath(rootDir, report.ID), report); err != nil {
+		return HealthScanReport{}, err
+	}
+	if err := fsutil.AppendJSONL(filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "checks.jsonl"), report); err != nil {
+		return HealthScanReport{}, err
+	}
+	_ = logging.Log(rootDir, "audit", "server_resource.health_scan", map[string]any{"scan_id": report.ID, "decision": report.Decision, "status": report.Status, "results": len(report.Results)})
+	return report, nil
+}
+
 func save(rootDir string, registry Registry) error {
 	registry.SchemaVersion = 1
 	registry.Resources = normalizeOrder(registry.Resources)
@@ -244,6 +329,77 @@ func eventsPath(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "events.jsonl")
 }
 
+func healthScanPath(rootDir string, id string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "checks", id+".json")
+}
+
+func scanResource(ctx context.Context, resource Resource, approved bool) HealthScanResult {
+	result := HealthScanResult{ResourceID: resource.ID, Environment: resource.Environment, Target: resource.Healthcheck.Target, Status: "unknown"}
+	if resource.Environment == "production" && !approved {
+		result.Status = "blocked"
+		result.Reason = "production_approval_required"
+		return result
+	}
+	if resource.Status != "active" {
+		result.Status = "blocked"
+		result.Reason = "resource_not_active"
+		return result
+	}
+	switch resource.Healthcheck.Type {
+	case "manual":
+		result.Status = "unknown"
+		result.Reason = "manual_healthcheck"
+	case "http", "https":
+		return scanHTTP(ctx, resource, result)
+	default:
+		result.Status = "blocked"
+		result.Reason = "healthcheck_type_not_allowed:" + resource.Healthcheck.Type
+	}
+	return result
+}
+
+func scanHTTP(ctx context.Context, resource Resource, result HealthScanResult) HealthScanResult {
+	target := strings.TrimSpace(resource.Healthcheck.Target)
+	if target == "" {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_target_required"
+		return result
+	}
+	parsed, err := url.Parse(target)
+	if err != nil || parsed.Hostname() == "" {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_target_invalid"
+		return result
+	}
+	if parsed.Hostname() != "127.0.0.1" && parsed.Hostname() != "localhost" {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_target_not_allowed"
+		return result
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		result.Status = "blocked"
+		result.Reason = "healthcheck_request_invalid"
+		return result
+	}
+	client := http.Client{Timeout: 3 * time.Second}
+	response, err := client.Do(request)
+	if err != nil {
+		result.Status = "failed"
+		result.Reason = "healthcheck_request_failed"
+		return result
+	}
+	defer response.Body.Close()
+	result.HTTPStatus = response.StatusCode
+	if response.StatusCode >= 200 && response.StatusCode < 400 {
+		result.Status = "healthy"
+		return result
+	}
+	result.Status = "failed"
+	result.Reason = "healthcheck_http_status"
+	return result
+}
+
 func normalizeOrder(resources []Resource) []Resource {
 	out := append([]Resource{}, resources...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -256,9 +412,33 @@ func normalizeID(value string) string {
 	return strings.Trim(value, "-")
 }
 
+func normalizeIDs(values []string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, value := range values {
+		value = normalizeID(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func normalizeToken(value string) string {
 	value = strings.TrimSpace(strings.ToLower(value))
 	return strings.ReplaceAll(value, "-", "_")
+}
+
+func contains(values []string, value string) bool {
+	for _, item := range values {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 func allowedEnvironment(value string) bool {

@@ -94,7 +94,7 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 	case "release":
 		text, result, exitCode, err = handleRelease(ctx, argv[1:], cwd)
 	case "resources":
-		text, result, exitCode, err = handleResources(argv[1:], cwd)
+		text, result, exitCode, err = handleResources(ctx, argv[1:], cwd)
 	case "deploy":
 		text, result, exitCode, err = handleDeploy(ctx, argv[1:], cwd)
 	case "logs":
@@ -174,6 +174,7 @@ func usage() string {
 		"moyuan resources show <resource-id>",
 		"moyuan resources disable <resource-id>",
 		"moyuan resources expiration scan",
+		"moyuan resources health scan [--environment test_dev] [--resource <resource-id>] [--approved]",
 		"moyuan deploy plan <release-id> --environment test_dev [--resource <resource-id>]",
 		"moyuan deploy execute <deployment-id> [--mode dry_run] [--approved] [--command <safe-command>]",
 		"moyuan deploy show <deployment-id>",
@@ -925,7 +926,7 @@ func handleRelease(ctx context.Context, args []string, cwd string) (string, any,
 	return "unknown release command\n", nil, 1, nil
 }
 
-func handleResources(args []string, cwd string) (string, any, int, error) {
+func handleResources(ctx context.Context, args []string, cwd string) (string, any, int, error) {
 	rootDir := mustRoot(cwd)
 	if len(args) == 0 {
 		return "unknown resources command\n", nil, 1, nil
@@ -991,6 +992,19 @@ func handleResources(args []string, cwd string) (string, any, int, error) {
 		if len(args) >= 2 && args[1] == "scan" {
 			resources, err := serverresources.ExpirationScan(rootDir)
 			return "", resources, 0, err
+		}
+	case "health":
+		if len(args) >= 2 && args[1] == "scan" {
+			report, err := serverresources.HealthScan(ctx, rootDir, serverresources.HealthScanOptions{
+				Environment: flagValue(args, "--environment", ""),
+				ResourceIDs: flagValues(args, "--resource"),
+				Approved:    hasFlag(args, "--approved"),
+			})
+			code := 0
+			if report.Status == "blocked" || report.Status == "attention_required" {
+				code = 1
+			}
+			return "", report, code, err
 		}
 	}
 	return "unknown resources command\n", nil, 1, nil

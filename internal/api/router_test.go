@@ -148,6 +148,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/resources", http.StatusOK, `"resources"`, `"dev-api"`)
 	assertGETContains(t, router, "/v1/projects/managed/resources/dev-api", http.StatusOK, `"resource"`, `"test_dev"`)
 	assertGETContains(t, router, "/v1/projects/managed/resources/expiration-scan", http.StatusOK, `"resources"`)
+	assertPostContains(t, router, "/v1/projects/managed/resources/health-scan", `{"environment":"test_dev"}`, http.StatusOK, `"health_scan"`, `"HEALTH_SCAN_COMPLETED"`)
 	assertPostContains(t, router, "/v1/projects/managed/resources/dev-api/disable", `{}`, http.StatusOK, `"resource"`, `"disabled"`)
 	assertPostContains(t, router, "/v1/projects/managed/resources", `{"id":"prod-api","environment":"production","host":"prod.internal","provider":"aliyun","owner":"ops","auth_ref":"secret:prod_ssh_key"}`, http.StatusBadRequest, `"production_expires_at_required"`)
 	assertPostContains(t, router, "/v1/projects/managed/deployments/plan", `{"release_id":"missing-release","environment":"test_dev","resource_ids":["dev-api"]}`, http.StatusAccepted, `"deployment"`, `"release_not_found"`)

@@ -36,7 +36,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P2 | `beta-011` | `controlled-deploy-executor` | completed | 受控部署执行器基线 | dry-run/local_shell 执行可审计，生产真实执行被阻断 |
 | P1 | `beta-012` | `console-api-integration` | completed | Web Console 接入更多真实 API | 控制台可展示 live requirement、deploy execution、resource health |
 | P1 | `beta-013` | `subagent-run-visibility` | completed | Subagent/run 过程可视化 | 运行队列、等待原因、review/quality 结果可追踪 |
-| P2 | `beta-014` | `server-health-check-executor` | planned | 服务器健康检查执行器 | test_dev/staging 资源可执行受控 health check 并回写资源状态 |
+| P2 | `beta-014` | `server-health-check-executor` | completed | 服务器健康检查执行器 | test_dev/staging 资源可执行受控 health check 并回写资源状态 |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -429,16 +429,54 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 已支持 API：`GET /v1/projects/:project_id/runs?limit=...`。
 - Web Console Run Timeline 已优先展示 live run states，并回退到 deployment executions 和 demo timeline。
 
-## 16. 下一步任务建议
+## 16. 已完成任务：`beta-014 server-health-check-executor`
 
-### `beta-014 server-health-check-executor`
-
-范围草案：
+范围：
 
 - 基于 server resource registry 的 healthcheck 配置执行受控健康检查。
 - test_dev/staging 可自动执行，production 必须审批。
 - 健康检查结果回写 resource inventory 和 events。
 
-退出条件：
+非目标：
+
+- 不扫描未登记资源。
+- 不允许前端或仓库配置绕过 production approval。
+- 不对外部公网地址执行 HTTP scan；当前阶段 HTTP 目标限制为 `127.0.0.1` / `localhost`。
+
+验收：
 
 - 服务器资源支持 `health scan`，控制台可展示 last_status 和 scan history。
+- `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 `serverresources.HealthScan`。
+- 已支持 CLI：`moyuan resources health scan [--environment test_dev] [--resource <resource-id>] [--approved]`。
+- 已支持 API：`POST /v1/projects/:project_id/resources/health-scan`。
+- Health scan report 写入 `.moyuan/resources/checks/`，汇总写入 `.moyuan/resources/checks.jsonl`，并记录 `server_resource.health_scan` 审计日志。
+- HTTP health check 当前只允许 localhost/127.0.0.1，production 未审批时强制阻断。
+
+## 17. 下一步任务建议
+
+### `beta-015 subagent-model`
+
+范围草案：
+
+- 显式建模 Subagent Instance，连接 issue、role、runtime、provider、skills、memory scope、read/write scope 和 output contract。
+- Run State 引用 subagent id，控制台可从 issue 追踪到 subagent 和 runtime session。
+
+退出条件：
+
+- 每个 orchestrator run 都有可审计 subagent instance。
+- Subagent 不能自行越权扩大 scope 或绕过 quality/review。
+
+### `beta-016 quality-policy-api`
+
+范围草案：
+
+- 暴露质量门禁策略、最近 findings、coverage/test evidence 和 review verdict。
+- Web Console 可查看每个 issue 为什么 accepted、needs_rework 或 blocked。
+
+退出条件：
+
+- Quality Gate 不再只是报告文件，可以通过 API 和控制台形成可解释视图。

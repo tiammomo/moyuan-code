@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -484,6 +486,11 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 func TestServerResourcesCLIRegistersListsAndValidatesProductionHosts(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)
+	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer healthServer.Close()
 
 	dev := runCLI(t, root, "resources", "add",
 		"--id", "dev-1",
@@ -496,8 +503,8 @@ func TestServerResourcesCLIRegistersListsAndValidatesProductionHosts(t *testing.
 		"--cpu", "2",
 		"--memory-gb", "4",
 		"--disk-gb", "80",
-		"--health-type", "tcp",
-		"--health-target", "10.0.0.10:22",
+		"--health-type", "http",
+		"--health-target", healthServer.URL,
 	)
 	assertContains(t, dev.stdout, `"id": "dev-1"`)
 	assertContains(t, dev.stdout, `"environment": "test_dev"`)
@@ -539,6 +546,18 @@ func TestServerResourcesCLIRegistersListsAndValidatesProductionHosts(t *testing.
 
 	scan := runCLI(t, root, "resources", "expiration", "scan")
 	assertContains(t, scan.stdout, "[]")
+
+	healthScan := runCLI(t, root, "resources", "health", "scan", "--environment", "test_dev")
+	assertContains(t, healthScan.stdout, `"decision": "HEALTH_SCAN_COMPLETED"`)
+	assertContains(t, healthScan.stdout, `"status": "healthy"`)
+	assertFileContains(t, root, ".moyuan/resources/checks.jsonl", "HEALTH_SCAN_COMPLETED")
+	assertFileContains(t, root, ".moyuan/logs/audit.jsonl", "server_resource.health_scan")
+
+	prodHealthBlocked := runCLIAllowFailure(t, root, "resources", "health", "scan", "--resource", "prod-1")
+	if prodHealthBlocked.code == 0 {
+		t.Fatalf("expected production health scan without approval to block: %s", prodHealthBlocked.stdout)
+	}
+	assertContains(t, prodHealthBlocked.stdout, "production_approval_required")
 
 	disabled := runCLI(t, root, "resources", "disable", "dev-1")
 	assertContains(t, disabled.stdout, `"status": "disabled"`)
