@@ -167,6 +167,8 @@ func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 	needsReworkRun := runCLI(t, root, "orchestrator", "run", "status", needsReworkRunID)
 	assertContains(t, needsReworkRun.stdout, `"status": "failed"`)
 	assertContains(t, needsReworkRun.stdout, `"runtime_status": "blocked"`)
+	assertContains(t, needsRework.stdout, `"review_status": "rejected"`)
+	assertContains(t, needsRework.stdout, `"category": "protected_path"`)
 
 	assertFileExists(t, root, ".moyuan/orchestrator/issue-states/phase1-001.json")
 	assertFileExists(t, root, ".moyuan/orchestrator/issue-states/phase1-002.json")
@@ -174,6 +176,32 @@ func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 	assertFileExists(t, root, ".moyuan/orchestrator/run-states/"+needsReworkRunID+".json")
 	assertFileContains(t, root, ".moyuan/logs/run.jsonl", "orchestrator.issue.transitioned")
 	assertFileContains(t, root, ".moyuan/logs/run.jsonl", "orchestrator.run.transitioned")
+}
+
+func TestQualityReviewHardeningFindingsDriveNeedsRework(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	normal := runCLI(t, root, "orchestrator", "run", "phase1-001", "--runtime", "local_shell", "--prompt", "printf ok > generated.txt")
+	assertContains(t, normal.stdout, `"status": "accepted"`)
+	assertContains(t, normal.stdout, `"review_status": "accepted"`)
+
+	commitAll(t, root, "normal generated file")
+
+	secret := runCLIAllowFailure(t, root, "orchestrator", "run", "phase1-002", "--runtime", "local_shell", "--prompt", "printf secret > api-token.txt")
+	if secret.code == 0 {
+		t.Fatalf("expected secret-like file change to fail quality review: %s", secret.stdout)
+	}
+	assertContains(t, secret.stdout, `"status": "needs_rework"`)
+	assertContains(t, secret.stdout, `"review_status": "rejected"`)
+	assertContains(t, secret.stdout, `"category": "secret_file"`)
+	assertContains(t, secret.stdout, `"blocking": true`)
+
+	reportID := decodeQualityReportID(t, secret.stdout)
+	report := runCLI(t, root, "quality", "report", reportID)
+	assertContains(t, report.stdout, `"category": "secret_file"`)
+	assertContains(t, report.stdout, `"status": "failed"`)
+	assertFileContains(t, root, ".moyuan/logs/quality.jsonl", `"review_status":"rejected"`)
 }
 
 func TestRuntimeDiffCaptureTracksGeneratedFilesAndBlocksDirtyWorktree(t *testing.T) {
@@ -293,6 +321,22 @@ func decodeRunID(t *testing.T, raw string) string {
 		t.Fatalf("missing run_id in output: %s", raw)
 	}
 	return payload.RunID
+}
+
+func decodeQualityReportID(t *testing.T, raw string) string {
+	t.Helper()
+	var payload struct {
+		QualityReport struct {
+			ID string `json:"id"`
+		} `json:"quality_report"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode quality report id: %v\n%s", err, raw)
+	}
+	if payload.QualityReport.ID == "" {
+		t.Fatalf("missing quality_report.id in output: %s", raw)
+	}
+	return payload.QualityReport.ID
 }
 
 func runCLI(t *testing.T, root string, args ...string) cliResult {

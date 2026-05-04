@@ -80,7 +80,12 @@ func RunIssue(ctx context.Context, rootDir string, issueID string, runtimeID str
 	if _, err := transitionIssue(rootDir, "phase1-epic", issueID, "quality_checking", "", run.ID, nil); err != nil {
 		return Result{}, err
 	}
-	report, err := quality.Run(ctx, rootDir, issueID)
+	report, err := quality.RunWithReview(ctx, rootDir, issueID, quality.ReviewInput{
+		ChangedFiles:    rt.ChangedFiles,
+		DiffSummaryPath: rt.DiffSummaryPath,
+		ProtectedFiles:  rt.Diff.ProtectedFiles,
+		RuntimeRisks:    rt.Risks,
+	})
 	if err != nil {
 		_, _ = transitionIssue(rootDir, "phase1-epic", issueID, "failed", "quality_error", run.ID, nil)
 		_, _ = transitionRun(rootDir, issueID, run.ID, "failed", "quality_error", nil)
