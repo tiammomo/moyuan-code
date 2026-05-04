@@ -147,6 +147,9 @@ func usage() string {
 		"moyuan run <task-id>",
 		"moyuan quality check <task-id>",
 		"moyuan quality report <report-id>",
+		"moyuan quality reports [--limit 20]",
+		"moyuan quality explain <report-id>",
+		"moyuan quality policy",
 		"moyuan runtime health <runtime-id>",
 		"moyuan runtime invoke <runtime-id> --prompt <command> [--provider <provider-id>] [--model <model-id>]",
 		"moyuan orchestrator plan <epic-id>",
@@ -542,6 +545,23 @@ func handleQuality(ctx context.Context, args []string, cwd string) (string, any,
 			return "", map[string]any{}, 1, nil
 		}
 		return "", report, 0, nil
+	case "reports":
+		reports, err := quality.ListReports(rootDir, flagInt(args, "--limit", 20))
+		return "", reports, 0, err
+	case "explain":
+		if len(args) < 2 {
+			return "missing report id\n", nil, 1, nil
+		}
+		explanation, ok, err := quality.Explain(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", explanation, 0, nil
+	case "policy":
+		return "", quality.CurrentPolicy(), 0, nil
 	}
 	return "unknown quality command\n", nil, 1, nil
 }

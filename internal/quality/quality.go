@@ -2,7 +2,9 @@ package quality
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -52,6 +54,34 @@ type ReviewInput struct {
 	DiffSummaryPath string
 	ProtectedFiles  []string
 	RuntimeRisks    []string
+}
+
+type Policy struct {
+	RequiredChecks  []string `json:"required_checks"`
+	BlockingFinding []string `json:"blocking_finding_categories"`
+	MaxChangedFiles int      `json:"max_changed_files"`
+	ReviewStatuses  []string `json:"review_statuses"`
+}
+
+type Explanation struct {
+	ReportID     string    `json:"report_id"`
+	TaskID       string    `json:"task_id"`
+	Status       string    `json:"status"`
+	ReviewStatus string    `json:"review_status"`
+	Decision     string    `json:"decision"`
+	Reasons      []string  `json:"reasons"`
+	Checks       []Check   `json:"checks"`
+	Findings     []Finding `json:"findings"`
+	Policy       Policy    `json:"policy"`
+}
+
+func CurrentPolicy() Policy {
+	return Policy{
+		RequiredChecks:  []string{"build", "lint", "test"},
+		BlockingFinding: []string{"protected_path", "secret_file", "runtime_risk", "diff_size"},
+		MaxChangedFiles: 40,
+		ReviewStatuses:  []string{"accepted", "accepted_with_findings", "rejected"},
+	}
 }
 
 func Run(ctx context.Context, rootDir string, taskID string) (Report, error) {
@@ -141,6 +171,79 @@ func Read(rootDir string, reportID string) (Report, bool, error) {
 	var report Report
 	found, err := fsutil.ReadJSON(reportPaths(rootDir, reportID).json, &report)
 	return report, found, err
+}
+
+func ListReports(rootDir string, limit int) ([]Report, error) {
+	dir := filepath.Join(workspace.ForRoot(rootDir).QualityDir, "reports")
+	if err := fsutil.EnsureDir(dir); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	reports := []Report{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var report Report
+		found, err := fsutil.ReadJSON(filepath.Join(dir, entry.Name()), &report)
+		if err != nil {
+			return nil, err
+		}
+		if found && report.ID != "" {
+			reports = append(reports, report)
+		}
+	}
+	sort.SliceStable(reports, func(i, j int) bool {
+		return reports[i].CreatedAt > reports[j].CreatedAt
+	})
+	if limit > 0 && len(reports) > limit {
+		return reports[:limit], nil
+	}
+	return reports, nil
+}
+
+func Explain(rootDir string, reportID string) (Explanation, bool, error) {
+	report, found, err := Read(rootDir, reportID)
+	if err != nil || !found {
+		return Explanation{}, found, err
+	}
+	reasons := []string{}
+	decision := "QUALITY_ACCEPTED"
+	if report.Status != "passed" {
+		decision = "QUALITY_BLOCKED"
+		reasons = append(reasons, "quality_status:"+report.Status)
+	}
+	if report.ReviewStatus == "rejected" {
+		decision = "QUALITY_BLOCKED"
+		reasons = append(reasons, "review_status:rejected")
+	}
+	for _, check := range report.Checks {
+		if check.Status == "failed" {
+			reasons = append(reasons, "check_failed:"+check.Type)
+		}
+	}
+	for _, finding := range report.Findings {
+		if finding.Blocking {
+			reasons = append(reasons, "blocking_finding:"+finding.Category)
+		}
+	}
+	if len(reasons) == 0 {
+		reasons = append(reasons, "quality_and_review_accepted")
+	}
+	return Explanation{
+		ReportID:     report.ID,
+		TaskID:       report.TaskID,
+		Status:       report.Status,
+		ReviewStatus: report.ReviewStatus,
+		Decision:     decision,
+		Reasons:      reasons,
+		Checks:       report.Checks,
+		Findings:     report.Findings,
+		Policy:       CurrentPolicy(),
+	}, true, nil
 }
 
 func appendChecks(ctx context.Context, rootDir string, checks []Check, typ string, commands []string) []Check {

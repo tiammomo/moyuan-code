@@ -263,6 +263,56 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"quality_report": report})
 	})
+	router.GET("/v1/projects/:project_id/quality-policy", func(c *gin.Context) {
+		_, _, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"quality_policy": quality.CurrentPolicy()})
+	})
+	router.GET("/v1/projects/:project_id/quality-reports", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		reports, err := quality.ListReports(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"quality_reports": reports})
+	})
+	router.GET("/v1/projects/:project_id/quality/:report_id/explain", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		explanation, found, err := quality.Explain(rootDir, c.Param("report_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "quality report not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"quality_explanation": explanation})
+	})
 	router.POST("/v1/projects/:project_id/issues/:issue_id/merge-decision", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

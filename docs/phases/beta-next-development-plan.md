@@ -38,7 +38,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P1 | `beta-013` | `subagent-run-visibility` | completed | Subagent/run 过程可视化 | 运行队列、等待原因、review/quality 结果可追踪 |
 | P2 | `beta-014` | `server-health-check-executor` | completed | 服务器健康检查执行器 | test_dev/staging 资源可执行受控 health check 并回写资源状态 |
 | P1 | `beta-015` | `subagent-model` | completed | 显式 Subagent Instance 模型 | 每个 run 都有 role/runtime/scope/skills/memory 的可审计 subagent |
-| P1 | `beta-016` | `quality-policy-api` | planned | 质量门禁策略和 findings 可解释 API | 控制台可查看 accepted/blocked/needs_rework 的证据 |
+| P1 | `beta-016` | `quality-policy-api` | completed | 质量门禁策略和 findings 可解释 API | 控制台可查看 accepted/blocked/needs_rework 的证据 |
+| P1 | `beta-017` | `console-quality-subagent-view` | planned | 控制台展示 Subagent 和质量解释 | Issue Inspector 可看到 subagent、quality explanation 和 rework reason |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -491,11 +492,38 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 
 ### `beta-016 quality-policy-api`
 
-范围草案：
+状态：completed
+
+范围：
 
 - 暴露质量门禁策略、最近 findings、coverage/test evidence 和 review verdict。
 - Web Console 可查看每个 issue 为什么 accepted、needs_rework 或 blocked。
 
+非目标：
+
+- 不修改质量门禁判定逻辑。
+- 不降低 blocker finding 门槛。
+- 不在控制台直接读取 quality report 文件。
+
+验收：
+
+- Quality Gate 不再只是报告文件，可以通过 API 和 CLI 形成可解释视图。
+- `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 `quality.CurrentPolicy`、`quality.ListReports`、`quality.Explain`。
+- 已支持 CLI：`moyuan quality policy`、`moyuan quality reports`、`moyuan quality explain <report-id>`。
+- 已支持 API：`GET /v1/projects/:project_id/quality-policy`、`GET /quality-reports`、`GET /quality/:report_id/explain`。
+- Explanation 输出包含 decision、reasons、checks、findings 和 policy。
+
+### `beta-017 console-quality-subagent-view`
+
+范围草案：
+
+- Web Console Issue Inspector 接入 subagent、run state、quality explanation。
+- 让用户能从 issue graph 点击后看到为什么 blocked、needs_rework 或 accepted。
+
 退出条件：
 
-- Quality Gate 不再只是报告文件，可以通过 API 和控制台形成可解释视图。
+- Inspector 能展示 subagent id、runtime、provider、quality report、review status、blocking findings。

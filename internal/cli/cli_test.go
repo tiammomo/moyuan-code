@@ -107,6 +107,14 @@ func exercisePhase1Lifecycle(t *testing.T, root string) {
 
 	reportResult := runCLI(t, root, "quality", "report", report.ID)
 	assertContains(t, reportResult.stdout, report.ID)
+	reportsResult := runCLI(t, root, "quality", "reports", "--limit", "1")
+	assertContains(t, reportsResult.stdout, report.ID)
+	explainResult := runCLI(t, root, "quality", "explain", report.ID)
+	assertContains(t, explainResult.stdout, `"decision": "QUALITY_ACCEPTED"`)
+	assertContains(t, explainResult.stdout, `"quality_and_review_accepted"`)
+	policyResult := runCLI(t, root, "quality", "policy")
+	assertContains(t, policyResult.stdout, `"required_checks"`)
+	assertContains(t, policyResult.stdout, `"blocking_finding_categories"`)
 
 	orchestrated := runCLI(t, root, "orchestrator", "run", "phase1-001", "--runtime", "local_shell", "--prompt", "printf orchestrator-ok")
 	assertContains(t, orchestrated.stdout, "accepted")
