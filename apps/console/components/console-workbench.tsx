@@ -47,6 +47,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [selectedIssueID, setSelectedIssueID] = useState(snapshot.issues[0]?.id ?? "");
   const [requirementText, setRequirementText] = useState("");
   const [requirementState, setRequirementState] = useState<RequirementSubmitState>({ status: "idle" });
+  const [visualActionState, setVisualActionState] = useState<Record<string, VisualActionState>>({});
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
 
@@ -80,6 +81,41 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
       });
     } catch (error) {
       setRequirementState({ status: "error", message: error instanceof Error ? error.message : "Requirement planning failed." });
+    }
+  }
+
+  async function runVisualDryRun(assetID: string) {
+    setVisualActionState((current) => ({
+      ...current,
+      [assetID]: { status: "running", message: "Creating dry-run render..." },
+    }));
+    try {
+      const response = await fetch(`/api/projects/${snapshot.project.id}/visuals/assets/${encodeURIComponent(assetID)}/render`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "dry_run" }),
+      });
+      const payload = (await response.json()) as VisualRenderEnvelope;
+      const execution = payload.visual_render_execution;
+      if (!response.ok || !execution) {
+        throw new Error(payload.error ?? "Visual render dry-run failed.");
+      }
+      setVisualActionState((current) => ({
+        ...current,
+        [assetID]: {
+          status: execution.status === "completed" ? "completed" : "blocked",
+          executionID: execution.id,
+          message: `${execution.decision ?? execution.status ?? "dry-run recorded"}`,
+        },
+      }));
+    } catch (error) {
+      setVisualActionState((current) => ({
+        ...current,
+        [assetID]: {
+          status: "error",
+          message: error instanceof Error ? error.message : "Visual render dry-run failed.",
+        },
+      }));
     }
   }
 
@@ -439,23 +475,43 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
             <div className="signalList">
               {snapshot.visual_assets.length > 0 || snapshot.visual_render_executions.length > 0 ? (
                 <>
-                  {snapshot.visual_assets.map((asset) => (
-                    <div className="signalItem" key={asset.id}>
-                      <div className="signalHeader">
-                        <strong>{asset.title}</strong>
-                        <StatusPill tone={toneForStatus(asset.status)} label={asset.status} />
+                  {snapshot.visual_assets.map((asset) => {
+                    const actionState = visualActionState[asset.id];
+                    return (
+                      <div className="signalItem" key={asset.id}>
+                        <div className="signalHeader">
+                          <strong>{asset.title}</strong>
+                          <StatusPill tone={toneForStatus(asset.status)} label={asset.status} />
+                        </div>
+                        <span>
+                          {asset.diagram_type} / {asset.size}
+                        </span>
+                        <div className="signalMeta">
+                          {asset.provider_id ? <code>{asset.provider_id}</code> : null}
+                          {asset.model_id ? <code>{asset.model_id}</code> : null}
+                          <code>{shortPath(asset.prompt_path || asset.spec_path)}</code>
+                        </div>
+                        {asset.route_reason ? <small>{asset.route_reason}</small> : null}
+                        <div className="signalActions">
+                          <button
+                            className="inlineActionButton"
+                            disabled={actionState?.status === "running"}
+                            onClick={() => void runVisualDryRun(asset.id)}
+                            type="button"
+                          >
+                            <Play size={13} />
+                            <span>{actionState?.status === "running" ? "Running" : "Dry Run"}</span>
+                          </button>
+                          {actionState ? (
+                            <small className={`actionMessage ${actionState.status}`}>
+                              {actionState.executionID ? `${compactID(actionState.executionID)} / ` : ""}
+                              {actionState.message}
+                            </small>
+                          ) : null}
+                        </div>
                       </div>
-                      <span>
-                        {asset.diagram_type} / {asset.size}
-                      </span>
-                      <div className="signalMeta">
-                        {asset.provider_id ? <code>{asset.provider_id}</code> : null}
-                        {asset.model_id ? <code>{asset.model_id}</code> : null}
-                        <code>{shortPath(asset.prompt_path || asset.spec_path)}</code>
-                      </div>
-                      {asset.route_reason ? <small>{asset.route_reason}</small> : null}
-                    </div>
-                  ))}
+                    );
+                  })}
                   {snapshot.visual_render_executions.map((execution) => (
                     <div className="signalItem" key={execution.id}>
                       <div className="signalHeader">
@@ -562,6 +618,21 @@ type RequirementPlanEnvelope = {
       required?: boolean;
       questions?: string[];
     };
+  };
+};
+
+type VisualActionState = {
+  status: "running" | "completed" | "blocked" | "error";
+  executionID?: string;
+  message?: string;
+};
+
+type VisualRenderEnvelope = {
+  error?: string;
+  visual_render_execution?: {
+    id?: string;
+    status?: string;
+    decision?: string;
   };
 };
 

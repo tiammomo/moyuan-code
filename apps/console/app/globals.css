@@ -806,6 +806,42 @@ dd {
   white-space: nowrap;
 }
 
+.signalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.inlineActionButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid #bfd0eb;
+  border-radius: 7px;
+  background: #fff;
+  color: #173b73;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inlineActionButton:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.actionMessage.completed {
+  color: var(--green);
+}
+
+.actionMessage.blocked,
+.actionMessage.error {
+  color: var(--red);
+}
+
 meter {
   width: 100%;
   height: 7px;
