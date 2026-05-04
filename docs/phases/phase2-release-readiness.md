@@ -15,6 +15,7 @@
 - Native Runtime recovery archive。
 - Subagent retry/archive state 和 scheduler backlog。
 - Visual diagram plan、diagram spec、prompt 和 asset index。
+- Console Phase 2 observability：runtime recoveries、subagent backlog、visual assets。
 
 不在本次收口内：
 
@@ -23,7 +24,7 @@
 - 真实 Claude/Codex session resume 命令。
 - 自动切换 fallback runtime 执行代码。
 - 真实 `gpt-image-2` 图像 API 执行。
-- Console 对 runtime recovery、subagent backlog 和 visual assets 的完整 UI 接入。
+- 真实运行中的 Console 日志流、diff 展开和 visual asset 图片预览。
 
 ## 2. 验证命令
 
@@ -111,14 +112,14 @@ moyuan visuals asset show <asset-id>
 - Runtime recovery 只归档上下文和建议 fallback candidate，不自动 resume。
 - Subagent retry/archive 已进入调度输入，但还没有生产级队列和 worker。
 - Visual diagram plan 不执行真实图像 API，真实生成仍在 `scripts/`。
-- Console 需要补齐 Phase 2 新状态的可视化入口。
+- Console 已有 Phase 2 可视化入口，但还未展开到完整日志、diff 和图片预览。
 
 ## 7. 下一批建议
 
 优先级建议：
 
-1. Console 接入 runtime recoveries、subagent backlog、visual assets。
-2. 将 `scripts/` 图像生成纳入受控 CLI/API execution，保持脱敏和不阻塞质量门禁。
-3. Provider 自动健康检查和 quota refresh。
-4. Workspace schema validator 和 `.moyuan/state.db` 索引深化。
-5. Skills 外部 adapter 接入和 recommendation score 与 effectiveness 闭环。
+1. 将 `scripts/` 图像生成纳入受控 CLI/API execution，保持脱敏和不阻塞质量门禁。
+2. Provider 自动健康检查和 quota refresh。
+3. Workspace schema validator 和 `.moyuan/state.db` 索引深化。
+4. Skills 外部 adapter 接入和 recommendation score 与 effectiveness 闭环。
+5. Console 深化日志流、diff 展开、visual asset 图片预览和人工审批动作。

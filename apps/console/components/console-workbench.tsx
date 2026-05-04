@@ -377,6 +377,87 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
         </section>
 
+        <section className="observabilityGrid">
+          <div className="panel">
+            <PanelTitle icon={<TerminalSquare size={18} />} title="Runtime Recoveries" meta={`${snapshot.runtime_recoveries.length} archived`} />
+            <div className="signalList">
+              {snapshot.runtime_recoveries.length > 0 ? (
+                snapshot.runtime_recoveries.map((recovery) => (
+                  <div className="signalItem" key={recovery.id}>
+                    <div className="signalHeader">
+                      <strong>{compactID(recovery.issue_id || recovery.run_id || recovery.id)}</strong>
+                      <StatusPill tone={toneForStatus(recovery.status)} label={recovery.status} />
+                    </div>
+                    <span>
+                      {recovery.failure_category} / {recovery.runtime_id || "runtime pending"}
+                    </span>
+                    <div className="signalMeta">
+                      {recovery.fallback_candidate ? <code>fallback {recovery.fallback_candidate}</code> : null}
+                      {recovery.native_session_id ? <code>{compactID(recovery.native_session_id)}</code> : null}
+                      {recovery.diff_summary_path ? <code>{shortPath(recovery.diff_summary_path)}</code> : null}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No runtime recovery archived</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<CircleDotDashed size={18} />} title="Subagent Backlog" meta={`${snapshot.subagent_backlog.length} waiting`} />
+            <div className="signalList">
+              {snapshot.subagent_backlog.length > 0 ? (
+                snapshot.subagent_backlog.map((item) => (
+                  <div className="signalItem" key={`${item.issue_id}-${item.subagent_id}`}>
+                    <div className="signalHeader">
+                      <strong>{compactID(item.issue_id)}</strong>
+                      <StatusPill tone={toneForStatus(item.status)} label={item.status} />
+                    </div>
+                    <span>{item.reason || item.failure_category || "waiting for scheduler decision"}</span>
+                    <div className="signalMeta">
+                      <code>{compactID(item.subagent_id)}</code>
+                      <code>
+                        retry {item.retry_count}/{item.max_retries}
+                      </code>
+                      {item.recovery_id ? <code>{compactID(item.recovery_id)}</code> : null}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No subagent backlog</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<Sparkles size={18} />} title="Visual Assets" meta={`${snapshot.visual_assets.length} plans`} />
+            <div className="signalList">
+              {snapshot.visual_assets.length > 0 ? (
+                snapshot.visual_assets.map((asset) => (
+                  <div className="signalItem" key={asset.id}>
+                    <div className="signalHeader">
+                      <strong>{asset.title}</strong>
+                      <StatusPill tone={toneForStatus(asset.status)} label={asset.status} />
+                    </div>
+                    <span>
+                      {asset.diagram_type} / {asset.size}
+                    </span>
+                    <div className="signalMeta">
+                      {asset.provider_id ? <code>{asset.provider_id}</code> : null}
+                      {asset.model_id ? <code>{asset.model_id}</code> : null}
+                      <code>{shortPath(asset.prompt_path || asset.spec_path)}</code>
+                    </div>
+                    {asset.route_reason ? <small>{asset.route_reason}</small> : null}
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No visual assets planned</div>
+              )}
+            </div>
+          </div>
+        </section>
+
         <section className="bottomGrid">
           <div className="panel">
             <PanelTitle icon={<Sparkles size={18} />} title="Providers & Runtimes" meta={`${snapshot.providers.length} registered`} />
@@ -512,12 +593,24 @@ function groupIssues(issues: IssueNode[]) {
 
 function toneForStatus(status: string): StatusTone {
   if (status === "accepted" || status === "passed" || status === "ready" || status === "completed" || status === "planned") return "ok";
-  if (status === "running" || status === "dispatch") return "running";
-  if (status === "blocked" || status === "rejected" || status === "failed") return "blocked";
-  if (status === "waiting" || status === "pending") return "warning";
+  if (status === "running" || status === "dispatch" || status === "retrying") return "running";
+  if (status === "blocked" || status === "rejected" || status === "failed" || status === "route_blocked") return "blocked";
+  if (status === "waiting" || status === "pending" || status === "archived") return "warning";
   return "neutral";
 }
 
 function statusClass(status: string) {
   return toneForStatus(status);
+}
+
+function compactID(value: string) {
+  if (!value) return "unknown";
+  if (value.length <= 28) return value;
+  return `${value.slice(0, 18)}...${value.slice(-7)}`;
+}
+
+function shortPath(value?: string) {
+  if (!value) return "path pending";
+  const parts = value.split("/").filter(Boolean);
+  return parts.slice(-3).join("/");
 }

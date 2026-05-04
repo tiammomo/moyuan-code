@@ -1,6 +1,6 @@
 # Next.js 16 控制台方案
 
-状态：implementation-started
+状态：phase2-observability-added
 责任角色：frontend_architect + product_designer + frontend
 最后更新：2026-05-05
 
@@ -155,6 +155,9 @@ apps/console/
 | Quality Review | 查看 quality report、review finding、测试缺口和返工建议 |
 | Memory | 查看 record、candidate、compact、命中证据和维护事件 |
 | Providers & Runtimes | 查看 Claude CLI、Codex CLI、MiniMax、GPT、GLM、gpt-image-2 状态 |
+| Runtime Recoveries | 查看原生 runtime 失败归档、fallback candidate、resume hint 和 diff 摘要路径 |
+| Subagent Backlog | 查看 retry/archive 后进入调度等待的 subagent、失败原因和重试预算 |
+| Visual Assets | 查看架构图 plan、diagram spec、prompt、route decision 和图片生成状态 |
 | Git & Release | 查看分支、PR/MR plan、release suggestion 和 tag/push 计划 |
 | Server Resources | 查看 test_dev、production 机器、到期、健康和维护窗口 |
 | Deployments | 查看部署计划、审批、线上冒烟、监控和 rollback |
@@ -192,6 +195,7 @@ apps/console/
 - Human-in-the-loop Approval：高风险动作内联展示审批原因和影响范围。
 - Progressive Disclosure：默认展示结论，点击后展开证据、日志、原始 JSON。
 - Live Workbench：运行中 issue 的状态、日志和下一步持续刷新。
+- Phase 2 Observability：把 runtime recoveries、subagent backlog、visual assets 放在同一屏，便于判断“失败如何恢复、任务为什么等待、架构图是否已规划”。
 - Schema-aware Forms：表单从 contract/schema 生成约束，错误能定位到字段。
 - AI Assist Surface：保留“让 agent 解释当前状态 / 生成修复建议 / 生成发布说明”的入口，但不能绕过后端门禁。
 

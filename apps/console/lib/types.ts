@@ -35,7 +35,24 @@ export type ScheduleItem = {
   issue_id: string;
   status: string;
   runtime_id?: string;
+  reason?: string;
   blocked_reason?: string;
+  subagent_id?: string;
+  subagent_status?: string;
+  recovery_id?: string;
+  retry_count?: number;
+  max_retries?: number;
+};
+
+export type SubagentBacklogItem = {
+  issue_id: string;
+  subagent_id: string;
+  status: string;
+  reason?: string;
+  recovery_id?: string;
+  failure_category?: string;
+  retry_count: number;
+  max_retries: number;
 };
 
 export type ProviderSummary = {
@@ -89,6 +106,7 @@ export type RunSummary = {
   subagent_id?: string;
   runtime_id?: string;
   runtime_status?: string;
+  recovery_id?: string;
   quality_status?: string;
   quality_report_id?: string;
   updated_at?: string;
@@ -108,6 +126,57 @@ export type SubagentSummary = {
   read_scope: string[];
   write_scope: string[];
   output_contract: string[];
+  retry_policy?: string;
+  retry_count?: number;
+  max_retries?: number;
+  blocked_reason?: string;
+  archive_reason?: string;
+  recovery_id?: string;
+  failure_category?: string;
+  output_converged?: boolean;
+  updated_at?: string;
+};
+
+export type RuntimeRecoverySummary = {
+  id: string;
+  run_id: string;
+  subagent_id?: string;
+  issue_id?: string;
+  runtime_id: string;
+  provider_id?: string;
+  model_id?: string;
+  native_session_id?: string;
+  status: string;
+  failure_category: string;
+  fallback_candidate?: string;
+  fallback_reason?: string;
+  resume_hint?: string;
+  prompt_path?: string;
+  metadata_path?: string;
+  stdout_path?: string;
+  stderr_path?: string;
+  diff_summary_path?: string;
+  changed_files: string[];
+  risks: string[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type VisualAssetSummary = {
+  id: string;
+  diagram_spec_id: string;
+  diagram_type: string;
+  title: string;
+  status: string;
+  provider_id?: string;
+  model_id?: string;
+  size: string;
+  image_path?: string;
+  prompt_path: string;
+  spec_path: string;
+  explanation_path?: string;
+  route_reason?: string;
+  created_at?: string;
   updated_at?: string;
 };
 
@@ -175,15 +244,20 @@ export type ConsoleSnapshot = {
     deployments: number;
     executions: number;
     runs: number;
+    recoveries: number;
+    visual_assets: number;
   };
   issues: IssueNode[];
   schedule: ScheduleItem[];
+  subagent_backlog: SubagentBacklogItem[];
   providers: ProviderSummary[];
   resources: ResourceSummary[];
   deployments: DeploymentSummary[];
   executions: DeploymentExecutionSummary[];
   runs: RunSummary[];
   subagents: SubagentSummary[];
+  runtime_recoveries: RuntimeRecoverySummary[];
+  visual_assets: VisualAssetSummary[];
   quality_explanations: QualityExplanation[];
   timeline: TimelineEvent[];
   quality: QualitySignal[];

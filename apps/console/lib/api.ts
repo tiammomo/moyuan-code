@@ -9,10 +9,13 @@ import type {
   ProviderSummary,
   QualityExplanation,
   QualitySignal,
+  RuntimeRecoverySummary,
   RunSummary,
   ResourceSummary,
   ScheduleItem,
+  SubagentBacklogItem,
   SubagentSummary,
+  VisualAssetSummary,
 } from "./types";
 
 const apiBase = process.env.MOYUAN_API_BASE_URL ?? "http://127.0.0.1:8080/v1";
@@ -58,11 +61,13 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     executionsResponse,
     runsResponse,
     subagentsResponse,
+    recoveriesResponse,
+    visualAssetsResponse,
     qualityReportsResponse,
     memoryResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
-    apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: ScheduleItem[]; waiting_queue?: ScheduleItem[] } }>>(
+    apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: unknown[]; waiting_queue?: unknown[]; subagent_backlog?: unknown[] } }>>(
       `/projects/${project.id}/epics/phase1-epic/schedule?limit=4`,
     ),
     apiGet<ApiEnvelope<{ providers: unknown[] }>>(`/projects/${project.id}/providers`),
@@ -71,20 +76,25 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
     apiGet<ApiEnvelope<{ runs: unknown[] }>>(`/projects/${project.id}/runs?limit=12`),
     apiGet<ApiEnvelope<{ subagents: unknown[] }>>(`/projects/${project.id}/subagents?limit=12`),
+    apiGet<ApiEnvelope<{ runtime_recoveries: unknown[] }>>(`/projects/${project.id}/runtime-recoveries?limit=6`),
+    apiGet<ApiEnvelope<{ visual_assets: unknown[] }>>(`/projects/${project.id}/visuals/assets?limit=6`),
     apiGet<ApiEnvelope<{ quality_reports: unknown[] }>>(`/projects/${project.id}/quality-reports?limit=8`),
     apiGet<ApiEnvelope<{ candidates: unknown[] }>>(`/projects/${project.id}/memory/candidates?limit=3`),
   ]);
 
   const schedule = [
-    ...(scheduleResponse?.schedule.dispatch_queue ?? []),
-    ...(scheduleResponse?.schedule.waiting_queue ?? []),
+    ...normalizeScheduleItems(scheduleResponse?.schedule.dispatch_queue ?? [], "dispatch"),
+    ...normalizeScheduleItems(scheduleResponse?.schedule.waiting_queue ?? [], "waiting"),
   ];
+  const subagentBacklog = normalizeSubagentBacklog(scheduleResponse?.schedule.subagent_backlog ?? []);
   const providers = normalizeProviders(providersResponse?.providers ?? []);
   const resources = normalizeResources(resourcesResponse?.resources ?? []);
   const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
   const executions = normalizeExecutions(executionsResponse?.executions ?? []);
   const runs = normalizeRuns(runsResponse?.runs ?? []);
   const subagents = normalizeSubagents(subagentsResponse?.subagents ?? []);
+  const recoveries = normalizeRuntimeRecoveries(recoveriesResponse?.runtime_recoveries ?? []);
+  const visualAssets = normalizeVisualAssets(visualAssetsResponse?.visual_assets ?? []);
   const qualityReports = normalizeQualityReports(qualityReportsResponse?.quality_reports ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
@@ -105,15 +115,20 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       deployments: deployments.length,
       executions: executions.length,
       runs: runs.length,
+      recoveries: recoveries.length,
+      visual_assets: visualAssets.length,
     },
     issues: issues.length > 0 ? issues : demoSnapshot.issues,
     schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
+    subagent_backlog: subagentBacklog,
     providers: providers.length > 0 ? providers : demoSnapshot.providers,
     resources,
     deployments,
     executions,
     runs,
     subagents,
+    runtime_recoveries: recoveries,
+    visual_assets: visualAssets,
     quality_explanations: qualityExplanations,
     timeline: timeline.length > 0 ? timeline : demoSnapshot.timeline,
     quality: qualitySignals.length > 0 ? qualitySignals : demoSnapshot.quality,
@@ -125,6 +140,34 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
         score: Number(readUnknown(candidate, "score") ?? 0.72),
       })) ?? demoSnapshot.memory,
   };
+}
+
+function normalizeScheduleItems(rawItems: unknown[], fallbackStatus: string): ScheduleItem[] {
+  return rawItems.map((raw, index) => ({
+    issue_id: readString(raw, "issue_id", `issue-${index + 1}`),
+    status: readString(raw, "decision", readString(raw, "status", fallbackStatus)),
+    runtime_id: readString(raw, "runtime_id", ""),
+    reason: readString(raw, "reason", ""),
+    blocked_reason: readString(raw, "blocked_reason", ""),
+    subagent_id: readString(raw, "subagent_id", ""),
+    subagent_status: readString(raw, "subagent_status", ""),
+    recovery_id: readString(raw, "recovery_id", ""),
+    retry_count: readNumber(raw, "retry_count"),
+    max_retries: readNumber(raw, "max_retries"),
+  }));
+}
+
+function normalizeSubagentBacklog(rawItems: unknown[]): SubagentBacklogItem[] {
+  return rawItems.map((raw, index) => ({
+    issue_id: readString(raw, "issue_id", `issue-${index + 1}`),
+    subagent_id: readString(raw, "subagent_id", `subagent-${index + 1}`),
+    status: readString(raw, "status", "archived"),
+    reason: readString(raw, "reason", ""),
+    recovery_id: readString(raw, "recovery_id", ""),
+    failure_category: readString(raw, "failure_category", ""),
+    retry_count: readNumber(raw, "retry_count"),
+    max_retries: readNumber(raw, "max_retries"),
+  }));
 }
 
 function normalizeIssues(rawIssues: unknown[], runs: RunSummary[], subagents: SubagentSummary[], explanations: QualityExplanation[]): IssueNode[] {
@@ -242,6 +285,7 @@ function normalizeRuns(rawRuns: unknown[]): RunSummary[] {
     subagent_id: readString(raw, "subagent_id", ""),
     runtime_id: readString(raw, "runtime_id", ""),
     runtime_status: readString(raw, "runtime_status", ""),
+    recovery_id: readString(raw, "recovery_id", ""),
     quality_status: readString(raw, "quality_status", ""),
     quality_report_id: readString(raw, "quality_report_id", ""),
     updated_at: readString(raw, "updated_at", ""),
@@ -263,8 +307,66 @@ function normalizeSubagents(rawSubagents: unknown[]): SubagentSummary[] {
     read_scope: readArray(raw, "read_scope"),
     write_scope: readArray(raw, "write_scope"),
     output_contract: readArray(raw, "output_contract"),
+    retry_policy: readString(raw, "retry_policy", ""),
+    retry_count: readNumber(raw, "retry_count"),
+    max_retries: readNumber(raw, "max_retries"),
+    blocked_reason: readString(raw, "blocked_reason", ""),
+    archive_reason: readString(raw, "archive_reason", ""),
+    recovery_id: readString(raw, "recovery_id", ""),
+    failure_category: readString(raw, "failure_category", ""),
+    output_converged: readBoolean(raw, "output_converged"),
     updated_at: readString(raw, "updated_at", ""),
   }));
+}
+
+function normalizeRuntimeRecoveries(rawRecoveries: unknown[]): RuntimeRecoverySummary[] {
+  return rawRecoveries.map((raw, index) => ({
+    id: readString(raw, "id", `recovery-${index + 1}`),
+    run_id: readString(raw, "run_id", ""),
+    subagent_id: readString(raw, "subagent_id", ""),
+    issue_id: readString(raw, "issue_id", ""),
+    runtime_id: readString(raw, "runtime_id", ""),
+    provider_id: readString(raw, "provider_id", ""),
+    model_id: readString(raw, "model_id", ""),
+    native_session_id: readString(raw, "native_session_id", ""),
+    status: readString(raw, "status", "unknown"),
+    failure_category: readString(raw, "failure_category", "unknown"),
+    fallback_candidate: readString(raw, "fallback_candidate", ""),
+    fallback_reason: readString(raw, "fallback_reason", ""),
+    resume_hint: readString(raw, "resume_hint", ""),
+    prompt_path: readString(raw, "prompt_path", ""),
+    metadata_path: readString(raw, "metadata_path", ""),
+    stdout_path: readString(raw, "stdout_path", ""),
+    stderr_path: readString(raw, "stderr_path", ""),
+    diff_summary_path: readString(raw, "diff_summary_path", ""),
+    changed_files: readArray(raw, "changed_files"),
+    risks: readArray(raw, "risks"),
+    created_at: readString(raw, "created_at", ""),
+    updated_at: readString(raw, "updated_at", ""),
+  }));
+}
+
+function normalizeVisualAssets(rawAssets: unknown[]): VisualAssetSummary[] {
+  return rawAssets.map((raw, index) => {
+    const routeDecision = readUnknown(raw, "route_decision");
+    return {
+      id: readString(raw, "id", `visual-${index + 1}`),
+      diagram_spec_id: readString(raw, "diagram_spec_id", ""),
+      diagram_type: readString(raw, "diagram_type", "architecture"),
+      title: readString(raw, "title", `Visual asset ${index + 1}`),
+      status: readString(raw, "status", "planned"),
+      provider_id: readString(raw, "provider_id", ""),
+      model_id: readString(raw, "model_id", ""),
+      size: readString(raw, "size", "3072x2048"),
+      image_path: readString(raw, "image_path", ""),
+      prompt_path: readString(raw, "prompt_path", ""),
+      spec_path: readString(raw, "spec_path", ""),
+      explanation_path: readString(raw, "explanation_path", ""),
+      route_reason: readString(routeDecision, "reason", ""),
+      created_at: readString(raw, "created_at", ""),
+      updated_at: readString(raw, "updated_at", ""),
+    };
+  });
 }
 
 function normalizeQualityReports(rawReports: unknown[]) {
@@ -391,6 +493,11 @@ function readObjectArray(value: unknown, key: string): Record<string, unknown>[]
   return field.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
 }
 
+function readNumber(value: unknown, key: string): number {
+  const field = readUnknown(value, key);
+  return typeof field === "number" && Number.isFinite(field) ? field : 0;
+}
+
 function readBoolean(value: unknown, key: string): boolean {
   return readUnknown(value, key) === true;
 }
@@ -401,9 +508,9 @@ function unique(values: string[]): string[] {
 
 function toneFromStatus(status: string) {
   if (status === "completed" || status === "planned" || status === "accepted" || status === "passed" || status === "ready") return "ok" as const;
-  if (status === "running" || status === "dispatch") return "running" as const;
-  if (status === "blocked" || status === "failed" || status === "rejected") return "blocked" as const;
-  if (status === "waiting" || status === "pending") return "warning" as const;
+  if (status === "running" || status === "dispatch" || status === "retrying") return "running" as const;
+  if (status === "blocked" || status === "failed" || status === "rejected" || status === "route_blocked") return "blocked" as const;
+  if (status === "waiting" || status === "pending" || status === "archived") return "warning" as const;
   return "neutral" as const;
 }
 
