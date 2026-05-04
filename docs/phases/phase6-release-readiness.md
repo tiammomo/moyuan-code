@@ -104,7 +104,7 @@ npm run dev
 
 - Release provider publish 仍停在 preview-only 降级，没有真实远程写入 adapter。
 - Deployment SSH 仍只做 preview，尚未实现受控 SSH runner、远程烟测和回滚命令执行。
-- Provider telemetry 仍依赖本地 ops update/refresh，未接入真实账单、额度和模型质量采样。
+- Provider telemetry 已接入本地 ops update/refresh、runtime execution、quality gate 和 route decision；仍未接入真实账单、额度接口和外部模型质量采样。
 - Console schema-aware forms 先落地必填字段预检，尚未接入后端导出的完整 schema metadata。
 
 ## 7. 下一阶段入口

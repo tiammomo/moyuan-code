@@ -137,6 +137,7 @@ Issue 进入代码开发主线前必须满足：
 - worktree path 和 branch。
 - changed files。
 - commands、tests、quality gates。
+- provider telemetry feedback：`runtime_execution`、`quality_gate`、`provider_route`。
 - review findings。
 - rework decision。
 - memory candidates。

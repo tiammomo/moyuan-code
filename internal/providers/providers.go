@@ -137,6 +137,14 @@ type TelemetryRecord struct {
 	ID              string  `json:"id"`
 	ProviderID      string  `json:"provider_id"`
 	Source          string  `json:"source"`
+	RuntimeID       string  `json:"runtime_id,omitempty"`
+	ModelID         string  `json:"model_id,omitempty"`
+	RunID           string  `json:"run_id,omitempty"`
+	IssueID         string  `json:"issue_id,omitempty"`
+	QualityReportID string  `json:"quality_report_id,omitempty"`
+	RuntimeStatus   string  `json:"runtime_status,omitempty"`
+	QualityStatus   string  `json:"quality_status,omitempty"`
+	RouteDecision   string  `json:"route_decision,omitempty"`
 	HealthStatus    string  `json:"health_status,omitempty"`
 	HealthReason    string  `json:"health_reason,omitempty"`
 	QuotaStatus     string  `json:"quota_status,omitempty"`
@@ -149,6 +157,21 @@ type TelemetryRecord struct {
 	Decision        string  `json:"decision"`
 	Reason          string  `json:"reason,omitempty"`
 	CreatedAt       string  `json:"created_at"`
+}
+
+type FeedbackOptions struct {
+	ProviderID        string `json:"provider_id,omitempty"`
+	RuntimeID         string `json:"runtime_id,omitempty"`
+	ModelID           string `json:"model_id,omitempty"`
+	RunID             string `json:"run_id,omitempty"`
+	IssueID           string `json:"issue_id,omitempty"`
+	QualityReportID   string `json:"quality_report_id,omitempty"`
+	Source            string `json:"source,omitempty"`
+	RuntimeStatus     string `json:"runtime_status,omitempty"`
+	QualityStatus     string `json:"quality_status,omitempty"`
+	RouteDecision     string `json:"route_decision,omitempty"`
+	Reason            string `json:"reason,omitempty"`
+	IncrementRequests bool   `json:"increment_requests,omitempty"`
 }
 
 type RouteRequest struct {
@@ -391,6 +414,21 @@ func ListTelemetry(rootDir string, providerID string, limit int) ([]TelemetryRec
 	return records, nil
 }
 
+func RecordExecutionFeedback(rootDir string, options FeedbackOptions) (TelemetryRecord, bool, error) {
+	if strings.TrimSpace(options.Source) == "" {
+		options.Source = "runtime_execution"
+	}
+	options.IncrementRequests = true
+	return recordFeedback(rootDir, options)
+}
+
+func RecordQualityFeedback(rootDir string, options FeedbackOptions) (TelemetryRecord, bool, error) {
+	if strings.TrimSpace(options.Source) == "" {
+		options.Source = "quality_gate"
+	}
+	return recordFeedback(rootDir, options)
+}
+
 func RefreshOps(rootDir string, options OpsRefreshOptions) (OpsRefreshResult, error) {
 	registry, err := Load(rootDir)
 	if err != nil {
@@ -492,6 +530,7 @@ func Route(rootDir string, request RouteRequest) (RouteDecision, error) {
 		return RouteDecision{}, err
 	}
 	decision := Decide(registry, request)
+	recordRouteFeedback(rootDir, registry, decision)
 	_ = logging.Log(rootDir, "audit", "provider.route.decided", map[string]any{
 		"decision":    decision.Decision,
 		"provider_id": decision.ProviderID,
@@ -612,6 +651,11 @@ func telemetryPath(rootDir string) string {
 }
 
 func recordTelemetry(rootDir string, provider Provider, source string) error {
+	_, err := recordTelemetryWithFeedback(rootDir, provider, source, FeedbackOptions{})
+	return err
+}
+
+func recordTelemetryWithFeedback(rootDir string, provider Provider, source string, feedback FeedbackOptions) (TelemetryRecord, error) {
 	if strings.TrimSpace(source) == "" {
 		source = "unknown"
 	}
@@ -620,6 +664,14 @@ func recordTelemetry(rootDir string, provider Provider, source string) error {
 		ID:              "provider-telemetry-" + provider.ID + "-" + strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", ""),
 		ProviderID:      provider.ID,
 		Source:          source,
+		RuntimeID:       normalizeToken(feedback.RuntimeID),
+		ModelID:         strings.TrimSpace(feedback.ModelID),
+		RunID:           strings.TrimSpace(feedback.RunID),
+		IssueID:         strings.TrimSpace(feedback.IssueID),
+		QualityReportID: strings.TrimSpace(feedback.QualityReportID),
+		RuntimeStatus:   normalizeToken(feedback.RuntimeStatus),
+		QualityStatus:   normalizeToken(feedback.QualityStatus),
+		RouteDecision:   strings.TrimSpace(feedback.RouteDecision),
 		HealthStatus:    provider.Health.Status,
 		HealthReason:    provider.Health.Reason,
 		QuotaStatus:     provider.Quota.Status,
@@ -633,8 +685,11 @@ func recordTelemetry(rootDir string, provider Provider, source string) error {
 		Reason:          reason,
 		CreatedAt:       now(),
 	}
+	if feedback.Reason != "" {
+		record.Reason = sanitizeFeedbackReason(feedback.Reason)
+	}
 	if err := fsutil.AppendJSONL(telemetryPath(rootDir), record); err != nil {
-		return err
+		return TelemetryRecord{}, err
 	}
 	_ = logging.Log(rootDir, "audit", "provider.telemetry.recorded", map[string]any{
 		"provider_id": provider.ID,
@@ -642,7 +697,7 @@ func recordTelemetry(rootDir string, provider Provider, source string) error {
 		"decision":    decision,
 		"reason":      reason,
 	})
-	return nil
+	return record, nil
 }
 
 func telemetryDecision(provider Provider) (string, string) {
@@ -660,6 +715,110 @@ func refreshTelemetrySource(options OpsRefreshOptions) string {
 		return "probe_refresh"
 	}
 	return "ops_refresh"
+}
+
+func recordFeedback(rootDir string, options FeedbackOptions) (TelemetryRecord, bool, error) {
+	options.ProviderID = normalizeID(options.ProviderID)
+	if options.ProviderID == "" {
+		return TelemetryRecord{}, false, nil
+	}
+	registry, err := Load(rootDir)
+	if err != nil {
+		return TelemetryRecord{}, false, err
+	}
+	for i, provider := range registry.Providers {
+		if provider.ID != options.ProviderID {
+			continue
+		}
+		provider = applyFeedback(provider, options)
+		provider.UpdatedAt = now()
+		registry.Providers[i] = provider
+		if err := Save(rootDir, registry); err != nil {
+			return TelemetryRecord{}, false, err
+		}
+		record, err := recordTelemetryWithFeedback(rootDir, provider, options.Source, options)
+		if err != nil {
+			return TelemetryRecord{}, false, err
+		}
+		return record, true, nil
+	}
+	return TelemetryRecord{}, false, nil
+}
+
+func recordRouteFeedback(rootDir string, registry Registry, decision RouteDecision) {
+	if strings.TrimSpace(decision.ProviderID) == "" {
+		return
+	}
+	provider, ok := providerByID(registry, decision.ProviderID)
+	if !ok {
+		return
+	}
+	_, _ = recordTelemetryWithFeedback(rootDir, provider, "provider_route", FeedbackOptions{
+		ProviderID:        provider.ID,
+		RuntimeID:         decision.RuntimeID,
+		ModelID:           decision.ModelID,
+		RouteDecision:     decision.Decision,
+		Reason:            decision.Reason,
+		QualityStatus:     "",
+		RuntimeStatus:     "",
+		IncrementRequests: false,
+	})
+}
+
+func applyFeedback(provider Provider, options FeedbackOptions) Provider {
+	now := now()
+	runtimeStatus := normalizeToken(options.RuntimeStatus)
+	qualityStatus := normalizeToken(options.QualityStatus)
+	reason := sanitizeFeedbackReason(options.Reason)
+	if options.IncrementRequests {
+		if provider.Usage.Window == "" {
+			provider.Usage.Window = "lifecycle"
+		}
+		provider.Usage.Requests++
+		provider.Usage.UpdatedAt = now
+	}
+	health, healthReason := feedbackHealth(runtimeStatus, qualityStatus, reason)
+	if health != "" {
+		provider.Health.Status = health
+		provider.Health.Reason = healthReason
+		provider.Health.LastCheckedAt = now
+	}
+	return provider
+}
+
+func feedbackHealth(runtimeStatus string, qualityStatus string, reason string) (string, string) {
+	switch runtimeStatus {
+	case "failed", "blocked":
+		return "degraded", firstNonEmpty(reason, "runtime_feedback:"+runtimeStatus)
+	case "completed", "passed":
+	}
+	switch qualityStatus {
+	case "failed", "rejected":
+		return "degraded", firstNonEmpty(reason, "quality_feedback:"+qualityStatus)
+	case "passed", "accepted", "accepted_with_findings":
+		return "ok", firstNonEmpty(reason, "execution_quality_feedback_ok")
+	}
+	if runtimeStatus == "completed" {
+		return "ok", firstNonEmpty(reason, "runtime_feedback:completed")
+	}
+	return "", ""
+}
+
+func sanitizeFeedbackReason(value string) string {
+	value = strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(value, "\n", " "), "\r", " "))
+	if len(value) > 180 {
+		return value[:180]
+	}
+	return value
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func normalizeForSave(provider Provider) (Provider, error) {

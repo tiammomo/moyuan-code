@@ -202,6 +202,74 @@ func TestProviderOpsSnapshotBlocksUnavailableRoutes(t *testing.T) {
 	}
 }
 
+func TestProviderExecutionAndQualityFeedbackUpdateTelemetry(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	runtimeRecord, ok, err := RecordExecutionFeedback(root, FeedbackOptions{
+		ProviderID:    "codex_cli",
+		RuntimeID:     "codex_cli",
+		ModelID:       "gpt-5.5",
+		RunID:         "run-1",
+		IssueID:       "issue-1",
+		RuntimeStatus: "failed",
+		Reason:        "runtime_failed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || runtimeRecord.Source != "runtime_execution" || runtimeRecord.RuntimeStatus != "failed" || runtimeRecord.Decision != "PROVIDER_TELEMETRY_WARNING" {
+		t.Fatalf("unexpected runtime feedback telemetry: ok=%v record=%+v", ok, runtimeRecord)
+	}
+	provider, ok, err := Show(root, "codex_cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || provider.Health.Status != "degraded" || provider.Usage.Requests != 1 {
+		t.Fatalf("expected runtime feedback to degrade health and increment usage: ok=%v provider=%+v", ok, provider)
+	}
+	route, err := Route(root, RouteRequest{Role: "backend", RequiresRepoEdit: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if route.Decision != DecisionAllowed || !hasRouteSignal(route.Signals, "health", "degraded") {
+		t.Fatalf("expected degraded health signal without blocking route, got %+v", route)
+	}
+
+	qualityRecord, ok, err := RecordQualityFeedback(root, FeedbackOptions{
+		ProviderID:      "codex_cli",
+		RuntimeID:       "codex_cli",
+		RunID:           "run-1",
+		IssueID:         "issue-1",
+		QualityReportID: "quality-1",
+		RuntimeStatus:   "completed",
+		QualityStatus:   "passed",
+		Reason:          "quality_status:passed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || qualityRecord.Source != "quality_gate" || qualityRecord.QualityStatus != "passed" || qualityRecord.Decision != "PROVIDER_TELEMETRY_OK" {
+		t.Fatalf("unexpected quality feedback telemetry: ok=%v record=%+v", ok, qualityRecord)
+	}
+	provider, ok, err = Show(root, "codex_cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || provider.Health.Status != "ok" || provider.Usage.Requests != 1 {
+		t.Fatalf("expected quality feedback to restore health without usage increment: ok=%v provider=%+v", ok, provider)
+	}
+	records, err := ListTelemetry(root, "codex_cli", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasTelemetrySource(records, "runtime_execution") || !hasTelemetrySource(records, "quality_gate") || !hasTelemetrySource(records, "provider_route") {
+		t.Fatalf("expected runtime, quality and route telemetry, got %+v", records)
+	}
+}
+
 func TestProviderOpsRefreshUpdatesLocalSignals(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {
@@ -422,6 +490,15 @@ func writeProviderSecretPolicy(t *testing.T, root string, text string) {
 func hasRouteSignal(signals []RouteSignal, signalType string, status string) bool {
 	for _, signal := range signals {
 		if signal.Type == signalType && signal.Status == status {
+			return true
+		}
+	}
+	return false
+}
+
+func hasTelemetrySource(records []TelemetryRecord, source string) bool {
+	for _, record := range records {
+		if record.Source == source {
 			return true
 		}
 	}

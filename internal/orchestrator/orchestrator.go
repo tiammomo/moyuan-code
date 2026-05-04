@@ -158,6 +158,19 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		_, _, _ = subagent.Finish(rootDir, instance.ID, "failed")
 		return Result{}, err
 	}
+	if rt.ProviderID != "" {
+		_, _, _ = providers.RecordQualityFeedback(rootDir, providers.FeedbackOptions{
+			ProviderID:      rt.ProviderID,
+			RuntimeID:       rt.RuntimeID,
+			ModelID:         rt.ModelID,
+			RunID:           rt.RunID,
+			IssueID:         issueID,
+			QualityReportID: report.ID,
+			RuntimeStatus:   rt.Status,
+			QualityStatus:   report.Status,
+			Reason:          qualityFeedbackReason(report),
+		})
+	}
 	status := "accepted"
 	if rt.Status != "completed" || report.Status != "passed" {
 		status = "needs_rework"
@@ -217,6 +230,23 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	}
 	_ = logging.Log(rootDir, "run", "orchestrator.issue.completed", map[string]any{"issue_id": issueID, "run_id": run.ID, "status": status})
 	return result, nil
+}
+
+func qualityFeedbackReason(report quality.Report) string {
+	if report.Status == "passed" {
+		return "quality_status:passed"
+	}
+	for _, check := range report.Checks {
+		if check.Status == "failed" {
+			return "quality_check_failed:" + check.Type
+		}
+	}
+	for _, finding := range report.Findings {
+		if finding.Blocking {
+			return "quality_blocking_finding:" + finding.Category
+		}
+	}
+	return "quality_status:" + report.Status
 }
 
 func protectedPaths(rootDir string) []string {

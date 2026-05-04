@@ -106,6 +106,7 @@ Provider env profile 规则：
 - Native Runtime 只能接收白名单环境变量，不能继承完整用户环境。
 - `provider_id` 指向 Provider Registry；`auth_ref` 在执行前解析为子进程环境变量，结果文件和日志只记录 `env_keys`。
 - `claude_cli` 可注入 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN` 和模型相关变量，用于 MiniMax-M2.7 等 Anthropic-compatible provider。
+- Native Runtime 完成后写入 provider telemetry `runtime_execution` feedback，只记录 run、issue、runtime/model、status 和 reason，不记录 prompt、secret 或 stdout/stderr 原文。
 - Runtime Adapter 不负责决定代码是否可合入，所有 diff 必须回到质量门禁和 review。
 
 Native Runtime recovery 输出：

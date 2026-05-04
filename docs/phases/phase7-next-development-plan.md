@@ -14,7 +14,7 @@ Phase 6 已完成并通过 release readiness：
 - Git Provider PR/MR create 已在真实写入路径前消费 approval。
 - Deployment 已具备 SSH preview 状态模型，真实 SSH 仍默认阻断。
 - Release provider 已具备 preview/publish execution，真实 release provider write 仍默认关闭。
-- Provider telemetry 已进入 ops update、refresh 和 route decision。
+- Provider telemetry 已进入 ops update、refresh、route decision、runtime execution 和 quality gate。
 - Console 已具备多视图、schema-aware 必填预检和 release/provider 操作入口。
 
 ## 2. Phase 7 第一批任务
@@ -24,7 +24,7 @@ Phase 6 已完成并通过 release readiness：
 | P0 | `phase7-001` | `release-provider-approval-consumption` | completed | release provider 真实 publish 的 approval consumption 和 replay guard | 真实 publish 路径不能重复使用 approval |
 | P0 | `phase7-002` | `ssh-executor-guarded-runner` | completed | SSH executor 受控执行边界 | 默认阻断真实 SSH，启用后只执行白名单命令 |
 | P1 | `phase7-003` | `post-action-evidence-model` | completed | 发布/部署/烟测/监控/回滚证据链 | 每次操作能查询统一 evidence |
-| P1 | `phase7-004` | `runtime-telemetry-feedback-loop` | planned | runtime/quality 结果反哺 provider telemetry | route decision 可读取执行反馈 |
+| P1 | `phase7-004` | `runtime-telemetry-feedback-loop` | completed | runtime/quality 结果反哺 provider telemetry | route decision 可读取执行反馈 |
 | P2 | `phase7-005` | `console-execution-detail-history` | planned | Console execution detail 和 operation history | 用户能追踪 preview、approval、publish、evidence |
 
 ## 3. 执行规划：`phase7-001 release-provider-approval-consumption`
@@ -171,7 +171,50 @@ Phase 6 已完成并通过 release readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 9. 验证要求
+## 9. 执行规划：`phase7-004 runtime-telemetry-feedback-loop`
+
+范围：
+
+- Provider telemetry record 增加 runtime、model、run、issue、quality report、runtime status、quality status 和 route decision 上下文。
+- Native Runtime 完成后写入 `runtime_execution` telemetry，并更新 provider health 与 usage request 计数。
+- Orchestrator quality gate 完成后写入 `quality_gate` telemetry，质量通过可恢复 provider health，质量失败会降级。
+- Provider route decision 写入 `provider_route` telemetry，用于解释后续调度看到的 health/quota/cost signals。
+
+非目标：
+
+- 不外呼模型服务商账单、额度或真实质量采样接口。
+- 不把 prompt、secret、stdout、stderr 或 diff 原文写入 provider telemetry。
+- 不因 telemetry 写入失败阻断 runtime 主流程。
+
+验收：
+
+- runtime execution 能产生 `runtime_execution` telemetry。
+- quality gate 能产生 `quality_gate` telemetry。
+- route decision 能产生 `provider_route` telemetry。
+- degraded provider 不被直接阻断，但 route signal 必须可见。
+- `go test ./internal/providers ./internal/runtime ./internal/orchestrator` 通过。
+- `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
+
+## 10. 已完成任务：`phase7-004 runtime-telemetry-feedback-loop`
+
+范围：
+
+- `TelemetryRecord` 增加 execution feedback 上下文字段。
+- 新增 `RecordExecutionFeedback` 和 `RecordQualityFeedback`，统一写入 provider telemetry。
+- Runtime native CLI 执行结束后记录 `runtime_execution` 反馈。
+- Orchestrator quality gate 结束后记录 `quality_gate` 反馈。
+- Provider route decision 记录 `provider_route` 反馈。
+- 反馈会更新 provider health 和 usage request，route decision 可读取降级后的 health signal。
+
+验证：
+
+- `go test ./internal/providers ./internal/runtime ./internal/orchestrator` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 11. 验证要求
 
 每完成一个 Phase 7 issue，至少运行：
 

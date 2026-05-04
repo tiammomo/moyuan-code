@@ -11,6 +11,7 @@ import (
 	gitadapter "moyuan-code/internal/git"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/process"
+	"moyuan-code/internal/providers"
 	"moyuan-code/internal/workspace"
 )
 
@@ -235,8 +236,26 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(rootDir).RuntimeDir, invocation.RunID+"-"+invocation.RuntimeID+".json"), result); err != nil {
 		return Result{}, err
 	}
+	if result.ProviderID != "" {
+		_, _, _ = providers.RecordExecutionFeedback(rootDir, providers.FeedbackOptions{
+			ProviderID:    result.ProviderID,
+			RuntimeID:     result.RuntimeID,
+			ModelID:       result.ModelID,
+			RunID:         result.RunID,
+			IssueID:       invocation.IssueID,
+			RuntimeStatus: result.Status,
+			Reason:        feedbackReason(result.Risks, "runtime_status:"+result.Status),
+		})
+	}
 	_ = logging.Log(rootDir, "run", "runtime.completed", map[string]any{"run_id": invocation.RunID, "runtime_id": invocation.RuntimeID, "status": result.Status, "changed_files": result.ChangedFiles, "diff_summary_path": result.DiffSummaryPath})
 	return result, nil
+}
+
+func feedbackReason(risks []string, fallback string) string {
+	if len(risks) == 0 {
+		return fallback
+	}
+	return strings.Join(risks, ",")
 }
 
 func appendRisk(risks []string, risk string) []string {

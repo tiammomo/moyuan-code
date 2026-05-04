@@ -167,4 +167,5 @@ collect runtime signal
 - 低风险 confirmed bug 能自动创建 repair attempt，并补充回归测试。
 - 自动修复后的代码必须通过质量门禁和独立 review。
 - 修复经验能进入 Memory，并在后续类似任务中被检索。
+- runtime execution 和 quality gate 结果能反哺 provider telemetry，供后续路由参考。
 - 同类 bug 重复出现时，系统能提升风险等级或建议新增质量规则。
