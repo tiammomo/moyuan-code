@@ -136,6 +136,75 @@ func TestExecuteBlocksRealSSHExecution(t *testing.T) {
 	}
 }
 
+func TestExecuteSSHGuardedRunnerValidatesAllowlist(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("MOYUAN_ALLOW_SSH_EXECUTE", "1")
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	plan := createDeploymentPlanWithHealthTarget(t, root, "ssh-guarded-safe", "http://127.0.0.1/healthz")
+	execution, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "ssh_execute",
+		Approved:     true,
+		Commands:     []string{"printf deploy-ok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if execution.Status != "blocked" || execution.Decision != "DEPLOY_SSH_EXECUTION_GUARDED_READY" || !execution.RemoteExecEnabled {
+		t.Fatalf("expected guarded SSH execution boundary, got %+v", execution)
+	}
+	if execution.RemotePlan == nil || execution.RemotePlan.Decision != "SSH_EXECUTION_GUARDED_READY" {
+		t.Fatalf("expected guarded remote plan, got %+v", execution.RemotePlan)
+	}
+	if !hasStep(execution.Steps, "ssh_execute", "planned") {
+		t.Fatalf("expected planned SSH execute step, got %+v", execution.Steps)
+	}
+	if !containsReason(execution.Reasons, "remote_ssh_command_runner_not_enabled") {
+		t.Fatalf("expected runner boundary reason, got %+v", execution.Reasons)
+	}
+	releaseLog, found, err := fsutil.ReadText(filepath.Join(workspace.ForRoot(root).LogsDir, "release.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found || !strings.Contains(releaseLog, "deployment.ssh.execution.guarded") {
+		t.Fatalf("expected guarded ssh execution log, found=%v log=%s", found, releaseLog)
+	}
+}
+
+func TestExecuteSSHGuardedRunnerBlocksUnsafeCommand(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("MOYUAN_ALLOW_SSH_EXECUTE", "1")
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	plan := createDeploymentPlanWithHealthTarget(t, root, "ssh-guarded-unsafe", "http://127.0.0.1/healthz")
+	execution, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "ssh_execute",
+		Approved:     true,
+		Commands:     []string{"rm -rf /"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if execution.Status != "blocked" || execution.Decision != "DEPLOY_SSH_EXECUTION_BLOCKED" {
+		t.Fatalf("expected unsafe SSH command to be blocked, got %+v", execution)
+	}
+	if execution.RemotePlan == nil || execution.RemotePlan.Decision != "SSH_EXECUTION_BLOCKED" {
+		t.Fatalf("expected blocked remote plan, got %+v", execution.RemotePlan)
+	}
+	if !containsReason(execution.Reasons, "command_not_allowed") {
+		t.Fatalf("expected command allowlist reason, got %+v", execution.Reasons)
+	}
+	if !hasStep(execution.Steps, "ssh_execute", "blocked") {
+		t.Fatalf("expected blocked SSH execute step, got %+v", execution.Steps)
+	}
+}
+
 func createDeploymentPlanWithHealthTarget(t *testing.T, root string, id string, target string) Plan {
 	t.Helper()
 	resource, err := serverresources.Add(root, serverresources.Resource{

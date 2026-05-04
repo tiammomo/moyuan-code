@@ -82,6 +82,7 @@ type Execution struct {
 	MonitorReport      CheckReport        `json:"monitor_report,omitempty"`
 	RollbackSuggestion RollbackSuggestion `json:"rollback_suggestion,omitempty"`
 	ApprovalID         string             `json:"approval_id,omitempty"`
+	RemoteExecEnabled  bool               `json:"remote_exec_enabled"`
 	StartedAt          string             `json:"started_at"`
 	FinishedAt         string             `json:"finished_at,omitempty"`
 }
@@ -386,20 +387,26 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 			execution.RollbackSuggestion = rollbackFor(plan, "deploy_command_failed")
 		}
 	case "ssh_execute":
-		execution.RemotePlan = &RemotePlan{
-			Status:    "blocked",
-			Decision:  "SSH_EXECUTION_NOT_ENABLED",
-			Targets:   []RemoteTarget{},
-			CreatedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		execution.RemoteExecEnabled = sshExecutionEnabled()
+		remotePlan, steps, ok, reasons := buildSSHExecutionPlan(rootDir, plan, options.Commands, execution.RemoteExecEnabled)
+		execution.RemotePlan = &remotePlan
+		execution.Steps = steps
+		execution.Reasons = append(execution.Reasons, reasons...)
+		switch {
+		case !execution.RemoteExecEnabled:
+			execution.Decision = "DEPLOY_EXECUTION_BLOCKED"
+		case ok:
+			execution.Decision = "DEPLOY_SSH_EXECUTION_GUARDED_READY"
+			_ = logging.Log(rootDir, "release", "deployment.ssh.execution.guarded", map[string]any{
+				"deployment_id": execution.DeploymentID,
+				"release_id":    execution.ReleaseID,
+				"environment":   execution.Environment,
+				"targets":       len(remotePlan.Targets),
+				"decision":      execution.Decision,
+			})
+		default:
+			execution.Decision = "DEPLOY_SSH_EXECUTION_BLOCKED"
 		}
-		execution.ManualBlock("ssh_real_execution_not_enabled")
-		execution.Steps = append(execution.Steps, ExecutionStep{
-			Name:       "ssh_execute",
-			Status:     "blocked",
-			Output:     "real SSH execution is not enabled",
-			StartedAt:  time.Now().UTC().Format(time.RFC3339Nano),
-			FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
-		})
 	default:
 		execution.Reasons = append(execution.Reasons, "execution_mode_not_allowed:"+options.Mode)
 	}
@@ -635,6 +642,103 @@ func buildSSHPreview(rootDir string, plan Plan, commands []string) (RemotePlan, 
 		remotePlan.Decision = "SSH_PREVIEW_BLOCKED"
 	}
 	return remotePlan, steps, ok, reasons
+}
+
+func buildSSHExecutionPlan(rootDir string, plan Plan, commands []string, enabled bool) (RemotePlan, []ExecutionStep, bool, []string) {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	remotePlan := RemotePlan{
+		Status:    "blocked",
+		Decision:  "SSH_EXECUTION_NOT_ENABLED",
+		Targets:   []RemoteTarget{},
+		CreatedAt: now,
+	}
+	steps := []ExecutionStep{}
+	reasons := []string{}
+	if !enabled {
+		reasons = append(reasons, "ssh_real_execution_not_enabled")
+	}
+	if len(commands) == 0 {
+		reasons = append(reasons, "commands_required")
+	}
+	ok := enabled && len(commands) > 0
+	for _, summary := range plan.Resources {
+		resource, found, err := serverresources.Show(rootDir, summary.ID)
+		target := RemoteTarget{
+			ResourceID:  summary.ID,
+			Environment: summary.Environment,
+			Host:        summary.Host,
+			Status:      "blocked",
+			Reason:      "ssh_real_execution_not_enabled",
+			Commands:    append([]string{}, commands...),
+		}
+		if err != nil || !found {
+			target.Reason = "server_resource_not_found"
+			reasons = append(reasons, "server_resource_not_found:"+summary.ID)
+			ok = false
+		} else {
+			target.Environment = resource.Environment
+			target.Host = resource.Host
+			target.Provider = resource.Provider
+			target.AuthRef = resource.AuthRef
+			if enabled {
+				target.Status, target.Reason = validateRemoteTarget(plan, resource)
+				if target.Status == "planned" {
+					target.Reason = "ssh_guarded_execution_ready"
+				}
+			}
+			if enabled && len(commands) == 0 {
+				target.Status = "blocked"
+				target.Reason = "commands_required"
+			}
+			if target.Status == "blocked" && target.Reason != "ssh_real_execution_not_enabled" {
+				reasons = append(reasons, target.Reason+":"+resource.ID)
+				ok = false
+			}
+		}
+		for _, command := range commands {
+			if !isSafeSSHCommand(command) {
+				target.Status = "blocked"
+				target.Reason = "command_not_allowed"
+				reasons = append(reasons, "command_not_allowed")
+				ok = false
+				break
+			}
+		}
+		remotePlan.Targets = append(remotePlan.Targets, target)
+		steps = append(steps, ExecutionStep{
+			Name:       "ssh_execute",
+			Status:     target.Status,
+			Command:    commandSummary(commands),
+			Output:     target.ResourceID + ":" + target.Host + ":" + target.Reason,
+			Allowlist:  safeSSHPrefixes(),
+			StartedAt:  now,
+			FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		})
+	}
+	if len(remotePlan.Targets) == 0 {
+		reasons = append(reasons, "deployment_resources_missing")
+		return remotePlan, steps, false, reasons
+	}
+	if ok {
+		remotePlan.Status = "planned"
+		remotePlan.Decision = "SSH_EXECUTION_GUARDED_READY"
+		reasons = append(reasons, "ssh_guarded_execution_ready", "remote_ssh_command_runner_not_enabled")
+		return remotePlan, steps, true, reasons
+	}
+	if enabled {
+		remotePlan.Decision = "SSH_EXECUTION_BLOCKED"
+	}
+	return remotePlan, steps, false, reasons
+}
+
+func commandSummary(commands []string) string {
+	if len(commands) == 0 {
+		return ""
+	}
+	if len(commands) == 1 {
+		return commands[0]
+	}
+	return fmt.Sprintf("%d remote commands", len(commands))
 }
 
 func validateRemoteTarget(plan Plan, resource serverresources.Resource) (string, string) {
@@ -915,6 +1019,29 @@ func isSafeShellCommand(command string) bool {
 	return false
 }
 
+func isSafeSSHCommand(command string) bool {
+	if strings.ContainsAny(command, "\n\r") {
+		return false
+	}
+	for _, token := range []string{";", "&&", "||", "`", "$(", ">", "<", "|"} {
+		if strings.Contains(command, token) {
+			return false
+		}
+	}
+	for _, prefix := range safeSSHPrefixes() {
+		if strings.HasSuffix(prefix, " ") {
+			if strings.HasPrefix(command, prefix) {
+				return true
+			}
+			continue
+		}
+		if command == prefix {
+			return true
+		}
+	}
+	return false
+}
+
 func safeShellPrefixes() []string {
 	return []string{
 		"true",
@@ -923,6 +1050,23 @@ func safeShellPrefixes() []string {
 		"curl -fsS http://127.0.0.1",
 		"curl -fsS http://localhost",
 	}
+}
+
+func safeSSHPrefixes() []string {
+	return []string{
+		"true",
+		"echo ",
+		"printf ",
+		"curl -fsS http://127.0.0.1",
+		"curl -fsS http://localhost",
+		"systemctl status ",
+		"docker ps",
+		"docker compose ps",
+	}
+}
+
+func sshExecutionEnabled() bool {
+	return os.Getenv("MOYUAN_ALLOW_SSH_EXECUTE") == "1"
 }
 
 func (execution *Execution) ManualBlock(reason string) {

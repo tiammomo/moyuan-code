@@ -22,7 +22,7 @@ Phase 6 已完成并通过 release readiness：
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase7-001` | `release-provider-approval-consumption` | completed | release provider 真实 publish 的 approval consumption 和 replay guard | 真实 publish 路径不能重复使用 approval |
-| P0 | `phase7-002` | `ssh-executor-guarded-runner` | planned | SSH executor 受控执行边界 | 默认阻断真实 SSH，启用后只执行白名单命令 |
+| P0 | `phase7-002` | `ssh-executor-guarded-runner` | completed | SSH executor 受控执行边界 | 默认阻断真实 SSH，启用后只执行白名单命令 |
 | P1 | `phase7-003` | `post-action-evidence-model` | planned | 发布/部署/烟测/监控/回滚证据链 | 每次操作能查询统一 evidence |
 | P1 | `phase7-004` | `runtime-telemetry-feedback-loop` | planned | runtime/quality 结果反哺 provider telemetry | route decision 可读取执行反馈 |
 | P2 | `phase7-005` | `console-execution-detail-history` | planned | Console execution detail 和 operation history | 用户能追踪 preview、approval、publish、evidence |
@@ -75,7 +75,54 @@ Phase 6 已完成并通过 release readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 5. 验证要求
+## 5. 执行规划：`phase7-002 ssh-executor-guarded-runner`
+
+范围：
+
+- `ssh_execute` 增加真实执行开关语义，默认未启用时只记录 blocked execution 和 `SSH_EXECUTION_NOT_ENABLED` remote plan。
+- 设置 `MOYUAN_ALLOW_SSH_EXECUTE=1` 后，不直接连接远程 SSH，而是先校验 server resource、`auth_ref` 引用和命令 allowlist。
+- 通过校验时生成 `SSH_EXECUTION_GUARDED_READY` remote plan，明确记录 `remote_ssh_command_runner_not_enabled`，等待后续真实 runner。
+- 不安全命令必须被 allowlist 阻断，并进入 execution step。
+
+非目标：
+
+- 不解析 SSH 私钥或 secret value。
+- 不启动真实 SSH session。
+- 不执行生产环境真实部署。
+
+验收：
+
+- 默认 `ssh_execute` 仍返回 blocked，并记录 `ssh_real_execution_not_enabled`。
+- 开启 `MOYUAN_ALLOW_SSH_EXECUTE=1` 且命令在 allowlist 内时，remote plan 进入 guarded ready。
+- 开启写开关但命令不在 allowlist 内时，execution 被阻断并记录 `command_not_allowed`。
+- `go test ./internal/deployment ./internal/cli ./internal/api` 通过。
+- `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
+
+## 6. 已完成任务：`phase7-002 ssh-executor-guarded-runner`
+
+范围：
+
+- `Execution` 新增 `remote_exec_enabled`，明确记录本次远程执行开关是否开启。
+- `ssh_execute` 默认仍返回 `DEPLOY_EXECUTION_BLOCKED` 和 `SSH_EXECUTION_NOT_ENABLED`。
+- `MOYUAN_ALLOW_SSH_EXECUTE=1` 开启后，会生成 guarded remote plan，但仍不真实连接 SSH。
+- SSH 命令复用受限 allowlist 和 shell metacharacter 阻断规则；不安全命令进入 blocked step。
+- 新增 `deployment.ssh.execution.guarded` release log，用于审计 guarded ready 状态。
+
+非目标：
+
+- 不执行真实远程命令。
+- 不读取、解析或打印 secret value。
+- 不改变 production real execution 默认阻断策略。
+
+验证：
+
+- `go test ./internal/deployment ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 7. 验证要求
 
 每完成一个 Phase 7 issue，至少运行：
 
