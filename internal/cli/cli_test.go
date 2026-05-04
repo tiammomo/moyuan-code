@@ -271,6 +271,34 @@ func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 	assertFileContains(t, root, ".moyuan/logs/run.jsonl", "orchestrator.run.transitioned")
 }
 
+func TestRequirementPlanCreatesReadableIssueGraph(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	result := runCLI(t, root, "requirement", "plan", "--text", "add backend API to inspect issue graph with go test verification")
+	assertContains(t, result.stdout, `"clarification_decision"`)
+	assertContains(t, result.stdout, `"status": "proceed"`)
+	assertContains(t, result.stdout, `"backend-implementation"`)
+	epicID := decodeStringField(t, result.stdout, "epic_id")
+	requirementID := decodeStringField(t, result.stdout, "id")
+
+	graph := runCLI(t, root, "issue", "graph", epicID)
+	assertContains(t, graph.stdout, `"backend-implementation"`)
+
+	schedule := runCLI(t, root, "issue", "schedule", epicID)
+	assertContains(t, schedule.stdout, `"ready_queue"`)
+	assertContains(t, schedule.stdout, `"blocked_queue"`)
+
+	assertFileExists(t, root, ".moyuan/lifecycle/requirements/"+requirementID+".json")
+
+	weak := runCLIAllowFailure(t, root, "requirement", "plan", "--text", "tune")
+	if weak.code == 0 {
+		t.Fatalf("expected weak requirement to require clarification: %s", weak.stdout)
+	}
+	assertContains(t, weak.stdout, `"needs_user_input"`)
+	assertContains(t, weak.stdout, `"missing_verifiable_goal"`)
+}
+
 func TestQualityReviewHardeningFindingsDriveNeedsRework(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)
@@ -460,6 +488,19 @@ func decodeRepairAttemptID(t *testing.T, raw string) string {
 		t.Fatalf("missing repair attempt id in output: %s", raw)
 	}
 	return payload.ID
+}
+
+func decodeStringField(t *testing.T, raw string, field string) string {
+	t.Helper()
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode %s: %v\n%s", field, err, raw)
+	}
+	value, _ := payload[field].(string)
+	if value == "" {
+		t.Fatalf("missing %s in output: %s", field, raw)
+	}
+	return value
 }
 
 func runCLI(t *testing.T, root string, args ...string) cliResult {

@@ -245,6 +245,7 @@ moyuan comprehend --full
 moyuan comprehend --since <commit>
 moyuan comprehend status
 moyuan status
+moyuan requirement plan --text <text>
 moyuan epic create
 moyuan epic plan <epic-id>
 moyuan issue graph <epic-id>

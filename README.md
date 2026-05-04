@@ -36,6 +36,7 @@ go run ./cmd/moyuan --help
 ```bash
 ./bin/moyuan project add --local /path/to/repo --root /path/to/repo
 ./bin/moyuan auth whoami --root /path/to/repo
+./bin/moyuan requirement plan --text "add backend API to inspect issue graph with go test verification" --root /path/to/repo
 ./bin/moyuan issue graph phase1-epic --root /path/to/repo
 ./bin/moyuan orchestrator plan phase1-epic --root /path/to/repo
 ./bin/moyuan runtime invoke local_shell --prompt "printf ok" --root /path/to/repo

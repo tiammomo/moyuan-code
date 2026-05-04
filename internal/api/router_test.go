@@ -18,6 +18,7 @@ import (
 	"moyuan-code/internal/memory"
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/repair"
+	"moyuan-code/internal/requirement"
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/workspace"
 )
@@ -107,6 +108,10 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	if decision.Status != "recorded" {
 		t.Fatalf("expected memory to record, got %s", decision.Status)
 	}
+	reqPlan, err := requirement.PlanFromText(root, "add backend API to inspect issue graph with go test verification")
+	if err != nil {
+		t.Fatal(err)
+	}
 	signal, err := repair.CaptureSignal(root, "test_failure", "sample API repair status", result.RunID)
 	if err != nil {
 		t.Fatal(err)
@@ -134,6 +139,9 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)
 	assertGETContains(t, router, "/v1/projects/managed/runs/"+result.RunID, http.StatusOK, `"run"`, `"completed"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality/"+result.QualityReport.ID, http.StatusOK, `"quality_report"`, `"accepted"`)
+	assertGETContains(t, router, "/v1/projects/managed/requirements/"+reqPlan.ID, http.StatusOK, `"requirement"`, `"clarification_decision"`)
+	assertPostContains(t, router, "/v1/projects/managed/requirements/plan", `{"text":"add backend API to inspect requirements with go test verification"}`, http.StatusCreated, `"requirement"`, `"backend-implementation"`)
+	assertPostContains(t, router, "/v1/projects/managed/requirements/plan", `{"text":"tune"}`, http.StatusAccepted, `"needs_user_input"`)
 	assertGETContains(t, router, "/v1/projects/managed/memory/search?q=Beta&limit=1", http.StatusOK, `"records"`, `Beta API should expose`)
 	assertGETContains(t, router, "/v1/projects/managed/memory/candidates?limit=5", http.StatusOK, `"candidates"`, `"recorded"`)
 	assertGETContains(t, router, "/v1/projects/managed/repair/attempts/"+attempt.ID, http.StatusOK, `"repair_attempt"`, `"repaired"`)
@@ -141,6 +149,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/epics/missing/issue-graph", http.StatusNotFound, `"issue graph not found"`)
 	assertGETContains(t, router, "/v1/projects/managed/epics/missing/schedule", http.StatusNotFound, `"schedule not found"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/missing", http.StatusNotFound, `"issue state not found"`)
+	assertGETContains(t, router, "/v1/projects/managed/requirements/missing", http.StatusNotFound, `"requirement plan not found"`)
 }
 
 func TestGinRouterResolvesProjectsFromControlplaneRegistryWithoutStore(t *testing.T) {
@@ -189,6 +198,22 @@ func assertGETContains(t *testing.T, router http.Handler, path string, status in
 	for _, value := range values {
 		if !strings.Contains(recorder.Body.String(), value) {
 			t.Fatalf("GET %s missing %q in body=%s", path, value, recorder.Body.String())
+		}
+	}
+}
+
+func assertPostContains(t *testing.T, router http.Handler, path string, body string, status int, values ...string) {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != status {
+		t.Fatalf("POST %s status = %d body=%s", path, recorder.Code, recorder.Body.String())
+	}
+	for _, value := range values {
+		if !strings.Contains(recorder.Body.String(), value) {
+			t.Fatalf("POST %s missing %q in body=%s", path, value, recorder.Body.String())
 		}
 	}
 }

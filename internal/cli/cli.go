@@ -21,6 +21,7 @@ import (
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/quality"
 	"moyuan-code/internal/repair"
+	"moyuan-code/internal/requirement"
 	runrecord "moyuan-code/internal/run"
 	"moyuan-code/internal/runtime"
 	"moyuan-code/internal/store"
@@ -64,6 +65,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		exitCode = 0
 	case "git":
 		text, result, exitCode, err = handleGit(ctx, argv[1:], cwd)
+	case "requirement":
+		text, result, exitCode, err = handleRequirement(argv[1:], cwd)
 	case "issue":
 		text, result, exitCode, err = handleIssue(argv[1:], cwd)
 	case "run":
@@ -119,6 +122,7 @@ func usage() string {
 		"moyuan git status",
 		"moyuan git branch list",
 		"moyuan git sync [--comprehend]",
+		"moyuan requirement plan --text <text>",
 		"moyuan issue graph <epic-id>",
 		"moyuan issue schedule <epic-id>",
 		"moyuan run <task-id>",
@@ -402,6 +406,30 @@ func handleIssue(args []string, cwd string) (string, any, int, error) {
 		return "", schedule, 0, nil
 	}
 	return "unknown issue command\n", nil, 1, nil
+}
+
+func handleRequirement(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown requirement command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "plan":
+		text := flagValue(args, "--text", "")
+		if text == "" {
+			return "missing --text\n", nil, 1, nil
+		}
+		plan, err := requirement.PlanFromText(rootDir, text)
+		if err != nil {
+			return "", nil, 1, err
+		}
+		code := 0
+		if plan.ClarificationDecision.Required {
+			code = 1
+		}
+		return "", plan, code, nil
+	}
+	return "unknown requirement command\n", nil, 1, nil
 }
 
 func handleRun(args []string, cwd string) (string, any, int, error) {
