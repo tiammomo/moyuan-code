@@ -519,7 +519,7 @@ moyuan repo pr create <task-id>
 
 目标：
 
-- 提供 Web Console。
+- 提供基于 Next.js 16 的 Web Console，前端端口 `3000`，后端 API 端口 `8080`。
 - 支持多项目看板。
 - 支持组织级 policies。
 - 支持模型成本统计。

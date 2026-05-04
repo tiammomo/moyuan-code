@@ -15,7 +15,7 @@
 5. [策略决策树](./policies/README.md)：阅读鉴权、阅读理解、调度、质量、Bug 判断、Git、服务器、发布、Provider 和 Memory 的判断规则。
 6. [契约文档](./contracts/README.md)：确认 auth、subagent/skill、self-repair、schema、runtime、logging 和 workspace migration 的接口边界。
 7. [项目工作空间规范](./project-workspace-spec.md)、[配置方案](./configuration-guide.md)、[配置 Schema 规则](./configuration-schema-spec.md)：理解每个被管理项目的 `.moyuan/` 工作空间和配置校验边界。
-8. [Agent Memory 系统方案](./agent-memory-system.md)、[Subagent 与 Skills 系统方案](./subagents-skills-system.md)、[模型与工具适配规划](./model-tool-adapters.md)、[后端技术栈与本地环境](./backend-tech-stack.md)：阅读关键横切能力和 Go/Python 职责边界。
+8. [Agent Memory 系统方案](./agent-memory-system.md)、[Subagent 与 Skills 系统方案](./subagents-skills-system.md)、[模型与工具适配规划](./model-tool-adapters.md)、[后端技术栈与本地环境](./backend-tech-stack.md)、[前端控制台文档](./frontend/README.md)：阅读关键横切能力和前后端职责边界。
 9. [实现模块拆分](./implementation-module-map.md)、[框架自身测试策略](./framework-testing-strategy.md)、[持久化与并发一致性](./persistence-concurrency-consistency.md)：确认模块、测试、状态和锁。
 10. [安全威胁模型](./threat-model.md)、[设计就绪门禁](./design-readiness-checklist.md)、[ADR](./adr/README.md)：确认生产级实现前的安全、评审和架构决策。
 
@@ -41,6 +41,7 @@
 | Subagent 生命周期、Skill Registry、推荐、绑定和效果反馈 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | Agent Memory record、retrieve、compact 和维护 | [Agent Memory 系统方案](./agent-memory-system.md) |
 | 后端技术栈、Go 本地环境和 Python 本地环境 | [后端技术栈与本地环境](./backend-tech-stack.md) |
+| Web Console、Next.js 16、前端端口和控制台设计模式 | [前端控制台文档](./frontend/README.md) |
 | Issue Graph、并发调度和等待模型 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | AI 代码质量门禁、review 和返工闭环 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) |
 | commit、issue、fix、release 和覆盖率规范 | [工程流程规范](./engineering-process-standards.md) |
@@ -52,7 +53,7 @@
 1. 每个被管理项目都有独立 `.moyuan/` 工作空间、配置、任务状态、Memory 和审计记录。
 2. 所有项目、Git、Runtime、Provider、服务器、发布和模型操作都先建立 `auth_context`。
 3. 用户需求必须先进入需求完善、澄清判断和 Issue Graph，再进入代码开发。
-4. 前端默认交给 Claude CLI，后端和后端调优默认交给 Codex CLI，最终统一回到质量门禁和 review。
+4. 前端默认交给 Claude CLI，后端和后端调优默认交给 Codex CLI，最终统一回到质量门禁和 review；Web Console 技术栈冻结为 Next.js 16，前端端口 `3000`，后端 API 端口 `8080`。
 5. AI 生成代码必须通过可运行性、测试覆盖率、重复度、复杂度、架构边界、安全和独立审查。
 6. Memory 只以 [Agent Memory 系统方案](./agent-memory-system.md) 为唯一详细方案，其他文档只引用。
 7. Provider Registry、Skill Registry、Project Registry、Server Resource Registry 和 Agent Runtime Registry 是配置注册表，不是服务注册发现系统。

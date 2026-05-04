@@ -106,6 +106,7 @@
 - 每次远程同步后自动 incremental comprehension。
 - 用户需求先经过澄清判断和 Issue Graph 拆分。
 - 前端默认 Claude CLI，后端和后端调优默认 Codex CLI。
+- Web Console 默认 Next.js 16，前端端口 `3000`，Go/Gin API 后端端口 `8080`。
 - 每个 issue 使用独立分支或 worktree。
 - 每个 issue 都经过测试、质量门禁和 review。
 - 日志和审计记录可追踪 run、agent、model、git、quality、memory、error。
