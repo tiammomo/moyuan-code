@@ -238,6 +238,10 @@ func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 	assertContains(t, runState.stdout, `"runtime_status": "completed"`)
 	assertContains(t, runState.stdout, `"quality_status": "passed"`)
 
+	runList := runCLI(t, root, "orchestrator", "run", "list", "--limit", "1")
+	assertContains(t, runList.stdout, acceptedRunID)
+	assertContains(t, runList.stdout, `"issue_id": "phase1-001"`)
+
 	graph := runCLI(t, root, "issue", "graph", "phase1-epic")
 	assertContains(t, graph.stdout, `"id": "phase1-001"`)
 	assertContains(t, graph.stdout, `"status": "accepted"`)

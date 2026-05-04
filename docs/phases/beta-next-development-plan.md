@@ -35,7 +35,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P1 | `beta-010` | `devops-deploy-smoke-monitor` | completed | 部署、线上冒烟和生产监控计划 | 可生成受控部署计划 |
 | P2 | `beta-011` | `controlled-deploy-executor` | completed | 受控部署执行器基线 | dry-run/local_shell 执行可审计，生产真实执行被阻断 |
 | P1 | `beta-012` | `console-api-integration` | completed | Web Console 接入更多真实 API | 控制台可展示 live requirement、deploy execution、resource health |
-| P1 | `beta-013` | `subagent-run-visibility` | planned | Subagent/run 过程可视化 | 运行队列、等待原因、review/quality 结果可追踪 |
+| P1 | `beta-013` | `subagent-run-visibility` | completed | Subagent/run 过程可视化 | 运行队列、等待原因、review/quality 结果可追踪 |
 | P2 | `beta-014` | `server-health-check-executor` | planned | 服务器健康检查执行器 | test_dev/staging 资源可执行受控 health check 并回写资源状态 |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
@@ -403,19 +403,33 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - Web Console 已新增 Requirement Intake 表单，提交后展示 clarification 或 issue graph 生成结果。
 - Server Resources 视图展示 health 信息，Deployment Executions 视图展示 dry-run/local_shell 执行状态。
 
-## 15. 下一步任务建议
+## 15. 已完成任务：`beta-013 subagent-run-visibility`
 
-### `beta-013 subagent-run-visibility`
-
-范围草案：
+范围：
 
 - 为 subagent/run 暴露列表 API 和控制台视图。
 - 展示 role、runtime、provider、blocked reason、quality/review 状态和 artifact 路径。
 - 支持按 project/epic/issue 过滤。
 
-退出条件：
+非目标：
+
+- 不新增真实 Subagent 执行器。
+- 不改变 orchestrator run state 的权威来源。
+- 不在前端直接读取 `.moyuan/orchestrator`。
+
+验收：
 
 - 用户能在控制台看清每个 issue 的执行队列、等待原因和复核结果。
+- `go test ./...`、`npm run typecheck`、`npm run build`、`npm audit --omit=dev` 通过。
+
+完成记录：
+
+- 已新增 `orchestrator.ListRunStates`。
+- 已支持 CLI：`moyuan orchestrator run list [--limit 20]`。
+- 已支持 API：`GET /v1/projects/:project_id/runs?limit=...`。
+- Web Console Run Timeline 已优先展示 live run states，并回退到 deployment executions 和 demo timeline。
+
+## 16. 下一步任务建议
 
 ### `beta-014 server-health-check-executor`
 

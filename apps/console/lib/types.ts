@@ -72,6 +72,17 @@ export type DeploymentExecutionSummary = {
   started_at?: string;
 };
 
+export type RunSummary = {
+  run_id: string;
+  issue_id: string;
+  status: string;
+  runtime_id?: string;
+  runtime_status?: string;
+  quality_status?: string;
+  quality_report_id?: string;
+  updated_at?: string;
+};
+
 export type TimelineEvent = {
   id: string;
   title: string;
@@ -108,6 +119,7 @@ export type ConsoleSnapshot = {
     resources: number;
     deployments: number;
     executions: number;
+    runs: number;
   };
   issues: IssueNode[];
   schedule: ScheduleItem[];
@@ -115,6 +127,7 @@ export type ConsoleSnapshot = {
   resources: ResourceSummary[];
   deployments: DeploymentSummary[];
   executions: DeploymentExecutionSummary[];
+  runs: RunSummary[];
   timeline: TimelineEvent[];
   quality: QualitySignal[];
   memory: MemorySignal[];

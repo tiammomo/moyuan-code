@@ -54,7 +54,7 @@ npm audit --omit=dev
 
 当前 live API 接入：
 
-- 项目、Issue Graph、Schedule、Providers、Resources、Memory candidates。
+- 项目、Issue Graph、Schedule、Runs、Providers、Resources、Memory candidates。
 - Deployment plans 和 Deployment executions。
 - Requirement Intake 表单通过 `/api/projects/:project_id/requirements/plan` 调用后端低风险规划入口。
 

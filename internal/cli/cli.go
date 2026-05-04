@@ -150,6 +150,7 @@ func usage() string {
 		"moyuan runtime invoke <runtime-id> --prompt <command> [--provider <provider-id>] [--model <model-id>]",
 		"moyuan orchestrator plan <epic-id>",
 		"moyuan orchestrator run <issue-id> [--role backend] [--runtime local_shell] [--provider <provider-id>] [--prompt <command>]",
+		"moyuan orchestrator run list [--limit 20]",
 		"moyuan orchestrator status <issue-id>",
 		"moyuan orchestrator issue status <issue-id>",
 		"moyuan orchestrator run status <run-id>",
@@ -603,6 +604,10 @@ func handleOrchestrator(ctx context.Context, args []string, cwd string) (string,
 		plan, err := orchestrator.Plan(rootDir, epicID)
 		return "", plan, 0, err
 	case "run":
+		if len(args) >= 2 && args[1] == "list" {
+			states, err := orchestrator.ListRunStates(rootDir, flagInt(args, "--limit", 20))
+			return "", states, 0, err
+		}
 		if len(args) >= 3 && args[1] == "status" {
 			state, ok, err := orchestrator.LoadRunState(rootDir, args[2])
 			if err != nil {
@@ -1078,6 +1083,18 @@ func flagValue(args []string, name string, fallback string) string {
 		}
 	}
 	return fallback
+}
+
+func flagInt(args []string, name string, fallback int) int {
+	value := flagValue(args, name, "")
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func hasFlag(args []string, name string) bool {

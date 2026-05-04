@@ -19,6 +19,7 @@ export const demoSnapshot: ConsoleSnapshot = {
     resources: 2,
     deployments: 1,
     executions: 1,
+    runs: 2,
   },
   issues: [
     {
@@ -172,6 +173,26 @@ export const demoSnapshot: ConsoleSnapshot = {
       reasons: ["no_remote_or_local_commands_executed"],
       step_count: 4,
       started_at: "2026-05-05T00:12:00.000Z",
+    },
+  ],
+  runs: [
+    {
+      run_id: "run-frontend-console",
+      issue_id: "frontend-console",
+      status: "completed",
+      runtime_id: "claude_cli",
+      runtime_status: "completed",
+      quality_status: "passed",
+      updated_at: "2026-05-05T00:18:00.000Z",
+    },
+    {
+      run_id: "run-quality-review",
+      issue_id: "quality-review",
+      status: "running",
+      runtime_id: "codex_cli",
+      runtime_status: "running",
+      quality_status: "pending",
+      updated_at: "2026-05-05T00:24:00.000Z",
     },
   ],
   timeline: [

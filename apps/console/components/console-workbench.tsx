@@ -263,7 +263,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
 
         <section className="lowerGrid">
           <div className="panel">
-            <PanelTitle icon={<Activity size={18} />} title="Run Timeline" meta="live workbench" />
+            <PanelTitle icon={<Activity size={18} />} title="Run Timeline" meta={`${snapshot.runs.length} runs`} />
             <div className="timeline">
               {snapshot.timeline.map((event) => (
                 <div className="timelineItem" key={event.id}>

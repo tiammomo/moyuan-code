@@ -1,7 +1,10 @@
 package orchestrator
 
 import (
+	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"moyuan-code/internal/fsutil"
@@ -52,6 +55,41 @@ func LoadRunState(rootDir string, runID string) (RunState, bool, error) {
 	var state RunState
 	found, err := fsutil.ReadJSON(runStatePath(rootDir, runID), &state)
 	return state, found, err
+}
+
+func ListRunStates(rootDir string, limit int) ([]RunState, error) {
+	if err := workspace.EnsureDirs(workspace.ForRoot(rootDir)); err != nil {
+		return nil, err
+	}
+	dir := filepath.Join(workspace.ForRoot(rootDir).OrchestratorDir, "run-states")
+	if err := fsutil.EnsureDir(dir); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	states := []RunState{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var state RunState
+		found, err := fsutil.ReadJSON(filepath.Join(dir, entry.Name()), &state)
+		if err != nil {
+			return nil, err
+		}
+		if found && state.RunID != "" {
+			states = append(states, state)
+		}
+	}
+	sort.SliceStable(states, func(i, j int) bool {
+		return states[i].UpdatedAt > states[j].UpdatedAt
+	})
+	if limit > 0 && len(states) > limit {
+		return states[:limit], nil
+	}
+	return states, nil
 }
 
 func transitionIssue(rootDir string, epicID string, issueID string, status string, reason string, runID string, mutate func(*IssueState)) (IssueState, error) {

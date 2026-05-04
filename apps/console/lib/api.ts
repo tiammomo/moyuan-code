@@ -7,6 +7,7 @@ import type {
   IssueNode,
   ProjectSummary,
   ProviderSummary,
+  RunSummary,
   ResourceSummary,
   ScheduleItem,
 } from "./types";
@@ -52,6 +53,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     resourcesResponse,
     deploymentsResponse,
     executionsResponse,
+    runsResponse,
     memoryResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
@@ -62,6 +64,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ resources: unknown[] }>>(`/projects/${project.id}/resources`),
     apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
     apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
+    apiGet<ApiEnvelope<{ runs: unknown[] }>>(`/projects/${project.id}/runs?limit=6`),
     apiGet<ApiEnvelope<{ candidates: unknown[] }>>(`/projects/${project.id}/memory/candidates?limit=3`),
   ]);
 
@@ -74,7 +77,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const resources = normalizeResources(resourcesResponse?.resources ?? []);
   const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
   const executions = normalizeExecutions(executionsResponse?.executions ?? []);
-  const timeline = liveTimeline(executions, deployments);
+  const runs = normalizeRuns(runsResponse?.runs ?? []);
+  const timeline = liveTimeline(runs, executions, deployments);
 
   return {
     mode: "live",
@@ -89,6 +93,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       resources: resources.length,
       deployments: deployments.length,
       executions: executions.length,
+      runs: runs.length,
     },
     issues: issues.length > 0 ? issues : demoSnapshot.issues,
     schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
@@ -96,6 +101,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     resources,
     deployments,
     executions,
+    runs,
     timeline: timeline.length > 0 ? timeline : demoSnapshot.timeline,
     quality: demoSnapshot.quality,
     memory:
@@ -185,8 +191,28 @@ function normalizeExecutions(rawExecutions: unknown[]): DeploymentExecutionSumma
   }));
 }
 
-function liveTimeline(executions: DeploymentExecutionSummary[], deployments: DeploymentSummary[]) {
+function normalizeRuns(rawRuns: unknown[]): RunSummary[] {
+  return rawRuns.map((raw, index) => ({
+    run_id: readString(raw, "run_id", `run-${index + 1}`),
+    issue_id: readString(raw, "issue_id", ""),
+    status: readString(raw, "status", "unknown"),
+    runtime_id: readString(raw, "runtime_id", ""),
+    runtime_status: readString(raw, "runtime_status", ""),
+    quality_status: readString(raw, "quality_status", ""),
+    quality_report_id: readString(raw, "quality_report_id", ""),
+    updated_at: readString(raw, "updated_at", ""),
+  }));
+}
+
+function liveTimeline(runs: RunSummary[], executions: DeploymentExecutionSummary[], deployments: DeploymentSummary[]) {
   return [
+    ...runs.map((run) => ({
+      id: run.run_id,
+      title: `Run ${run.issue_id || run.run_id}`,
+      detail: `${run.runtime_id || "runtime pending"} / quality ${run.quality_status || "pending"}`,
+      tone: toneFromStatus(run.status),
+      time: shortTime(run.updated_at),
+    })),
     ...executions.map((execution) => ({
       id: execution.id,
       title: `Deploy execution ${execution.mode}`,
