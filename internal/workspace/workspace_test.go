@@ -260,6 +260,173 @@ policies:
 	}
 }
 
+func TestValidateVisualsYAMLConfig(t *testing.T) {
+	root := t.TempDir()
+	if _, err := Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	visualsPath := filepath.Join(root, DirName, "visuals", "architecture-visuals.yaml")
+	if err := fsutil.WriteText(visualsPath, `schema_version: 1
+architecture_visuals:
+  enabled: true
+provider_policy:
+  diagram_planning: planning
+  image_generation: gpt_image_2
+output:
+  base_dir: ".moyuan/visuals"
+diagram_types:
+  - architecture
+pipeline:
+  steps:
+    - plan
+    - render
+diagram_spec:
+  required_fields:
+    - title
+    - sections
+gpt_image_2:
+  model: gpt-image-2
+safety:
+  strip_secrets: true
+`); err != nil {
+		t.Fatal(err)
+	}
+	report, err := Validate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "passed" {
+		t.Fatalf("expected valid visuals config to pass, got %+v", report)
+	}
+
+	if err := fsutil.WriteText(visualsPath, `schema_version: 1
+architecture_visuals:
+  enabled: true
+provider_policy:
+  diagram_planning: planning
+output:
+  base_dir: ".moyuan/visuals"
+diagram_types: []
+pipeline:
+  steps: []
+diagram_spec:
+  required_fields: []
+gpt_image_2:
+  model: ""
+safety:
+  strip_secrets: false
+`); err != nil {
+		t.Fatal(err)
+	}
+	report, err = Validate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || !hasValidationIssue(report, "visuals_image_generation_required") || !hasValidationIssue(report, "visuals_strip_secrets_required") {
+		t.Fatalf("expected visuals validation failure, got %+v", report)
+	}
+}
+
+func TestValidateAgentRuntimesYAMLConfig(t *testing.T) {
+	root := t.TempDir()
+	if _, err := Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	runtimesPath := filepath.Join(root, DirName, "runtimes", "agent-runtimes.yaml")
+	if err := fsutil.WriteText(runtimesPath, `schema_version: 1
+agent_runtimes:
+  enabled: true
+  default_runtime: codex_cli
+  session_store: ".moyuan/runtimes/sessions"
+  output_store: ".moyuan/runtime"
+  runtimes:
+    - type: native_agent_cli
+      provider: codex
+      enabled: true
+      command: codex
+      auth:
+        mode: local_cli_login
+      provider_env_profile:
+        enabled: false
+        allowed_env_keys: []
+      health_check:
+        command: "codex --version"
+      invocation: {}
+      context: {}
+      tools: {}
+      session:
+        enable_resume: true
+      audit:
+        capture_diff_before_after: true
+  routing:
+    task_modes:
+      frontend:
+        - claude_cli
+      backend:
+        - codex_cli
+  role_runtime_defaults:
+    frontend: claude_cli
+    backend: codex_cli
+    backend_tuning: codex_cli
+  isolation:
+    require_issue_worktree: true
+  require_quality_gate_after_run: true
+`); err != nil {
+		t.Fatal(err)
+	}
+	report, err := Validate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "passed" {
+		t.Fatalf("expected valid agent runtimes config to pass, got %+v", report)
+	}
+
+	if err := fsutil.WriteText(runtimesPath, `schema_version: 1
+agent_runtimes:
+  enabled: true
+  default_runtime: codex_cli
+  session_store: ".moyuan/runtimes/sessions"
+  output_store: ".moyuan/runtime"
+  runtimes:
+    - type: native_agent_cli
+      provider: codex
+      enabled: true
+      command: codex
+      auth:
+        mode: local_cli_login
+      provider_env_profile:
+        enabled: true
+        allowed_env_keys: []
+      health_check:
+        command: "codex --version"
+      invocation:
+        one_shot: true
+      context: {}
+      tools: {}
+      session:
+        enable_resume: true
+      audit:
+        capture_diff_before_after: false
+  role_runtime_defaults:
+    frontend: claude_cli
+    backend: codex_cli
+    backend_tuning: codex_cli
+  isolation:
+    require_issue_worktree: false
+  require_quality_gate_after_run: false
+`); err != nil {
+		t.Fatal(err)
+	}
+	report, err = Validate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || !hasValidationIssue(report, "agent_runtime_env_keys_required") || !hasValidationIssue(report, "agent_runtime_one_shot_must_be_empty_for_codex") || !hasValidationIssue(report, "agent_runtimes_quality_gate_required") {
+		t.Fatalf("expected agent runtimes validation failure, got %+v", report)
+	}
+}
+
 func hasValidationIssue(report ValidationReport, code string) bool {
 	for _, issue := range report.Issues {
 		if issue.Code == code {

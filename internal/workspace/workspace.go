@@ -314,6 +314,8 @@ func Validate(rootDir string) (ValidationReport, error) {
 	}
 	validateProvidersConfigFile(&report, paths.ProvidersYAML)
 	validateRoutingConfigFile(&report, paths.RoutingYAML)
+	validateVisualsConfigFile(&report, paths.VisualsYAML)
+	validateAgentRuntimesConfigFile(&report, paths.AgentRuntimesYAML)
 	if stateFound {
 		validateStateDrift(&report, state, project, projectFound, repository, repositoryFound, access, accessFound)
 	}

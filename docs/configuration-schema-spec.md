@@ -669,6 +669,8 @@ Phase 3 当前落地：
 - 当前 validator 会检查 YAML 解析错误、`schema_version`、核心必填字段、`local_path`/`remote_git` 互斥、`local_single_user`/`team_server` 条件必填、`workspace.json` 与 YAML 的关键字段漂移。
 - `.moyuan/models/providers.yaml` 已纳入可选校验：当文件存在时会校验 provider 管理开关、accounts、providers、`auth_ref` 引用、API 型 `base_url` 和明文密钥禁用。
 - `.moyuan/models/routing.yaml` 已纳入可选校验：当文件存在时会校验 policies、primary provider、fallback provider 和明文密钥禁用。
+- `.moyuan/visuals/architecture-visuals.yaml` 已纳入可选校验：当文件存在时会校验 provider policy、diagram types、pipeline、diagram spec、`gpt_image_2.model` 和 `safety.strip_secrets`。
+- `.moyuan/runtimes/agent-runtimes.yaml` 已纳入可选校验：当文件存在时会校验 Native Runtime、auth、provider env profile、health check、audit diff capture、role defaults 和质量门禁。
 - 后续 `phase3-002` 继续扩展到 provider、routing、visual、runtime、server、release 和 budget 配置域。
 
 机器校验必须能输出：
