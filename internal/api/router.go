@@ -85,6 +85,17 @@ type resourceHealthScanRequest struct {
 	Approved    bool     `json:"approved"`
 }
 
+type resourceRenewRequest struct {
+	ExpiresAt string `json:"expires_at"`
+	ActorID   string `json:"actor_id"`
+	Reason    string `json:"reason"`
+}
+
+type resourceRetireRequest struct {
+	ActorID string `json:"actor_id"`
+	Reason  string `json:"reason"`
+}
+
 type approvalRequest struct {
 	TargetType  string         `json:"target_type"`
 	TargetID    string         `json:"target_id"`
@@ -1081,6 +1092,40 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"resources": resources})
 	})
+	router.GET("/v1/projects/:project_id/resources/maintenance", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		records, err := serverresources.ListMaintenance(rootDir, queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"maintenance_records": records})
+	})
+	router.POST("/v1/projects/:project_id/resources/maintenance/scan", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		records, err := serverresources.MaintenanceScan(rootDir)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"maintenance_records": records})
+	})
 	router.POST("/v1/projects/:project_id/resources/health-scan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -1131,6 +1176,67 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"resource": resource})
+	})
+	router.POST("/v1/projects/:project_id/resources/:resource_id/renew", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req resourceRenewRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		resource, record, found, err := serverresources.Renew(rootDir, serverresources.RenewalOptions{
+			ResourceID: c.Param("resource_id"),
+			ExpiresAt:  req.ExpiresAt,
+			ActorID:    req.ActorID,
+			Reason:     req.Reason,
+		})
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "resource not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"resource": resource, "maintenance_record": record})
+	})
+	router.POST("/v1/projects/:project_id/resources/:resource_id/retire", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req resourceRetireRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		resource, record, found, err := serverresources.Retire(rootDir, serverresources.RetireOptions{
+			ResourceID: c.Param("resource_id"),
+			ActorID:    req.ActorID,
+			Reason:     req.Reason,
+		})
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "resource not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"resource": resource, "maintenance_record": record})
 	})
 	router.POST("/v1/projects/:project_id/resources/:resource_id/disable", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

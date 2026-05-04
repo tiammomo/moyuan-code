@@ -24,7 +24,7 @@ Phase 3 已完成并通过 release readiness：
 | P0 | `phase4-002` | `approval-record-store-api` | completed | 高风险操作审批记录落盘、查询和审计 | release/deploy/visual/provider 高风险动作有完整 approval lifecycle |
 | P1 | `phase4-003` | `team-auth-session-token-baseline` | completed | 本地团队模式的 session、API token 和 service account 基线 | session/token/service account 可创建、查询、撤销并写入 audit log |
 | P1 | `phase4-004` | `git-pr-mr-plan-sync` | completed | GitHub/Gitee PR/MR 计划、远程链接和状态同步 | PR/MR 状态可记录，不绕过 review 与质量门禁 |
-| P2 | `phase4-005` | `server-resource-maintenance` | planned | 服务器到期、续费、巡检、退役和环境引用维护 | 测试开发机和生产机生命周期可查询、可提醒、可审计 |
+| P2 | `phase4-005` | `server-resource-maintenance` | completed | 服务器到期、续费、巡检、退役和环境引用维护 | 测试开发机和生产机生命周期可查询、可提醒、可审计 |
 
 ## 3. 已完成任务：`phase4-001 audit-log-query-api-console`
 
@@ -129,7 +129,33 @@ Phase 3 已完成并通过 release readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 7. 验证要求
+## 7. 已完成任务：`phase4-005 server-resource-maintenance`
+
+范围：
+
+- 扩展 `internal/serverresources`，增加 maintenance record、续费记录和退役记录。
+- 新增维护扫描：到期 warning/critical/expired 和健康 failed/blocked 会生成 `MAINTENANCE_REQUIRED` 记录。
+- 支持资源续费，更新 `expires_at`、`expiration_state`、`renewed_at`、`renewed_by`，并记录 `RESOURCE_RENEWAL_RECORDED`。
+- 支持资源退役，更新 `status=retired`、`retired_at`、`retired_by`、`retire_reason`，并记录 `RESOURCE_RETIRED`。
+- 新增 API：`GET /resources/maintenance`、`POST /resources/maintenance/scan`、`POST /resources/:id/renew`、`POST /resources/:id/retire`。
+- 新增 CLI：`moyuan resources maintenance scan|list`、`moyuan resources renew`、`moyuan resources retire`。
+- Console 的 Server Resources 面板展示维护记录数量和最新维护队列。
+
+非目标：
+
+- 不连接 SSH、不执行云厂商续费、不修改真实云资源。
+- 不执行生产远程命令；生产操作仍走 deployment approval、smoke 和 monitor。
+- 不替代云厂商账单系统，只记录 Moyuan 可审计维护事实。
+
+验证：
+
+- `go test ./internal/serverresources ./internal/api ./internal/cli` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 8. 验证要求
 
 每完成一个 Phase 4 issue，至少运行：
 

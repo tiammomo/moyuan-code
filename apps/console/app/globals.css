@@ -762,16 +762,22 @@ dd {
 .qualityList,
 .memoryList,
 .providerMatrix,
-.resourceList {
+.resourceList,
+.maintenanceList {
   display: grid;
   gap: 10px;
   padding: 14px;
 }
 
+.maintenanceList {
+  padding-top: 0;
+}
+
 .timelineItem,
 .qualityItem,
 .providerRow,
-.resourceItem {
+.resourceItem,
+.maintenanceItem {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -785,7 +791,8 @@ dd {
 .timelineItem div,
 .qualityItem div,
 .providerRow div,
-.resourceItem div {
+.resourceItem div,
+.maintenanceItem div {
   min-width: 0;
   flex: 1;
 }
@@ -797,14 +804,17 @@ dd {
 .providerRow strong,
 .providerRow span,
 .resourceItem strong,
-.resourceItem span {
+.resourceItem span,
+.maintenanceItem strong,
+.maintenanceItem span {
   display: block;
 }
 
 .timelineItem span,
 .qualityItem span,
 .providerRow span,
-.resourceItem span {
+.resourceItem span,
+.maintenanceItem span {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.25;

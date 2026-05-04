@@ -76,6 +76,20 @@ export type ResourceSummary = {
   health?: string;
 };
 
+export type MaintenanceRecordSummary = {
+  id: string;
+  resource_id: string;
+  environment: string;
+  type: string;
+  status: string;
+  decision: string;
+  expiration_state?: string;
+  expires_at?: string;
+  health_status?: string;
+  reason?: string;
+  created_at?: string;
+};
+
 export type DeploymentSummary = {
   id: string;
   release_id: string;
@@ -352,6 +366,7 @@ export type ConsoleSnapshot = {
   subagent_backlog: SubagentBacklogItem[];
   providers: ProviderSummary[];
   resources: ResourceSummary[];
+  maintenance_records: MaintenanceRecordSummary[];
   deployments: DeploymentSummary[];
   executions: DeploymentExecutionSummary[];
   runs: RunSummary[];

@@ -184,6 +184,20 @@ export const demoSnapshot: ConsoleSnapshot = {
       health: "approval_required",
     },
   ],
+  maintenance_records: [
+    {
+      id: "maintenance-prod-1-expiration-alert-20260505004600",
+      resource_id: "prod-1",
+      environment: "production",
+      type: "expiration_alert",
+      status: "open",
+      decision: "MAINTENANCE_REQUIRED",
+      expiration_state: "warning",
+      expires_at: "2026-09-30",
+      reason: "expiration_warning",
+      created_at: "2026-05-05T00:46:00.000Z",
+    },
+  ],
   deployments: [
     {
       id: "deployment-v0-1-0-test-dev",

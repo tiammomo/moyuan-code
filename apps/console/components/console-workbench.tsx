@@ -837,7 +837,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
 
           <div className="panel">
-            <PanelTitle icon={<Server size={18} />} title="Server Resources" meta="test_dev / production" />
+            <PanelTitle icon={<Server size={18} />} title="Server Resources" meta={`${snapshot.maintenance_records.length} maintenance`} />
             <div className="resourceList">
               {snapshot.resources.length > 0 ? (
                 snapshot.resources.map((resource) => (
@@ -854,6 +854,21 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 ))
               ) : (
                 <div className="emptyState">No resources registered</div>
+              )}
+            </div>
+            <div className="maintenanceList">
+              {snapshot.maintenance_records.length > 0 ? (
+                snapshot.maintenance_records.slice(0, 3).map((record) => (
+                  <div className="maintenanceItem" key={record.id}>
+                    <div>
+                      <strong>{record.resource_id || compactID(record.id)}</strong>
+                      <span>{record.reason || record.type}</span>
+                    </div>
+                    <StatusPill tone={toneForStatus(record.status)} label={record.expiration_state || record.health_status || record.status} />
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No maintenance records</div>
               )}
             </div>
           </div>
@@ -1044,7 +1059,7 @@ function toneForStatus(status: string): StatusTone {
   if (status === "accepted" || status === "passed" || status === "ready" || status === "completed" || status === "planned") return "ok";
   if (status === "running" || status === "dispatch" || status === "retrying") return "running";
   if (status === "blocked" || status === "rejected" || status === "failed" || status === "route_blocked") return "blocked";
-  if (status === "waiting" || status === "pending" || status === "archived") return "warning";
+  if (status === "waiting" || status === "pending" || status === "archived" || status === "open") return "warning";
   return "neutral";
 }
 

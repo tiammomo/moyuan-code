@@ -689,11 +689,36 @@ func TestServerResourcesCLIRegistersListsAndValidatesProductionHosts(t *testing.
 	}
 	assertContains(t, prodHealthBlocked.stdout, "production_approval_required")
 
+	oldDev := runCLI(t, root, "resources", "add",
+		"--id", "old-dev",
+		"--environment", "test_dev",
+		"--host", "10.0.0.12",
+		"--provider", "local_vm",
+		"--owner", "dev-owner",
+		"--auth-ref", "env:DEV_SERVER_SSH_KEY",
+		"--expires-at", "2000-01-01",
+	)
+	assertContains(t, oldDev.stdout, `"expiration_state": "expired"`)
+	maintenance := runCLI(t, root, "resources", "maintenance", "scan")
+	assertContains(t, maintenance.stdout, `"maintenance_records"`)
+	assertContains(t, maintenance.stdout, `"old-dev"`)
+	assertContains(t, maintenance.stdout, `"MAINTENANCE_REQUIRED"`)
+	maintenanceList := runCLI(t, root, "resources", "maintenance", "list")
+	assertContains(t, maintenanceList.stdout, `"expiration_alert"`)
+	renewed := runCLI(t, root, "resources", "renew", "old-dev", "--expires-at", "2099-03-01", "--actor", "ops-owner", "--reason", "renewed")
+	assertContains(t, renewed.stdout, `"RESOURCE_RENEWAL_RECORDED"`)
+	assertContains(t, renewed.stdout, `"expires_at": "2099-03-01"`)
+	retired := runCLI(t, root, "resources", "retire", "old-dev", "--actor", "ops-owner", "--reason", "decommissioned")
+	assertContains(t, retired.stdout, `"RESOURCE_RETIRED"`)
+	assertContains(t, retired.stdout, `"status": "retired"`)
+
 	disabled := runCLI(t, root, "resources", "disable", "dev-1")
 	assertContains(t, disabled.stdout, `"status": "disabled"`)
 	assertFileContains(t, root, ".moyuan/resources/inventory.json", `"prod-1"`)
 	assertFileContains(t, root, ".moyuan/resources/events.jsonl", "resource.added")
 	assertFileContains(t, root, ".moyuan/logs/audit.jsonl", "server_resource.added")
+	assertFileContains(t, root, ".moyuan/resources/maintenance.jsonl", "RESOURCE_RETIRED")
+	assertFileContains(t, root, ".moyuan/logs/audit.jsonl", "server_resource.renewed")
 }
 
 func TestQualityReviewHardeningFindingsDriveNeedsRework(t *testing.T) {

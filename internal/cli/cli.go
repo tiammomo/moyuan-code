@@ -206,6 +206,9 @@ func usage() string {
 		"moyuan resources show <resource-id>",
 		"moyuan resources disable <resource-id>",
 		"moyuan resources expiration scan",
+		"moyuan resources maintenance scan|list",
+		"moyuan resources renew <resource-id> --expires-at YYYY-MM-DD",
+		"moyuan resources retire <resource-id>",
 		"moyuan resources health scan [--environment test_dev] [--resource <resource-id>] [--approved]",
 		"moyuan deploy plan <release-id> --environment test_dev [--resource <resource-id>]",
 		"moyuan deploy execute <deployment-id> [--mode dry_run] [--approved] [--command <safe-command>]",
@@ -1328,10 +1331,52 @@ func handleResources(ctx context.Context, args []string, cwd string) (string, an
 			return "", map[string]any{}, 1, nil
 		}
 		return "", resource, 0, nil
+	case "renew":
+		if len(args) < 2 {
+			return "missing resource id\n", nil, 1, nil
+		}
+		resource, record, ok, err := serverresources.Renew(rootDir, serverresources.RenewalOptions{
+			ResourceID: args[1],
+			ExpiresAt:  flagValue(args, "--expires-at", ""),
+			ActorID:    flagValue(args, "--actor", ""),
+			Reason:     flagValue(args, "--reason", ""),
+		})
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", map[string]any{"resource": resource, "maintenance_record": record}, 0, nil
+	case "retire":
+		if len(args) < 2 {
+			return "missing resource id\n", nil, 1, nil
+		}
+		resource, record, ok, err := serverresources.Retire(rootDir, serverresources.RetireOptions{
+			ResourceID: args[1],
+			ActorID:    flagValue(args, "--actor", ""),
+			Reason:     flagValue(args, "--reason", ""),
+		})
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", map[string]any{"resource": resource, "maintenance_record": record}, 0, nil
 	case "expiration":
 		if len(args) >= 2 && args[1] == "scan" {
 			resources, err := serverresources.ExpirationScan(rootDir)
 			return "", resources, 0, err
+		}
+	case "maintenance":
+		if len(args) >= 2 && args[1] == "scan" {
+			records, err := serverresources.MaintenanceScan(rootDir)
+			return "", map[string]any{"maintenance_records": records}, 0, err
+		}
+		if len(args) >= 2 && args[1] == "list" {
+			records, err := serverresources.ListMaintenance(rootDir, 20)
+			return "", map[string]any{"maintenance_records": records}, 0, err
 		}
 	case "health":
 		if len(args) >= 2 && args[1] == "scan" {

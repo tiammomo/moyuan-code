@@ -10,6 +10,7 @@ import type {
   DeploymentSummary,
   GitProviderPlanSummary,
   IssueNode,
+  MaintenanceRecordSummary,
   ProjectSummary,
   ProviderSummary,
   QualityExplanation,
@@ -64,6 +65,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     scheduleResponse,
     providersResponse,
     resourcesResponse,
+    maintenanceResponse,
     deploymentsResponse,
     executionsResponse,
     runsResponse,
@@ -86,6 +88,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     ),
     apiGet<ApiEnvelope<{ providers: unknown[] }>>(`/projects/${project.id}/providers`),
     apiGet<ApiEnvelope<{ resources: unknown[] }>>(`/projects/${project.id}/resources`),
+    apiGet<ApiEnvelope<{ maintenance_records: unknown[] }>>(`/projects/${project.id}/resources/maintenance?limit=5`),
     apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
     apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
     apiGet<ApiEnvelope<{ runs: unknown[] }>>(`/projects/${project.id}/runs?limit=12`),
@@ -110,6 +113,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const subagentBacklog = normalizeSubagentBacklog(scheduleResponse?.schedule.subagent_backlog ?? []);
   const providers = normalizeProviders(providersResponse?.providers ?? []);
   const resources = normalizeResources(resourcesResponse?.resources ?? []);
+  const maintenanceRecords = normalizeMaintenanceRecords(maintenanceResponse?.maintenance_records ?? []);
   const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
   const executions = normalizeExecutions(executionsResponse?.executions ?? []);
   const runs = normalizeRuns(runsResponse?.runs ?? []);
@@ -152,6 +156,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     subagent_backlog: subagentBacklog,
     providers: providers.length > 0 ? providers : demoSnapshot.providers,
     resources,
+    maintenance_records: maintenanceRecords,
     deployments,
     executions,
     runs,
@@ -283,6 +288,22 @@ function normalizeResources(rawResources: unknown[]): ResourceSummary[] {
     owner: readString(raw, "owner", ""),
     expires_at: readString(raw, "expires_at", ""),
     health: readString(readUnknown(raw, "healthcheck"), "last_status", "unknown"),
+  }));
+}
+
+function normalizeMaintenanceRecords(rawRecords: unknown[]): MaintenanceRecordSummary[] {
+  return rawRecords.map((raw, index) => ({
+    id: readString(raw, "id", `maintenance-${index + 1}`),
+    resource_id: readString(raw, "resource_id", ""),
+    environment: readString(raw, "environment", "test_dev"),
+    type: readString(raw, "type", "maintenance"),
+    status: readString(raw, "status", "open"),
+    decision: readString(raw, "decision", "MAINTENANCE_REQUIRED"),
+    expiration_state: readString(raw, "expiration_state", ""),
+    expires_at: readString(raw, "expires_at", ""),
+    health_status: readString(raw, "health_status", ""),
+    reason: readString(raw, "reason", ""),
+    created_at: readString(raw, "created_at", ""),
   }));
 }
 
