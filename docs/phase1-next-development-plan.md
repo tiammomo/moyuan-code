@@ -1,10 +1,10 @@
-# Phase 1 下一步开发任务规划
+# Phase 1 实施收口记录
 
-状态：ready
+状态：completed
 责任角色：orchestrator_owner + core_engineer + qa_owner
 最后更新：2026-05-04
 
-本文是 Phase 1 当前 Go CLI 骨架之后的开发计划。它不替代 [Phase 1 实现 Issue Graph](./phase1-issue-graph.md)，只把下一批任务的执行顺序、依赖、验收标准和 git 同步规则收敛到一个入口。
+本文记录 Phase 1 本地 CLI MVP 的实施顺序、依赖、验收标准和完成状态。当前可执行验收入口见 [Phase 1 Release Readiness](./phase1-release-readiness.md)。
 
 ## 1. 当前基线
 
@@ -22,7 +22,7 @@
 - `phase1-019 repair-controlled-loop` 已补齐 repair attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
 - 当前测试覆盖已经包含 package unit test、CLI smoke 和 Phase 1 e2e smoke。
 
-下一步目标不是继续铺更多模块，而是把“能跑通、能审计、能复核、能失败恢复”的 MVP 闭环做实。
+Phase 1 目标已经从“规划下一批任务”收口为“可运行、可审计、可复核、可失败恢复”的本地 CLI MVP。
 
 ## 2. 下一批任务总览
 
@@ -35,7 +35,7 @@
 | Done | `phase1-017` | `quality-review-hardening` | 强化质量复核：diff review、secret scan、重复/复杂度/保护路径检查 | `phase1-014`,`phase1-016` | 结构化 findings 和 review_status 可阻断 accepted |
 | Done | `phase1-018` | `memory-record-gate` | 将当前 memory stub 升级为 record gate、staging、dedup、compact 最小闭环 | `phase1-007`,`phase1-016` | 可记录项目事实和运行经验，compact 可自动产生摘要 |
 | Done | `phase1-019` | `repair-controlled-loop` | 将 runtime signal、bug candidate、repair attempt 接入受控修复闭环 | `phase1-016`,`phase1-017`,`phase1-018` | 修复必须补回归测试并重新通过 quality gate |
-| P1 | `phase1-020` | `docs-release-readiness` | 更新 README、CLI help、e2e 说明和 Phase 1 验收记录 | `phase1-013`~`phase1-019` | 用户可按文档复现 Phase 1 MVP |
+| Done | `phase1-020` | `docs-release-readiness` | 更新 README、CLI help、e2e 说明和 Phase 1 验收记录 | `phase1-013`~`phase1-019` | 用户可按文档复现 Phase 1 MVP |
 
 ## 3. 推荐执行顺序
 
@@ -45,7 +45,8 @@
 4. `phase1-016 orchestrator-state-machine` 已完成，issue/run 状态不再只停留在单次命令输出。
 5. `phase1-017 quality-review-hardening` 已完成，质量复核可以向状态机返回可阻断结论。
 6. `phase1-018 memory-record-gate` 已完成，Memory 具备 record gate 和 compact 最小闭环。
-7. `phase1-019 repair-controlled-loop` 已完成，下一步做 `phase1-020 docs-release-readiness`。
+7. `phase1-019 repair-controlled-loop` 已完成。
+8. `phase1-020 docs-release-readiness` 已完成，Phase 1 验收入口见 [Phase 1 Release Readiness](./phase1-release-readiness.md)。
 
 ## 4. 任务详情
 
@@ -214,6 +215,8 @@
 
 ### `phase1-020 docs-release-readiness`
 
+状态：已完成。
+
 范围：
 
 - 更新 README、CLI help、Phase 1 验收说明和 e2e 运行说明。
@@ -223,17 +226,23 @@
 验收：
 
 - 新用户可按 README 跑通 smoke。
-- 文档不再保留“仍在规划中”的 Phase 1 入口表述。
+- 文档不再保留会让 Phase 1 被误读为规划阶段的入口表述。
 - 未实现能力明确标注为 Beta/Production。
+
+实现：
+
+- 新增 [Phase 1 Release Readiness](./phase1-release-readiness.md)。
+- README 指向验收说明，不再把 Phase 1 描述为仍在实施中。
+- Beta/Production 边界和剩余风险已集中记录。
 
 ## 5. 并发策略
 
-当前阶段推荐低并发：
+Phase 1 已收口。后续进入 Beta/Production 拆分前，推荐低并发推进：
 
 - `phase1-013` 已完成，作为后续实现的回归基线。
 - `phase1-014` 已完成，runtime、git、orchestrator 和 quality 的共同字段已有回归基线。
 - `phase1-015` 已完成，后续可在真实 CLI 安装环境中继续增强 session resume 和结构化输出解析。
-- `phase1-018` 已完成，`phase1-019 repair-controlled-loop` 可以开始接入受控修复。
+- Phase 1 已完成，下一批应先拆 Beta issue graph，再进入生产级能力扩展。
 
 ## 6. 每轮实现门禁
 

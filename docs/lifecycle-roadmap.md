@@ -536,13 +536,13 @@ Adapter 路线：
 - Beta：DashScope、DeepSeek、Zhipu、MCP。
 - Production：GitHub/Gitee/GitLab PR/MR、CI/CD、Observability、Enterprise SSO/Policy。
 
-## 9. Phase 1 执行入口
+## 9. Phase 1 收口状态
 
-文档规划阶段已完成收口。当前 [设计就绪门禁](./design-readiness-checklist.md) 结论为 `READY_WITH_RISKS`，可以进入 Phase 1 本地 CLI MVP 的实现拆分和第一批代码开发。
+文档规划阶段已完成收口。Phase 1 本地 CLI MVP 已完成主要闭环，验收入口见 [Phase 1 Release Readiness](./phase1-release-readiness.md)。[设计就绪门禁](./design-readiness-checklist.md) 中的风险项继续作为后续实现期设计债务跟踪。
 
-Phase 1 的执行原则：
+Phase 1 的执行结果：
 
-- 只实现本地 CLI MVP，不启动 Web Console 和 team_server。
+- 已实现本地 CLI MVP，不启动 Web Console 和 team_server。
 - 文件化 `.moyuan/` 状态、JSONL 日志和 schema_version 1 保留为审计权威；查询型状态开始同步到 GORM SQLite。
 - 所有入口先建立 `auth_context`，再执行项目、Git、Runtime、质量或写入操作。
 - Native Runtime 只能通过 Runtime Adapter 调用，不能绕过 Orchestrator、Workspace、Logging 和 Quality Gate。
@@ -562,16 +562,24 @@ Phase 1 第一批实现模块：
 | 8 | `scheduler` | blocked、ready、running、review 队列，先支持串行执行 |
 | 9 | `quality` | build、lint、test、typecheck 的基础 gate 和质量报告 |
 
-Phase 1 暂不进入第一批的能力：
+Phase 1 后续补齐的能力：
+
+- Runtime diff capture。
+- Native Runtime Adapter 的 Claude CLI / Codex CLI 调用契约。
+- Orchestrator issue/run 状态机。
+- Quality review hardening。
+- Gin + GORM 后端基线。
+- Memory record gate。
+- Repair controlled loop。
+
+Phase 1 仍不覆盖的能力：
 
 - 并发 worktree。
 - Skill Registry 自动推荐。
-- Memory 长期存储和 compact 的完整实现。
 - GitHub/Gitee/GitLab PR/MR 自动创建。
-- self-repair 自动修复闭环。
 - release/deployment 投产流水线。
 
-这些能力可以在第一批模块稳定后按 [实现模块拆分](./implementation-module-map.md) 的第二批扩展继续拆分。
+这些能力进入 Beta/Production 阶段继续拆分。
 
 ## 10. 进入实施前的冻结清单
 
@@ -582,11 +590,11 @@ Phase 1 暂不进入第一批的能力：
 - `README` 只保留导航和边界。
 - `CLI` 命令以本路线图为唯一权威。
 - `Phase 1` issue graph 以 [Phase 1 实现 Issue Graph](./phase1-issue-graph.md) 为唯一执行图。
-- `Phase 1` 下一批任务以 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md) 为当前实施入口。
+- `Phase 1` 验收以 [Phase 1 Release Readiness](./phase1-release-readiness.md) 为当前入口。
 - `design-readiness-checklist.md` 的风险项只允许补齐，不允许借口绕过门禁。
 - `workspace`、`auth_context`、`logging`、`git`、`runtime-adapters`、`comprehension`、`orchestrator`、`scheduler`、`quality`、`memory`、`repair` 的边界不再重新拆分定义。
 
-进入实施阶段的最低条件：
+Phase 1 已满足的实施条件：
 
 - `phase1-issue-graph.md` 已作为执行图确定。
 - 所有 Phase 1 issue 的依赖关系已经可读。

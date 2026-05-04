@@ -1,14 +1,14 @@
 # Phase 1 实现 Issue Graph
 
-状态：ready
+状态：completed
 责任角色：orchestrator_owner + architect + core_engineer
 最后更新：2026-05-04
 
-本文把冻结后的 Phase 1 执行入口拆成可执行 issue graph。它只覆盖本地 CLI MVP，不覆盖 team_server、Web Console、生产部署和 Beta 能力。
+本文把冻结后的 Phase 1 执行入口拆成可执行 issue graph。当前 Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](./phase1-release-readiness.md)。本图不覆盖 team_server、Web Console、生产部署和 Beta 能力。
 
 ## 0. 当前实现进度
 
-当前进入 Phase 1 实施阶段，控制面已切换为 Go。
+Phase 1 本地 CLI MVP 已完成主要闭环，控制面已切换为 Go。
 
 已完成骨架：
 
@@ -32,8 +32,9 @@
 - `phase1-017a gin-gorm-baseline`：已切换后端框架口径为 Gin + GORM，新增 `internal/api` Gin router、`internal/store` GORM SQLite store，并让项目注册同步 `.moyuan/state.db`。
 - `phase1-018 memory-record-gate`：已实现 candidate score、staging、dedup、敏感信息阻断、record 元数据、`memory candidates` 和 compact 自动摘要。
 - `phase1-019 repair-controlled-loop`：已实现受控 repair attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
+- `phase1-020 docs-release-readiness`：已收口 README、CLI help、e2e 说明、Phase 1 验收记录和剩余风险。
 
-下一轮进入 `phase1-020 docs-release-readiness`，收口 README、CLI help、e2e 说明、Phase 1 验收记录和剩余风险。下一批任务的执行顺序、验收标准和 git 同步规则见 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)。
+Phase 1 已完成。后续进入 Beta/Production 前，应先基于 [Phase 1 Release Readiness](./phase1-release-readiness.md) 和 [生命周期路线图](./lifecycle-roadmap.md) 拆下一阶段 issue graph。
 
 ## 1. 目标
 

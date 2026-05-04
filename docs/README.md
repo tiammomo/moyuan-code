@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 1 本地 CLI MVP 实施中。
+当前阶段：Phase 1 本地 CLI MVP 已完成主要闭环，下一阶段进入 Beta issue 拆分和生产级能力扩展。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
@@ -9,7 +9,7 @@
 ## 推荐阅读顺序
 
 1. [总体规划与生命周期路线图](./lifecycle-roadmap.md)：产品定位、端到端流程、CLI、Phase 和近期落地范围。
-2. [Phase 1 实现 Issue Graph](./phase1-issue-graph.md)、[Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)：查看当前实现进度和下一批开发顺序。
+2. [Phase 1 Release Readiness](./phase1-release-readiness.md)、[Phase 1 实现 Issue Graph](./phase1-issue-graph.md)、[Phase 1 实施收口记录](./phase1-next-development-plan.md)：查看当前验收状态、完成范围和剩余边界。
 3. [参考架构](./reference-architecture.md)：系统分层、核心模块、运行链路、上下文装配和安全边界。
 4. [主线文档](./mainlines/README.md)：按真实生命周期阅读平台用户、项目接入、需求规划、代码开发、运行反馈、代码管理、服务器资源和 DevOps 发布投产。
 5. [策略决策树](./policies/README.md)：阅读鉴权、阅读理解、调度、质量、Bug 判断、Git、服务器、发布、Provider 和 Memory 的判断规则。
@@ -25,7 +25,7 @@
 | --- | --- | --- |
 | 基础规范 | [foundations/](./foundations/README.md) | 术语、核心对象、权限、失败恢复、状态机和文档治理 |
 | 总体规划 | [lifecycle-roadmap.md](./lifecycle-roadmap.md)、[reference-architecture.md](./reference-architecture.md) | 产品生命周期、系统架构和阶段计划 |
-| 实施入口 | [phase1-issue-graph.md](./phase1-issue-graph.md)、[phase1-next-development-plan.md](./phase1-next-development-plan.md) | Phase 1 当前进度、下一批任务、依赖和验收 |
+| 实施入口 | [phase1-release-readiness.md](./phase1-release-readiness.md)、[phase1-issue-graph.md](./phase1-issue-graph.md)、[phase1-next-development-plan.md](./phase1-next-development-plan.md) | Phase 1 验收、完成状态、依赖和剩余边界 |
 | 主线流程 | [mainlines/](./mainlines/README.md) | 真实执行链路和每条主线的输入、输出、阻断点 |
 | 策略决策 | [policies/](./policies/README.md) | 可实现为规则引擎、状态机或 validator 的判断规则 |
 | 实现契约 | [contracts/](./contracts/README.md) | 模块接口、事件、错误和迁移边界 |
@@ -61,8 +61,9 @@
 
 ## 当前实施入口
 
-Phase 1 已进入本地 CLI MVP 实施阶段。当前执行入口：
+Phase 1 本地 CLI MVP 已完成主要闭环。当前验收和状态入口：
 
+- [Phase 1 Release Readiness](./phase1-release-readiness.md)：本地 CLI MVP 的验证命令、产物、边界和剩余风险。
 - [Phase 1 实现 Issue Graph](./phase1-issue-graph.md)：已完成骨架、依赖图和阶段边界。
-- [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)：下一批开发任务、验收标准、并发策略和 git 同步规则。
+- [Phase 1 实施收口记录](./phase1-next-development-plan.md)：完成任务、验收标准、并发策略和 git 同步规则。
 - [设计就绪门禁](./design-readiness-checklist.md)：设计风险仍按 `READY_WITH_RISKS` 跟踪，不能绕过实现门禁。
