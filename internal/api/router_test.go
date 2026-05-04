@@ -165,6 +165,14 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/approvals/"+approval.ID, http.StatusOK, `"approval"`, `"deploy.production"`)
 	assertPostContains(t, router, "/v1/projects/managed/approvals/"+approval.ID+"/decide", `{"decision":"approved","decided_by":"reviewer","reason":"release gates passed"}`, http.StatusOK, `"approval"`, `"APPROVAL_APPROVED"`)
 	assertPostContains(t, router, "/v1/projects/managed/approvals", `{"target_type":"provider","target_id":"glm-api","action":"provider.probe","reason":"token=plain"}`, http.StatusBadRequest, `"approval_payload_must_not_contain_secret"`)
+	session := assertPostSession(t, router, "/v1/projects/managed/auth/sessions", `{"user_id":"alice","display_name":"Alice","roles":["developer","reviewer"]}`, http.StatusCreated)
+	assertGETContains(t, router, "/v1/projects/managed/auth/sessions", http.StatusOK, `"sessions"`, session.ID, `"alice"`)
+	assertPostContains(t, router, "/v1/projects/managed/auth/sessions/"+session.ID+"/revoke", `{"actor_id":"owner","reason":"test"}`, http.StatusOK, `"session"`, `"revoked"`)
+	apiToken := assertPostAPIToken(t, router, "/v1/projects/managed/auth/api-tokens", `{"name":"ci","actor_id":"svc-ci","scopes":["project:read"]}`, http.StatusCreated)
+	assertGETContains(t, router, "/v1/projects/managed/auth/api-tokens", http.StatusOK, `"api_tokens"`, apiToken.ID, `"token_prefix"`)
+	assertPostContains(t, router, "/v1/projects/managed/auth/api-tokens/"+apiToken.ID+"/revoke", `{"actor_id":"owner"}`, http.StatusOK, `"api_token"`, `"revoked"`)
+	assertPostContains(t, router, "/v1/projects/managed/auth/service-accounts", `{"name":"Release Bot","roles":["release_bot"]}`, http.StatusCreated, `"service_account"`, `"svc-release-bot"`)
+	assertGETContains(t, router, "/v1/projects/managed/auth/service-accounts", http.StatusOK, `"service_accounts"`, `"release_bot"`)
 	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries?limit=1", http.StatusOK, `"runtime_recoveries"`, recoveryResult.RecoveryID, `"runtime_failed"`)
 	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries/"+recoveryResult.RecoveryID, http.StatusOK, `"runtime_recovery"`, `"fallback_candidate"`)
 	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries/"+recoveryResult.RecoveryID+"/artifacts", http.StatusOK, `"runtime_recovery_artifacts"`, `"stderr"`, "api codex failed")
@@ -333,6 +341,52 @@ func assertPostApproval(t *testing.T, router http.Handler, path string, body str
 		t.Fatalf("approval response missing id: %s", recorder.Body.String())
 	}
 	return payload.Approval
+}
+
+func assertPostSession(t *testing.T, router http.Handler, path string, body string, status int) auth.Session {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != status {
+		t.Fatalf("POST %s status = %d body=%s", path, recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		Session auth.Session `json:"session"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode session response failed: %v body=%s", err, recorder.Body.String())
+	}
+	if payload.Session.ID == "" {
+		t.Fatalf("session response missing id: %s", recorder.Body.String())
+	}
+	return payload.Session
+}
+
+func assertPostAPIToken(t *testing.T, router http.Handler, path string, body string, status int) auth.APIToken {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != status {
+		t.Fatalf("POST %s status = %d body=%s", path, recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		APIToken   auth.APIToken `json:"api_token"`
+		TokenValue string        `json:"token_value"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode api token response failed: %v body=%s", err, recorder.Body.String())
+	}
+	if payload.APIToken.ID == "" || payload.TokenValue == "" {
+		t.Fatalf("api token response missing id or one-time token: %s", recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "token_hash") {
+		t.Fatalf("api token response leaked token hash: %s", recorder.Body.String())
+	}
+	return payload.APIToken
 }
 
 func initGitRepo(t *testing.T, root string) {

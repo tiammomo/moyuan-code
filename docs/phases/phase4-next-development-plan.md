@@ -22,7 +22,7 @@ Phase 3 已完成并通过 release readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase4-001` | `audit-log-query-api-console` | completed | 统一核心日志查询 API 和 Console Audit 面板 | 脱敏后的 run/audit/error 日志可按 channel、issue、run、limit 查询 |
 | P0 | `phase4-002` | `approval-record-store-api` | completed | 高风险操作审批记录落盘、查询和审计 | release/deploy/visual/provider 高风险动作有完整 approval lifecycle |
-| P1 | `phase4-003` | `team-auth-session-token-baseline` | planned | 本地团队模式的 session、API token 和 service account 基线 | API 请求能携带 actor，并落入 auth context 和 audit log |
+| P1 | `phase4-003` | `team-auth-session-token-baseline` | completed | 本地团队模式的 session、API token 和 service account 基线 | session/token/service account 可创建、查询、撤销并写入 audit log |
 | P1 | `phase4-004` | `git-pr-mr-plan-sync` | planned | GitHub/Gitee PR/MR 计划、远程链接和状态同步 | PR/MR 状态可记录，不绕过 review 与质量门禁 |
 | P2 | `phase4-005` | `server-resource-maintenance` | planned | 服务器到期、续费、巡检、退役和环境引用维护 | 测试开发机和生产机生命周期可查询、可提醒、可审计 |
 
@@ -77,7 +77,33 @@ Phase 3 已完成并通过 release readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 5. 验证要求
+## 5. 已完成任务：`phase4-003 team-auth-session-token-baseline`
+
+范围：
+
+- 新增 `internal/auth` 团队身份基线，状态写入 `.moyuan/auth/team.json`。
+- 支持 local team session 创建、查询和撤销。
+- 支持 API token 创建、查询和撤销；Token 明文只在创建时返回一次，落盘只保存 hash 与 prefix。
+- 支持 service account 创建/覆盖和查询，用于后续 CI、release bot、deploy bot。
+- 新增 API：`GET/POST /auth/sessions`、`POST /auth/sessions/:id/revoke`、`GET/POST /auth/api-tokens`、`POST /auth/api-tokens/:id/revoke`、`GET/POST /auth/service-accounts`。
+- Console 新增 `Access Baseline` 面板，展示 active session、API token 和 service account 摘要。
+- session/token/service account 的创建与撤销写入 `auth.*` audit event。
+
+非目标：
+
+- 不实现真实登录页、密码认证、SSO/OIDC 或 refresh token。
+- 不在本任务中启用完整 RBAC middleware；当前是可审计的身份对象基线。
+- 不把 API token 明文写入日志、Memory、配置或 Console 列表。
+
+验证：
+
+- `go test ./internal/auth ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 6. 验证要求
 
 每完成一个 Phase 4 issue，至少运行：
 

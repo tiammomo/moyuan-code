@@ -3,7 +3,9 @@ import { demoSnapshot } from "./demo-data";
 import type {
   ConsoleSnapshot,
   AuditEventSummary,
+  APITokenSummary,
   ApprovalRecordSummary,
+  AuthSessionSummary,
   DeploymentExecutionSummary,
   DeploymentSummary,
   IssueNode,
@@ -15,6 +17,7 @@ import type {
   RunSummary,
   ResourceSummary,
   ScheduleItem,
+  ServiceAccountSummary,
   SubagentBacklogItem,
   SubagentSummary,
   VisualAssetSummary,
@@ -71,6 +74,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     memoryResponse,
     auditEventsResponse,
     approvalsResponse,
+    sessionsResponse,
+    apiTokensResponse,
+    serviceAccountsResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
     apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: unknown[]; waiting_queue?: unknown[]; subagent_backlog?: unknown[] } }>>(
@@ -89,6 +95,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ candidates: unknown[] }>>(`/projects/${project.id}/memory/candidates?limit=3`),
     apiGet<ApiEnvelope<{ audit_events: unknown[] }>>(`/projects/${project.id}/audit-events?channel=all&limit=10`),
     apiGet<ApiEnvelope<{ approvals: unknown[] }>>(`/projects/${project.id}/approvals?limit=6`),
+    apiGet<ApiEnvelope<{ sessions: unknown[] }>>(`/projects/${project.id}/auth/sessions`),
+    apiGet<ApiEnvelope<{ api_tokens: unknown[] }>>(`/projects/${project.id}/auth/api-tokens`),
+    apiGet<ApiEnvelope<{ service_accounts: unknown[] }>>(`/projects/${project.id}/auth/service-accounts`),
   ]);
 
   const schedule = [
@@ -108,6 +117,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const qualityReports = normalizeQualityReports(qualityReportsResponse?.quality_reports ?? []);
   const auditEvents = normalizeAuditEvents(auditEventsResponse?.audit_events ?? []);
   const approvals = normalizeApprovals(approvalsResponse?.approvals ?? []);
+  const authSessions = normalizeAuthSessions(sessionsResponse?.sessions ?? []);
+  const apiTokens = normalizeAPITokens(apiTokensResponse?.api_tokens ?? []);
+  const serviceAccounts = normalizeServiceAccounts(serviceAccountsResponse?.service_accounts ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
   const timeline = liveTimeline(runs, executions, deployments);
@@ -146,6 +158,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     quality_explanations: qualityExplanations,
     approvals,
     audit_events: auditEvents,
+    auth_sessions: authSessions,
+    api_tokens: apiTokens,
+    service_accounts: serviceAccounts,
     timeline: timeline.length > 0 ? timeline : demoSnapshot.timeline,
     quality: qualitySignals.length > 0 ? qualitySignals : demoSnapshot.quality,
     memory:
@@ -451,6 +466,39 @@ function normalizeApprovals(rawApprovals: unknown[]): ApprovalRecordSummary[] {
     decision_reason: readString(raw, "decision_reason", ""),
     requested_at: readString(raw, "requested_at", ""),
     decided_at: readString(raw, "decided_at", ""),
+  }));
+}
+
+function normalizeAuthSessions(rawSessions: unknown[]): AuthSessionSummary[] {
+  return rawSessions.map((raw, index) => ({
+    id: readString(raw, "id", `session-${index + 1}`),
+    user_id: readString(raw, "user_id", "unknown"),
+    display_name: readString(raw, "display_name", ""),
+    roles: readArray(raw, "roles"),
+    status: readString(raw, "status", "unknown"),
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeAPITokens(rawTokens: unknown[]): APITokenSummary[] {
+  return rawTokens.map((raw, index) => ({
+    id: readString(raw, "id", `api-token-${index + 1}`),
+    name: readString(raw, "name", "token"),
+    actor_id: readString(raw, "actor_id", "unknown"),
+    scopes: readArray(raw, "scopes"),
+    token_prefix: readString(raw, "token_prefix", ""),
+    status: readString(raw, "status", "unknown"),
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeServiceAccounts(rawAccounts: unknown[]): ServiceAccountSummary[] {
+  return rawAccounts.map((raw, index) => ({
+    id: readString(raw, "id", `svc-${index + 1}`),
+    name: readString(raw, "name", "service account"),
+    roles: readArray(raw, "roles"),
+    status: readString(raw, "status", "unknown"),
+    created_at: readString(raw, "created_at", ""),
   }));
 }
 

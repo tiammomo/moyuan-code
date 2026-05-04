@@ -54,6 +54,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
   const latestDeployment = snapshot.deployments[0];
+  const activeSessions = snapshot.auth_sessions.filter((session) => session.status === "active");
+  const activeTokens = snapshot.api_tokens.filter((token) => token.status === "active");
+  const activeServiceAccounts = snapshot.service_accounts.filter((account) => account.status === "active");
 
   async function submitRequirement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -748,6 +751,68 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
               ) : (
                 <div className="emptyState">No audit events recorded</div>
               )}
+            </div>
+          </div>
+        </section>
+
+        <section className="accessGrid">
+          <div className="panel">
+            <PanelTitle
+              icon={<ShieldCheck size={18} />}
+              title="Access Baseline"
+              meta={`${activeSessions.length} sessions / ${activeTokens.length} tokens / ${activeServiceAccounts.length} service accounts`}
+            />
+            <div className="accessList">
+              <div className="accessCard">
+                <div className="accessCardHeader">
+                  <strong>Sessions</strong>
+                  <StatusPill tone={activeSessions.length > 0 ? "ok" : "neutral"} label={`${activeSessions.length} active`} />
+                </div>
+                {snapshot.auth_sessions.slice(0, 3).map((session) => (
+                  <div className="accessRow" key={session.id}>
+                    <div>
+                      <strong>{session.display_name || session.user_id}</strong>
+                      <span>{session.roles.join(", ") || "role pending"}</span>
+                    </div>
+                    <code>{shortTimestamp(session.created_at)}</code>
+                  </div>
+                ))}
+                {snapshot.auth_sessions.length === 0 ? <div className="emptyState">No sessions</div> : null}
+              </div>
+
+              <div className="accessCard">
+                <div className="accessCardHeader">
+                  <strong>API Tokens</strong>
+                  <StatusPill tone={activeTokens.length > 0 ? "ok" : "neutral"} label={`${activeTokens.length} active`} />
+                </div>
+                {snapshot.api_tokens.slice(0, 3).map((token) => (
+                  <div className="accessRow" key={token.id}>
+                    <div>
+                      <strong>{token.name}</strong>
+                      <span>{token.scopes.join(", ") || "scope pending"}</span>
+                    </div>
+                    <code>{token.token_prefix || compactID(token.id)}</code>
+                  </div>
+                ))}
+                {snapshot.api_tokens.length === 0 ? <div className="emptyState">No API tokens</div> : null}
+              </div>
+
+              <div className="accessCard">
+                <div className="accessCardHeader">
+                  <strong>Service Accounts</strong>
+                  <StatusPill tone={activeServiceAccounts.length > 0 ? "ok" : "neutral"} label={`${activeServiceAccounts.length} active`} />
+                </div>
+                {snapshot.service_accounts.slice(0, 3).map((account) => (
+                  <div className="accessRow" key={account.id}>
+                    <div>
+                      <strong>{account.name}</strong>
+                      <span>{account.roles.join(", ") || "role pending"}</span>
+                    </div>
+                    <code>{compactID(account.id)}</code>
+                  </div>
+                ))}
+                {snapshot.service_accounts.length === 0 ? <div className="emptyState">No service accounts</div> : null}
+              </div>
             </div>
           </div>
         </section>

@@ -283,6 +283,33 @@ export type ApprovalRecordSummary = {
   decided_at?: string;
 };
 
+export type AuthSessionSummary = {
+  id: string;
+  user_id: string;
+  display_name?: string;
+  roles: string[];
+  status: string;
+  created_at?: string;
+};
+
+export type APITokenSummary = {
+  id: string;
+  name: string;
+  actor_id: string;
+  scopes: string[];
+  token_prefix: string;
+  status: string;
+  created_at?: string;
+};
+
+export type ServiceAccountSummary = {
+  id: string;
+  name: string;
+  roles: string[];
+  status: string;
+  created_at?: string;
+};
+
 export type ConsoleSnapshot = {
   mode: "live" | "demo";
   backendStatus: StatusTone;
@@ -316,6 +343,9 @@ export type ConsoleSnapshot = {
   quality_explanations: QualityExplanation[];
   approvals: ApprovalRecordSummary[];
   audit_events: AuditEventSummary[];
+  auth_sessions: AuthSessionSummary[];
+  api_tokens: APITokenSummary[];
+  service_accounts: ServiceAccountSummary[];
   timeline: TimelineEvent[];
   quality: QualitySignal[];
   memory: MemorySignal[];

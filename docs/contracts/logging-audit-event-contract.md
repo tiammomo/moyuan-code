@@ -111,7 +111,7 @@ interface StateChangedEvent extends LogEvent {
 
 | 主线 | 必填事件 |
 | --- | --- |
-| 平台用户与访问控制 | auth.login、auth.logout、auth.token.created、auth.token.revoked、auth.decision.deny、auth.approval.created |
+| 平台用户与访问控制 | auth.login、auth.logout、auth.session.created、auth.session.revoked、auth.token.created、auth.token.revoked、auth.service_account.upserted、auth.decision.deny、auth.approval.created |
 | 项目接入与阅读理解 | project_added、repository_cloned、comprehension_started、comprehension_completed |
 | 需求规划与 Issue 编排 | requirement_refined、clarification_decided、issue_graph_created、schedule_created |
 | 代码开发 | subagent.created、subagent.dispatched、runtime_started、runtime_completed、quality_started、review_completed |

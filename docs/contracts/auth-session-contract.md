@@ -183,8 +183,46 @@ interface ApprovalRecord {
 当前边界：
 
 - 已能创建、查询、通过和拒绝 approval record，并写入 audit log。
-- 未实现团队登录、approver role、禁止自审批和审批过期校验；这些进入 `phase4-003 team-auth-session-token-baseline`。
+- 未实现 approver role、禁止自审批和审批过期校验；这些由后续 RBAC middleware 任务接入。
 - 审批 reason/metadata 禁止携带 token、API key、password、secret、credential 和 private key。
+
+## 3.2 当前 Team Auth Baseline 接口
+
+Phase 4 已提供本地团队身份对象基线，供 Console、CLI、CI 和后续 RBAC middleware 复用：
+
+```http
+GET /v1/projects/:project_id/auth/sessions
+POST /v1/projects/:project_id/auth/sessions
+POST /v1/projects/:project_id/auth/sessions/:session_id/revoke
+
+GET /v1/projects/:project_id/auth/api-tokens
+POST /v1/projects/:project_id/auth/api-tokens
+POST /v1/projects/:project_id/auth/api-tokens/:token_id/revoke
+
+GET /v1/projects/:project_id/auth/service-accounts
+POST /v1/projects/:project_id/auth/service-accounts
+```
+
+当前存储：
+
+- 状态文件：`.moyuan/auth/team.json`。
+- Session：保存 user、display name、roles、status、created/revoked 信息。
+- API Token：创建时返回一次 `token_value`；落盘只保存 `token_hash` 与 `token_prefix`，列表接口不返回 hash。
+- Service Account：保存 id、name、roles、status，用于 release bot、deploy bot、CI bot。
+
+当前审计事件：
+
+- `auth.session.created`
+- `auth.session.revoked`
+- `auth.token.created`
+- `auth.token.revoked`
+- `auth.service_account.upserted`
+
+当前边界：
+
+- 这是 local team baseline，不是完整登录系统。
+- API 还未强制解析 `Authorization` header，也未按 role/scope 拦截请求。
+- 后续 RBAC middleware 必须基于这些对象输出统一 `AuthContext` 和 `AuthzResult`。
 
 ## 4. 错误类型
 

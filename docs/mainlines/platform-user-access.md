@@ -162,6 +162,12 @@ MVP 必须具备的用户功能：
 - 权限边界见 [权限模型](../foundations/permission-model.md)。
 - 会话接口见 [身份会话契约](../contracts/auth-session-contract.md)。
 
+当前实现基线：
+
+- Phase 4 已提供 local team session、API token 和 service account 的创建、查询、撤销 API。
+- API token 明文只在创建时返回一次；后续列表只展示 token id、prefix、actor 和 scopes。
+- 当前尚未启用全局 RBAC middleware；高风险动作先通过 approval record 与 audit log 形成可追溯控制。
+
 ## 10. 日志与审计
 
 必须审计：

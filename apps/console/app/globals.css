@@ -661,6 +661,7 @@ dd {
 .lowerGrid,
 .observabilityGrid,
 .auditGrid,
+.accessGrid,
 .bottomGrid {
   display: grid;
   gap: 12px;
@@ -679,6 +680,82 @@ dd {
 
 .auditList {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.accessGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.accessList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.accessCard {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 180px;
+  padding: 11px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.accessCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.accessCardHeader strong {
+  font-size: 13px;
+}
+
+.accessRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 9px;
+  border: 1px solid #dfe7f1;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.accessRow div {
+  min-width: 0;
+  flex: 1;
+}
+
+.accessRow strong,
+.accessRow span {
+  display: block;
+}
+
+.accessRow strong {
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.accessRow span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.accessRow code {
+  max-width: 44%;
+  overflow: hidden;
+  color: var(--blue);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .timeline,
@@ -1037,6 +1114,7 @@ meter {
   .lowerGrid,
   .observabilityGrid,
   .auditGrid,
+  .accessList,
   .auditList,
   .bottomGrid {
     grid-template-columns: 1fr;

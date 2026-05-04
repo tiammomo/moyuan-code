@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"moyuan-code/internal/approvals"
+	"moyuan-code/internal/auth"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/gitprovider"
@@ -98,6 +99,29 @@ type approvalDecisionRequest struct {
 	Decision  string `json:"decision"`
 	DecidedBy string `json:"decided_by"`
 	Reason    string `json:"reason"`
+}
+
+type authSessionRequest struct {
+	UserID      string   `json:"user_id"`
+	DisplayName string   `json:"display_name"`
+	Roles       []string `json:"roles"`
+}
+
+type authTokenRequest struct {
+	Name    string   `json:"name"`
+	ActorID string   `json:"actor_id"`
+	Scopes  []string `json:"scopes"`
+}
+
+type serviceAccountRequest struct {
+	ID    string   `json:"id"`
+	Name  string   `json:"name"`
+	Roles []string `json:"roles"`
+}
+
+type revokeRequest struct {
+	ActorID string `json:"actor_id"`
+	Reason  string `json:"reason"`
 }
 
 type visualDiagramPlanRequest struct {
@@ -382,6 +406,175 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"approval": record})
+	})
+	router.GET("/v1/projects/:project_id/auth/sessions", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		sessions, err := auth.ListSessions(rootDir)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"sessions": sessions})
+	})
+	router.POST("/v1/projects/:project_id/auth/sessions", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req authSessionRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		session, err := auth.CreateSession(rootDir, auth.CreateSessionOptions{UserID: req.UserID, DisplayName: req.DisplayName, Roles: req.Roles})
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"session": session})
+	})
+	router.POST("/v1/projects/:project_id/auth/sessions/:session_id/revoke", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req revokeRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		session, found, err := auth.RevokeSession(rootDir, c.Param("session_id"), auth.RevokeOptions{ActorID: req.ActorID, Reason: req.Reason})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "session not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"session": session})
+	})
+	router.GET("/v1/projects/:project_id/auth/api-tokens", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		tokens, err := auth.ListAPITokens(rootDir)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"api_tokens": tokens})
+	})
+	router.POST("/v1/projects/:project_id/auth/api-tokens", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req authTokenRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		token, err := auth.CreateAPIToken(rootDir, auth.CreateTokenOptions{Name: req.Name, ActorID: req.ActorID, Scopes: req.Scopes})
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"api_token": token.Token, "token_value": token.TokenValue})
+	})
+	router.POST("/v1/projects/:project_id/auth/api-tokens/:token_id/revoke", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req revokeRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		token, found, err := auth.RevokeAPIToken(rootDir, c.Param("token_id"), auth.RevokeOptions{ActorID: req.ActorID, Reason: req.Reason})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "api token not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"api_token": token})
+	})
+	router.GET("/v1/projects/:project_id/auth/service-accounts", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		accounts, err := auth.ListServiceAccounts(rootDir)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"service_accounts": accounts})
+	})
+	router.POST("/v1/projects/:project_id/auth/service-accounts", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req serviceAccountRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		account, err := auth.CreateServiceAccount(rootDir, auth.CreateServiceAccountOptions{ID: req.ID, Name: req.Name, Roles: req.Roles})
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"service_account": account})
 	})
 	router.GET("/v1/projects/:project_id/runtime-recoveries", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

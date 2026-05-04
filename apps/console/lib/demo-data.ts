@@ -433,6 +433,44 @@ export const demoSnapshot: ConsoleSnapshot = {
       decided_at: "2026-05-05T00:33:00.000Z",
     },
   ],
+  auth_sessions: [
+    {
+      id: "session-owner-20260505004000",
+      user_id: "owner",
+      display_name: "Project Owner",
+      roles: ["project_owner", "approver"],
+      status: "active",
+      created_at: "2026-05-05T00:40:00.000Z",
+    },
+    {
+      id: "session-reviewer-20260505003600",
+      user_id: "reviewer",
+      display_name: "Quality Reviewer",
+      roles: ["reviewer"],
+      status: "active",
+      created_at: "2026-05-05T00:36:00.000Z",
+    },
+  ],
+  api_tokens: [
+    {
+      id: "api-token-ci-dry-run-20260505003900",
+      name: "CI Dry Run",
+      actor_id: "svc-ci",
+      scopes: ["project:read", "deploy:dry-run"],
+      token_prefix: "moyuan_demo_pref",
+      status: "active",
+      created_at: "2026-05-05T00:39:00.000Z",
+    },
+  ],
+  service_accounts: [
+    {
+      id: "svc-release-bot",
+      name: "Release Bot",
+      roles: ["release_bot", "deploy_executor"],
+      status: "active",
+      created_at: "2026-05-05T00:38:00.000Z",
+    },
+  ],
   timeline: [
     {
       id: "t1",
