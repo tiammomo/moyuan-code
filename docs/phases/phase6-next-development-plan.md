@@ -23,7 +23,7 @@ Phase 5 已完成并通过 readiness：
 | P0 | `phase6-001` | `approval-consumption-replay-guard` | completed | approval record 消费和重放防护 | 已消费 approval 不能再次触发真实外部写入 |
 | P1 | `phase6-002` | `deployment-ssh-preview-adapter` | completed | 部署 adapter preview/dry-run/execute 状态模型 | 生产真实执行继续默认关闭 |
 | P1 | `phase6-003` | `ci-cd-release-provider-adapter` | completed | release/tag/workflow provider adapter | 远程发布动作可审计且可降级 |
-| P1 | `phase6-004` | `provider-cost-health-telemetry` | planned | Provider quota/cost/health 反馈 | 路由能读取 provider 健康和预算信号 |
+| P1 | `phase6-004` | `provider-cost-health-telemetry` | completed | Provider quota/cost/health 反馈 | 路由能读取 provider 健康和预算信号 |
 | P2 | `phase6-005` | `console-routes-schema-forms` | planned | Console 多页面和 schema-aware forms | 表单错误和 execution 状态以后端为准 |
 
 ## 3. 执行规划：`phase6-001 approval-consumption-replay-guard`
@@ -168,7 +168,53 @@ Phase 5 已完成并通过 readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 9. 验证要求
+## 9. 执行规划：`phase6-004 provider-cost-health-telemetry`
+
+范围：
+
+- Provider ops 更新和 refresh 时生成 telemetry record，记录 health、quota、usage、cost 和决策结果。
+- CLI/API 支持查询 provider telemetry 历史。
+- Provider route decision 返回 `signals`，显式暴露 health/quota/cost 对本次路由的影响。
+- Telemetry 只记录状态、用量、成本和 reason，不记录 auth token、prompt 或模型响应。
+
+非目标：
+
+- 不接入云厂商真实账单 API。
+- 不自动扣减实时 token；当前仍由运行器或 ops update 写入 usage/cost。
+- 不改变 provider probe 的 approval 要求。
+
+验收：
+
+- `model provider ops` 后能查询 telemetry。
+- route decision 中能看到 provider health/quota/cost signals。
+- 不可用 provider 仍按 health/quota/cost 阻断。
+- `go test ./internal/providers ./internal/cli ./internal/api` 通过。
+- `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
+
+## 10. 已完成任务：`phase6-004 provider-cost-health-telemetry`
+
+范围：
+
+- `internal/providers` 新增 `TelemetryRecord` 和 `ListTelemetry`。
+- `UpdateOps`、`RefreshOps` 会写入 `.moyuan/models/provider-telemetry.jsonl`。
+- `RouteDecision` 新增 `signals`，返回 health/quota/cost 状态。
+- CLI 增加 `moyuan model provider telemetry [--provider <provider>] [--limit 20]`。
+- API 增加 `GET /v1/projects/:project_id/providers/telemetry`。
+
+非目标：
+
+- 不写入 secret、prompt 或完整模型响应。
+- 不引入外部账单服务。
+
+验证：
+
+- `go test ./internal/providers ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 11. 验证要求
 
 每完成一个 Phase 6 issue，至少运行：
 

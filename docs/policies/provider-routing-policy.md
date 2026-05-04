@@ -120,6 +120,13 @@ Phase 2 当前实现：
 - API provider 选择会跳过不可用 provider；如果没有可用 API provider，会回到默认 runtime 路由。
 - 直接命中的 provider，例如 `gpt_image_2` 图像路由，会返回明确 blocked decision。
 
+Phase 6 当前实现：
+
+- Provider ops update/refresh 会追加 `.moyuan/models/provider-telemetry.jsonl`。
+- `model provider telemetry` 和 `GET /providers/telemetry` 可查询 provider health/quota/usage/cost 历史。
+- `provider-route` 返回 `signals`，包含参与决策的 health、quota 和 cost 状态。
+- Telemetry 只记录状态、用量、成本和 reason，不记录 token、prompt 或模型响应。
+
 模型策略当前实现：
 
 - `frontend-first`：将任务按前端代码路径路由，默认进入 `claude_cli` 或其 provider profile。

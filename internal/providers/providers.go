@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -132,6 +133,24 @@ type OpsRefreshDecision struct {
 	ProbeReason  string `json:"probe_reason,omitempty"`
 }
 
+type TelemetryRecord struct {
+	ID              string  `json:"id"`
+	ProviderID      string  `json:"provider_id"`
+	Source          string  `json:"source"`
+	HealthStatus    string  `json:"health_status,omitempty"`
+	HealthReason    string  `json:"health_reason,omitempty"`
+	QuotaStatus     string  `json:"quota_status,omitempty"`
+	UsedTokens      int64   `json:"used_tokens,omitempty"`
+	RemainingTokens int64   `json:"remaining_tokens,omitempty"`
+	UsageTokens     int64   `json:"usage_tokens,omitempty"`
+	CostStatus      string  `json:"cost_status,omitempty"`
+	EstimatedCost   float64 `json:"estimated_cost,omitempty"`
+	BudgetAmount    float64 `json:"budget_amount,omitempty"`
+	Decision        string  `json:"decision"`
+	Reason          string  `json:"reason,omitempty"`
+	CreatedAt       string  `json:"created_at"`
+}
+
 type RouteRequest struct {
 	Role                  string `json:"role"`
 	ModelStrategy         string `json:"model_strategy,omitempty"`
@@ -144,13 +163,21 @@ type RouteRequest struct {
 }
 
 type RouteDecision struct {
-	Decision   string `json:"decision"`
-	Blocked    bool   `json:"blocked"`
-	Strategy   string `json:"strategy,omitempty"`
-	ProviderID string `json:"provider_id,omitempty"`
-	RuntimeID  string `json:"runtime_id,omitempty"`
-	ModelID    string `json:"model_id,omitempty"`
-	Reason     string `json:"reason"`
+	Decision   string        `json:"decision"`
+	Blocked    bool          `json:"blocked"`
+	Strategy   string        `json:"strategy,omitempty"`
+	ProviderID string        `json:"provider_id,omitempty"`
+	RuntimeID  string        `json:"runtime_id,omitempty"`
+	ModelID    string        `json:"model_id,omitempty"`
+	Reason     string        `json:"reason"`
+	Signals    []RouteSignal `json:"signals,omitempty"`
+}
+
+type RouteSignal struct {
+	ProviderID string `json:"provider_id"`
+	Type       string `json:"type"`
+	Status     string `json:"status"`
+	Reason     string `json:"reason,omitempty"`
 }
 
 func Load(rootDir string) (Registry, error) {
@@ -296,6 +323,10 @@ func Disable(rootDir string, id string) (Provider, bool, error) {
 }
 
 func UpdateOps(rootDir string, id string, snapshot OpsSnapshot) (Provider, bool, error) {
+	return updateOps(rootDir, id, snapshot, "manual_ops")
+}
+
+func updateOps(rootDir string, id string, snapshot OpsSnapshot, source string) (Provider, bool, error) {
 	registry, err := Load(rootDir)
 	if err != nil {
 		return Provider{}, false, err
@@ -317,6 +348,9 @@ func UpdateOps(rootDir string, id string, snapshot OpsSnapshot) (Provider, bool,
 		if err := Save(rootDir, registry); err != nil {
 			return Provider{}, false, err
 		}
+		if err := recordTelemetry(rootDir, provider, source); err != nil {
+			return Provider{}, false, err
+		}
 		_ = logging.Log(rootDir, "audit", "provider.ops.updated", map[string]any{
 			"provider_id":  provider.ID,
 			"health":       provider.Health.Status,
@@ -326,6 +360,35 @@ func UpdateOps(rootDir string, id string, snapshot OpsSnapshot) (Provider, bool,
 		return provider, true, nil
 	}
 	return Provider{}, false, nil
+}
+
+func ListTelemetry(rootDir string, providerID string, limit int) ([]TelemetryRecord, error) {
+	providerID = normalizeID(providerID)
+	tailLimit := limit
+	if providerID != "" {
+		tailLimit = 0
+	}
+	lines, err := fsutil.TailLines(telemetryPath(rootDir), tailLimit)
+	if err != nil {
+		return nil, err
+	}
+	records := []TelemetryRecord{}
+	for _, line := range lines {
+		var record TelemetryRecord
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			return nil, err
+		}
+		if providerID == "" || record.ProviderID == providerID {
+			records = append(records, record)
+		}
+	}
+	sort.SliceStable(records, func(i, j int) bool {
+		return records[i].CreatedAt > records[j].CreatedAt
+	})
+	if limit > 0 && len(records) > limit {
+		return records[:limit], nil
+	}
+	return records, nil
 }
 
 func RefreshOps(rootDir string, options OpsRefreshOptions) (OpsRefreshResult, error) {
@@ -379,7 +442,7 @@ func RefreshOps(rootDir string, options OpsRefreshOptions) (OpsRefreshResult, er
 			continue
 		}
 		snapshot := refreshSnapshotFor(rootDir, provider, options)
-		updated, ok, err := UpdateOps(rootDir, provider.ID, snapshot)
+		updated, ok, err := updateOps(rootDir, provider.ID, snapshot, refreshTelemetrySource(options))
 		if err != nil {
 			return OpsRefreshResult{}, err
 		}
@@ -544,6 +607,61 @@ func registryPath(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).MoyuanDir, "models", "providers.json")
 }
 
+func telemetryPath(rootDir string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).MoyuanDir, "models", "provider-telemetry.jsonl")
+}
+
+func recordTelemetry(rootDir string, provider Provider, source string) error {
+	if strings.TrimSpace(source) == "" {
+		source = "unknown"
+	}
+	decision, reason := telemetryDecision(provider)
+	record := TelemetryRecord{
+		ID:              "provider-telemetry-" + provider.ID + "-" + strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", ""),
+		ProviderID:      provider.ID,
+		Source:          source,
+		HealthStatus:    provider.Health.Status,
+		HealthReason:    provider.Health.Reason,
+		QuotaStatus:     provider.Quota.Status,
+		UsedTokens:      provider.Quota.UsedTokens,
+		RemainingTokens: provider.Quota.RemainingTokens,
+		UsageTokens:     provider.Usage.TotalTokens,
+		CostStatus:      provider.Cost.Status,
+		EstimatedCost:   provider.Cost.EstimatedAmount,
+		BudgetAmount:    provider.Cost.BudgetAmount,
+		Decision:        decision,
+		Reason:          reason,
+		CreatedAt:       now(),
+	}
+	if err := fsutil.AppendJSONL(telemetryPath(rootDir), record); err != nil {
+		return err
+	}
+	_ = logging.Log(rootDir, "audit", "provider.telemetry.recorded", map[string]any{
+		"provider_id": provider.ID,
+		"source":      source,
+		"decision":    decision,
+		"reason":      reason,
+	})
+	return nil
+}
+
+func telemetryDecision(provider Provider) (string, string) {
+	if violation := availabilityViolation(provider); violation != "" {
+		return "PROVIDER_TELEMETRY_BLOCKING", violation
+	}
+	if provider.Health.Status == "degraded" || provider.Quota.Status == "warning" || provider.Cost.Status == "warning" {
+		return "PROVIDER_TELEMETRY_WARNING", "provider_degraded_or_budget_warning"
+	}
+	return "PROVIDER_TELEMETRY_OK", "provider_available"
+}
+
+func refreshTelemetrySource(options OpsRefreshOptions) string {
+	if options.Probe {
+		return "probe_refresh"
+	}
+	return "ops_refresh"
+}
+
 func normalizeForSave(provider Provider) (Provider, error) {
 	provider.ID = normalizeID(provider.ID)
 	if provider.ID == "" {
@@ -694,7 +812,7 @@ func providerDecision(registry Registry, request RouteRequest, providerID string
 		return blocked(violation)
 	}
 	if violation := availabilityViolation(provider); violation != "" {
-		return blocked(violation)
+		return blockedForProvider(provider, violation)
 	}
 	return allowed(provider, reason)
 }
@@ -1057,6 +1175,7 @@ func allowed(provider Provider, reason string) RouteDecision {
 		ProviderID: provider.ID,
 		RuntimeID:  provider.RuntimeID,
 		Reason:     reason,
+		Signals:    routeSignals(provider),
 	}
 	if len(provider.Models) > 0 {
 		decision.ModelID = provider.Models[0].ID
@@ -1070,6 +1189,31 @@ func blocked(reason string) RouteDecision {
 		Blocked:  true,
 		Reason:   reason,
 	}
+}
+
+func blockedForProvider(provider Provider, reason string) RouteDecision {
+	return RouteDecision{
+		Decision:   DecisionBlocked,
+		Blocked:    true,
+		ProviderID: provider.ID,
+		RuntimeID:  provider.RuntimeID,
+		Reason:     reason,
+		Signals:    routeSignals(provider),
+	}
+}
+
+func routeSignals(provider Provider) []RouteSignal {
+	signals := []RouteSignal{}
+	if provider.Health.Status != "" {
+		signals = append(signals, RouteSignal{ProviderID: provider.ID, Type: "health", Status: provider.Health.Status, Reason: provider.Health.Reason})
+	}
+	if provider.Quota.Status != "" {
+		signals = append(signals, RouteSignal{ProviderID: provider.ID, Type: "quota", Status: provider.Quota.Status})
+	}
+	if provider.Cost.Status != "" {
+		signals = append(signals, RouteSignal{ProviderID: provider.ID, Type: "cost", Status: provider.Cost.Status})
+	}
+	return signals
 }
 
 func withStrategy(decision RouteDecision, strategy string) RouteDecision {

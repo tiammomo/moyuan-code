@@ -465,6 +465,9 @@ func TestProviderRegistryCLIManagesProvidersAndRoutesRoles(t *testing.T) {
 	ops := runCLI(t, root, "model", "provider", "ops", "glm-main", "--health", "ok", "--quota-status", "ok", "--limit-tokens", "1000", "--used-tokens", "250", "--requests", "3", "--currency", "usd", "--estimated-cost", "0.4", "--budget", "5", "--cost-status", "ok")
 	assertContains(t, ops.stdout, `"remaining_tokens": 750`)
 	assertContains(t, ops.stdout, `"currency": "USD"`)
+	telemetry := runCLI(t, root, "model", "provider", "telemetry", "--provider", "glm-main")
+	assertContains(t, telemetry.stdout, `"provider_id": "glm-main"`)
+	assertContains(t, telemetry.stdout, `"PROVIDER_TELEMETRY_OK"`)
 
 	t.Setenv("GLM_API_KEY", "")
 	refresh := runCLI(t, root, "model", "provider", "refresh", "--provider", "glm-main")

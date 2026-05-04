@@ -116,6 +116,7 @@ interface StateChangedEvent extends LogEvent {
 | 需求规划与 Issue 编排 | requirement_refined、clarification_decided、issue_graph_created、schedule_created |
 | 代码开发 | subagent.created、subagent.dispatched、runtime_started、runtime_completed、quality_started、review_completed |
 | Subagent 与 Skills | subagent.planned、subagent.completed、subagent.failed、skill.recommended、skill.bound、skill.effectiveness.recorded |
+| 模型与 Provider | provider.ops.updated、provider.ops.refreshed、provider.telemetry.recorded、provider.route.decided |
 | 运行反馈与自我修复 | self_repair.signal.captured、self_repair.bug.classified、self_repair.repair.planned、self_repair.repair.completed |
 | 代码管理 | branch_created、worktree_created、commit.created、commit.blocked、merge_attempted、merge_completed、git_provider.plan.created、git_provider.status.synced、git_provider.pr_mr.previewed、git_provider.pr_mr.create |
 | 服务器资源管理 | host_added、resource_check_completed、expiration_alert_created、server_resource.maintenance_scan、server_resource.renewed、server_resource.retired |

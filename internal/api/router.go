@@ -1604,6 +1604,23 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusCreated, gin.H{"provider": provider})
 	})
+	router.GET("/v1/projects/:project_id/providers/telemetry", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		records, err := providers.ListTelemetry(rootDir, c.Query("provider_id"), queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"provider_telemetry": records})
+	})
 	router.GET("/v1/projects/:project_id/providers/:provider_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

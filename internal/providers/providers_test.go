@@ -160,6 +160,13 @@ func TestProviderOpsSnapshotBlocksUnavailableRoutes(t *testing.T) {
 	if !ok || updated.Health.Status != "unhealthy" || updated.Quota.RemainingTokens != 800 || updated.Usage.TotalTokens != 150 || updated.Cost.Currency != "USD" {
 		t.Fatalf("unexpected ops snapshot: ok=%v provider=%+v", ok, updated)
 	}
+	telemetry, err := ListTelemetry(root, "gpt_image_2", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(telemetry) != 1 || telemetry[0].Decision != "PROVIDER_TELEMETRY_BLOCKING" || telemetry[0].Source != "manual_ops" {
+		t.Fatalf("expected blocking telemetry record, got %+v", telemetry)
+	}
 
 	blocked, err := Route(root, RouteRequest{OutputType: "architecture_diagram"})
 	if err != nil {
@@ -167,6 +174,9 @@ func TestProviderOpsSnapshotBlocksUnavailableRoutes(t *testing.T) {
 	}
 	if !blocked.Blocked || blocked.Reason != "provider_unhealthy:gpt_image_2:unhealthy" {
 		t.Fatalf("expected unhealthy provider to block, got %+v", blocked)
+	}
+	if !hasRouteSignal(blocked.Signals, "health", "unhealthy") {
+		t.Fatalf("expected route decision health signal, got %+v", blocked.Signals)
 	}
 
 	updated, ok, err = UpdateOps(root, "gpt_image_2", OpsSnapshot{Health: Health{Status: "ok"}, Quota: Quota{Status: "exhausted"}})
@@ -407,4 +417,13 @@ func writeProviderSecretPolicy(t *testing.T, root string, text string) {
 	if err := fsutil.WriteText(path, strings.TrimSpace(text)+"\n"); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func hasRouteSignal(signals []RouteSignal, signalType string, status string) bool {
+	for _, signal := range signals {
+		if signal.Type == signalType && signal.Status == status {
+			return true
+		}
+	}
+	return false
 }

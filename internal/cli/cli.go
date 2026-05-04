@@ -186,6 +186,7 @@ func usage() string {
 		"moyuan model provider show <provider>",
 		"moyuan model provider ops <provider> [--health ok] [--quota-status ok] [--used-tokens 1000]",
 		"moyuan model provider refresh [--provider <provider>] [--include-disabled] [--probe] [--approved] [--probe-timeout-ms 3000]",
+		"moyuan model provider telemetry [--provider <provider>] [--limit 20]",
 		"moyuan model provider disable <provider>",
 		"moyuan model route [--role <role>] [--strategy low-cost-memory] [--task-type <type>] [--output-type <type>] [--repo-edit]",
 		"moyuan visuals diagram plan [--type architecture] [--title <title>] [--scope <text>]",
@@ -1091,6 +1092,9 @@ func handleModelProvider(args []string, rootDir string) (string, any, int, error
 			Approved:        hasFlag(args, "--approved"),
 		})
 		return "", result, 0, err
+	case "telemetry":
+		records, err := providers.ListTelemetry(rootDir, flagValue(args, "--provider", ""), flagInt(args, "--limit", 20))
+		return "", records, 0, err
 	case "disable":
 		if len(args) < 2 {
 			return "missing provider id\n", nil, 1, nil

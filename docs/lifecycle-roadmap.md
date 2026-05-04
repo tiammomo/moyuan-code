@@ -261,6 +261,7 @@ moyuan git provider show <plan-id>
 moyuan quality check <task-id>
 moyuan quality report <run-id>
 moyuan review merge-decision <issue-id>
+moyuan model provider telemetry [--provider <provider-id>]
 moyuan release suggest [--version <version>] [--min-issues <n>]
 moyuan release provider preview <release-id>
 moyuan release provider publish <release-id> [--approved] [--approval-id <approval-id>]

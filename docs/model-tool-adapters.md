@@ -23,15 +23,16 @@ Adapter 统一解决：
 
 模型服务商必须先进入 Provider Registry，再被路由策略引用。目标权威配置是 `models/providers.yaml`，运行记录落在 `.moyuan/model-ops/`。
 
-当前实现已落地 Provider Registry 和 Phase 2 ops snapshot：
+当前实现已落地 Provider Registry、ops snapshot 和 Phase 6 telemetry：
 
 - 运行期文件：`.moyuan/models/providers.json`。
-- CLI：`moyuan model provider add/list/show/ops/refresh/disable`、`moyuan model route`。
-- API：`GET/POST /v1/projects/:project_id/providers`、`GET /v1/projects/:project_id/providers/:provider_id`、`POST /v1/projects/:project_id/providers/:provider_id/ops`、`POST /v1/projects/:project_id/providers/ops/refresh`、`POST /v1/projects/:project_id/providers/:provider_id/disable`、`POST /v1/projects/:project_id/provider-route`。
+- Telemetry 文件：`.moyuan/models/provider-telemetry.jsonl`。
+- CLI：`moyuan model provider add/list/show/ops/refresh/telemetry/disable`、`moyuan model route`。
+- API：`GET/POST /v1/projects/:project_id/providers`、`GET /v1/projects/:project_id/providers/:provider_id`、`GET /v1/projects/:project_id/providers/telemetry`、`POST /v1/projects/:project_id/providers/:provider_id/ops`、`POST /v1/projects/:project_id/providers/ops/refresh`、`POST /v1/projects/:project_id/providers/:provider_id/disable`、`POST /v1/projects/:project_id/provider-route`。
 - 已实现约束：`auth_ref` 只能是 `env:` 或 `secret:` 引用；不会保存明文 API key。
 - 已实现默认路由：前端和架构类代码任务路由到 `claude_cli`，后端、调优、测试、review 和修复类任务路由到 `codex_cli`，启用后的 API provider 可承担 memory 抽取、规划或图像类任务。
 - 已实现 provider env profile：绑定到 `claude_cli` 或 `codex_cli` 的 provider 可通过 Secret Resolver 注入 `base_url`、模型名和 `auth_ref` 对应的环境变量；runtime metadata 只记录 `env_keys`，不记录 token 值。
-- 已实现 ops snapshot：provider 可记录 `health`、`quota`、`usage` 和 `cost`，路由会因 `unhealthy/down`、`quota.exhausted`、`cost.exceeded` 给出明确阻断原因。
+- 已实现 ops snapshot 和 telemetry：provider 可记录 `health`、`quota`、`usage` 和 `cost`，每次 ops update/refresh 会追加 telemetry 记录，路由会因 `unhealthy/down`、`quota.exhausted`、`cost.exceeded` 给出明确阻断原因，并在 route decision 中返回 `signals`。
 - 已实现 ops refresh：自动检查 native runtime 是否可发现、API provider 的 `auth_ref/base_url` 配置完整性，并按 quota/cost 阈值刷新状态；默认不外呼云厂商账单或模型 API。传入 `probe=true` 或 CLI `--probe --approved` 时，才通过轻量 HTTP probe 检查 API provider 可达性和鉴权状态，探测过程不落盘 token；未带 approval 时会生成 approval record 并返回 `provider_probe_approval_required`。
 - 已实现 task model strategy：`model route --strategy <strategy>` 和 `provider-route` API 可指定 `frontend-first`、`backend-safe`、`low-cost-memory`、`image-diagram`、`planning` 策略。
 - 已实现 Native Runtime recovery：Claude/Codex CLI 失败后会生成 `recovery_id`、`native_session_id`、stdout/stderr 归档、diff summary 引用和 fallback candidate。
