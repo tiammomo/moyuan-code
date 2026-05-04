@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+	"strings"
 )
 
 type Result struct {
@@ -13,9 +14,19 @@ type Result struct {
 }
 
 func RunCommand(ctx context.Context, cwd string, command string, args ...string) Result {
+	return RunCommandInput(ctx, cwd, "", nil, command, args...)
+}
+
+func RunCommandInput(ctx context.Context, cwd string, stdin string, env []string, command string, args ...string) Result {
 	cmd := exec.CommandContext(ctx, command, args...)
 	if cwd != "" {
 		cmd.Dir = cwd
+	}
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
+	if env != nil {
+		cmd.Env = env
 	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

@@ -123,8 +123,10 @@ func filterControlFiles(statusFiles []string) []string {
 
 func statusFilePath(line string) string {
 	line = strings.TrimSpace(line)
-	if len(line) > 3 {
+	if len(line) >= 3 && line[2] == ' ' {
 		line = strings.TrimSpace(line[3:])
+	} else if len(line) >= 2 && line[1] == ' ' {
+		line = strings.TrimSpace(line[2:])
 	}
 	if strings.Contains(line, " -> ") {
 		parts := strings.Split(line, " -> ")

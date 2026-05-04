@@ -123,7 +123,7 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 		risks = appendRisk(risks, "unknown runtime")
 	} else if _, err := exec.LookPath(command); err != nil {
 		status = "failed"
-		risks = appendRisk(risks, "runtime unavailable: "+command)
+		risks = appendRisk(risks, "runtime_unavailable: "+command)
 	} else if before.UserDirty {
 		status = "blocked"
 		summary = "runtime blocked because worktree has pre-existing user changes"
@@ -139,6 +139,20 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 		summary = strings.TrimSpace(res.Stdout)
 		if summary == "" {
 			summary = strings.TrimSpace(res.Stderr)
+		}
+	} else if isNativeRuntime(invocation.RuntimeID) {
+		cmd, nativeSummary, _, err := runNativeCLI(ctx, rootDir, invocation, command)
+		if err != nil {
+			return Result{}, err
+		}
+		if cmd.Status == "failed" {
+			status = "failed"
+			risks = appendRisk(risks, "runtime_failed")
+		}
+		commands = append(commands, cmd)
+		summary = nativeSummary
+		if summary == "" {
+			summary = "native runtime completed"
 		}
 	}
 	after := gitadapter.CaptureSnapshot(ctx, invocation.WorktreePath)
@@ -204,5 +218,14 @@ func commandFor(runtimeID string) string {
 		return "sh"
 	default:
 		return ""
+	}
+}
+
+func isNativeRuntime(runtimeID string) bool {
+	switch runtimeID {
+	case "claude_cli", "claude", "codex_cli", "codex":
+		return true
+	default:
+		return false
 	}
 }

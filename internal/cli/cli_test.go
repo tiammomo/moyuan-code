@@ -154,6 +154,51 @@ func TestRuntimeDiffCaptureBlocksProtectedPathChanges(t *testing.T) {
 	assertGlob(t, root, ".moyuan/runtime/*-local_shell-diff.md")
 }
 
+func TestNativeRuntimeAdaptersUseFakeClaudeAndCodexCLI(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+	restorePath := prependFakeRuntimeCLIs(t)
+	defer restorePath()
+
+	claude := runCLI(t, root, "runtime", "invoke", "claude_cli", "--prompt", "write claude output")
+	assertContains(t, claude.stdout, "fake claude completed")
+	assertContains(t, claude.stdout, "claude-output.txt")
+	assertContains(t, claude.stdout, "claude -p")
+
+	commitAll(t, root, "claude output")
+
+	codex := runCLI(t, root, "runtime", "invoke", "codex_cli", "--prompt", "write codex output")
+	assertContains(t, codex.stdout, "fake codex completed")
+	assertContains(t, codex.stdout, "codex-output.txt")
+	assertContains(t, codex.stdout, "codex exec")
+
+	assertGlob(t, root, ".moyuan/runtime/prompts/*.md")
+	assertGlob(t, root, ".moyuan/runtime/*-claude_cli.json")
+	assertGlob(t, root, ".moyuan/runtime/*-codex_cli.json")
+	assertGlob(t, root, ".moyuan/runtime/*-native.json")
+}
+
+func TestNativeRuntimeAdaptersClassifyUnavailableAndFailedCLI(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+	withoutClaude := withPath(t, t.TempDir())
+	unavailable := runCLIAllowFailure(t, root, "runtime", "invoke", "claude_cli", "--prompt", "noop")
+	withoutClaude()
+	if unavailable.code == 0 {
+		t.Fatalf("expected unavailable claude_cli to fail: %s", unavailable.stdout)
+	}
+	assertContains(t, unavailable.stdout, "runtime_unavailable: claude")
+
+	restorePath := prependFailingCodex(t)
+	defer restorePath()
+	failed := runCLIAllowFailure(t, root, "runtime", "invoke", "codex_cli", "--prompt", "noop")
+	if failed.code == 0 {
+		t.Fatalf("expected failing codex_cli to fail: %s", failed.stdout)
+	}
+	assertContains(t, failed.stdout, "runtime_failed")
+	assertContains(t, failed.stdout, "codex failed")
+}
+
 type qualityReport struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
@@ -241,6 +286,56 @@ func run(t *testing.T, cwd string, command string, args ...string) {
 	if err != nil {
 		t.Fatalf("%s %v failed: %v\n%s", command, args, err, string(out))
 	}
+}
+
+func prependFakeRuntimeCLIs(t *testing.T) func() {
+	t.Helper()
+	dir := t.TempDir()
+	writeExecutable(t, filepath.Join(dir, "claude"), `#!/bin/sh
+printf 'fake claude completed\n'
+printf 'claude output\n' > claude-output.txt
+`)
+	writeExecutable(t, filepath.Join(dir, "codex"), `#!/bin/sh
+printf 'fake codex completed\n'
+printf 'codex output\n' > codex-output.txt
+`)
+	return withPath(t, dir)
+}
+
+func prependFailingCodex(t *testing.T) func() {
+	t.Helper()
+	dir := t.TempDir()
+	writeExecutable(t, filepath.Join(dir, "codex"), `#!/bin/sh
+printf 'codex failed\n' >&2
+exit 42
+`)
+	return withPath(t, dir)
+}
+
+func writeExecutable(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func withPath(t *testing.T, firstDir string) func() {
+	t.Helper()
+	previous := os.Getenv("PATH")
+	if err := os.Setenv("PATH", firstDir+string(os.PathListSeparator)+previous); err != nil {
+		t.Fatal(err)
+	}
+	return func() {
+		if err := os.Setenv("PATH", previous); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func commitAll(t *testing.T, root string, message string) {
+	t.Helper()
+	run(t, root, "git", "add", ".")
+	run(t, root, "git", "-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-qm", message)
 }
 
 func assertCoreWorkspaceArtifacts(t *testing.T, root string) {
