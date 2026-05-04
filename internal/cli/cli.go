@@ -15,8 +15,12 @@ import (
 	"moyuan-code/internal/git"
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
+	"moyuan-code/internal/memory"
+	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/quality"
+	"moyuan-code/internal/repair"
 	runrecord "moyuan-code/internal/run"
+	"moyuan-code/internal/runtime"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
 )
@@ -61,6 +65,14 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleRun(argv[1:], cwd)
 	case "quality":
 		text, result, exitCode, err = handleQuality(ctx, argv[1:], cwd)
+	case "runtime":
+		text, result, exitCode, err = handleRuntime(ctx, argv[1:], cwd)
+	case "orchestrator":
+		text, result, exitCode, err = handleOrchestrator(ctx, argv[1:], cwd)
+	case "memory":
+		text, result, exitCode, err = handleMemory(argv[1:], cwd)
+	case "repair":
+		text, result, exitCode, err = handleRepair(argv[1:], cwd)
 	case "logs":
 		text, result, exitCode, err = handleLogs(argv[1:], cwd)
 	default:
@@ -106,6 +118,14 @@ func usage() string {
 		"moyuan run <task-id>",
 		"moyuan quality check <task-id>",
 		"moyuan quality report <report-id>",
+		"moyuan runtime health <runtime-id>",
+		"moyuan runtime invoke <runtime-id> --prompt <command>",
+		"moyuan orchestrator plan <epic-id>",
+		"moyuan orchestrator run <issue-id> [--runtime local_shell] [--prompt <command>]",
+		"moyuan memory add --summary <text> [--kind fact]",
+		"moyuan memory search <query>",
+		"moyuan memory compact",
+		"moyuan repair signal --type <type> --summary <text>",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -376,6 +396,140 @@ func handleQuality(ctx context.Context, args []string, cwd string) (string, any,
 		return "", report, 0, nil
 	}
 	return "unknown quality command\n", nil, 1, nil
+}
+
+func handleRuntime(ctx context.Context, args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown runtime command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "health":
+		runtimeID := "local_shell"
+		if len(args) > 1 {
+			runtimeID = args[1]
+		}
+		health := runtime.HealthCheck(rootDir, runtimeID)
+		code := 0
+		if !health.OK {
+			code = 1
+		}
+		return "", health, code, nil
+	case "invoke":
+		runtimeID := "local_shell"
+		if len(args) > 1 {
+			runtimeID = args[1]
+		}
+		prompt := flagValue(args, "--prompt", "")
+		run, err := runrecord.Create(rootDir, "runtime-invoke", map[string]any{"runtime_id": runtimeID, "mode": "manual"})
+		if err != nil {
+			return "", nil, 1, err
+		}
+		result, err := runtime.Invoke(ctx, rootDir, runtime.Invocation{RunID: run.ID, RuntimeID: runtimeID, IssueID: "runtime-invoke", Prompt: prompt, WorktreePath: rootDir})
+		if err != nil {
+			return "", nil, 1, err
+		}
+		code := 0
+		if result.Status != "completed" {
+			code = 1
+		}
+		return "", result, code, nil
+	}
+	return "unknown runtime command\n", nil, 1, nil
+}
+
+func handleOrchestrator(ctx context.Context, args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown orchestrator command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "plan":
+		epicID := "phase1-epic"
+		if len(args) > 1 {
+			epicID = args[1]
+		}
+		plan, err := orchestrator.Plan(rootDir, epicID)
+		return "", plan, 0, err
+	case "run":
+		issueID := "task-unknown"
+		if len(args) > 1 {
+			issueID = args[1]
+		}
+		runtimeID := flagValue(args, "--runtime", "local_shell")
+		prompt := flagValue(args, "--prompt", "")
+		result, err := orchestrator.RunIssue(ctx, rootDir, issueID, runtimeID, prompt)
+		code := 0
+		if result.Status != "" && result.Status != "accepted" {
+			code = 1
+		}
+		return "", result, code, err
+	}
+	return "unknown orchestrator command\n", nil, 1, nil
+}
+
+func handleMemory(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown memory command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "add":
+		summary := flagValue(args, "--summary", "")
+		if summary == "" {
+			return "missing --summary\n", nil, 1, nil
+		}
+		kind := flagValue(args, "--kind", "fact")
+		record, err := memory.Add(rootDir, kind, summary, []string{}, "cli")
+		return "", record, 0, err
+	case "search":
+		query := ""
+		if len(args) > 1 {
+			query = args[1]
+		}
+		records, err := memory.Search(rootDir, query, 10)
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if len(records) == 0 {
+			return "", nil, 0, nil
+		}
+		return strings.Join(records, "\n") + "\n", nil, 0, nil
+	case "compact":
+		summary, err := memory.Compact(rootDir)
+		return "", summary, 0, err
+	}
+	return "unknown memory command\n", nil, 1, nil
+}
+
+func handleRepair(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown repair command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "signal":
+		signalType := flagValue(args, "--type", "runtime_error")
+		summary := flagValue(args, "--summary", "")
+		if summary == "" {
+			return "missing --summary\n", nil, 1, nil
+		}
+		sourceID := flagValue(args, "--source", "")
+		signal, err := repair.CaptureSignal(rootDir, signalType, summary, sourceID)
+		if err != nil {
+			return "", nil, 1, err
+		}
+		candidate, err := repair.Classify(rootDir, signal)
+		if err != nil {
+			return "", nil, 1, err
+		}
+		plan, err := repair.PlanRepair(rootDir, candidate)
+		if err != nil {
+			return "", nil, 1, err
+		}
+		return "", map[string]any{"signal": signal, "candidate": candidate, "repair_plan": plan}, 0, nil
+	}
+	return "unknown repair command\n", nil, 1, nil
 }
 
 func handleLogs(args []string, cwd string) (string, any, int, error) {

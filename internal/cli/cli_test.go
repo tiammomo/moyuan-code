@@ -72,6 +72,65 @@ func TestLocalProjectAddCreatesWorkspaceOwnerComprehensionGraphAndQualityReport(
 	if !foundTest {
 		t.Fatalf("quality report missing npm test check: %+v", report.Checks)
 	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"orchestrator", "plan", "phase1-epic", "--root", root}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("orchestrator plan failed: %s", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "ready_queue") {
+		t.Fatalf("orchestrator plan missing ready_queue: %s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"runtime", "invoke", "local_shell", "--prompt", "printf runtime-ok", "--root", root}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runtime invoke failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "runtime-ok") {
+		t.Fatalf("runtime output missing: %s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"orchestrator", "run", "phase1-001", "--runtime", "local_shell", "--prompt", "printf orchestrator-ok", "--root", root}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("orchestrator run failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "accepted") {
+		t.Fatalf("orchestrator run not accepted: %s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"memory", "add", "--kind", "fact", "--summary", "phase1 memory fact", "--root", root}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("memory add failed: %s", stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"memory", "search", "phase1", "--root", root}, &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "phase1 memory fact") {
+		t.Fatalf("memory search failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"memory", "compact", "--root", root}, &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "records_seen") {
+		t.Fatalf("memory compact failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"repair", "signal", "--type", "test_failure", "--summary", "sample test failure", "--root", root}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("repair signal failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "CONFIRMED_BUG") {
+		t.Fatalf("repair classification missing: %s", stdout.String())
+	}
 }
 
 func createTempRepo(t *testing.T) string {

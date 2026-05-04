@@ -34,6 +34,10 @@ type Paths struct {
 	AgentsDir        string
 	RuntimesDir      string
 	SkillsDir        string
+	RuntimeDir       string
+	OrchestratorDir  string
+	SchedulerDir     string
+	RepairDir        string
 	TmpDir           string
 	LocksDir         string
 }
@@ -66,6 +70,10 @@ func ForRoot(rootDir string) Paths {
 		AgentsDir:        filepath.Join(moyuanDir, "agents"),
 		RuntimesDir:      filepath.Join(moyuanDir, "runtimes"),
 		SkillsDir:        filepath.Join(moyuanDir, "skills"),
+		RuntimeDir:       filepath.Join(moyuanDir, "runtime"),
+		OrchestratorDir:  filepath.Join(moyuanDir, "orchestrator"),
+		SchedulerDir:     filepath.Join(moyuanDir, "scheduler"),
+		RepairDir:        filepath.Join(moyuanDir, "repair"),
 		TmpDir:           filepath.Join(moyuanDir, "tmp"),
 		LocksDir:         filepath.Join(moyuanDir, ".locks"),
 	}
@@ -107,6 +115,10 @@ func EnsureDirs(paths Paths) error {
 		filepath.Join(paths.MoyuanDir, "policies"),
 		paths.RuntimesDir,
 		paths.SkillsDir,
+		paths.RuntimeDir,
+		paths.OrchestratorDir,
+		paths.SchedulerDir,
+		paths.RepairDir,
 		paths.TmpDir,
 		paths.LocksDir,
 	}

@@ -10,24 +10,22 @@
 
 当前进入 Phase 1 实施阶段，控制面已切换为 Go。
 
-已完成第一轮骨架：
+已完成骨架：
 
 - `phase1-001 workspace-core`：已实现 `.moyuan/` 初始化、核心目录、`project.yaml`、`repository.yaml`、`policies/access.yaml` 和内部 `workspace.json` 状态缓存。
 - `phase1-002 auth-context`：已实现 local owner、`whoami` 和基础 `auth_context` 审计事件。
 - `phase1-003 logging-audit`：已实现 run、audit、quality、git JSONL 日志。
 - `phase1-004 cli-bootstrap`：已实现 Go CLI 入口和 `bin/moyuan` wrapper。
 - `phase1-005 git-adapter-basics`：已实现本地绑定、远程 clone、status、branch list、fetch sync。
+- `phase1-006 runtime-adapters-core`：已实现 `local_shell` 调用、Claude CLI/Codex CLI 健康检查占位、timeout/exit code/status/result 落盘。
 - `phase1-007 project-comprehension`：已实现 full/incremental comprehension 的启发式项目画像、模块地图、命令识别和 memory candidate。
+- `phase1-008 orchestrator-core`：已实现 issue run 的 auth context、run、runtime、quality gate 和 accepted/needs_rework 状态收敛。
+- `phase1-009 scheduler-core`：已实现 ready/blocked queue、blocked reason 和最小并发度计算。
 - `phase1-010 quality-gates-core`：已实现 build、lint、test 命令执行和 quality report。
+- `phase1-011 memory-basics`：已实现 memory add/search/compact 的最小闭环。
+- `phase1-012 repair-basics`：已实现 runtime signal、bug candidate 分类和 repair plan 生成。
 
-下一轮继续补齐：
-
-- `phase1-006 runtime-adapters-core`
-- `phase1-008 orchestrator-core`
-- `phase1-009 scheduler-core`
-- `phase1-011 memory-basics`
-- `phase1-012 repair-basics`
-- `phase1-013 e2e-smoke`
+下一轮继续补齐 `phase1-013 e2e-smoke`，并增强 runtime adapter 的 Claude CLI / Codex CLI 真实执行契约、diff 捕获和失败降级。
 
 ## 1. 目标
 
