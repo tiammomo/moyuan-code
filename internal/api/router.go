@@ -263,6 +263,27 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"runtime_recovery": record})
 	})
+	router.GET("/v1/projects/:project_id/runtime-recoveries/:recovery_id/artifacts", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		artifacts, found, err := runtimemgr.LoadRecoveryArtifacts(rootDir, c.Param("recovery_id"), 6000)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "runtime recovery not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"runtime_recovery_artifacts": artifacts})
+	})
 	router.GET("/v1/projects/:project_id/subagents", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

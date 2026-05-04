@@ -39,6 +39,20 @@ type RecoveryRecord struct {
 	UpdatedAt         string   `json:"updated_at"`
 }
 
+type RecoveryArtifacts struct {
+	RecoveryID string                    `json:"recovery_id"`
+	Artifacts  []RecoveryArtifactPreview `json:"artifacts"`
+}
+
+type RecoveryArtifactPreview struct {
+	Kind      string `json:"kind"`
+	Path      string `json:"path"`
+	Status    string `json:"status"`
+	Content   string `json:"content,omitempty"`
+	Truncated bool   `json:"truncated"`
+	Size      int    `json:"size"`
+}
+
 type nativeArtifacts struct {
 	SessionID    string
 	Command      string
@@ -84,6 +98,86 @@ func ListRecoveries(rootDir string, limit int) ([]RecoveryRecord, error) {
 		return records[:limit], nil
 	}
 	return records, nil
+}
+
+func LoadRecoveryArtifacts(rootDir string, id string, limit int) (RecoveryArtifacts, bool, error) {
+	record, found, err := LoadRecovery(rootDir, id)
+	if err != nil || !found {
+		return RecoveryArtifacts{}, found, err
+	}
+	if limit <= 0 {
+		limit = 6000
+	}
+	artifacts := RecoveryArtifacts{
+		RecoveryID: record.ID,
+		Artifacts:  []RecoveryArtifactPreview{},
+	}
+	for _, item := range []struct {
+		kind string
+		path string
+	}{
+		{kind: "stdout", path: record.StdoutPath},
+		{kind: "stderr", path: record.StderrPath},
+		{kind: "diff_summary", path: record.DiffSummaryPath},
+	} {
+		if strings.TrimSpace(item.path) == "" {
+			continue
+		}
+		artifacts.Artifacts = append(artifacts.Artifacts, readRecoveryArtifact(rootDir, item.kind, item.path, limit))
+	}
+	return artifacts, true, nil
+}
+
+func readRecoveryArtifact(rootDir string, kind string, path string, limit int) RecoveryArtifactPreview {
+	preview := RecoveryArtifactPreview{Kind: kind, Path: path, Status: "available"}
+	if !isRecoveryArtifactPathAllowed(rootDir, path) {
+		preview.Status = "blocked"
+		return preview
+	}
+	text, found, err := fsutil.ReadText(path)
+	if err != nil {
+		preview.Status = "error"
+		preview.Content = err.Error()
+		return preview
+	}
+	if !found {
+		preview.Status = "missing"
+		return preview
+	}
+	text = redactRuntimeOutput(text)
+	preview.Size = len(text)
+	if len(text) > limit {
+		preview.Content = text[:limit]
+		preview.Truncated = true
+		return preview
+	}
+	preview.Content = text
+	return preview
+}
+
+func isRecoveryArtifactPathAllowed(rootDir string, path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	moyuanDir, err := filepath.Abs(workspace.ForRoot(rootDir).MoyuanDir)
+	if err != nil {
+		return false
+	}
+	if resolvedPath, err := filepath.EvalSymlinks(absPath); err == nil {
+		absPath = resolvedPath
+	}
+	if resolvedMoyuanDir, err := filepath.EvalSymlinks(moyuanDir); err == nil {
+		moyuanDir = resolvedMoyuanDir
+	}
+	rel, err := filepath.Rel(moyuanDir, absPath)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
 }
 
 func recordNativeRecovery(rootDir string, invocation Invocation, result Result, artifacts nativeArtifacts, failureCategory string) (RecoveryRecord, error) {

@@ -139,7 +139,25 @@ interface RuntimeRecovery {
 }
 ```
 
-当前实现只归档恢复上下文和建议 fallback candidate，不自动执行真实 resume，也不自动切换 runtime。
+Phase 3 当前实现还提供 artifact preview：
+
+```ts
+interface RuntimeRecoveryArtifacts {
+  recovery_id: string;
+  artifacts: Array<{
+    kind: "stdout" | "stderr" | "diff_summary";
+    path: string;
+    status: "available" | "missing" | "blocked" | "error";
+    content?: string;
+    truncated: boolean;
+    size: number;
+  }>;
+}
+```
+
+API：`GET /v1/projects/:project_id/runtime-recoveries/:recovery_id/artifacts`。
+
+Artifact preview 只能读取 recovery 记录中已归档、且位于 `.moyuan/` 下的文件，并必须进行脱敏和长度限制。当前实现只归档恢复上下文和建议 fallback candidate，不自动执行真实 resume，也不自动切换 runtime。
 
 ## 5. 执行约束
 

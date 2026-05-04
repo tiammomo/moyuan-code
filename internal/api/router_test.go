@@ -159,6 +159,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/runs/"+result.RunID, http.StatusOK, `"run"`, `"completed"`)
 	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries?limit=1", http.StatusOK, `"runtime_recoveries"`, recoveryResult.RecoveryID, `"runtime_failed"`)
 	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries/"+recoveryResult.RecoveryID, http.StatusOK, `"runtime_recovery"`, `"fallback_candidate"`)
+	assertGETContains(t, router, "/v1/projects/managed/runtime-recoveries/"+recoveryResult.RecoveryID+"/artifacts", http.StatusOK, `"runtime_recovery_artifacts"`, `"stderr"`, "api codex failed")
 	assertGETContains(t, router, "/v1/projects/managed/subagents?limit=1", http.StatusOK, `"subagents"`, result.SubagentID)
 	assertGETContains(t, router, "/v1/projects/managed/subagents/"+result.SubagentID, http.StatusOK, `"subagent"`, `"output_contract"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality/"+result.QualityReport.ID, http.StatusOK, `"quality_report"`, `"accepted"`)

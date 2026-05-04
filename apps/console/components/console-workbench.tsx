@@ -47,6 +47,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [selectedIssueID, setSelectedIssueID] = useState(snapshot.issues[0]?.id ?? "");
   const [requirementText, setRequirementText] = useState("");
   const [requirementState, setRequirementState] = useState<RequirementSubmitState>({ status: "idle" });
+  const [recoveryArtifactState, setRecoveryArtifactState] = useState<Record<string, RecoveryArtifactState>>({});
   const [visualActionState, setVisualActionState] = useState<Record<string, VisualActionState>>({});
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
@@ -81,6 +82,33 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
       });
     } catch (error) {
       setRequirementState({ status: "error", message: error instanceof Error ? error.message : "Requirement planning failed." });
+    }
+  }
+
+  async function loadRecoveryArtifacts(recoveryID: string) {
+    setRecoveryArtifactState((current) => ({
+      ...current,
+      [recoveryID]: { status: "loading", message: "Loading archived artifacts..." },
+    }));
+    try {
+      const response = await fetch(`/api/projects/${snapshot.project.id}/runtime-recoveries/${encodeURIComponent(recoveryID)}/artifacts`);
+      const payload = (await response.json()) as RecoveryArtifactsEnvelope;
+      const artifacts = payload.runtime_recovery_artifacts?.artifacts;
+      if (!response.ok || !artifacts) {
+        throw new Error(payload.error ?? "Runtime recovery artifacts failed to load.");
+      }
+      setRecoveryArtifactState((current) => ({
+        ...current,
+        [recoveryID]: { status: "loaded", artifacts, message: `${artifacts.length} artifacts` },
+      }));
+    } catch (error) {
+      setRecoveryArtifactState((current) => ({
+        ...current,
+        [recoveryID]: {
+          status: "error",
+          message: error instanceof Error ? error.message : "Runtime recovery artifacts failed to load.",
+        },
+      }));
     }
   }
 
@@ -418,22 +446,51 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
             <PanelTitle icon={<TerminalSquare size={18} />} title="Runtime Recoveries" meta={`${snapshot.runtime_recoveries.length} archived`} />
             <div className="signalList">
               {snapshot.runtime_recoveries.length > 0 ? (
-                snapshot.runtime_recoveries.map((recovery) => (
-                  <div className="signalItem" key={recovery.id}>
-                    <div className="signalHeader">
-                      <strong>{compactID(recovery.issue_id || recovery.run_id || recovery.id)}</strong>
-                      <StatusPill tone={toneForStatus(recovery.status)} label={recovery.status} />
+                snapshot.runtime_recoveries.map((recovery) => {
+                  const artifactState = recoveryArtifactState[recovery.id];
+                  return (
+                    <div className="signalItem" key={recovery.id}>
+                      <div className="signalHeader">
+                        <strong>{compactID(recovery.issue_id || recovery.run_id || recovery.id)}</strong>
+                        <StatusPill tone={toneForStatus(recovery.status)} label={recovery.status} />
+                      </div>
+                      <span>
+                        {recovery.failure_category} / {recovery.runtime_id || "runtime pending"}
+                      </span>
+                      <div className="signalMeta">
+                        {recovery.fallback_candidate ? <code>fallback {recovery.fallback_candidate}</code> : null}
+                        {recovery.native_session_id ? <code>{compactID(recovery.native_session_id)}</code> : null}
+                        {recovery.diff_summary_path ? <code>{shortPath(recovery.diff_summary_path)}</code> : null}
+                      </div>
+                      <div className="signalActions">
+                        <button
+                          className="inlineActionButton"
+                          disabled={artifactState?.status === "loading"}
+                          onClick={() => void loadRecoveryArtifacts(recovery.id)}
+                          type="button"
+                        >
+                          <TerminalSquare size={13} />
+                          <span>{artifactState?.status === "loading" ? "Loading" : "Artifacts"}</span>
+                        </button>
+                        {artifactState?.message ? <small className={`actionMessage ${artifactState.status}`}>{artifactState.message}</small> : null}
+                      </div>
+                      {artifactState?.artifacts && artifactState.artifacts.length > 0 ? (
+                        <div className="artifactPreviewList">
+                          {artifactState.artifacts.map((artifact) => (
+                            <div className="artifactPreview" key={`${recovery.id}-${artifact.kind}`}>
+                              <div className="artifactPreviewHeader">
+                                <strong>{artifact.kind}</strong>
+                                <code>{shortPath(artifact.path)}</code>
+                                <span>{artifact.truncated ? "truncated" : artifact.status}</span>
+                              </div>
+                              <pre>{artifact.content || artifact.status}</pre>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                    <span>
-                      {recovery.failure_category} / {recovery.runtime_id || "runtime pending"}
-                    </span>
-                    <div className="signalMeta">
-                      {recovery.fallback_candidate ? <code>fallback {recovery.fallback_candidate}</code> : null}
-                      {recovery.native_session_id ? <code>{compactID(recovery.native_session_id)}</code> : null}
-                      {recovery.diff_summary_path ? <code>{shortPath(recovery.diff_summary_path)}</code> : null}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="emptyState">No runtime recovery archived</div>
               )}
@@ -618,6 +675,27 @@ type RequirementPlanEnvelope = {
       required?: boolean;
       questions?: string[];
     };
+  };
+};
+
+type RecoveryArtifactPreview = {
+  kind: string;
+  path: string;
+  status: string;
+  content?: string;
+  truncated?: boolean;
+};
+
+type RecoveryArtifactState = {
+  status: "loading" | "loaded" | "error";
+  artifacts?: RecoveryArtifactPreview[];
+  message?: string;
+};
+
+type RecoveryArtifactsEnvelope = {
+  error?: string;
+  runtime_recovery_artifacts?: {
+    artifacts?: RecoveryArtifactPreview[];
   };
 };
 

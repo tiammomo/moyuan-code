@@ -155,7 +155,7 @@ apps/console/
 | Quality Review | 查看 quality report、review finding、测试缺口和返工建议 |
 | Memory | 查看 record、candidate、compact、命中证据和维护事件 |
 | Providers & Runtimes | 查看 Claude CLI、Codex CLI、MiniMax、GPT、GLM、gpt-image-2 状态 |
-| Runtime Recoveries | 查看原生 runtime 失败归档、fallback candidate、resume hint 和 diff 摘要路径 |
+| Runtime Recoveries | 查看原生 runtime 失败归档、fallback candidate、resume hint、stdout/stderr 和 diff 摘要预览 |
 | Subagent Backlog | 查看 retry/archive 后进入调度等待的 subagent、失败原因和重试预算 |
 | Visual Assets | 查看架构图 plan、diagram spec、prompt、route decision、render execution、script path 和图片生成状态；支持受控 dry-run render |
 | Git & Release | 查看分支、PR/MR plan、release suggestion 和 tag/push 计划 |
@@ -196,6 +196,7 @@ apps/console/
 - Progressive Disclosure：默认展示结论，点击后展开证据、日志、原始 JSON。
 - Live Workbench：运行中 issue 的状态、日志和下一步持续刷新。
 - Phase 2 Observability：把 runtime recoveries、subagent backlog、visual assets 和 visual render executions 放在同一屏，便于判断“失败如何恢复、任务为什么等待、架构图是否已规划、图片生成是否已进入受控执行”。
+- Runtime Evidence Preview：runtime recovery 可展开 stdout、stderr 和 diff summary 的受控预览；后端只读取 recovery 记录指向且位于 `.moyuan/` 下的归档文件。
 - Controlled Actions：低风险动作可从 Console 触发后端 dry-run 或 preview，例如 visual render dry-run；高风险动作仍必须进入 approval/authz。
 - Schema-aware Forms：表单从 contract/schema 生成约束，错误能定位到字段。
 - AI Assist Surface：保留“让 agent 解释当前状态 / 生成修复建议 / 生成发布说明”的入口，但不能绕过后端门禁。

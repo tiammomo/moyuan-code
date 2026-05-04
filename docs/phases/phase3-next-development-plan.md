@@ -25,7 +25,7 @@ Phase 2 第一批能力已完成并通过 release readiness：
 | P0 | `phase3-002` | `workspace-schema-coverage-expansion` | planned | 扩展到 providers、routing、visuals、runtimes、server、release 和 budget | 核心配置域均有字段级 issue code |
 | P1 | `phase3-003` | `console-operation-actions` | planned | Console 增加受控操作入口和后端 preview/dry-run 对齐 | 高风险动作不能绕过 approval/authz |
 | P1 | `phase3-003a` | `visual-render-dry-run-console-action` | completed | Visual Assets 面板触发后端 dry-run render | dry-run action 可见、可反馈 execution id，不调用真实图片 API |
-| P1 | `phase3-004` | `runtime-log-diff-viewer` | planned | Console 展开 runtime 日志、diff summary 和 resume hint | 失败排查证据链可见 |
+| P1 | `phase3-004` | `runtime-log-diff-viewer` | completed | Console 展开 runtime 日志、diff summary 和 resume hint | 失败排查证据链可见 |
 | P1 | `phase3-005` | `provider-probe-adapters` | planned | Provider refresh 接入可选轻量探测 adapter | 探测失败可解释，密钥不落盘 |
 | P2 | `phase3-006` | `visual-script-auth-quality` | planned | Visual script mode 接入 auth ref、审计和图片质量检查 | 图片生成可执行且可复核 |
 | P2 | `phase3-007` | `release-deploy-control-actions` | planned | Release/deploy/smoke/monitor 动作在 Console 可控 | 发布与部署流水线状态可见 |
@@ -75,7 +75,22 @@ Phase 2 第一批能力已完成并通过 release readiness：
 - `npm run typecheck` 通过。
 - `npm run build` 通过。
 
-## 5. Phase 3 收口规则
+## 5. 已完成任务：`phase3-004 runtime-log-diff-viewer`
+
+范围：
+
+- 新增后端 artifact preview：`GET /v1/projects/:project_id/runtime-recoveries/:recovery_id/artifacts`。
+- 后端只读取 recovery 记录中归档的 stdout、stderr 和 diff summary，且路径必须位于 `.moyuan/` 下。
+- artifact 内容会复用 runtime 输出脱敏逻辑，并按 limit 截断，避免任意文件读取和大日志压垮 Console。
+- Console Runtime Recoveries 面板增加 `Artifacts` 操作，可展开 stdout/stderr/diff summary 预览。
+
+验证：
+
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+
+## 6. Phase 3 收口规则
 
 - 每完成一个 Phase 3 issue，必须同步本实施记录和 issue graph。
 - 配置 validator 新增 issue code 时，必须能追溯到 [配置 Schema 规则](../configuration-schema-spec.md)。
