@@ -21,7 +21,7 @@ Phase 5 已完成并通过 readiness：
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase6-001` | `approval-consumption-replay-guard` | completed | approval record 消费和重放防护 | 已消费 approval 不能再次触发真实外部写入 |
-| P1 | `phase6-002` | `deployment-ssh-preview-adapter` | planned | 部署 adapter preview/dry-run/execute 状态模型 | 生产真实执行继续默认关闭 |
+| P1 | `phase6-002` | `deployment-ssh-preview-adapter` | completed | 部署 adapter preview/dry-run/execute 状态模型 | 生产真实执行继续默认关闭 |
 | P1 | `phase6-003` | `ci-cd-release-provider-adapter` | planned | release/tag/workflow provider adapter | 远程发布动作可审计且可降级 |
 | P1 | `phase6-004` | `provider-cost-health-telemetry` | planned | Provider quota/cost/health 反馈 | 路由能读取 provider 健康和预算信号 |
 | P2 | `phase6-005` | `console-routes-schema-forms` | planned | Console 多页面和 schema-aware forms | 表单错误和 execution 状态以后端为准 |
@@ -71,7 +71,56 @@ Phase 5 已完成并通过 readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 5. 验证要求
+## 5. 执行规划：`phase6-002 deployment-ssh-preview-adapter`
+
+范围：
+
+- Deployment execute 增加 `ssh_preview` 模式，读取 deployment plan 引用的 server resources，生成远程目标、host、provider、auth_ref 和预览命令。
+- `ssh_preview` 不触发真实 SSH、不解析 secret 明文、不要求 approval，可用于 `test_dev`、`staging` 和 `production` 的投产前审阅。
+- Deployment execute 增加 `ssh_execute` 状态入口，但真实 SSH 执行继续默认阻断。
+- 预览结果写入 deployment execution，并记录 `deployment.ssh.previewed` 日志事件。
+
+非目标：
+
+- 不实现真实 SSH command runner。
+- 不解析 SSH 私钥或服务器凭证明文。
+- 不改变 production real execution 默认阻断策略。
+- 不替代 smoke、monitor 和 rollback 的后续闭环。
+
+验收：
+
+- `ssh_preview` 生成 `remote_plan`，每个 target 必须包含 resource id、environment、host、provider、auth_ref、status 和 commands。
+- `ssh_execute` 返回 blocked，并给出 `ssh_real_execution_not_enabled`。
+- `deployment.ssh.previewed` 写入 release 日志。
+- `go test ./internal/deployment` 通过。
+- `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
+
+## 6. 已完成任务：`phase6-002 deployment-ssh-preview-adapter`
+
+范围：
+
+- `deployment.Execute` 支持 `ssh_preview` 和 `ssh_execute` 两种部署 adapter 状态。
+- `ssh_preview` 产出 `remote_plan`，仅记录 server resource reference 和预览命令。
+- `ssh_execute` 保留为 blocked 状态入口，避免提前开启真实远程执行。
+- CLI usage 已同步新的 deploy execute mode。
+- 测试覆盖 SSH preview 和真实 SSH execution blocked。
+
+非目标：
+
+- 不引入 SSH client 依赖。
+- 不访问远程服务器。
+- 不把 secret value 写入 execution 或 log。
+
+验证：
+
+- `go test ./internal/deployment` 通过。
+- `go test ./internal/deployment ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 7. 验证要求
 
 每完成一个 Phase 6 issue，至少运行：
 

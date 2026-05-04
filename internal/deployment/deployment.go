@@ -77,6 +77,7 @@ type Execution struct {
 	Reasons            []string           `json:"reasons"`
 	Resources          []ResourceSummary  `json:"resources"`
 	Steps              []ExecutionStep    `json:"steps"`
+	RemotePlan         *RemotePlan        `json:"remote_plan,omitempty"`
 	SmokeReport        CheckReport        `json:"smoke_report,omitempty"`
 	MonitorReport      CheckReport        `json:"monitor_report,omitempty"`
 	RollbackSuggestion RollbackSuggestion `json:"rollback_suggestion,omitempty"`
@@ -94,6 +95,24 @@ type ExecutionStep struct {
 	Allowlist  []string `json:"allowlist,omitempty"`
 	StartedAt  string   `json:"started_at,omitempty"`
 	FinishedAt string   `json:"finished_at,omitempty"`
+}
+
+type RemotePlan struct {
+	Status    string         `json:"status"`
+	Decision  string         `json:"decision"`
+	Targets   []RemoteTarget `json:"targets"`
+	CreatedAt string         `json:"created_at"`
+}
+
+type RemoteTarget struct {
+	ResourceID  string   `json:"resource_id"`
+	Environment string   `json:"environment"`
+	Host        string   `json:"host"`
+	Provider    string   `json:"provider,omitempty"`
+	AuthRef     string   `json:"auth_ref"`
+	Status      string   `json:"status"`
+	Reason      string   `json:"reason,omitempty"`
+	Commands    []string `json:"commands,omitempty"`
 }
 
 type CheckReport struct {
@@ -287,7 +306,7 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 		execution.Reasons = append(execution.Reasons, "deployment_resources_missing")
 		return finishExecution(rootDir, execution)
 	}
-	if options.Mode != "dry_run" && !options.Approved {
+	if requiresExecutionApproval(options.Mode) && !options.Approved {
 		execution.Reasons = append(execution.Reasons, "execution_approval_required")
 		approval, err := approvals.Request(rootDir, approvals.RequestOptions{
 			TargetType:  "deployment_execution",
@@ -309,7 +328,7 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 		execution.ApprovalID = approval.ID
 		return finishExecution(rootDir, execution)
 	}
-	if plan.Environment == "production" && options.Mode != "dry_run" {
+	if plan.Environment == "production" && isRealExecutionMode(options.Mode) {
 		execution.ManualBlock("production_real_execution_not_enabled")
 		return finishExecution(rootDir, execution)
 	}
@@ -319,6 +338,22 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 		execution.Decision = "DEPLOY_EXECUTION_DRY_RUN"
 		execution.Reasons = append(execution.Reasons, "no_remote_or_local_commands_executed")
 		execution.Steps = dryRunSteps(plan, options.Commands)
+	case "ssh_preview":
+		remotePlan, steps, ok, reasons := buildSSHPreview(rootDir, plan, options.Commands)
+		execution.RemotePlan = &remotePlan
+		execution.Steps = steps
+		execution.Reasons = append(execution.Reasons, reasons...)
+		if ok {
+			execution.Status = "completed"
+			execution.Decision = "DEPLOY_SSH_PREVIEW_READY"
+			_ = logging.Log(rootDir, "release", "deployment.ssh.previewed", map[string]any{
+				"deployment_id": execution.DeploymentID,
+				"release_id":    execution.ReleaseID,
+				"environment":   execution.Environment,
+				"targets":       len(remotePlan.Targets),
+				"decision":      execution.Decision,
+			})
+		}
 	case "local_shell":
 		if len(options.Commands) == 0 {
 			execution.Reasons = append(execution.Reasons, "commands_required")
@@ -350,6 +385,21 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 			execution.Decision = "DEPLOY_EXECUTION_FAILED"
 			execution.RollbackSuggestion = rollbackFor(plan, "deploy_command_failed")
 		}
+	case "ssh_execute":
+		execution.RemotePlan = &RemotePlan{
+			Status:    "blocked",
+			Decision:  "SSH_EXECUTION_NOT_ENABLED",
+			Targets:   []RemoteTarget{},
+			CreatedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		}
+		execution.ManualBlock("ssh_real_execution_not_enabled")
+		execution.Steps = append(execution.Steps, ExecutionStep{
+			Name:       "ssh_execute",
+			Status:     "blocked",
+			Output:     "real SSH execution is not enabled",
+			StartedAt:  time.Now().UTC().Format(time.RFC3339Nano),
+			FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		})
 	default:
 		execution.Reasons = append(execution.Reasons, "execution_mode_not_allowed:"+options.Mode)
 	}
@@ -500,6 +550,19 @@ func riskForExecution(environment string) string {
 	return "high"
 }
 
+func requiresExecutionApproval(mode string) bool {
+	return isRealExecutionMode(mode)
+}
+
+func isRealExecutionMode(mode string) bool {
+	switch mode {
+	case "dry_run", "ssh_preview":
+		return false
+	default:
+		return true
+	}
+}
+
 func dryRunSteps(plan Plan, commands []string) []ExecutionStep {
 	steps := []ExecutionStep{
 		{Name: "deploy", Status: "dry_run", Output: "deployment command preview only"},
@@ -511,6 +574,102 @@ func dryRunSteps(plan Plan, commands []string) []ExecutionStep {
 		steps = append(steps, ExecutionStep{Name: "command_preview", Status: "dry_run", Command: command, Allowlist: safeShellPrefixes()})
 	}
 	return steps
+}
+
+func buildSSHPreview(rootDir string, plan Plan, commands []string) (RemotePlan, []ExecutionStep, bool, []string) {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	remotePlan := RemotePlan{
+		Status:    "planned",
+		Decision:  "SSH_PREVIEW_READY",
+		Targets:   []RemoteTarget{},
+		CreatedAt: now,
+	}
+	steps := []ExecutionStep{}
+	reasons := []string{"ssh_preview_no_remote_commands_executed"}
+	ok := true
+	previewCommands := remotePreviewCommands(plan, commands)
+	for _, summary := range plan.Resources {
+		resource, found, err := serverresources.Show(rootDir, summary.ID)
+		target := RemoteTarget{
+			ResourceID:  summary.ID,
+			Environment: summary.Environment,
+			Host:        summary.Host,
+			Status:      "planned",
+			Reason:      "ssh_preview_ready",
+			Commands:    append([]string{}, previewCommands...),
+		}
+		if err != nil || !found {
+			target.Status = "blocked"
+			target.Reason = "server_resource_not_found"
+			reasons = append(reasons, "server_resource_not_found:"+summary.ID)
+			ok = false
+		} else {
+			target.Environment = resource.Environment
+			target.Host = resource.Host
+			target.Provider = resource.Provider
+			target.AuthRef = resource.AuthRef
+			target.Status, target.Reason = validateRemoteTarget(plan, resource)
+			if target.Status == "blocked" {
+				reasons = append(reasons, target.Reason+":"+resource.ID)
+				ok = false
+			}
+		}
+		remotePlan.Targets = append(remotePlan.Targets, target)
+		steps = append(steps, ExecutionStep{
+			Name:       "ssh_preview",
+			Status:     target.Status,
+			Output:     target.ResourceID + ":" + target.Host + ":" + target.Reason,
+			Allowlist:  []string{"preview_only", "secret_ref_only", "no_remote_command_executed"},
+			StartedAt:  now,
+			FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		})
+	}
+	if len(remotePlan.Targets) == 0 {
+		remotePlan.Status = "blocked"
+		remotePlan.Decision = "SSH_PREVIEW_BLOCKED"
+		reasons = append(reasons, "deployment_resources_missing")
+		return remotePlan, steps, false, reasons
+	}
+	if !ok {
+		remotePlan.Status = "blocked"
+		remotePlan.Decision = "SSH_PREVIEW_BLOCKED"
+	}
+	return remotePlan, steps, ok, reasons
+}
+
+func validateRemoteTarget(plan Plan, resource serverresources.Resource) (string, string) {
+	if resource.Status != "active" {
+		return "blocked", "server_resource_not_active"
+	}
+	if resource.Environment != plan.Environment {
+		return "blocked", "server_resource_environment_mismatch"
+	}
+	if strings.TrimSpace(resource.Host) == "" {
+		return "blocked", "server_resource_host_required"
+	}
+	if strings.TrimSpace(resource.AuthRef) == "" {
+		return "blocked", "server_resource_auth_ref_required"
+	}
+	if !isReference(resource.AuthRef) {
+		return "blocked", "server_resource_auth_ref_must_be_reference"
+	}
+	return "planned", "ssh_preview_ready"
+}
+
+func remotePreviewCommands(plan Plan, commands []string) []string {
+	if len(commands) > 0 {
+		return append([]string{}, commands...)
+	}
+	return []string{
+		"deploy release " + plan.ReleaseID,
+		"run configured smoke tests",
+		"watch configured monitor window",
+	}
+}
+
+func isReference(value string) bool {
+	value = strings.TrimSpace(value)
+	return (strings.HasPrefix(value, "env:") && len(value) > len("env:")) || (strings.HasPrefix(value, "secret:") && len(value) > len("secret:"))
 }
 
 func runPostDeploymentChecks(ctx context.Context, rootDir string, plan Plan) (CheckReport, CheckReport, RollbackSuggestion, []ExecutionStep, bool, []string) {

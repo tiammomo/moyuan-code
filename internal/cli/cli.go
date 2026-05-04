@@ -215,7 +215,7 @@ func usage() string {
 		"moyuan resources retire <resource-id>",
 		"moyuan resources health scan [--environment test_dev] [--resource <resource-id>] [--approved]",
 		"moyuan deploy plan <release-id> --environment test_dev [--resource <resource-id>]",
-		"moyuan deploy execute <deployment-id> [--mode dry_run] [--approved] [--command <safe-command>]",
+		"moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell] [--approved] [--command <safe-command>]",
 		"moyuan deploy show <deployment-id>",
 		"moyuan deploy execution <execution-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
