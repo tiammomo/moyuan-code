@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"moyuan-code/internal/api"
 	"moyuan-code/internal/auth"
 	"moyuan-code/internal/comprehension"
 	"moyuan-code/internal/controlplane"
@@ -21,6 +23,7 @@ import (
 	"moyuan-code/internal/repair"
 	runrecord "moyuan-code/internal/run"
 	"moyuan-code/internal/runtime"
+	"moyuan-code/internal/store"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
 )
@@ -48,6 +51,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleProject(ctx, argv[1:], cwd)
 	case "auth":
 		text, result, exitCode, err = handleAuth(argv[1:], cwd)
+	case "api":
+		text, result, exitCode, err = handleAPI(ctx, argv[1:], cwd)
 	case "init":
 		text, result, exitCode, err = handleInit(argv[1:], cwd)
 	case "workspace":
@@ -104,6 +109,7 @@ func usage() string {
 		"moyuan project add --local <path>",
 		"moyuan project add --remote <git-url>",
 		"moyuan project list",
+		"moyuan api serve [--addr 127.0.0.1:8080]",
 		"moyuan auth init-owner [--name <name>]",
 		"moyuan auth whoami",
 		"moyuan init <path>",
@@ -162,15 +168,19 @@ func handleProject(ctx context.Context, args []string, cwd string) (string, any,
 				return "", nil, 1, err
 			}
 			_, _ = workspace.Ensure(cwd)
-			_, err = controlplane.Register(cwd, controlplane.Project{
+			project := controlplane.Project{
 				ID:      textutil.Slugify(filepath.Base(rootDir)),
 				Name:    filepath.Base(rootDir),
 				Root:    rootDir,
 				Source:  map[string]any{"type": "local_path", "provider": "local", "path": rootDir},
 				OwnerID: owner.ActorID,
 				Status:  "active",
-			})
+			}
+			registeredProject, err := controlplane.Register(cwd, project)
 			if err != nil {
+				return "", nil, 1, err
+			}
+			if err := syncProjectToStore(cwd, registeredProject); err != nil {
 				return "", nil, 1, err
 			}
 			return "project added: " + rootDir + "\n", nil, 0, nil
@@ -201,15 +211,19 @@ func handleProject(ctx context.Context, args []string, cwd string) (string, any,
 				return "", nil, 1, err
 			}
 			_, _ = workspace.Ensure(cwd)
-			_, err = controlplane.Register(cwd, controlplane.Project{
+			project := controlplane.Project{
 				ID:      textutil.Slugify(filepath.Base(destDir)),
 				Name:    filepath.Base(destDir),
 				Root:    destDir,
 				Source:  map[string]any{"type": "remote_git", "provider": "generic_git", "url": remote, "clone_path": destDir},
 				OwnerID: owner.ActorID,
 				Status:  "active",
-			})
+			}
+			registeredProject, err := controlplane.Register(cwd, project)
 			if err != nil {
+				return "", nil, 1, err
+			}
+			if err := syncProjectToStore(cwd, registeredProject); err != nil {
 				return "", nil, 1, err
 			}
 			return "project added: " + destDir + "\n", nil, 0, nil
@@ -230,6 +244,38 @@ func handleProject(ctx context.Context, args []string, cwd string) (string, any,
 		return strings.Join(lines, "\n") + "\n", nil, 0, nil
 	}
 	return "unknown project command\n", nil, 1, nil
+}
+
+func handleAPI(ctx context.Context, args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown api command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "serve":
+		addr := flagValue(args, "--addr", "127.0.0.1:8080")
+		db, err := store.Open(rootDir)
+		if err != nil {
+			return "", nil, 1, err
+		}
+		defer db.Close()
+		server := &http.Server{Addr: addr, Handler: api.NewRouter(api.Options{RootDir: rootDir, Store: &db})}
+		err = server.ListenAndServe()
+		if err == http.ErrServerClosed || ctx.Err() != nil {
+			return "", nil, 0, nil
+		}
+		return "", nil, 1, err
+	}
+	return "unknown api command\n", nil, 1, nil
+}
+
+func syncProjectToStore(rootDir string, project controlplane.Project) error {
+	db, err := store.Open(rootDir)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	return db.UpsertProject(project)
 }
 
 func handleAuth(args []string, cwd string) (string, any, int, error) {

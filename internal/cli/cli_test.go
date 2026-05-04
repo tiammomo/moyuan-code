@@ -18,6 +18,7 @@ func TestPhase1E2ESmokeCoversLocalAndRemoteProjectLifecycle(t *testing.T) {
 		result := runCLI(t, root, "project", "add", "--local", root)
 		assertContains(t, result.stdout, "project added:")
 		assertFileContains(t, root, ".moyuan/projects.json", root)
+		assertFileExists(t, root, ".moyuan/state.db")
 
 		exercisePhase1Lifecycle(t, root)
 	})
@@ -31,6 +32,7 @@ func TestPhase1E2ESmokeCoversLocalAndRemoteProjectLifecycle(t *testing.T) {
 		result := runCLI(t, controlRoot, "project", "add", "--remote", remote, "--dest", dest)
 		assertContains(t, result.stdout, "project added:")
 		assertFileContains(t, controlRoot, ".moyuan/projects.json", dest)
+		assertFileExists(t, controlRoot, ".moyuan/state.db")
 
 		list := runCLI(t, controlRoot, "project", "list")
 		assertContains(t, list.stdout, dest)

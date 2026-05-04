@@ -48,7 +48,7 @@ cli/api
   -> orchestrator
   -> requirement / scheduler / subagent / quality / release
   -> runtime-adapters / git / providers / server-resources
-  -> workspace / state-store / logging / auth / policy
+  -> workspace / store / logging / auth / policy
 ```
 
 禁止方向：
@@ -58,6 +58,8 @@ cli/api
 - `memory` 不能直接读取 secret 明文。
 - `providers` 不能直接读取完整 workspace，只能接收脱敏后的 request。
 - `cli` 不能直接写 `.moyuan/lifecycle/` 状态，必须通过 Orchestrator 或 Workspace API。
+- `api` 统一使用 Gin router。
+- `store` 统一使用 GORM，业务模块不能自行迁移数据库表。
 
 ## 4. 模块职责
 
@@ -89,6 +91,32 @@ cli/api
 
 - [项目工作空间规范](./project-workspace-spec.md)
 - [Workspace 迁移契约](./contracts/workspace-migration-contract.md)
+- [持久化与并发一致性](./persistence-concurrency-consistency.md)
+
+### `api`
+
+职责：
+
+- 使用 Gin 暴露控制面 HTTP API。
+- 管理 health、version、project、issue、run、quality、memory 等 API 入口。
+- 只做参数绑定、响应结构和中间件编排，不承载领域状态机。
+
+权威文档：
+
+- [后端技术栈与本地环境](./backend-tech-stack.md)
+- [持久化与并发一致性](./persistence-concurrency-consistency.md)
+
+### `store`
+
+职责：
+
+- 使用 GORM 管理本地 SQLite State Store。
+- 维护 project、issue、run、quality、memory 等查询型索引。
+- 提供迁移入口，保证后续 PostgreSQL 替换不改变对象语义。
+
+权威文档：
+
+- [后端技术栈与本地环境](./backend-tech-stack.md)
 - [持久化与并发一致性](./persistence-concurrency-consistency.md)
 
 ### `orchestrator`
@@ -224,6 +252,7 @@ cmd/
 internal/
   cli/
   api/
+  store/
   auth/
   orchestrator/
   requirement/

@@ -29,6 +29,7 @@
 - `phase1-015 native-runtime-adapters`：已实现 Claude CLI / Codex CLI 的 prompt file、cwd、env allowlist、stdout/stderr、result contract、fake CLI 回归测试和 unavailable/failed 分类。
 - `phase1-016 orchestrator-state-machine`：已实现 issue/run 状态文件、状态转移历史、accepted/needs_rework 持久化、状态查询 CLI、issue graph/schedule 同步和回归测试。
 - `phase1-017 quality-review-hardening`：已实现结构化 findings、review_status、protected path、敏感文件、runtime risk、大 diff 阻断和 Markdown/JSON 报告同步。
+- `phase1-017a gin-gorm-baseline`：已切换后端框架口径为 Gin + GORM，新增 `internal/api` Gin router、`internal/store` GORM SQLite store，并让项目注册同步 `.moyuan/state.db`。
 
 下一轮进入 `phase1-018 memory-record-gate`，升级 memory candidate 的 score、staging、dedup、record gate 和 compact 最小闭环。下一批任务的执行顺序、验收标准和 git 同步规则见 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)。
 

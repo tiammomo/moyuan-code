@@ -4,7 +4,7 @@
 责任角色：core_engineer + orchestrator_owner
 最后更新：2026-05-03
 
-本文定义 Moyuan Code 在 `.moyuan/` 工作空间中的状态持久化、并发写入、锁、事务、崩溃恢复和幂等规则。它是 Workspace Manager 和 State Store 的实现依据。
+本文定义 Moyuan Code 在 `.moyuan/` 工作空间中的状态持久化、GORM State Store、并发写入、锁、事务、崩溃恢复和幂等规则。它是 Workspace Manager 和 State Store 的实现依据。
 
 ## 1. 目标
 
@@ -34,6 +34,7 @@
 | Runtime 输出 | stdout、stderr、diff、session output | 大文件独立存储，状态中只保存引用 |
 | Memory 状态 | candidates、staging、facts、compact | 先暂存，后异步合并 |
 | 临时状态 | lock、transaction、tmp、cache | 可清理，但必须可恢复 |
+| 查询型状态 | project registry、后续 issue/run index | 由 GORM + SQLite 承载，不能替代审计日志 |
 
 ## 4. 写入原则
 
@@ -155,6 +156,19 @@ scan pending transactions
 - audit log 不允许静默修改。
 - 日志写入失败不能阻断低风险只读操作，但必须阻断高风险写操作。
 - 日志可以轮转，但索引必须保留。
+
+## 8.1 GORM State Store
+
+Phase 1 起引入 `GORM + SQLite` 作为本地 State Store 基线。
+
+规则：
+
+- 默认数据库路径为 `.moyuan/state.db`。
+- GORM model 只能承载查询、索引和 API 读取需要的状态，不替代 JSONL 审计日志。
+- 文件化状态和数据库状态同时存在时，以可审计文件和日志作为恢复依据。
+- 写入流程应先完成领域状态变更，再同步写入 GORM index；同步失败必须返回错误或记录恢复事件，不能静默制造不一致。
+- 数据库迁移必须由 `internal/store` 统一管理，业务模块不能自行打开数据库并迁移表。
+- 团队版迁移到 PostgreSQL 时，GORM model 字段、对象 id 和状态机语义保持兼容。
 
 ## 9. Memory 一致性
 

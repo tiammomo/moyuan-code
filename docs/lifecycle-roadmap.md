@@ -522,11 +522,11 @@ moyuan repo pr create <task-id>
 
 ## 8. 技术选型建议
 
-语言优先建议 `Go + Python`。其中 `Go` 作为控制面后端，负责 CLI、API server、调度、Git、workspace、质量、发布和审计；`Python` 作为模型邻接 worker，负责 prompt 处理、Memory 辅助、文本分析和轻量批处理。两者之间优先通过版本化 JSON 协议协作，规模上来后再升级到 `gRPC`。具体约定见 [后端技术栈与本地环境](./backend-tech-stack.md) 和 [ADR-0005](./adr/0005-go-control-plane-python-worker.md)。
+语言优先建议 `Go + Python`。其中 `Go` 作为控制面后端，负责 CLI、API server、调度、Git、workspace、质量、发布和审计；HTTP/API 框架统一使用 `Gin`，State Store 统一使用 `GORM`，Phase 1 本地数据库使用 SQLite。`Python` 作为模型邻接 worker，负责 prompt 处理、Memory 辅助、文本分析和轻量批处理。两者之间优先通过版本化 JSON 协议协作，规模上来后再升级到 `gRPC`。具体约定见 [后端技术栈与本地环境](./backend-tech-stack.md) 和 [ADR-0005](./adr/0005-go-control-plane-python-worker.md)。
 
 存储路线：
 
-- MVP：YAML + JSONL + SQLite。
+- MVP：YAML + JSONL + GORM SQLite。
 - Beta：SQLite + 本地向量索引。
 - Production：PostgreSQL + pgvector + 对象存储。
 
@@ -543,7 +543,7 @@ Adapter 路线：
 Phase 1 的执行原则：
 
 - 只实现本地 CLI MVP，不启动 Web Console 和 team_server。
-- 只使用文件化 `.moyuan/` 状态、JSONL 日志和 schema_version 1。
+- 文件化 `.moyuan/` 状态、JSONL 日志和 schema_version 1 保留为审计权威；查询型状态开始同步到 GORM SQLite。
 - 所有入口先建立 `auth_context`，再执行项目、Git、Runtime、质量或写入操作。
 - Native Runtime 只能通过 Runtime Adapter 调用，不能绕过 Orchestrator、Workspace、Logging 和 Quality Gate。
 - 设计债务记录在 [设计就绪门禁](./design-readiness-checklist.md)，跟随对应模块实现补齐。

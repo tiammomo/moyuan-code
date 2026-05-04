@@ -18,6 +18,7 @@
 - 模型邻接、文本处理和轻量执行辅助使用 `Python`。
 - `Go` 是唯一的状态与编排主入口。
 - `Python` 只做 worker / helper，不直接拥有权威状态。
+- 后端框架基线统一为 `Gin + GORM`。
 - 两者之间优先使用版本化 JSON 协议；规模上来后再升级到 `gRPC`。
 
 如果仓库里还保留过渡性的 `Node` 原型，只把它视为临时验证层，不作为最终后端实现。
@@ -52,11 +53,13 @@
 
 建议的基础组合：
 
-- HTTP 层：`net/http` + `chi`
+- HTTP 层：`Gin`
+- ORM / State Store 层：`GORM`
+- 本地数据库：`SQLite`
 - CLI 层：`cobra`
 - 配置与序列化：`yaml.v3`、`encoding/json`
 - 日志：`slog` 或 `zap`
-- 测试：标准库 `testing`、`httptest`
+- 测试：标准库 `testing`、`httptest`，HTTP handler 测试走 Gin router
 - 进程执行：标准库 `os/exec`
 
 原则：
@@ -64,6 +67,14 @@
 - 业务入口统一落在 `cmd/moyuan`。
 - 领域代码放在 `internal/`。
 - 不把模型调用逻辑直接塞进控制面业务函数里。
+- `Gin` 只负责 HTTP 入口、参数绑定、响应结构和中间件编排，不承载领域状态机。
+- `GORM` 只作为 State Store 实现层，不能改变 Project、Issue、Run、Memory 等对象契约。
+
+当前 Phase 1 的代码基线：
+
+- `internal/api`：Gin router。
+- `internal/store`：GORM store，默认 SQLite 落盘到 `.moyuan/state.db`。
+- `.moyuan/*.json`、JSONL 和 Markdown 仍作为 Phase 1 的可审计文件状态保留；后续逐步把查询型状态迁移到 GORM。
 
 ## 4. 推荐 Python 技术栈
 
@@ -102,8 +113,15 @@ go env GOPATH GOMODCACHE GOROOT
 go mod download
 go test ./...
 go run ./cmd/moyuan --help
+go run ./cmd/moyuan api serve --addr 127.0.0.1:8080
 ./bin/moyuan --help
 gofmt -w .
+```
+
+依赖拉取建议：
+
+```bash
+GOPROXY=https://goproxy.cn,direct go mod download
 ```
 
 ### 开发约定
@@ -167,6 +185,7 @@ cmd/
 internal/
   cli/
   api/
+  store/
   auth/
   orchestrator/
   scheduler/

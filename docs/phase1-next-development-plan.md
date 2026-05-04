@@ -17,6 +17,7 @@
 - `phase1-015 native-runtime-adapters` 已补齐 Claude CLI / Codex CLI 的 prompt file、cwd、env allowlist、stdout/stderr、result contract 和失败分类。
 - `phase1-016 orchestrator-state-machine` 已持久化 issue/run 状态、转移历史、accepted/needs_rework 结论，并同步 issue graph/schedule。
 - `phase1-017 quality-review-hardening` 已输出结构化 findings、review_status，并用 protected path、敏感文件、runtime risk 和大 diff 阻断 accepted。
+- 后端框架口径已切换为 `Gin + GORM`，并建立 `internal/api` Gin router、`internal/store` GORM SQLite store 基线。
 - 当前测试覆盖已经包含 package unit test、CLI smoke 和 Phase 1 e2e smoke。
 
 下一步目标不是继续铺更多模块，而是把“能跑通、能审计、能复核、能失败恢复”的 MVP 闭环做实。
