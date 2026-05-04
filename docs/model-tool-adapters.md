@@ -23,14 +23,15 @@ Adapter 统一解决：
 
 模型服务商必须先进入 Provider Registry，再被路由策略引用。目标权威配置是 `models/providers.yaml`，运行记录落在 `.moyuan/model-ops/`。
 
-当前 Beta 实现已落地最小 registry：
+当前实现已落地 Provider Registry 和 Phase 2 ops snapshot：
 
 - 运行期文件：`.moyuan/models/providers.json`。
-- CLI：`moyuan model provider add/list/show/disable`、`moyuan model route`。
-- API：`GET/POST /v1/projects/:project_id/providers`、`GET /v1/projects/:project_id/providers/:provider_id`、`POST /v1/projects/:project_id/providers/:provider_id/disable`、`POST /v1/projects/:project_id/provider-route`。
+- CLI：`moyuan model provider add/list/show/ops/disable`、`moyuan model route`。
+- API：`GET/POST /v1/projects/:project_id/providers`、`GET /v1/projects/:project_id/providers/:provider_id`、`POST /v1/projects/:project_id/providers/:provider_id/ops`、`POST /v1/projects/:project_id/providers/:provider_id/disable`、`POST /v1/projects/:project_id/provider-route`。
 - 已实现约束：`auth_ref` 只能是 `env:` 或 `secret:` 引用；不会保存明文 API key。
 - 已实现默认路由：前端和架构类代码任务路由到 `claude_cli`，后端、调优、测试、review 和修复类任务路由到 `codex_cli`，启用后的 API provider 可承担 memory 抽取、规划或图像类任务。
 - 已实现 provider env profile：绑定到 `claude_cli` 或 `codex_cli` 的 provider 可在 Native Runtime 调用时注入 `base_url`、模型名和 `auth_ref` 对应的环境变量；runtime metadata 只记录 `env_keys`，不记录 token 值。
+- 已实现 ops snapshot：provider 可记录 `health`、`quota`、`usage` 和 `cost`，路由会因 `unhealthy/down`、`quota.exhausted`、`cost.exceeded` 给出明确阻断原因。
 
 `providers.json` 是 Beta 运行状态快照；后续 schema validator 完成后，再把同字段收敛到 `models/providers.yaml`，并保留 snapshot 用于审计。
 
@@ -52,6 +53,13 @@ Adapter 统一解决：
 - `models`：模型 id、alias、能力声明和限制。
 - `quotas`：限流、日预算、超时。
 - `health_checks`：可用性检测和自动降级。
+
+Phase 2 当前运行期 ops 字段：
+
+- `health.status`：`ok`、`healthy`、`degraded`、`unhealthy`、`down`、`unknown`。
+- `quota.status`：`ok`、`warning`、`exhausted`、`unknown`。
+- `usage`：请求数、输入/输出/总 token、统计窗口和更新时间。
+- `cost`：币种、预估成本、预算和 `ok`、`warning`、`exceeded` 状态。
 
 第三方 API 必须额外声明：
 

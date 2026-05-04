@@ -776,6 +776,32 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"provider": provider})
 	})
+	router.POST("/v1/projects/:project_id/providers/:provider_id/ops", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req providers.OpsSnapshot
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		provider, found, err := providers.UpdateOps(rootDir, c.Param("provider_id"), req)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "provider not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"provider": provider})
+	})
 	router.POST("/v1/projects/:project_id/providers/:provider_id/disable", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

@@ -112,6 +112,14 @@ else:
 - Memory scope 限制。
 - 工具执行权限。
 
+Phase 2 当前实现：
+
+- `provider.health.status == unhealthy/down` 时阻断该 provider，原因形如 `provider_unhealthy:<provider_id>:<status>`。
+- `provider.quota.status == exhausted` 时阻断该 provider，原因形如 `provider_quota_exhausted:<provider_id>`。
+- `provider.cost.status == exceeded` 时阻断该 provider，原因形如 `provider_budget_exceeded:<provider_id>`。
+- API provider 选择会跳过不可用 provider；如果没有可用 API provider，会回到默认 runtime 路由。
+- 直接命中的 provider，例如 `gpt_image_2` 图像路由，会返回明确 blocked decision。
+
 ## 7. 图像生成路由
 
 ```text

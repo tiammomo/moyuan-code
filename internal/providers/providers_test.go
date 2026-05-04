@@ -123,3 +123,65 @@ func TestProviderRouteUsesEnabledImageProviderAndBlocksSensitiveData(t *testing.
 		t.Fatalf("secret route should be blocked: %+v", secret)
 	}
 }
+
+func TestProviderOpsSnapshotBlocksUnavailableRoutes(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	imageProvider, ok, err := Show(root, "gpt_image_2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("missing default gpt_image_2 provider")
+	}
+	imageProvider.Enabled = true
+	if _, err := Upsert(root, imageProvider); err != nil {
+		t.Fatal(err)
+	}
+
+	updated, ok, err := UpdateOps(root, "gpt_image_2", OpsSnapshot{
+		Health: Health{Status: "unhealthy", Reason: "upstream_timeout"},
+		Quota:  Quota{Status: "ok", LimitTokens: 1000, UsedTokens: 200},
+		Usage:  Usage{Window: "daily", Requests: 12, InputTokens: 100, OutputTokens: 50},
+		Cost:   Cost{Currency: "usd", EstimatedAmount: 1.2, BudgetAmount: 10, Status: "ok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || updated.Health.Status != "unhealthy" || updated.Quota.RemainingTokens != 800 || updated.Usage.TotalTokens != 150 || updated.Cost.Currency != "USD" {
+		t.Fatalf("unexpected ops snapshot: ok=%v provider=%+v", ok, updated)
+	}
+
+	blocked, err := Route(root, RouteRequest{OutputType: "architecture_diagram"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !blocked.Blocked || blocked.Reason != "provider_unhealthy:gpt_image_2:unhealthy" {
+		t.Fatalf("expected unhealthy provider to block, got %+v", blocked)
+	}
+
+	updated, ok, err = UpdateOps(root, "gpt_image_2", OpsSnapshot{Health: Health{Status: "ok"}, Quota: Quota{Status: "exhausted"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || updated.Health.Status != "ok" || updated.Quota.Status != "exhausted" {
+		t.Fatalf("unexpected quota update: ok=%v provider=%+v", ok, updated)
+	}
+	blocked, err = Route(root, RouteRequest{OutputType: "architecture_diagram"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !blocked.Blocked || blocked.Reason != "provider_quota_exhausted:gpt_image_2" {
+		t.Fatalf("expected exhausted quota to block, got %+v", blocked)
+	}
+
+	if _, _, err := UpdateOps(root, "gpt_image_2", OpsSnapshot{Health: Health{Status: "burning"}}); err == nil {
+		t.Fatal("expected invalid health status to be rejected")
+	}
+	if _, _, err := UpdateOps(root, "gpt_image_2", OpsSnapshot{Quota: Quota{UsedTokens: -1}}); err == nil {
+		t.Fatal("expected negative usage values to be rejected")
+	}
+}

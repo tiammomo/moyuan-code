@@ -38,6 +38,10 @@ type Provider struct {
 	RuntimeID            string     `json:"runtime_id,omitempty"`
 	DataPolicy           DataPolicy `json:"data_policy"`
 	Models               []Model    `json:"models,omitempty"`
+	Health               Health     `json:"health,omitempty"`
+	Quota                Quota      `json:"quota,omitempty"`
+	Usage                Usage      `json:"usage,omitempty"`
+	Cost                 Cost       `json:"cost,omitempty"`
 	UpstreamVendor       string     `json:"upstream_vendor,omitempty"`
 	RequireProviderLabel bool       `json:"require_provider_label,omitempty"`
 	AllowedUseCases      []string   `json:"allowed_use_cases,omitempty"`
@@ -55,6 +59,43 @@ type Model struct {
 	ID           string   `json:"id"`
 	Alias        string   `json:"alias,omitempty"`
 	Capabilities []string `json:"capabilities,omitempty"`
+}
+
+type Health struct {
+	Status        string `json:"status,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+	LastCheckedAt string `json:"last_checked_at,omitempty"`
+}
+
+type Quota struct {
+	Status          string `json:"status,omitempty"`
+	LimitTokens     int64  `json:"limit_tokens,omitempty"`
+	UsedTokens      int64  `json:"used_tokens,omitempty"`
+	RemainingTokens int64  `json:"remaining_tokens,omitempty"`
+	ResetAt         string `json:"reset_at,omitempty"`
+}
+
+type Usage struct {
+	Window       string `json:"window,omitempty"`
+	Requests     int64  `json:"requests,omitempty"`
+	InputTokens  int64  `json:"input_tokens,omitempty"`
+	OutputTokens int64  `json:"output_tokens,omitempty"`
+	TotalTokens  int64  `json:"total_tokens,omitempty"`
+	UpdatedAt    string `json:"updated_at,omitempty"`
+}
+
+type Cost struct {
+	Currency        string  `json:"currency,omitempty"`
+	EstimatedAmount float64 `json:"estimated_amount,omitempty"`
+	BudgetAmount    float64 `json:"budget_amount,omitempty"`
+	Status          string  `json:"status,omitempty"`
+}
+
+type OpsSnapshot struct {
+	Health Health `json:"health"`
+	Quota  Quota  `json:"quota"`
+	Usage  Usage  `json:"usage"`
+	Cost   Cost   `json:"cost"`
 }
 
 type RouteRequest struct {
@@ -140,18 +181,21 @@ func ResolveRuntimeProvider(rootDir string, runtimeID string, providerID string)
 		if !provider.Enabled {
 			return Provider{}, false, fmt.Errorf("provider_disabled:%s", provider.ID)
 		}
+		if violation := availabilityViolation(provider); violation != "" {
+			return Provider{}, false, errors.New(violation)
+		}
 		if !runtimeMatches(provider, runtimeID) {
 			return Provider{}, false, fmt.Errorf("provider_runtime_mismatch:%s", provider.ID)
 		}
 		return provider, true, nil
 	}
 	for _, provider := range registry.Providers {
-		if provider.Enabled && provider.ID == runtimeID && runtimeMatches(provider, runtimeID) {
+		if provider.Enabled && availabilityViolation(provider) == "" && provider.ID == runtimeID && runtimeMatches(provider, runtimeID) {
 			return provider, true, nil
 		}
 	}
 	for _, provider := range registry.Providers {
-		if provider.Enabled && runtimeMatches(provider, runtimeID) {
+		if provider.Enabled && availabilityViolation(provider) == "" && runtimeMatches(provider, runtimeID) {
 			return provider, true, nil
 		}
 	}
@@ -210,6 +254,39 @@ func Disable(rootDir string, id string) (Provider, bool, error) {
 			return Provider{}, false, err
 		}
 		_ = logging.Log(rootDir, "audit", "provider.disabled", map[string]any{"provider_id": provider.ID})
+		return provider, true, nil
+	}
+	return Provider{}, false, nil
+}
+
+func UpdateOps(rootDir string, id string, snapshot OpsSnapshot) (Provider, bool, error) {
+	registry, err := Load(rootDir)
+	if err != nil {
+		return Provider{}, false, err
+	}
+	id = normalizeID(id)
+	for i, provider := range registry.Providers {
+		if provider.ID != id {
+			continue
+		}
+		if err := normalizeOpsSnapshot(&snapshot); err != nil {
+			return Provider{}, false, err
+		}
+		provider.Health = mergeHealth(provider.Health, snapshot.Health)
+		provider.Quota = mergeQuota(provider.Quota, snapshot.Quota)
+		provider.Usage = mergeUsage(provider.Usage, snapshot.Usage)
+		provider.Cost = mergeCost(provider.Cost, snapshot.Cost)
+		provider.UpdatedAt = now()
+		registry.Providers[i] = provider
+		if err := Save(rootDir, registry); err != nil {
+			return Provider{}, false, err
+		}
+		_ = logging.Log(rootDir, "audit", "provider.ops.updated", map[string]any{
+			"provider_id":  provider.ID,
+			"health":       provider.Health.Status,
+			"quota_status": provider.Quota.Status,
+			"cost_status":  provider.Cost.Status,
+		})
 		return provider, true, nil
 	}
 	return Provider{}, false, nil
@@ -482,13 +559,16 @@ func providerDecision(registry Registry, request RouteRequest, providerID string
 	if violation := dataPolicyViolation(provider, request); violation != "" {
 		return blocked(violation)
 	}
+	if violation := availabilityViolation(provider); violation != "" {
+		return blocked(violation)
+	}
 	return allowed(provider, reason)
 }
 
 func firstMatchingAPIProvider(registry Registry, request RouteRequest, vendors []string, reason string) (RouteDecision, bool) {
 	for _, vendor := range vendors {
 		for _, provider := range registry.Providers {
-			if !provider.Enabled || provider.NativeRuntime || provider.Vendor != vendor || provider.APIType == "image" {
+			if !provider.Enabled || provider.NativeRuntime || provider.Vendor != vendor || provider.APIType == "image" || availabilityViolation(provider) != "" {
 				continue
 			}
 			if request.TaskType != "" && len(provider.AllowedUseCases) > 0 && !contains(provider.AllowedUseCases, request.TaskType) {
@@ -506,7 +586,7 @@ func firstMatchingAPIProvider(registry Registry, request RouteRequest, vendors [
 func firstMatchingRuntimeProvider(registry Registry, request RouteRequest, runtimeID string, reason string) (RouteDecision, bool) {
 	runtimeID = normalizeToken(runtimeID)
 	for _, provider := range registry.Providers {
-		if !provider.Enabled || provider.ID == runtimeID || !runtimeMatches(provider, runtimeID) {
+		if !provider.Enabled || provider.ID == runtimeID || !runtimeMatches(provider, runtimeID) || availabilityViolation(provider) != "" {
 			continue
 		}
 		if len(provider.AllowedUseCases) > 0 && !matchesUseCase(provider.AllowedUseCases, request) {
@@ -539,6 +619,20 @@ func dataPolicyViolation(provider Provider, request RouteRequest) string {
 	}
 	if isThirdParty(provider) && request.RequiresRepoEdit {
 		return fmt.Sprintf("third_party_provider_disallows_repo_edit:%s", provider.ID)
+	}
+	return ""
+}
+
+func availabilityViolation(provider Provider) string {
+	switch provider.Health.Status {
+	case "unhealthy", "down":
+		return fmt.Sprintf("provider_unhealthy:%s:%s", provider.ID, provider.Health.Status)
+	}
+	if provider.Quota.Status == "exhausted" {
+		return fmt.Sprintf("provider_quota_exhausted:%s", provider.ID)
+	}
+	if provider.Cost.Status == "exceeded" {
+		return fmt.Sprintf("provider_budget_exceeded:%s", provider.ID)
 	}
 	return ""
 }
@@ -600,4 +694,129 @@ func blocked(reason string) RouteDecision {
 
 func now() string {
 	return time.Now().UTC().Format(time.RFC3339Nano)
+}
+
+func normalizeOpsSnapshot(snapshot *OpsSnapshot) error {
+	snapshot.Health.Status = normalizeToken(snapshot.Health.Status)
+	snapshot.Health.Reason = strings.TrimSpace(snapshot.Health.Reason)
+	snapshot.Health.LastCheckedAt = strings.TrimSpace(snapshot.Health.LastCheckedAt)
+	snapshot.Quota.Status = normalizeToken(snapshot.Quota.Status)
+	snapshot.Quota.ResetAt = strings.TrimSpace(snapshot.Quota.ResetAt)
+	snapshot.Usage.Window = normalizeToken(snapshot.Usage.Window)
+	snapshot.Usage.UpdatedAt = strings.TrimSpace(snapshot.Usage.UpdatedAt)
+	snapshot.Cost.Currency = strings.ToUpper(strings.TrimSpace(snapshot.Cost.Currency))
+	snapshot.Cost.Status = normalizeToken(snapshot.Cost.Status)
+	if snapshot.Health.Status != "" && !allowedHealthStatus(snapshot.Health.Status) {
+		return errors.New("provider_health_status_invalid")
+	}
+	if snapshot.Quota.Status != "" && !allowedQuotaStatus(snapshot.Quota.Status) {
+		return errors.New("provider_quota_status_invalid")
+	}
+	if snapshot.Cost.Status != "" && !allowedCostStatus(snapshot.Cost.Status) {
+		return errors.New("provider_cost_status_invalid")
+	}
+	if snapshot.Quota.LimitTokens < 0 || snapshot.Quota.UsedTokens < 0 || snapshot.Quota.RemainingTokens < 0 ||
+		snapshot.Usage.Requests < 0 || snapshot.Usage.InputTokens < 0 || snapshot.Usage.OutputTokens < 0 || snapshot.Usage.TotalTokens < 0 ||
+		snapshot.Cost.EstimatedAmount < 0 || snapshot.Cost.BudgetAmount < 0 {
+		return errors.New("provider_ops_values_must_not_be_negative")
+	}
+	if snapshot.Quota.RemainingTokens == 0 && snapshot.Quota.LimitTokens > 0 && snapshot.Quota.UsedTokens > 0 && snapshot.Quota.LimitTokens >= snapshot.Quota.UsedTokens {
+		snapshot.Quota.RemainingTokens = snapshot.Quota.LimitTokens - snapshot.Quota.UsedTokens
+	}
+	if snapshot.Usage.TotalTokens == 0 {
+		snapshot.Usage.TotalTokens = snapshot.Usage.InputTokens + snapshot.Usage.OutputTokens
+	}
+	if snapshot.Health.LastCheckedAt == "" && snapshot.Health.Status != "" {
+		snapshot.Health.LastCheckedAt = now()
+	}
+	if snapshot.Usage.UpdatedAt == "" && hasUsage(snapshot.Usage) {
+		snapshot.Usage.UpdatedAt = now()
+	}
+	return nil
+}
+
+func mergeHealth(existing Health, incoming Health) Health {
+	if incoming.Status != "" {
+		existing.Status = incoming.Status
+	}
+	if incoming.Reason != "" {
+		existing.Reason = incoming.Reason
+	}
+	if incoming.LastCheckedAt != "" {
+		existing.LastCheckedAt = incoming.LastCheckedAt
+	}
+	return existing
+}
+
+func mergeQuota(existing Quota, incoming Quota) Quota {
+	if incoming.Status != "" {
+		existing.Status = incoming.Status
+	}
+	if incoming.LimitTokens != 0 {
+		existing.LimitTokens = incoming.LimitTokens
+	}
+	if incoming.UsedTokens != 0 {
+		existing.UsedTokens = incoming.UsedTokens
+	}
+	if incoming.RemainingTokens != 0 {
+		existing.RemainingTokens = incoming.RemainingTokens
+	}
+	if incoming.ResetAt != "" {
+		existing.ResetAt = incoming.ResetAt
+	}
+	return existing
+}
+
+func mergeUsage(existing Usage, incoming Usage) Usage {
+	if incoming.Window != "" {
+		existing.Window = incoming.Window
+	}
+	if incoming.Requests != 0 {
+		existing.Requests = incoming.Requests
+	}
+	if incoming.InputTokens != 0 {
+		existing.InputTokens = incoming.InputTokens
+	}
+	if incoming.OutputTokens != 0 {
+		existing.OutputTokens = incoming.OutputTokens
+	}
+	if incoming.TotalTokens != 0 {
+		existing.TotalTokens = incoming.TotalTokens
+	}
+	if incoming.UpdatedAt != "" {
+		existing.UpdatedAt = incoming.UpdatedAt
+	}
+	return existing
+}
+
+func mergeCost(existing Cost, incoming Cost) Cost {
+	if incoming.Currency != "" {
+		existing.Currency = incoming.Currency
+	}
+	if incoming.EstimatedAmount != 0 {
+		existing.EstimatedAmount = incoming.EstimatedAmount
+	}
+	if incoming.BudgetAmount != 0 {
+		existing.BudgetAmount = incoming.BudgetAmount
+	}
+	if incoming.Status != "" {
+		existing.Status = incoming.Status
+	}
+	return existing
+}
+
+func hasUsage(usage Usage) bool {
+	return usage.Window != "" || usage.Requests != 0 || usage.InputTokens != 0 || usage.OutputTokens != 0 || usage.TotalTokens != 0
+}
+
+func allowedHealthStatus(value string) bool {
+	return value == "ok" || value == "healthy" || value == "degraded" || value == "unhealthy" || value == "down" || value == "unknown"
+}
+
+func allowedQuotaStatus(value string) bool {
+	return value == "ok" || value == "warning" || value == "exhausted" || value == "unknown"
+}
+
+func allowedCostStatus(value string) bool {
+	return value == "ok" || value == "warning" || value == "exceeded" || value == "unknown"
 }

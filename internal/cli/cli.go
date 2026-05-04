@@ -174,6 +174,7 @@ func usage() string {
 		"moyuan model provider add --id <id> --vendor <vendor> --api-type <type> [--auth-ref env:KEY]",
 		"moyuan model provider list",
 		"moyuan model provider show <provider>",
+		"moyuan model provider ops <provider> [--health ok] [--quota-status ok] [--used-tokens 1000]",
 		"moyuan model provider disable <provider>",
 		"moyuan model route --role <role> [--task-type <type>] [--output-type <type>] [--repo-edit]",
 		"moyuan skills add --id <id> --source <source> [--role backend] [--tag tdd]",
@@ -927,6 +928,45 @@ func handleModelProvider(args []string, rootDir string) (string, any, int, error
 			return "", map[string]any{}, 1, nil
 		}
 		return "", provider, 0, nil
+	case "ops":
+		if len(args) < 2 {
+			return "missing provider id\n", nil, 1, nil
+		}
+		provider, ok, err := providers.UpdateOps(rootDir, args[1], providers.OpsSnapshot{
+			Health: providers.Health{
+				Status:        flagValue(args, "--health", ""),
+				Reason:        flagValue(args, "--health-reason", ""),
+				LastCheckedAt: flagValue(args, "--health-checked-at", ""),
+			},
+			Quota: providers.Quota{
+				Status:          flagValue(args, "--quota-status", ""),
+				LimitTokens:     flagInt64(args, "--limit-tokens", 0),
+				UsedTokens:      flagInt64(args, "--used-tokens", 0),
+				RemainingTokens: flagInt64(args, "--remaining-tokens", 0),
+				ResetAt:         flagValue(args, "--quota-reset-at", ""),
+			},
+			Usage: providers.Usage{
+				Window:       flagValue(args, "--usage-window", ""),
+				Requests:     flagInt64(args, "--requests", 0),
+				InputTokens:  flagInt64(args, "--input-tokens", 0),
+				OutputTokens: flagInt64(args, "--output-tokens", 0),
+				TotalTokens:  flagInt64(args, "--total-tokens", 0),
+				UpdatedAt:    flagValue(args, "--usage-updated-at", ""),
+			},
+			Cost: providers.Cost{
+				Currency:        flagValue(args, "--currency", ""),
+				EstimatedAmount: flagFloat(args, "--estimated-cost", 0),
+				BudgetAmount:    flagFloat(args, "--budget", 0),
+				Status:          flagValue(args, "--cost-status", ""),
+			},
+		})
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", provider, 0, nil
 	case "disable":
 		if len(args) < 2 {
 			return "missing provider id\n", nil, 1, nil
@@ -1259,6 +1299,30 @@ func flagInt(args []string, name string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func flagInt64(args []string, name string, fallback int64) int64 {
+	value := flagValue(args, name, "")
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func flagFloat(args []string, name string, fallback float64) float64 {
+	value := flagValue(args, name, "")
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil {
 		return fallback
 	}
