@@ -25,7 +25,7 @@
 - `phase1-011 memory-basics`：已实现 memory add/search/compact 的最小闭环。
 - `phase1-012 repair-basics`：已实现 runtime signal、bug candidate 分类和 repair plan 生成。
 
-下一轮继续补齐 `phase1-013 e2e-smoke`，并增强 runtime adapter 的 Claude CLI / Codex CLI 真实执行契约、diff 捕获和失败降级。
+下一轮继续补齐 `phase1-013 e2e-smoke`，并增强 runtime adapter 的 Claude CLI / Codex CLI 真实执行契约、diff 捕获和失败降级。下一批任务的执行顺序、验收标准和 git 同步规则见 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)。
 
 ## 1. 目标
 

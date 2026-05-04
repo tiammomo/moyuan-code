@@ -3,12 +3,14 @@
 Moyuan Code 是面向代码开发全生命周期的多 Agent 编排框架。当前进入 `Phase 1` 本地 CLI MVP 实施阶段。
 
 核心设计入口见 [docs/README.md](./docs/README.md)。
+下一步开发任务规划见 [docs/phase1-next-development-plan.md](./docs/phase1-next-development-plan.md)。
 
 ## 当前实现状态
 
 - 控制面后端：Go。
 - 图像生成辅助脚本：Node.js，仅保留在 `scripts/`。
 - Phase 1 已实现最小 CLI 骨架：workspace、auth、logging、git、project comprehension、issue graph、runtime adapter、orchestrator、scheduler、memory、repair、quality gate。
+- 下一批实现重点：e2e smoke、runtime diff capture、Claude CLI / Codex CLI 真实调用契约、orchestrator 状态机、质量复核强化和 memory record gate。
 
 ## 本地运行
 

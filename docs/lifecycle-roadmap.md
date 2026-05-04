@@ -582,6 +582,7 @@ Phase 1 暂不进入第一批的能力：
 - `README` 只保留导航和边界。
 - `CLI` 命令以本路线图为唯一权威。
 - `Phase 1` issue graph 以 [Phase 1 实现 Issue Graph](./phase1-issue-graph.md) 为唯一执行图。
+- `Phase 1` 下一批任务以 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md) 为当前实施入口。
 - `design-readiness-checklist.md` 的风险项只允许补齐，不允许借口绕过门禁。
 - `workspace`、`auth_context`、`logging`、`git`、`runtime-adapters`、`comprehension`、`orchestrator`、`scheduler`、`quality`、`memory`、`repair` 的边界不再重新拆分定义。
 
