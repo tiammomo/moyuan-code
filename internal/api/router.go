@@ -151,6 +151,7 @@ func NewRouter(options Options) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(authzMiddleware(options))
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true, "version": Version})
 	})
@@ -1887,4 +1888,118 @@ func queryLimit(c *gin.Context, fallback int) int {
 
 func writeError(c *gin.Context, status int, message string) {
 	c.JSON(status, gin.H{"error": message})
+}
+
+type authzRule struct {
+	Action string
+	Risk   string
+	Scopes []string
+}
+
+func authzMiddleware(options Options) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rule, ok := protectedAuthzRule(c.Request.Method, c.FullPath(), c.Request.URL.Path)
+		if !ok {
+			c.Next()
+			return
+		}
+		_, rootDir, found, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			c.Abort()
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "project not found")
+			c.Abort()
+			return
+		}
+		ctx, resolved, err := resolveRequestContext(rootDir, c)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			c.Abort()
+			return
+		}
+		result := auth.Authorize(ctx, rule.Action, rule.Risk, rule.Scopes)
+		if !resolved && result.Reason == "AUTH_PERMISSION_DENIED" {
+			result.Reason = "AUTH_MISSING_CREDENTIAL"
+		}
+		_ = logging.Log(rootDir, "audit", "auth.decision."+strings.ToLower(result.Decision), map[string]any{
+			"actor_id":    ctx.ActorID,
+			"auth_method": ctx.AuthMethod,
+			"action":      rule.Action,
+			"decision":    result.Decision,
+			"reason":      result.Reason,
+			"risk":        rule.Risk,
+		})
+		if result.Decision != "ALLOW" {
+			c.JSON(http.StatusForbidden, gin.H{"error": result.Reason, "authz": result})
+			c.Abort()
+			return
+		}
+		c.Set("auth_context", ctx)
+		c.Next()
+	}
+}
+
+func resolveRequestContext(rootDir string, c *gin.Context) (auth.RequestContext, bool, error) {
+	if strings.TrimSpace(c.GetHeader("Authorization")) != "" {
+		return auth.ResolveBearer(rootDir, c.GetHeader("Authorization"))
+	}
+	if strings.TrimSpace(c.GetHeader("X-Moyuan-Session")) != "" {
+		return auth.ResolveSession(rootDir, c.GetHeader("X-Moyuan-Session"))
+	}
+	return auth.ResolveLocalOwner(rootDir)
+}
+
+func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRule, bool) {
+	if method != http.MethodPost {
+		return authzRule{}, false
+	}
+	path := fullPath
+	if path == "" {
+		path = rawPath
+	}
+	switch path {
+	case "/v1/projects/:project_id/providers/ops/refresh":
+		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
+	case "/v1/projects/:project_id/approvals/:approval_id/decide":
+		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
+	case "/v1/projects/:project_id/deployments/:deployment_id/execute":
+		return authzRule{Action: "deployment.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
+	case "/v1/projects/:project_id/visuals/assets/:asset_id/render":
+		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
+	case "/v1/projects/:project_id/resources/:resource_id/renew":
+		return authzRule{Action: "resource.renew", Risk: "high", Scopes: []string{"resource:write"}}, true
+	case "/v1/projects/:project_id/resources/:resource_id/retire":
+		return authzRule{Action: "resource.retire", Risk: "high", Scopes: []string{"resource:write"}}, true
+	case "/v1/projects/:project_id/git-provider-plans/:plan_id/sync":
+		return authzRule{Action: "git.provider.sync", Risk: "high", Scopes: []string{"git:write"}}, true
+	default:
+		return protectedAuthzRuleByRawPath(method, rawPath)
+	}
+}
+
+func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool) {
+	if method != http.MethodPost {
+		return authzRule{}, false
+	}
+	switch {
+	case strings.Contains(rawPath, "/providers/ops/refresh"):
+		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
+	case strings.Contains(rawPath, "/approvals/") && strings.HasSuffix(rawPath, "/decide"):
+		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
+	case strings.Contains(rawPath, "/deployments/") && strings.HasSuffix(rawPath, "/execute"):
+		return authzRule{Action: "deployment.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
+	case strings.Contains(rawPath, "/visuals/assets/") && strings.HasSuffix(rawPath, "/render"):
+		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
+	case strings.Contains(rawPath, "/resources/") && strings.HasSuffix(rawPath, "/renew"):
+		return authzRule{Action: "resource.renew", Risk: "high", Scopes: []string{"resource:write"}}, true
+	case strings.Contains(rawPath, "/resources/") && strings.HasSuffix(rawPath, "/retire"):
+		return authzRule{Action: "resource.retire", Risk: "high", Scopes: []string{"resource:write"}}, true
+	case strings.Contains(rawPath, "/git-provider-plans/") && strings.HasSuffix(rawPath, "/sync"):
+		return authzRule{Action: "git.provider.sync", Risk: "high", Scopes: []string{"git:write"}}, true
+	default:
+		return authzRule{}, false
+	}
 }

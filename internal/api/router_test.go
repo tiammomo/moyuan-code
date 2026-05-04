@@ -22,6 +22,7 @@ import (
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
 	runtimemgr "moyuan-code/internal/runtime"
+	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/visuals"
 	"moyuan-code/internal/workspace"
@@ -69,6 +70,55 @@ func TestGinRouterServesHealthAndProjectsFromGORMStore(t *testing.T) {
 	if !jsonContains(projects.Body.Bytes(), "managed") {
 		t.Fatalf("projects missing managed project: %s", projects.Body.String())
 	}
+}
+
+func TestGinRouterAuthzMiddlewareProtectsHighRiskWrites(t *testing.T) {
+	root := t.TempDir()
+	ws, err := workspace.Ensure(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgID := "org-test"
+	ws.Access.Access.Mode = "team_server"
+	ws.Access.Access.OrganizationID = &orgID
+	ws.Access.Access.LocalOwnerID = nil
+	if err := workspace.SaveAccess(root, ws.Access); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "dev-sec",
+		Environment: "test_dev",
+		Host:        "10.0.0.20",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2099-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	readOnly, err := auth.CreateAPIToken(root, auth.CreateTokenOptions{Name: "read-only", ActorID: "svc-ci", Scopes: []string{"project:read"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resourceWriter, err := auth.CreateAPIToken(root, auth.CreateTokenOptions{Name: "resource-writer", ActorID: "svc-ops", Scopes: []string{"resource:write"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := store.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.UpsertProject(controlplane.Project{ID: "managed", Name: "managed", Root: root, Status: "active"}); err != nil {
+		t.Fatal(err)
+	}
+
+	router := NewRouter(Options{RootDir: root, Store: &db})
+	body := `{"expires_at":"2099-04-01","actor_id":"ops","reason":"authz test"}`
+	assertPostContains(t, router, "/v1/projects/managed/resources/dev-sec/renew", body, http.StatusForbidden, "AUTH_MISSING_CREDENTIAL")
+	assertPostWithHeadersContains(t, router, "/v1/projects/managed/resources/dev-sec/renew", body, map[string]string{"Authorization": "Bearer " + readOnly.TokenValue}, http.StatusForbidden, "AUTH_TOKEN_SCOPE_MISMATCH")
+	assertPostWithHeadersContains(t, router, "/v1/projects/managed/resources/dev-sec/renew", body, map[string]string{"Authorization": "Bearer " + resourceWriter.TokenValue}, http.StatusOK, `"RESOURCE_RENEWAL_RECORDED"`)
+	assertGETContains(t, router, "/v1/projects/managed/audit-events?event=auth.decision.deny&limit=5", http.StatusOK, `"auth.decision.deny"`)
 }
 
 func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
@@ -316,6 +366,25 @@ func assertPostContains(t *testing.T, router http.Handler, path string, body str
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != status {
+		t.Fatalf("POST %s status = %d body=%s", path, recorder.Code, recorder.Body.String())
+	}
+	for _, value := range values {
+		if !strings.Contains(recorder.Body.String(), value) {
+			t.Fatalf("POST %s missing %q in body=%s", path, value, recorder.Body.String())
+		}
+	}
+}
+
+func assertPostWithHeadersContains(t *testing.T, router http.Handler, path string, body string, headers map[string]string, status int, values ...string) {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
 	router.ServeHTTP(recorder, request)
 	if recorder.Code != status {
 		t.Fatalf("POST %s status = %d body=%s", path, recorder.Code, recorder.Body.String())

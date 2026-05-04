@@ -166,7 +166,8 @@ MVP 必须具备的用户功能：
 
 - Phase 4 已提供 local team session、API token 和 service account 的创建、查询、撤销 API。
 - API token 明文只在创建时返回一次；后续列表只展示 token id、prefix、actor 和 scopes。
-- 当前尚未启用全局 RBAC middleware；高风险动作先通过 approval record 与 audit log 形成可追溯控制。
+- Phase 5 已启用最小 authz middleware，先保护 provider refresh、approval decide、deployment execute、visual render、resource renew/retire 和 git provider sync。
+- 完整登录、组织成员 UI 和 read-only API 全量拦截仍在后续阶段推进。
 
 ## 10. 日志与审计
 

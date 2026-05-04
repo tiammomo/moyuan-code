@@ -78,6 +78,24 @@ type RevokeOptions struct {
 	Reason  string `json:"reason,omitempty"`
 }
 
+type RequestContext struct {
+	ActorID          string   `json:"actor_id"`
+	ActorType        string   `json:"actor_type"`
+	AuthMethod       string   `json:"auth_method"`
+	Roles            []string `json:"roles,omitempty"`
+	Scopes           []string `json:"scopes,omitempty"`
+	SessionID        string   `json:"session_id,omitempty"`
+	APITokenID       string   `json:"api_token_id,omitempty"`
+	ServiceAccountID string   `json:"service_account_id,omitempty"`
+}
+
+type AuthzResult struct {
+	Decision string `json:"decision"`
+	Reason   string `json:"reason"`
+	Action   string `json:"action"`
+	Risk     string `json:"risk"`
+}
+
 type teamState struct {
 	SchemaVersion   int              `json:"schema_version"`
 	Sessions        []Session        `json:"sessions"`
@@ -266,6 +284,104 @@ func ListServiceAccounts(rootDir string) ([]ServiceAccount, error) {
 	return state.ServiceAccounts, nil
 }
 
+func ResolveBearer(rootDir string, authorization string) (RequestContext, bool, error) {
+	value := bearerValue(authorization)
+	if value == "" {
+		return RequestContext{}, false, nil
+	}
+	state, err := loadTeamState(rootDir)
+	if err != nil {
+		return RequestContext{}, false, err
+	}
+	tokenHash := hashToken(value)
+	for _, token := range state.APITokens {
+		if token.Status != "active" || token.TokenHash != tokenHash {
+			continue
+		}
+		ctx := RequestContext{
+			ActorID:    token.ActorID,
+			ActorType:  "user",
+			AuthMethod: "api_token",
+			Scopes:     normalizeList(token.Scopes, nil),
+			APITokenID: token.ID,
+		}
+		if account, ok := serviceAccountByID(state, token.ActorID); ok {
+			ctx.ActorType = "service_account"
+			ctx.ServiceAccountID = account.ID
+			ctx.Roles = normalizeList(account.Roles, nil)
+		}
+		return ctx, true, nil
+	}
+	return RequestContext{}, false, nil
+}
+
+func ResolveSession(rootDir string, sessionID string) (RequestContext, bool, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return RequestContext{}, false, nil
+	}
+	state, err := loadTeamState(rootDir)
+	if err != nil {
+		return RequestContext{}, false, err
+	}
+	for _, session := range state.Sessions {
+		if session.ID == sessionID && session.Status == "active" {
+			return RequestContext{
+				ActorID:    session.UserID,
+				ActorType:  "user",
+				AuthMethod: "session",
+				Roles:      normalizeList(session.Roles, nil),
+				SessionID:  session.ID,
+			}, true, nil
+		}
+	}
+	return RequestContext{}, false, nil
+}
+
+func ResolveLocalOwner(rootDir string) (RequestContext, bool, error) {
+	ws, err := workspace.Load(rootDir)
+	if err != nil {
+		return RequestContext{}, false, err
+	}
+	if ws.Access.Access.Mode != "local_single_user" {
+		return RequestContext{}, false, nil
+	}
+	owner, err := Whoami(rootDir)
+	if err != nil {
+		return RequestContext{}, false, err
+	}
+	roles := []string{"owner"}
+	if configured := ws.Access.Access.ProjectRoles["owner"]; len(configured) > 0 {
+		roles = configured
+	}
+	return RequestContext{ActorID: owner.ActorID, ActorType: "user", AuthMethod: "local_identity", Roles: normalizeList(roles, []string{"owner"})}, true, nil
+}
+
+func Authorize(ctx RequestContext, action string, risk string, requiredScopes []string) AuthzResult {
+	action = strings.TrimSpace(action)
+	risk = normalizeIdentity(risk)
+	if risk == "" {
+		risk = "medium"
+	}
+	result := AuthzResult{Decision: "DENY", Reason: "AUTH_PERMISSION_DENIED", Action: action, Risk: risk}
+	if ctx.ActorID == "" {
+		result.Reason = "AUTH_MISSING_CREDENTIAL"
+		return result
+	}
+	if hasRole(ctx.Roles, "*") || hasRole(ctx.Roles, "owner") || hasRole(ctx.Roles, "project_owner") {
+		result.Decision = "ALLOW"
+		result.Reason = "role_allows_action"
+		return result
+	}
+	if len(requiredScopes) == 0 || scopesAllow(ctx.Scopes, requiredScopes) {
+		result.Decision = "ALLOW"
+		result.Reason = "scope_allows_action"
+		return result
+	}
+	result.Reason = "AUTH_TOKEN_SCOPE_MISMATCH"
+	return result
+}
+
 func teamStatePath(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).AuthDir, "team.json")
 }
@@ -301,6 +417,58 @@ func randomToken() (string, error) {
 		return "", err
 	}
 	return "moyuan_" + hex.EncodeToString(data), nil
+}
+
+func bearerValue(authorization string) string {
+	authorization = strings.TrimSpace(authorization)
+	if authorization == "" {
+		return ""
+	}
+	parts := strings.Fields(authorization)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+		return strings.TrimSpace(parts[1])
+	}
+	return ""
+}
+
+func serviceAccountByID(state teamState, id string) (ServiceAccount, bool) {
+	id = normalizeIdentity(id)
+	for _, account := range state.ServiceAccounts {
+		if account.ID == id && account.Status == "active" {
+			return account, true
+		}
+	}
+	return ServiceAccount{}, false
+}
+
+func hasRole(roles []string, role string) bool {
+	role = normalizeIdentity(role)
+	for _, item := range roles {
+		if normalizeIdentity(item) == role {
+			return true
+		}
+	}
+	return false
+}
+
+func scopesAllow(scopes []string, required []string) bool {
+	normalized := map[string]bool{}
+	for _, scope := range scopes {
+		normalized[normalizeIdentity(scope)] = true
+	}
+	if normalized["*"] {
+		return true
+	}
+	for _, scope := range required {
+		scope = normalizeIdentity(scope)
+		if scope == "" {
+			continue
+		}
+		if !normalized[scope] {
+			return false
+		}
+	}
+	return true
 }
 
 func hashToken(value string) string {

@@ -221,8 +221,33 @@ POST /v1/projects/:project_id/auth/service-accounts
 当前边界：
 
 - 这是 local team baseline，不是完整登录系统。
-- API 还未强制解析 `Authorization` header，也未按 role/scope 拦截请求。
-- 后续 RBAC middleware 必须基于这些对象输出统一 `AuthContext` 和 `AuthzResult`。
+- Phase 5 已开始为高风险写操作强制解析 `Authorization: Bearer <token>`、`X-Moyuan-Session` 或 local owner fallback。
+- 后续仍需补齐完整组织成员、登录 UI、refresh token 和细粒度 role matrix。
+
+## 3.3 当前 Authz Middleware 接口
+
+Phase 5 第一批已提供最小 API 鉴权中间件：
+
+- 解析 Bearer API token、session id 和 local_single_user owner。
+- 输出 `RequestContext`，包含 actor、auth method、roles、scopes、session id、api token id 和 service account id。
+- 对高风险 POST API 执行最小 role/scope 校验。
+- allow/deny 决策写入 audit log。
+
+当前受保护动作：
+
+- `provider.refresh`：需要 `provider:write`。
+- `approval.decide`：需要 `approval:decide`。
+- `deployment.execute`：需要 `deploy:execute`。
+- `visual.render`：需要 `visual:render`。
+- `resource.renew` / `resource.retire`：需要 `resource:write`。
+- `git.provider.sync`：需要 `git:write`。
+
+当前边界：
+
+- `owner`、`project_owner` 或 `*` role 可通过受保护动作。
+- API token 必须具备对应 scope；否则返回 `AUTH_TOKEN_SCOPE_MISMATCH`。
+- team_server 模式缺少凭证会返回 `AUTH_MISSING_CREDENTIAL`。
+- read-only API 暂不强制鉴权，后续按风险逐步收紧。
 
 ## 4. 错误类型
 

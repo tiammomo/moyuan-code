@@ -44,6 +44,21 @@ func TestTeamAuthSessionTokenAndServiceAccountLifecycle(t *testing.T) {
 	if created.TokenValue == "" || !strings.HasPrefix(created.TokenValue, "moyuan_") {
 		t.Fatalf("expected one-time token value, got %+v", created)
 	}
+	requestContext, ok, err := ResolveBearer(root, "Bearer "+created.TokenValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || requestContext.APITokenID != created.Token.ID {
+		t.Fatalf("expected bearer token to resolve, ok=%v ctx=%+v", ok, requestContext)
+	}
+	allowed := Authorize(requestContext, "deploy.dry_run", "medium", []string{"deploy:dry-run"})
+	if allowed.Decision != "ALLOW" {
+		t.Fatalf("expected token scope to allow deploy dry-run: %+v", allowed)
+	}
+	denied := Authorize(requestContext, "resource.renew", "high", []string{"resource:write"})
+	if denied.Decision != "DENY" || denied.Reason != "AUTH_TOKEN_SCOPE_MISMATCH" {
+		t.Fatalf("expected missing scope denial: %+v", denied)
+	}
 	tokens, err := ListAPITokens(root)
 	if err != nil {
 		t.Fatal(err)

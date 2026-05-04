@@ -19,13 +19,13 @@ Phase 4 已完成并通过 readiness：
 
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase5-001` | `auth-context-rbac-middleware` | planned | API middleware 解析身份并执行最小 RBAC | 受保护 API 有 allow/deny/require approval 决策和 audit event |
+| P0 | `phase5-001` | `auth-context-rbac-middleware` | completed | API middleware 解析身份并执行最小 RBAC | 受保护 API 有 allow/deny 决策和 audit event |
 | P0 | `phase5-002` | `secret-ref-resolver` | planned | 安全解析 `secret:`/`env:` 引用并注入 adapter | Secret 明文不出现在响应、日志、Memory、prompt 或测试 fixture |
 | P1 | `phase5-003` | `github-gitee-pr-mr-adapter` | planned | PR/MR preview/create/status adapter | 默认 preview，真实 create 需 authz + approval |
 | P1 | `phase5-004` | `deployment-smoke-monitor-adapters` | planned | smoke/monitor 结果记录和 rollback 建议 | production 必须 approval，结果可审计 |
 | P1 | `phase5-005` | `console-controlled-forms` | planned | Console 增加受控操作表单 | 表单只调用后端受控 API，状态以后端为准 |
 
-## 3. 即将执行：`phase5-001 auth-context-rbac-middleware`
+## 3. 执行规划：`phase5-001 auth-context-rbac-middleware`
 
 范围：
 
@@ -47,7 +47,31 @@ Phase 4 已完成并通过 readiness：
 - local owner fallback 仅在 local_single_user 模式可用。
 - `go test ./internal/auth ./internal/api ./...` 通过。
 
-## 4. 验证要求
+## 4. 已完成任务：`phase5-001 auth-context-rbac-middleware`
+
+范围：
+
+- `internal/auth` 增加 RequestContext、AuthzResult、Bearer token/session/local owner 解析和最小 scope/role 授权。
+- API 增加 authz middleware，保护 provider refresh、approval decide、deployment execute、visual render、resource renew/retire 和 git provider sync。
+- local_single_user 模式保留 owner fallback；team_server 模式必须提供有效 Bearer token 或 session。
+- API token 按 scope 校验，scope 不足返回 `AUTH_TOKEN_SCOPE_MISMATCH`。
+- allow/deny 写入 `auth.decision.allow` / `auth.decision.deny` audit event。
+
+非目标：
+
+- 不实现登录 UI、SSO/OIDC 或组织成员管理。
+- 不拦截所有 read-only API。
+- 不在 middleware 中自动创建 approval record；高风险业务动作仍由各模块创建 approval record。
+
+验证：
+
+- `go test ./internal/auth ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 5. 验证要求
 
 每完成一个 Phase 5 issue，至少运行：
 
