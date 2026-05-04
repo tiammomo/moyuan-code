@@ -362,6 +362,40 @@ func TestProviderRegistryCLIManagesProvidersAndRoutesRoles(t *testing.T) {
 	assertFileContains(t, root, ".moyuan/logs/audit.jsonl", "provider.route.decided")
 }
 
+func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
+	root := createTempRepo(t)
+	remote := createBareRemote(t, root)
+	run(t, root, "git", "remote", "add", "origin", remote)
+	runCLI(t, root, "project", "add", "--local", root)
+	commitAll(t, root, "moyuan project artifacts")
+
+	blocked := runCLIAllowFailure(t, root, "git", "provider", "plan", "phase1-001")
+	if blocked.code == 0 {
+		t.Fatalf("expected git provider plan to block before issue is accepted: %s", blocked.stdout)
+	}
+	assertContains(t, blocked.stdout, `"decision": "GIT_PROVIDER_BLOCKED"`)
+	assertContains(t, blocked.stdout, "review_merge_not_allowed")
+	commitAll(t, root, "blocked git provider plan")
+
+	accepted := runCLI(t, root, "orchestrator", "run", "phase1-001", "--runtime", "local_shell", "--prompt", "printf pr-plan > pr-plan.txt")
+	assertContains(t, accepted.stdout, `"status": "accepted"`)
+	commitAll(t, root, "accepted issue output")
+
+	plan := runCLI(t, root, "git", "provider", "plan", "phase1-001")
+	assertContains(t, plan.stdout, `"status": "push_plan_ready"`)
+	assertContains(t, plan.stdout, `"decision": "PUSH_ALLOWED_PR_MR_UNSUPPORTED"`)
+	assertContains(t, plan.stdout, `"provider": "generic_git"`)
+	assertContains(t, plan.stdout, `"push_command": "git push origin`)
+	planID := decodeStringField(t, plan.stdout, "id")
+
+	shown := runCLI(t, root, "git", "provider", "show", planID)
+	assertContains(t, shown.stdout, planID)
+	assertContains(t, shown.stdout, `"manual_required": true`)
+	assertFileExists(t, root, ".moyuan/lifecycle/pull-requests/"+planID+".json")
+	assertFileContains(t, root, ".moyuan/lifecycle/pull-requests/plans.jsonl", planID)
+	assertFileContains(t, root, ".moyuan/logs/git.jsonl", "git_provider.plan.created")
+}
+
 func TestQualityReviewHardeningFindingsDriveNeedsRework(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)

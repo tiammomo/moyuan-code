@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"moyuan-code/internal/controlplane"
+	"moyuan-code/internal/gitprovider"
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/memory"
 	"moyuan-code/internal/orchestrator"
@@ -199,6 +200,48 @@ func NewRouter(options Options) *gin.Engine {
 			status = http.StatusAccepted
 		}
 		c.JSON(status, gin.H{"merge_decision": decision})
+	})
+	router.POST("/v1/projects/:project_id/issues/:issue_id/git-provider-plan", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plan, err := gitprovider.CreatePlan(c.Request.Context(), rootDir, c.Param("issue_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if plan.Status == "blocked" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"git_provider_plan": plan})
+	})
+	router.GET("/v1/projects/:project_id/git-provider-plans/:plan_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plan, found, err := gitprovider.Load(rootDir, c.Param("plan_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "git provider plan not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"git_provider_plan": plan})
 	})
 	router.POST("/v1/projects/:project_id/requirements/plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

@@ -25,6 +25,15 @@ Git Provider 接入必须支持：
 
 Git Provider 文档只定义远程服务商差异，不重复项目阅读理解、Issue 编排和质量门禁。
 
+当前 Beta 实现已落地最小 Git Provider plan：
+
+- CLI：`moyuan git provider plan <issue-id>`、`moyuan git provider show <plan-id>`。
+- API：`POST /v1/projects/:project_id/issues/:issue_id/git-provider-plan`、`GET /v1/projects/:project_id/git-provider-plans/:plan_id`。
+- 输出位置：`.moyuan/lifecycle/pull-requests/`。
+- 当前只生成可审计 push/PR/MR plan，不真实执行 push、PR/MR 创建或合并。
+- 已接入门禁：dirty worktree、remote 缺失、review merge decision 未通过时阻断。
+- `github`、`gitee`、`gitlab` 会输出 PR/MR 计划；缺少 API auth 时降级为 manual create mode。`generic_git` 只输出 push plan 和手动 PR/MR 指引。
+
 ## 2. Provider 类型
 
 | Provider | 场景 | API 能力 | PR/MR 能力 | 降级方式 |

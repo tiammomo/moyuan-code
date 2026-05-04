@@ -28,7 +28,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P1 | `beta-004` | `parallel-orchestration-engine` | completed | 自动并发、等待和 replan | 并发度由系统决策且可审计 |
 | P1 | `beta-005` | `review-merge-pipeline` | completed | 复核通过后合入任务分支 | review gate 阻断未达标代码 |
 | P1 | `beta-006` | `provider-registry-runtime-routing` | completed | Provider 和 Runtime 路由基线 | Provider 可配置、校验、路由和审计 |
-| P1 | `beta-007` | `git-provider-pr-mr` | in_progress | GitHub/Gitee 分支、push、PR/MR 编排 | 任务分支可推送并形成 PR/MR 计划 |
+| P1 | `beta-007` | `git-provider-pr-mr` | completed | GitHub/Gitee 分支、push、PR/MR 编排 | 任务分支可推送并形成 PR/MR 计划 |
+| P1 | `beta-008` | `release-branch-pipeline` | in_progress | 版本分支、tag 和 GitHub/Gitee 发布记录 | 可根据积累量生成 release plan |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -210,7 +211,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - Scheduler 的默认角色 runtime 已收敛到 Provider 路由默认规则。
 - 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
 
-## 9. 当前任务：`beta-007 git-provider-pr-mr`
+## 9. 已完成任务：`beta-007 git-provider-pr-mr`
 
 范围：
 
@@ -227,7 +228,37 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 
 验收：
 
-- 缺失 remote 或认证信息时返回 blocked reason。
+- 缺失 remote 时返回 blocked reason；缺少 PR/MR API auth 时降级为 manual create mode。
 - review 未通过时不允许 push/PR/MR。
 - GitHub/Gitee/generic git 能生成差异化 provider plan。
+- `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 `internal/gitprovider` Git Provider plan 模块。
+- 已支持 CLI：`moyuan git provider plan <issue-id>`、`moyuan git provider show <plan-id>`。
+- 已支持 API：`POST /v1/projects/:project_id/issues/:issue_id/git-provider-plan`、`GET /v1/projects/:project_id/git-provider-plans/:plan_id`。
+- Plan 写入 `.moyuan/lifecycle/pull-requests/`，并记录 `git_provider.plan.created` 日志。
+- 当前只生成计划，不执行 push、PR/MR 创建或 merge。
+- 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
+
+## 10. 当前任务：`beta-008 release-branch-pipeline`
+
+范围：
+
+- 基于已通过 review/merge gate 的 issue 生成 release suggestion。
+- 管理 release branch、tag suggestion、release notes 和 Git provider publish plan。
+- 只推到 GitHub/Gitee/GitLab/generic git 的远程记录层，不做服务器部署。
+
+非目标：
+
+- 不直接部署到服务器。
+- 不绕过 beta-007 的 push/PR/MR plan。
+- 不自动 tag 或发布正式 release，先输出可审计计划。
+
+验收：
+
+- 可根据 accepted issue 数量和风险给出是否发版建议。
+- 可生成 release branch plan 和 release notes draft。
+- 缺失 remote 或存在未合入 issue 时阻断。
 - `go test ./...` 通过。

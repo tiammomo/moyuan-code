@@ -27,6 +27,9 @@ type Paths struct {
 	RunsDir          string
 	QualityDir       string
 	ReviewsDir       string
+	BranchesDir      string
+	MergeReportsDir  string
+	PullRequestsDir  string
 	ReleasesDir      string
 	DeploymentsDir   string
 	ComprehensionDir string
@@ -63,6 +66,9 @@ func ForRoot(rootDir string) Paths {
 		RunsDir:          filepath.Join(moyuanDir, "lifecycle", "runs"),
 		QualityDir:       filepath.Join(moyuanDir, "lifecycle", "quality"),
 		ReviewsDir:       filepath.Join(moyuanDir, "lifecycle", "reviews"),
+		BranchesDir:      filepath.Join(moyuanDir, "lifecycle", "branches"),
+		MergeReportsDir:  filepath.Join(moyuanDir, "lifecycle", "merge-reports"),
+		PullRequestsDir:  filepath.Join(moyuanDir, "lifecycle", "pull-requests"),
 		ReleasesDir:      filepath.Join(moyuanDir, "lifecycle", "releases"),
 		DeploymentsDir:   filepath.Join(moyuanDir, "lifecycle", "deployments"),
 		ComprehensionDir: filepath.Join(moyuanDir, "comprehension"),
@@ -107,6 +113,9 @@ func EnsureDirs(paths Paths) error {
 		paths.QualityDir,
 		filepath.Join(paths.QualityDir, "reports"),
 		paths.ReviewsDir,
+		paths.BranchesDir,
+		paths.MergeReportsDir,
+		paths.PullRequestsDir,
 		paths.ReleasesDir,
 		paths.DeploymentsDir,
 		paths.LogsDir,

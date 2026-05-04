@@ -256,6 +256,8 @@ moyuan task list
 moyuan run <task-id>
 moyuan git status
 moyuan git branch list
+moyuan git provider plan <issue-id>
+moyuan git provider show <plan-id>
 moyuan quality check <task-id>
 moyuan quality report <run-id>
 moyuan review merge-decision <issue-id>

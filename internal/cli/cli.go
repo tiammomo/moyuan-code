@@ -15,6 +15,7 @@ import (
 	"moyuan-code/internal/comprehension"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/git"
+	"moyuan-code/internal/gitprovider"
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/memory"
@@ -128,6 +129,8 @@ func usage() string {
 		"moyuan git status",
 		"moyuan git branch list",
 		"moyuan git sync [--comprehend]",
+		"moyuan git provider plan <issue-id>",
+		"moyuan git provider show <plan-id>",
 		"moyuan requirement plan --text <text>",
 		"moyuan issue graph <epic-id>",
 		"moyuan issue schedule <epic-id>",
@@ -384,6 +387,34 @@ func handleGit(ctx context.Context, args []string, cwd string) (string, any, int
 			}
 		}
 		return "", result, 0, nil
+	case "provider":
+		if len(args) < 2 {
+			return "unknown git provider command\n", nil, 1, nil
+		}
+		switch args[1] {
+		case "plan":
+			if len(args) < 3 {
+				return "missing issue id\n", nil, 1, nil
+			}
+			plan, err := gitprovider.CreatePlan(ctx, rootDir, args[2])
+			code := 0
+			if plan.Status == "blocked" {
+				code = 1
+			}
+			return "", plan, code, err
+		case "show":
+			if len(args) < 3 {
+				return "missing plan id\n", nil, 1, nil
+			}
+			plan, ok, err := gitprovider.Load(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", plan, 0, nil
+		}
 	}
 	return "unknown git command\n", nil, 1, nil
 }
