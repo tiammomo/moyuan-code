@@ -568,9 +568,9 @@ Phase 1 的执行结果：
 
 ## 10. 当前阶段状态
 
-Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力和 Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力已完成。
+Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力、Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力和 Phase 6 approval consumption/adapter telemetry/Console schema forms 能力已完成。
 
-当前进入 Phase 6，执行入口见 [Phase 6 实现 Issue Graph](./phases/phase6-issue-graph.md) 和 [Phase 6 实施记录](./phases/phase6-next-development-plan.md)。Phase 6 先推进 approval consumption、真实部署 adapter、CI/CD provider、Console 多页面化和 provider 成本/健康治理。
+当前进入 Phase 7，执行入口见 [Phase 7 实现 Issue Graph](./phases/phase7-issue-graph.md) 和 [Phase 7 实施记录](./phases/phase7-next-development-plan.md)。Phase 7 先推进 release provider approval consumption、SSH guarded runner、post-action evidence、provider telemetry feedback 和 Console execution history。
 
 Phase 1 第一批实现模块：
 

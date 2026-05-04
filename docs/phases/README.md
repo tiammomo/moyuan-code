@@ -4,6 +4,9 @@
 
 ## 当前阶段
 
+- [Phase 7 实现 Issue Graph](./phase7-issue-graph.md)：Phase 7 受控真实外部执行准备的依赖图。
+- [Phase 7 实施记录](./phase7-next-development-plan.md)：Phase 7 当前任务、执行范围和验收记录。
+- [Phase 6 Release Readiness](./phase6-release-readiness.md)：Phase 6 approval、adapter、telemetry 和 Console schema forms 的收口验证。
 - [Phase 6 实现 Issue Graph](./phase6-issue-graph.md)：Phase 6 approval consumption、部署 adapter、CI/CD provider、Provider telemetry 和 Console schema forms 的依赖图。
 - [Phase 6 实施记录](./phase6-next-development-plan.md)：Phase 6 当前任务、执行范围和验收记录。
 - [Phase 5 实现 Issue Graph](./phase5-issue-graph.md)：Phase 5 鉴权强制门禁、Secret resolver、真实外部 adapter preview/dry-run 和 Console 表单的依赖图。
