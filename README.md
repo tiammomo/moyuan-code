@@ -20,7 +20,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - API/State Store 已建立 Gin router 和 GORM SQLite 基线，项目注册会同步 `.moyuan/state.db`。
 - Memory 已具备 record gate、staging、dedup、敏感信息阻断和 compact 自动摘要。
 - Repair 已具备受控 attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
-- 下一批实现重点：新增下一阶段 issue graph，推进 approval consumption、真实部署 adapter、CI/CD provider、Console 多页面化和 provider 成本/健康治理。
+- 下一批实现重点：按 Phase 6 issue graph 推进 approval consumption、真实部署 adapter、CI/CD provider、Console 多页面化和 provider 成本/健康治理。
 
 ## 本地运行
 
