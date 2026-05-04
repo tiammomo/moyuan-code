@@ -919,6 +919,23 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(status, gin.H{"git_provider_plan": plan})
 	})
+	router.GET("/v1/projects/:project_id/git-provider-plans", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plans, err := gitprovider.List(rootDir, queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"git_provider_plans": plans})
+	})
 	router.GET("/v1/projects/:project_id/git-provider-plans/:plan_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -930,6 +947,27 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		plan, found, err := gitprovider.Load(rootDir, c.Param("plan_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "git provider plan not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"git_provider_plan": plan})
+	})
+	router.POST("/v1/projects/:project_id/git-provider-plans/:plan_id/sync", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plan, found, err := gitprovider.SyncStatus(c.Request.Context(), rootDir, c.Param("plan_id"))
 		if err != nil {
 			writeError(c, http.StatusInternalServerError, err.Error())
 			return

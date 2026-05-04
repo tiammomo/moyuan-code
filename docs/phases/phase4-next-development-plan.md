@@ -23,7 +23,7 @@ Phase 3 已完成并通过 release readiness：
 | P0 | `phase4-001` | `audit-log-query-api-console` | completed | 统一核心日志查询 API 和 Console Audit 面板 | 脱敏后的 run/audit/error 日志可按 channel、issue、run、limit 查询 |
 | P0 | `phase4-002` | `approval-record-store-api` | completed | 高风险操作审批记录落盘、查询和审计 | release/deploy/visual/provider 高风险动作有完整 approval lifecycle |
 | P1 | `phase4-003` | `team-auth-session-token-baseline` | completed | 本地团队模式的 session、API token 和 service account 基线 | session/token/service account 可创建、查询、撤销并写入 audit log |
-| P1 | `phase4-004` | `git-pr-mr-plan-sync` | planned | GitHub/Gitee PR/MR 计划、远程链接和状态同步 | PR/MR 状态可记录，不绕过 review 与质量门禁 |
+| P1 | `phase4-004` | `git-pr-mr-plan-sync` | completed | GitHub/Gitee PR/MR 计划、远程链接和状态同步 | PR/MR 状态可记录，不绕过 review 与质量门禁 |
 | P2 | `phase4-005` | `server-resource-maintenance` | planned | 服务器到期、续费、巡检、退役和环境引用维护 | 测试开发机和生产机生命周期可查询、可提醒、可审计 |
 
 ## 3. 已完成任务：`phase4-001 audit-log-query-api-console`
@@ -103,7 +103,33 @@ Phase 3 已完成并通过 release readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 6. 验证要求
+## 6. 已完成任务：`phase4-004 git-pr-mr-plan-sync`
+
+范围：
+
+- 扩展 `internal/gitprovider`，支持 PR/MR plan 列表和远程状态同步记录。
+- PR/MR plan 增加 `remote_link`、`remote_status`、`sync_decision`、`sync_reason`、`synced_at` 字段。
+- GitHub/Gitee/GitLab plan 会生成远程 compare/new PR/MR 链接；缺少 API auth 时降级为 manual status。
+- 新增 API：`GET /git-provider-plans`、`POST /git-provider-plans/:id/sync`。
+- 新增 CLI：`moyuan git provider list`、`moyuan git provider sync <plan-id>`。
+- Console 的 Release Pipeline 展示 PR/MR plan、branch、provider、remote status 和 sync decision。
+- 状态同步写入 `git_provider.status.synced` 日志。
+
+非目标：
+
+- 不真实 push、创建 PR/MR、合并 PR/MR 或读取远程保护分支。
+- 不绕过 review merge decision 和质量门禁。
+- 不读取 GitHub/Gitee token 明文；API auth adapter 进入后续任务。
+
+验证：
+
+- `go test ./internal/gitprovider ./internal/api ./internal/cli` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 7. 验证要求
 
 每完成一个 Phase 4 issue，至少运行：
 

@@ -433,6 +433,26 @@ export const demoSnapshot: ConsoleSnapshot = {
       decided_at: "2026-05-05T00:33:00.000Z",
     },
   ],
+  git_provider_plans: [
+    {
+      id: "git-provider-plan-frontend-console-20260505004300",
+      issue_id: "frontend-console",
+      status: "pr_mr_plan_ready",
+      decision: "PR_MR_ALLOWED",
+      provider: "github",
+      remote_name: "origin",
+      base_branch: "main",
+      target_branch: "feature/frontend-console",
+      pr_mr_type: "pull_request",
+      create_mode: "manual",
+      remote_link: "https://github.com/tiammomo/moyuan-code/compare/main...feature%2Ffrontend-console?expand=1",
+      remote_status: "manual_required",
+      sync_decision: "PR_MR_STATUS_MANUAL_REQUIRED",
+      sync_reason: "manual_create_mode_or_provider_without_pr_mr_api",
+      manual_required: true,
+      created_at: "2026-05-05T00:43:00.000Z",
+    },
+  ],
   auth_sessions: [
     {
       id: "session-owner-20260505004000",

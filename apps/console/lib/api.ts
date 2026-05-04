@@ -8,6 +8,7 @@ import type {
   AuthSessionSummary,
   DeploymentExecutionSummary,
   DeploymentSummary,
+  GitProviderPlanSummary,
   IssueNode,
   ProjectSummary,
   ProviderSummary,
@@ -74,6 +75,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     memoryResponse,
     auditEventsResponse,
     approvalsResponse,
+    gitProviderPlansResponse,
     sessionsResponse,
     apiTokensResponse,
     serviceAccountsResponse,
@@ -95,6 +97,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ candidates: unknown[] }>>(`/projects/${project.id}/memory/candidates?limit=3`),
     apiGet<ApiEnvelope<{ audit_events: unknown[] }>>(`/projects/${project.id}/audit-events?channel=all&limit=10`),
     apiGet<ApiEnvelope<{ approvals: unknown[] }>>(`/projects/${project.id}/approvals?limit=6`),
+    apiGet<ApiEnvelope<{ git_provider_plans: unknown[] }>>(`/projects/${project.id}/git-provider-plans?limit=5`),
     apiGet<ApiEnvelope<{ sessions: unknown[] }>>(`/projects/${project.id}/auth/sessions`),
     apiGet<ApiEnvelope<{ api_tokens: unknown[] }>>(`/projects/${project.id}/auth/api-tokens`),
     apiGet<ApiEnvelope<{ service_accounts: unknown[] }>>(`/projects/${project.id}/auth/service-accounts`),
@@ -117,6 +120,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const qualityReports = normalizeQualityReports(qualityReportsResponse?.quality_reports ?? []);
   const auditEvents = normalizeAuditEvents(auditEventsResponse?.audit_events ?? []);
   const approvals = normalizeApprovals(approvalsResponse?.approvals ?? []);
+  const gitProviderPlans = normalizeGitProviderPlans(gitProviderPlansResponse?.git_provider_plans ?? []);
   const authSessions = normalizeAuthSessions(sessionsResponse?.sessions ?? []);
   const apiTokens = normalizeAPITokens(apiTokensResponse?.api_tokens ?? []);
   const serviceAccounts = normalizeServiceAccounts(serviceAccountsResponse?.service_accounts ?? []);
@@ -158,6 +162,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     quality_explanations: qualityExplanations,
     approvals,
     audit_events: auditEvents,
+    git_provider_plans: gitProviderPlans,
     auth_sessions: authSessions,
     api_tokens: apiTokens,
     service_accounts: serviceAccounts,
@@ -467,6 +472,30 @@ function normalizeApprovals(rawApprovals: unknown[]): ApprovalRecordSummary[] {
     requested_at: readString(raw, "requested_at", ""),
     decided_at: readString(raw, "decided_at", ""),
   }));
+}
+
+function normalizeGitProviderPlans(rawPlans: unknown[]): GitProviderPlanSummary[] {
+  return rawPlans.map((raw, index) => {
+    const prmr = readUnknown(raw, "pr_mr");
+    return {
+      id: readString(raw, "id", `git-plan-${index + 1}`),
+      issue_id: readString(raw, "issue_id", ""),
+      status: readString(raw, "status", "unknown"),
+      decision: readString(raw, "decision", "unknown"),
+      provider: readString(raw, "provider", "generic_git"),
+      remote_name: readString(raw, "remote_name", ""),
+      base_branch: readString(raw, "base_branch", ""),
+      target_branch: readString(raw, "target_branch", ""),
+      pr_mr_type: readString(prmr, "type", ""),
+      create_mode: readString(prmr, "create_mode", ""),
+      remote_link: readString(prmr, "remote_link", ""),
+      remote_status: readString(prmr, "remote_status", ""),
+      sync_decision: readString(prmr, "sync_decision", ""),
+      sync_reason: readString(prmr, "sync_reason", ""),
+      manual_required: readBoolean(raw, "manual_required"),
+      created_at: readString(raw, "created_at", ""),
+    };
+  });
 }
 
 function normalizeAuthSessions(rawSessions: unknown[]): AuthSessionSummary[] {

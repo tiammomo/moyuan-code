@@ -473,6 +473,12 @@ func handleGit(ctx context.Context, args []string, cwd string) (string, any, int
 			return "unknown git provider command\n", nil, 1, nil
 		}
 		switch args[1] {
+		case "list":
+			plans, err := gitprovider.List(rootDir, 20)
+			if err != nil {
+				return "", nil, 1, err
+			}
+			return "", map[string]any{"git_provider_plans": plans}, 0, nil
 		case "plan":
 			if len(args) < 3 {
 				return "missing issue id\n", nil, 1, nil
@@ -488,6 +494,18 @@ func handleGit(ctx context.Context, args []string, cwd string) (string, any, int
 				return "missing plan id\n", nil, 1, nil
 			}
 			plan, ok, err := gitprovider.Load(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", plan, 0, nil
+		case "sync":
+			if len(args) < 3 {
+				return "missing plan id\n", nil, 1, nil
+			}
+			plan, ok, err := gitprovider.SyncStatus(ctx, rootDir, args[2])
 			if err != nil {
 				return "", nil, 1, err
 			}

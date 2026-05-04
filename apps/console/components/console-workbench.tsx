@@ -859,7 +859,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
 
           <div className="panel releasePanel">
-            <PanelTitle icon={<GitBranch size={18} />} title="Release Pipeline" meta="GitHub / Gitee" />
+            <PanelTitle icon={<GitBranch size={18} />} title="Release Pipeline" meta={`${snapshot.git_provider_plans.length} PR/MR plans`} />
             <div className="releaseSteps">
               <span>accepted issues</span>
               <ChevronRight size={15} />
@@ -868,6 +868,24 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
               <span>tag + PR/MR</span>
               <ChevronRight size={15} />
               <span>deploy plan</span>
+            </div>
+            <div className="prmrList">
+              {snapshot.git_provider_plans.length > 0 ? (
+                snapshot.git_provider_plans.slice(0, 3).map((plan) => (
+                  <div className="prmrItem" key={plan.id}>
+                    <div>
+                      <strong>{plan.issue_id || compactID(plan.id)}</strong>
+                      <span>
+                        {plan.provider} / {plan.target_branch || "branch pending"}
+                      </span>
+                    </div>
+                    <StatusPill tone={toneForStatus(plan.status)} label={plan.remote_status || plan.status} />
+                    <code>{plan.sync_decision || plan.decision}</code>
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No PR/MR plans recorded</div>
+              )}
             </div>
             <div className="approvalStrip">
               <Lock size={16} />

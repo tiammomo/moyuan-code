@@ -283,6 +283,25 @@ export type ApprovalRecordSummary = {
   decided_at?: string;
 };
 
+export type GitProviderPlanSummary = {
+  id: string;
+  issue_id: string;
+  status: string;
+  decision: string;
+  provider: string;
+  remote_name?: string;
+  base_branch?: string;
+  target_branch?: string;
+  pr_mr_type?: string;
+  create_mode?: string;
+  remote_link?: string;
+  remote_status?: string;
+  sync_decision?: string;
+  sync_reason?: string;
+  manual_required: boolean;
+  created_at?: string;
+};
+
 export type AuthSessionSummary = {
   id: string;
   user_id: string;
@@ -343,6 +362,7 @@ export type ConsoleSnapshot = {
   quality_explanations: QualityExplanation[];
   approvals: ApprovalRecordSummary[];
   audit_events: AuditEventSummary[];
+  git_provider_plans: GitProviderPlanSummary[];
   auth_sessions: AuthSessionSummary[];
   api_tokens: APITokenSummary[];
   service_accounts: ServiceAccountSummary[];

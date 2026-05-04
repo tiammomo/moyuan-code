@@ -1021,6 +1021,56 @@ meter {
   font-weight: 700;
 }
 
+.prmrList {
+  display: grid;
+  gap: 9px;
+  padding: 0 14px 14px;
+}
+
+.prmrItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.prmrItem div {
+  min-width: 0;
+}
+
+.prmrItem strong,
+.prmrItem span {
+  display: block;
+}
+
+.prmrItem strong {
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.prmrItem span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.prmrItem code {
+  grid-column: 1 / -1;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--blue);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .approvalStrip {
   margin: 0 14px;
 }
