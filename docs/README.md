@@ -14,7 +14,7 @@
 4. [策略决策树](./policies/README.md)：阅读鉴权、阅读理解、调度、质量、Bug 判断、Git、服务器、发布、Provider 和 Memory 的判断规则。
 5. [契约文档](./contracts/README.md)：进入实现前确认 auth、subagent/skill、self-repair、schema、runtime、logging 和 workspace migration 的接口边界。
 6. [项目工作空间规范](./project-workspace-spec.md)、[配置方案](./configuration-guide.md)、[配置 Schema 规则](./configuration-schema-spec.md)：理解每个被管理项目的 `.moyuan/` 工作空间和配置校验边界。
-7. [Agent Memory 系统方案](./agent-memory-system.md)、[Subagent 与 Skills 系统方案](./subagents-skills-system.md)、[模型与工具适配规划](./model-tool-adapters.md)：阅读关键横切能力。
+7. [Agent Memory 系统方案](./agent-memory-system.md)、[Subagent 与 Skills 系统方案](./subagents-skills-system.md)、[模型与工具适配规划](./model-tool-adapters.md)、[后端技术栈与本地环境](./backend-tech-stack.md)：阅读关键横切能力和 Go/Python 职责边界。
 8. [实现模块拆分](./implementation-module-map.md)、[框架自身测试策略](./framework-testing-strategy.md)、[持久化与并发一致性](./persistence-concurrency-consistency.md)：进入代码实现前确认模块、测试、状态和锁。
 9. [安全威胁模型](./threat-model.md)、[设计就绪门禁](./design-readiness-checklist.md)、[ADR](./adr/README.md)：确认生产级实现前的安全、评审和架构决策。
 
@@ -38,6 +38,7 @@
 | Agent role、team 和默认 Runtime | [Agent 角色与团队概览](./agent-roles-overview.md) |
 | Subagent 生命周期、Skill Registry、推荐、绑定和效果反馈 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | Agent Memory record、retrieve、compact 和维护 | [Agent Memory 系统方案](./agent-memory-system.md) |
+| 后端技术栈、Go 本地环境和 Python 本地环境 | [后端技术栈与本地环境](./backend-tech-stack.md) |
 | Issue Graph、并发调度和等待模型 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | AI 代码质量门禁、review 和返工闭环 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) |
 | commit、issue、fix、release 和覆盖率规范 | [工程流程规范](./engineering-process-standards.md) |

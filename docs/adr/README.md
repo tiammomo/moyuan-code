@@ -52,3 +52,4 @@ ADR 只记录“为什么这样选”。它不替代：
 | [ADR-0002](./0002-native-agent-runtime-boundary.md) | accepted | Claude CLI 和 Codex CLI 作为 Native Agent Runtime 接入，输出必须回到 Moyuan 门禁 |
 | [ADR-0003](./0003-default-2k-image-generation.md) | accepted | 架构图默认生成横版 2K，4K 仅作为显式实验或后处理 |
 | [ADR-0004](./0004-file-state-first-before-database.md) | accepted | 规划阶段优先文件化状态和 schema，数据库作为后续可替换实现 |
+| [ADR-0005](./0005-go-control-plane-python-worker.md) | accepted | 控制面后端采用 Go，模型邻接 worker 采用 Python |

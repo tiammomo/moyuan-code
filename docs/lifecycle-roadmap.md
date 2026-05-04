@@ -522,7 +522,7 @@ moyuan repo pr create <task-id>
 
 ## 8. 技术选型建议
 
-语言优先建议 TypeScript。原因是 CLI、API server、配置生态、Node 工具链、Claude Code SDK、OpenAI SDK 和 Web Console 集成都更直接。后续如强调单二进制分发和本地性能，可用 Rust 重写 CLI 或执行沙箱组件。
+语言优先建议 `Go + Python`。其中 `Go` 作为控制面后端，负责 CLI、API server、调度、Git、workspace、质量、发布和审计；`Python` 作为模型邻接 worker，负责 prompt 处理、Memory 辅助、文本分析和轻量批处理。两者之间优先通过版本化 JSON 协议协作，规模上来后再升级到 `gRPC`。具体约定见 [后端技术栈与本地环境](./backend-tech-stack.md) 和 [ADR-0005](./adr/0005-go-control-plane-python-worker.md)。
 
 存储路线：
 

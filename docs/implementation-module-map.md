@@ -216,10 +216,12 @@ cli/api
 
 ## 5. 建议代码目录
 
-后续代码实现建议使用以下逻辑目录。具体语言和框架可由 ADR 决定。
+后续代码实现建议使用以下逻辑目录。控制面主实现语言为 `Go`，模型邻接 worker 以 `Python` 为辅；具体语言边界见 [后端技术栈与本地环境](./backend-tech-stack.md) 和 [ADR-0005](./adr/0005-go-control-plane-python-worker.md)。
 
 ```text
-src/
+cmd/
+  moyuan/
+internal/
   cli/
   api/
   auth/
@@ -227,13 +229,13 @@ src/
   requirement/
   scheduler/
   subagent/
-  runtime-adapters/
-    claude-cli/
-    codex-cli/
-    model-api/
+  runtime/
+    claude/
+    codex/
+    model/
     shell/
   workspace/
-  state-store/
+  state/
   policy/
   logging/
   secrets/
@@ -249,6 +251,15 @@ src/
   server-resources/
   visuals/
   testing/
+workers/
+  python/
+    src/
+      moyuan_worker/
+        memory/
+        review/
+        prompts/
+        analysis/
+scripts/
 ```
 
 ## 6. 最小实现顺序
