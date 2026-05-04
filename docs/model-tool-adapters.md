@@ -287,18 +287,20 @@ Image Adapter 负责图像生成和图像编辑能力。首个目标是接入 Op
 
 - 从项目理解、模块地图、Issue Graph、服务器资源和发布配置中抽取结构化信息。
 - 先生成 `diagram_spec`，再生成图像 prompt。
-- 默认调用 `gpt-image-2` 生成横版 2K 图片，默认尺寸为 `3072x2048`。
+- 真实生成时调用 `gpt-image-2` 生成横版 2K 图片，默认尺寸为 `3072x2048`。
 - 保存图片、prompt、spec 和 Markdown 讲解。
 - 检查图片可读性、节点一致性和敏感信息泄露。
+- 图像脚本执行必须进入受控 execution：默认 dry-run，只在显式 approval 和运行开关同时满足时允许 script mode。
 
 Phase 2 当前落地：
 
-- CLI：`moyuan visuals diagram plan`、`moyuan visuals assets`、`moyuan visuals asset show <asset-id>`。
-- API：`POST /v1/projects/:project_id/visuals/diagrams/plan`、`GET /v1/projects/:project_id/visuals/assets`、`GET /v1/projects/:project_id/visuals/assets/:asset_id`。
-- 运行期产物：`.moyuan/visuals/specs/`、`.moyuan/visuals/prompts/`、`.moyuan/visuals/assets/`。
+- CLI：`moyuan visuals diagram plan`、`moyuan visuals assets`、`moyuan visuals asset show <asset-id>`、`moyuan visuals asset render <asset-id>`、`moyuan visuals renders`。
+- API：`POST /v1/projects/:project_id/visuals/diagrams/plan`、`GET /v1/projects/:project_id/visuals/assets`、`GET /v1/projects/:project_id/visuals/assets/:asset_id`、`POST /v1/projects/:project_id/visuals/assets/:asset_id/render`、`GET /v1/projects/:project_id/visuals/render-executions`。
+- 运行期产物：`.moyuan/visuals/specs/`、`.moyuan/visuals/prompts/`、`.moyuan/visuals/assets/`、`.moyuan/visuals/executions/`。
 - Diagram plan 会生成脱敏后的 `diagram_spec`、prompt 和 asset record。
 - Provider Route 使用 `image-diagram` 策略检查 `gpt_image_2`；provider 不可用时保留 `route_blocked` asset record。
-- 当前不直接调用图像 API；真实生成仍由 `scripts/generate-architecture-image.js` 和 `scripts/generate-multi-agent-flow-image.js` 执行。
+- Render execution 默认 `dry_run`，记录脚本预览和 `no_image_api_called`。
+- `script` mode 必须同时满足 `--approved`、`MOYUAN_ALLOW_IMAGE_SCRIPT=1`、`OPENAI_API_KEY` 已存在、脚本文件存在；执行记录不得落明文密钥。
 
 注意：
 

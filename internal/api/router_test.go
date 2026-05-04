@@ -173,6 +173,16 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/visuals/assets?limit=1", http.StatusOK, `"visual_assets"`, visualAssets[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/visuals/assets/"+visualAssets[0].ID, http.StatusOK, `"visual_asset"`, `"prompt_path"`)
+	assertPostContains(t, router, "/v1/projects/managed/visuals/assets/"+visualAssets[0].ID+"/render", `{"mode":"dry_run"}`, http.StatusOK, `"visual_render_execution"`, `"VISUAL_RENDER_DRY_RUN"`, `"no_image_api_called"`)
+	visualRenderExecutions, err := visuals.ListRenderExecutions(root, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(visualRenderExecutions) != 1 {
+		t.Fatalf("expected visual render execution from API render")
+	}
+	assertGETContains(t, router, "/v1/projects/managed/visuals/render-executions?limit=1", http.StatusOK, `"visual_render_executions"`, visualRenderExecutions[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/visuals/render-executions/"+visualRenderExecutions[0].ID, http.StatusOK, `"visual_render_execution"`, `"script_preview"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality-reports?limit=1", http.StatusOK, `"quality_reports"`, `"review_status"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality/"+result.QualityReport.ID+"/explain", http.StatusOK, `"quality_explanation"`, `"QUALITY_ACCEPTED"`)
 	assertPostContains(t, router, "/v1/projects/managed/issues/phase1-001/merge-decision", `{}`, http.StatusOK, `"merge_decision"`, `"MERGE_ALLOWED"`)

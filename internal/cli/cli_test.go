@@ -242,6 +242,16 @@ func TestVisualsDiagramPlanSanitizesAndIndexesAssets(t *testing.T) {
 	assertContains(t, asset.stdout, `"size": "3072x2048"`)
 	assets := runCLI(t, root, "visuals", "assets", "--limit", "1")
 	assertContains(t, assets.stdout, assetID)
+	render := runCLI(t, root, "visuals", "asset", "render", assetID)
+	assertContains(t, render.stdout, `"decision": "VISUAL_RENDER_DRY_RUN"`)
+	assertContains(t, render.stdout, `"no_image_api_called"`)
+	renderID := decodeStringField(t, render.stdout, "id")
+	renders := runCLI(t, root, "visuals", "renders", "--limit", "1")
+	assertContains(t, renders.stdout, renderID)
+	shownRender := runCLI(t, root, "visuals", "render", "show", renderID)
+	assertContains(t, shownRender.stdout, `"script_preview"`)
+	blockedRender := runCLI(t, root, "visuals", "asset", "render", assetID, "--mode", "script")
+	assertContains(t, blockedRender.stdout, `"visual_render_approval_required"`)
 
 	assertGlob(t, root, ".moyuan/visuals/specs/*.json")
 	assertGlob(t, root, ".moyuan/visuals/prompts/*.prompt.md")
@@ -250,7 +260,9 @@ func TestVisualsDiagramPlanSanitizesAndIndexesAssets(t *testing.T) {
 	assertGlobFileNotContains(t, root, ".moyuan/visuals/specs/*.json", "10.0.0.1")
 	assertGlobFileNotContains(t, root, ".moyuan/visuals/prompts/*.prompt.md", "plain-secret")
 	assertFileContains(t, root, ".moyuan/visuals/assets/assets.jsonl", assetID)
+	assertFileContains(t, root, ".moyuan/visuals/executions/events.jsonl", renderID)
 	assertFileContains(t, root, ".moyuan/logs/model.jsonl", "visual.diagram.planned")
+	assertFileContains(t, root, ".moyuan/logs/model.jsonl", "visual.render.execution.created")
 }
 
 func TestRepairControlledLoopRunsQualityAndStopsAfterMaxAttempts(t *testing.T) {

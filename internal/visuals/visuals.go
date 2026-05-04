@@ -1,6 +1,7 @@
 package visuals
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
+	"moyuan-code/internal/process"
 	"moyuan-code/internal/providers"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
@@ -76,6 +78,44 @@ type AssetRecord struct {
 type Plan struct {
 	DiagramSpec DiagramSpec `json:"diagram_spec"`
 	Asset       AssetRecord `json:"asset"`
+}
+
+type RenderOptions struct {
+	AssetID  string `json:"asset_id"`
+	Mode     string `json:"mode"`
+	Approved bool   `json:"approved"`
+}
+
+type RenderExecution struct {
+	ID            string       `json:"id"`
+	AssetID       string       `json:"asset_id"`
+	DiagramSpecID string       `json:"diagram_spec_id,omitempty"`
+	DiagramType   string       `json:"diagram_type,omitempty"`
+	Title         string       `json:"title,omitempty"`
+	Mode          string       `json:"mode"`
+	Status        string       `json:"status"`
+	Decision      string       `json:"decision"`
+	Reasons       []string     `json:"reasons"`
+	ProviderID    string       `json:"provider_id,omitempty"`
+	ModelID       string       `json:"model_id,omitempty"`
+	Size          string       `json:"size,omitempty"`
+	PromptPath    string       `json:"prompt_path,omitempty"`
+	SpecPath      string       `json:"spec_path,omitempty"`
+	ImagePath     string       `json:"image_path,omitempty"`
+	ScriptPath    string       `json:"script_path,omitempty"`
+	Steps         []RenderStep `json:"steps"`
+	StartedAt     string       `json:"started_at"`
+	FinishedAt    string       `json:"finished_at,omitempty"`
+}
+
+type RenderStep struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Command    string `json:"command,omitempty"`
+	Output     string `json:"output,omitempty"`
+	Error      string `json:"error,omitempty"`
+	StartedAt  string `json:"started_at,omitempty"`
+	FinishedAt string `json:"finished_at,omitempty"`
 }
 
 var (
@@ -195,11 +235,193 @@ func LoadAsset(rootDir string, id string) (AssetRecord, bool, error) {
 	return asset, found, err
 }
 
+func RenderAsset(ctx context.Context, rootDir string, options RenderOptions) (RenderExecution, error) {
+	if err := workspace.EnsureDirs(workspace.ForRoot(rootDir)); err != nil {
+		return RenderExecution{}, err
+	}
+	options.AssetID = strings.TrimSpace(options.AssetID)
+	options.Mode = normalizeRenderMode(options.Mode)
+	if options.AssetID == "" {
+		return RenderExecution{}, errors.New("asset_id_required")
+	}
+	if options.Mode == "" {
+		options.Mode = "dry_run"
+	}
+	now := time.Now().UTC()
+	asset, found, err := LoadAsset(rootDir, options.AssetID)
+	if err != nil {
+		return RenderExecution{}, err
+	}
+	execution := RenderExecution{
+		ID:            "visual-render-" + textutil.Slugify(options.AssetID+"-"+options.Mode) + "-" + now.Format("20060102150405"),
+		AssetID:       options.AssetID,
+		DiagramSpecID: asset.DiagramSpecID,
+		DiagramType:   asset.DiagramType,
+		Title:         asset.Title,
+		Mode:          options.Mode,
+		Status:        "blocked",
+		Decision:      "VISUAL_RENDER_BLOCKED",
+		Reasons:       []string{},
+		ProviderID:    asset.ProviderID,
+		ModelID:       asset.ModelID,
+		Size:          asset.Size,
+		PromptPath:    asset.PromptPath,
+		SpecPath:      asset.SpecPath,
+		ImagePath:     asset.ImagePath,
+		Steps:         []RenderStep{},
+		StartedAt:     now.Format(time.RFC3339Nano),
+	}
+	if !found {
+		execution.Reasons = append(execution.Reasons, "visual_asset_not_found")
+		return finishRenderExecution(rootDir, execution)
+	}
+	scriptPath := scriptFor(asset.DiagramType)
+	execution.ScriptPath = scriptPath
+	switch options.Mode {
+	case "dry_run":
+		execution.Status = "completed"
+		execution.Decision = "VISUAL_RENDER_DRY_RUN"
+		execution.Reasons = append(execution.Reasons, "no_image_api_called")
+		if asset.Status == "route_blocked" {
+			execution.Reasons = append(execution.Reasons, "visual_asset_route_blocked_preview_only")
+		}
+		execution.Steps = append(execution.Steps, RenderStep{
+			Name:    "script_preview",
+			Status:  "dry_run",
+			Command: renderCommand(scriptPath),
+			Output:  "script execution preview only",
+		})
+	case "script":
+		if !options.Approved {
+			execution.Reasons = append(execution.Reasons, "visual_render_approval_required")
+			return finishRenderExecution(rootDir, execution)
+		}
+		if asset.Status == "route_blocked" {
+			execution.Reasons = append(execution.Reasons, "visual_asset_route_blocked")
+			return finishRenderExecution(rootDir, execution)
+		}
+		if os.Getenv("MOYUAN_ALLOW_IMAGE_SCRIPT") != "1" {
+			execution.Reasons = append(execution.Reasons, "image_script_execution_not_enabled")
+			return finishRenderExecution(rootDir, execution)
+		}
+		if os.Getenv("OPENAI_API_KEY") == "" {
+			execution.Reasons = append(execution.Reasons, "image_api_key_missing")
+			return finishRenderExecution(rootDir, execution)
+		}
+		if !fsutil.Exists(filepath.Join(rootDir, scriptPath)) {
+			execution.Reasons = append(execution.Reasons, "visual_render_script_missing")
+			return finishRenderExecution(rootDir, execution)
+		}
+		execution = runScript(ctx, rootDir, execution, asset, scriptPath)
+	default:
+		execution.Reasons = append(execution.Reasons, "visual_render_mode_not_allowed:"+options.Mode)
+	}
+	return finishRenderExecution(rootDir, execution)
+}
+
+func LoadRenderExecution(rootDir string, id string) (RenderExecution, bool, error) {
+	var execution RenderExecution
+	found, err := fsutil.ReadJSON(filepath.Join(renderExecutionsDir(rootDir), textutil.Slugify(id)+".json"), &execution)
+	return execution, found, err
+}
+
+func ListRenderExecutions(rootDir string, limit int) ([]RenderExecution, error) {
+	dir := renderExecutionsDir(rootDir)
+	if err := fsutil.EnsureDir(dir); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	executions := []RenderExecution{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var execution RenderExecution
+		found, err := fsutil.ReadJSON(filepath.Join(dir, entry.Name()), &execution)
+		if err != nil {
+			return nil, err
+		}
+		if found && execution.ID != "" {
+			executions = append(executions, execution)
+		}
+	}
+	sort.SliceStable(executions, func(i, j int) bool {
+		return executions[i].StartedAt > executions[j].StartedAt
+	})
+	if limit > 0 && len(executions) > limit {
+		return executions[:limit], nil
+	}
+	return executions, nil
+}
+
 func writeAsset(rootDir string, asset AssetRecord) error {
 	if err := fsutil.WriteJSON(filepath.Join(assetsDir(rootDir), asset.ID+".json"), asset); err != nil {
 		return err
 	}
 	return fsutil.AppendJSONL(filepath.Join(assetsDir(rootDir), "assets.jsonl"), asset)
+}
+
+func runScript(ctx context.Context, rootDir string, execution RenderExecution, asset AssetRecord, scriptPath string) RenderExecution {
+	step := RenderStep{Name: "image_script", Status: "running", Command: renderCommand(scriptPath), StartedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+	env := append(os.Environ(), "IMAGE_SIZE="+asset.Size)
+	if asset.ModelID != "" {
+		env = append(env, "OPENAI_IMAGE_MODEL="+asset.ModelID)
+	}
+	result := process.RunCommandInput(ctx, rootDir, "", env, "node", scriptPath)
+	step.Output = strings.TrimSpace(result.Stdout)
+	step.Error = sanitizeExecutionText(result.Stderr)
+	step.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	if result.Code == 0 {
+		step.Status = "completed"
+		execution.Status = "completed"
+		execution.Decision = "VISUAL_RENDER_COMPLETED"
+		execution.Reasons = append(execution.Reasons, "image_script_completed")
+		imagePath := outputPathFromScript(step.Output, "Image written:")
+		if imagePath != "" {
+			asset.ImagePath = imagePath
+			execution.ImagePath = imagePath
+		}
+		promptPath := outputPathFromScript(step.Output, "Prompt written:")
+		if promptPath != "" {
+			asset.PromptPath = promptPath
+			execution.PromptPath = promptPath
+		}
+		explanationPath := outputPathFromScript(step.Output, "Explanation written:")
+		if explanationPath != "" {
+			asset.ExplanationPath = explanationPath
+		}
+		asset.Status = "rendered"
+		asset.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
+		_ = writeAsset(rootDir, asset)
+	} else {
+		step.Status = "failed"
+		execution.Status = "failed"
+		execution.Decision = "VISUAL_RENDER_FAILED"
+		execution.Reasons = append(execution.Reasons, "image_script_failed")
+	}
+	execution.Steps = append(execution.Steps, step)
+	return execution
+}
+
+func finishRenderExecution(rootDir string, execution RenderExecution) (RenderExecution, error) {
+	execution.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	if err := fsutil.WriteJSON(filepath.Join(renderExecutionsDir(rootDir), execution.ID+".json"), execution); err != nil {
+		return RenderExecution{}, err
+	}
+	if err := fsutil.AppendJSONL(filepath.Join(renderExecutionsDir(rootDir), "events.jsonl"), execution); err != nil {
+		return RenderExecution{}, err
+	}
+	_ = logging.Log(rootDir, "model", "visual.render.execution.created", map[string]any{
+		"execution_id": execution.ID,
+		"asset_id":     execution.AssetID,
+		"decision":     execution.Decision,
+		"status":       execution.Status,
+		"mode":         execution.Mode,
+	})
+	return execution, nil
 }
 
 func visualsDir(rootDir string) string {
@@ -208,6 +430,10 @@ func visualsDir(rootDir string) string {
 
 func assetsDir(rootDir string) string {
 	return filepath.Join(visualsDir(rootDir), "assets")
+}
+
+func renderExecutionsDir(rootDir string) string {
+	return filepath.Join(visualsDir(rootDir), "executions")
 }
 
 func normalizeDiagramType(value string) string {
@@ -222,6 +448,44 @@ func normalizeDiagramType(value string) string {
 	default:
 		return ""
 	}
+}
+
+func normalizeRenderMode(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	value = strings.ReplaceAll(value, "-", "_")
+	switch value {
+	case "script", "local_script":
+		return "script"
+	default:
+		return value
+	}
+}
+
+func scriptFor(diagramType string) string {
+	if normalizeDiagramType(diagramType) == "multi_agent" {
+		return "scripts/generate-multi-agent-flow-image.js"
+	}
+	return "scripts/generate-architecture-image.js"
+}
+
+func renderCommand(scriptPath string) string {
+	return "node " + scriptPath
+}
+
+func outputPathFromScript(output string, prefix string) string {
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(line, prefix))
+		}
+	}
+	return ""
+}
+
+func sanitizeExecutionText(value string) string {
+	value = credentialPattern.ReplaceAllString(value, "$1=[REDACTED]")
+	value = openAIKeyPattern.ReplaceAllString(value, "[REDACTED_API_KEY]")
+	return strings.TrimSpace(value)
 }
 
 func defaultTitle(diagramType string) string {

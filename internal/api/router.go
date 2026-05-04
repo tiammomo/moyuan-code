@@ -81,6 +81,11 @@ type visualDiagramPlanRequest struct {
 	Size        string `json:"size"`
 }
 
+type visualRenderRequest struct {
+	Mode     string `json:"mode"`
+	Approved bool   `json:"approved"`
+}
+
 func NewRouter(options Options) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -367,6 +372,74 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"visual_assets": assets})
+	})
+	router.POST("/v1/projects/:project_id/visuals/assets/:asset_id/render", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req visualRenderRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		execution, err := visuals.RenderAsset(c.Request.Context(), rootDir, visuals.RenderOptions{
+			AssetID:  c.Param("asset_id"),
+			Mode:     req.Mode,
+			Approved: req.Approved,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if execution.Status == "blocked" || execution.Status == "failed" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"visual_render_execution": execution})
+	})
+	router.GET("/v1/projects/:project_id/visuals/render-executions", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		executions, err := visuals.ListRenderExecutions(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"visual_render_executions": executions})
+	})
+	router.GET("/v1/projects/:project_id/visuals/render-executions/:execution_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		execution, found, err := visuals.LoadRenderExecution(rootDir, c.Param("execution_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "visual render execution not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"visual_render_execution": execution})
 	})
 	router.GET("/v1/projects/:project_id/visuals/assets/:asset_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

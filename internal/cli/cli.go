@@ -103,7 +103,7 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 	case "deploy":
 		text, result, exitCode, err = handleDeploy(ctx, argv[1:], cwd)
 	case "visuals":
-		text, result, exitCode, err = handleVisuals(argv[1:], cwd)
+		text, result, exitCode, err = handleVisuals(ctx, argv[1:], cwd)
 	case "logs":
 		text, result, exitCode, err = handleLogs(argv[1:], cwd)
 	default:
@@ -185,6 +185,9 @@ func usage() string {
 		"moyuan visuals diagram plan [--type architecture] [--title <title>] [--scope <text>]",
 		"moyuan visuals assets [--limit 20]",
 		"moyuan visuals asset show <asset-id>",
+		"moyuan visuals asset render <asset-id> [--mode dry_run] [--approved]",
+		"moyuan visuals renders [--limit 20]",
+		"moyuan visuals render show <execution-id>",
 		"moyuan skills add --id <id> --source <source> [--role backend] [--tag tdd]",
 		"moyuan skills list",
 		"moyuan skills recommend --role backend [--task-type testing] [--risk medium]",
@@ -1118,7 +1121,7 @@ func handleSkills(args []string, cwd string) (string, any, int, error) {
 	return "unknown skills command\n", nil, 1, nil
 }
 
-func handleVisuals(args []string, cwd string) (string, any, int, error) {
+func handleVisuals(ctx context.Context, args []string, cwd string) (string, any, int, error) {
 	rootDir := mustRoot(cwd)
 	if len(args) == 0 {
 		return "unknown visuals command\n", nil, 1, nil
@@ -1147,6 +1150,28 @@ func handleVisuals(args []string, cwd string) (string, any, int, error) {
 				return "", map[string]any{}, 1, nil
 			}
 			return "", asset, 0, nil
+		}
+		if len(args) >= 3 && args[1] == "render" {
+			execution, err := visuals.RenderAsset(ctx, rootDir, visuals.RenderOptions{
+				AssetID:  args[2],
+				Mode:     flagValue(args, "--mode", "dry_run"),
+				Approved: hasFlag(args, "--approved"),
+			})
+			return "", execution, 0, err
+		}
+	case "renders":
+		executions, err := visuals.ListRenderExecutions(rootDir, flagInt(args, "--limit", 20))
+		return "", executions, 0, err
+	case "render":
+		if len(args) >= 3 && args[1] == "show" {
+			execution, ok, err := visuals.LoadRenderExecution(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", execution, 0, nil
 		}
 	}
 	return "unknown visuals command\n", nil, 1, nil

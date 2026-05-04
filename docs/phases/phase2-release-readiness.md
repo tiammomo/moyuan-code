@@ -90,6 +90,8 @@ Visual diagrams：
 moyuan visuals diagram plan --type multi-agent
 moyuan visuals assets
 moyuan visuals asset show <asset-id>
+moyuan visuals asset render <asset-id> --mode dry_run
+moyuan visuals renders
 ```
 
 ## 5. 产物位置
@@ -103,6 +105,7 @@ moyuan visuals asset show <asset-id>
 - `.moyuan/visuals/specs/`
 - `.moyuan/visuals/prompts/`
 - `.moyuan/visuals/assets/`
+- `.moyuan/visuals/executions/`
 - `.moyuan/logs/`
 
 ## 6. 剩余风险
@@ -111,15 +114,15 @@ moyuan visuals asset show <asset-id>
 - Skill recommendation 当前是本地规则 fallback，不是真实外部 marketplace adapter。
 - Runtime recovery 只归档上下文和建议 fallback candidate，不自动 resume。
 - Subagent retry/archive 已进入调度输入，但还没有生产级队列和 worker。
-- Visual diagram plan 不执行真实图像 API，真实生成仍在 `scripts/`。
+- Visual render execution 默认不执行真实图像 API；script mode 需要 approval、运行开关和环境密钥。
 - Console 已有 Phase 2 可视化入口，但还未展开到完整日志、diff 和图片预览。
 
 ## 7. 下一批建议
 
 优先级建议：
 
-1. 将 `scripts/` 图像生成纳入受控 CLI/API execution，保持脱敏和不阻塞质量门禁。
-2. Provider 自动健康检查和 quota refresh。
-3. Workspace schema validator 和 `.moyuan/state.db` 索引深化。
-4. Skills 外部 adapter 接入和 recommendation score 与 effectiveness 闭环。
-5. Console 深化日志流、diff 展开、visual asset 图片预览和人工审批动作。
+1. Provider 自动健康检查和 quota refresh。
+2. Workspace schema validator 和 `.moyuan/state.db` 索引深化。
+3. Skills 外部 adapter 接入和 recommendation score 与 effectiveness 闭环。
+4. Console 深化日志流、diff 展开、visual asset 图片预览和人工审批动作。
+5. Visual script mode 接入 auth ref、密钥注入审计和图片结果质量检查。
