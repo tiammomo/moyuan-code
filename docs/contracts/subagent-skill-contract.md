@@ -173,6 +173,9 @@ Phase 2 当前实现边界：
 - 绑定事件：`.moyuan/skills/bindings.events.jsonl`。
 - 绑定入口：`moyuan skills bind --skill <skill-id> --target-type role --target backend`、`GET/POST /v1/projects/:project_id/skills/bindings`。
 - `enabled` binding 必须引用存在且启用的 skill；高风险 skill 不能直接绑定到 project 级默认范围。
+- 效果记录存储：`.moyuan/skills/effectiveness/<id>.json` 和 `.moyuan/skills/effectiveness/effectiveness.jsonl`。
+- 效果记录入口：`moyuan skills effectiveness add/list`、`GET/POST /v1/projects/:project_id/skills/effectiveness`。
+- 当前效果记录只写入和查询，不自动改变 recommendation score。
 
 ## 6. Skill 效果接口
 

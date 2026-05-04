@@ -188,6 +188,8 @@ Phase 2 当前落地：
 - 推荐 CLI/API：`moyuan skills recommend --role <role>`、`POST /v1/projects/:project_id/skills/recommend`。
 - 绑定结果写入 `.moyuan/skills/bindings.json`，绑定事件写入 `.moyuan/skills/bindings.events.jsonl`。
 - Binding CLI/API：`moyuan skills bind`、`moyuan skills bindings`、`moyuan skills binding disable`、`GET/POST /v1/projects/:project_id/skills/bindings`。
+- 效果记录写入 `.moyuan/skills/effectiveness/`，用于后续 recommendation 加权、降权和禁用策略。
+- Effectiveness CLI/API：`moyuan skills effectiveness add/list`、`GET/POST /v1/projects/:project_id/skills/effectiveness`。
 
 每个 Skill 必须声明：
 

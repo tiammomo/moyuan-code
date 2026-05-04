@@ -178,6 +178,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertPostContains(t, router, "/v1/projects/managed/skills/bindings", `{"skill_id":"tdd","target_type":"role","target_id":"backend"}`, http.StatusCreated, `"skill_binding"`, `"binding-role-backend-tdd"`)
 	assertGETContains(t, router, "/v1/projects/managed/skills/bindings", http.StatusOK, `"skill_bindings"`, `"binding-role-backend-tdd"`)
 	assertPostContains(t, router, "/v1/projects/managed/skills/bindings/binding-role-backend-tdd/disable", `{}`, http.StatusOK, `"skill_binding"`, `"disabled"`)
+	assertPostContains(t, router, "/v1/projects/managed/skills/effectiveness", `{"skill_id":"tdd","issue_id":"phase1-001","outcome":"helped","quality_impact":"improved","rework_reduced":true}`, http.StatusCreated, `"skill_effectiveness"`, `"helped"`)
+	assertGETContains(t, router, "/v1/projects/managed/skills/effectiveness?skill_id=tdd", http.StatusOK, `"skill_effectiveness"`, `"improved"`)
 	assertPostContains(t, router, "/v1/projects/managed/skills/tdd/disable", `{}`, http.StatusOK, `"skill"`, `"enabled":false`)
 	assertPostContains(t, router, "/v1/projects/managed/skills", `{"id":"bad-secret","source":"local","auth_ref":"sk-plain-secret"}`, http.StatusBadRequest, `"auth_ref_must_be_reference"`)
 	assertGETContains(t, router, "/v1/projects/managed/memory/search?q=Beta&limit=1", http.StatusOK, `"records"`, `Beta API should expose`)

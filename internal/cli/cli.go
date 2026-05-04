@@ -182,6 +182,8 @@ func usage() string {
 		"moyuan skills bind --skill <skill-id> --target-type role --target backend",
 		"moyuan skills bindings",
 		"moyuan skills binding disable <binding-id>",
+		"moyuan skills effectiveness add --skill <skill-id> --issue <issue-id>",
+		"moyuan skills effectiveness list [--skill <skill-id>]",
 		"moyuan skills disable <skill-id>",
 		"moyuan release suggest [--version v0.1.0] [--min-issues 3]",
 		"moyuan release show <release-id>",
@@ -1006,6 +1008,28 @@ func handleSkills(args []string, cwd string) (string, any, int, error) {
 				return "", map[string]any{}, 1, nil
 			}
 			return "", binding, 0, nil
+		}
+	case "effectiveness":
+		if len(args) >= 2 && args[1] == "add" {
+			duration, _ := strconv.Atoi(flagValue(args, "--duration-seconds", "0"))
+			record, err := skills.RecordEffectiveness(rootDir, skills.Effectiveness{
+				SkillID:         flagValue(args, "--skill", ""),
+				BindingID:       flagValue(args, "--binding", ""),
+				SubagentID:      flagValue(args, "--subagent", ""),
+				RunID:           flagValue(args, "--run", ""),
+				IssueID:         flagValue(args, "--issue", ""),
+				Outcome:         flagValue(args, "--outcome", "neutral"),
+				QualityImpact:   flagValue(args, "--quality-impact", "unchanged"),
+				ReworkReduced:   hasFlag(args, "--rework-reduced"),
+				DurationSeconds: duration,
+				Findings:        flagValues(args, "--finding"),
+			})
+			return "", record, 0, err
+		}
+		if len(args) >= 2 && args[1] == "list" {
+			limit, _ := strconv.Atoi(flagValue(args, "--limit", "20"))
+			records, err := skills.ListEffectiveness(rootDir, flagValue(args, "--skill", ""), limit)
+			return "", records, 0, err
 		}
 	case "disable":
 		if len(args) < 2 {
