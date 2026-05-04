@@ -444,7 +444,8 @@ dd {
 }
 
 .warningLine,
-.approvalStrip {
+.approvalStrip,
+.decisionStrip {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -454,6 +455,85 @@ dd {
   background: #fff9ec;
   color: #835101;
   font-size: 13px;
+}
+
+.decisionStrip {
+  align-items: flex-start;
+  border-color: #b6dfcf;
+  background: #f4fbf7;
+  color: #145f43;
+}
+
+.decisionStrip div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.decisionStrip span {
+  color: #45715e;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.chipSection {
+  display: grid;
+  gap: 8px;
+}
+
+.chipSection > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chipList code {
+  padding: 4px 7px;
+  border: 1px solid #dce4ef;
+  border-radius: 7px;
+  background: #f7f9fc;
+  color: #334155;
+  font-size: 11px;
+}
+
+.reasonList,
+.findingList {
+  display: grid;
+  gap: 8px;
+}
+
+.reasonList span,
+.findingList div {
+  padding: 9px 10px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: #45546a;
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.findingList div {
+  display: grid;
+  gap: 4px;
+  border-color: #f1b9b2;
+  background: #fff4f3;
+}
+
+.findingList strong {
+  color: var(--red);
+}
+
+.findingList code {
+  width: fit-content;
+  color: #835101;
 }
 
 .requirementForm {

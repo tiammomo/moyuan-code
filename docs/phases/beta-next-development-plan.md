@@ -2,7 +2,7 @@
 
 状态：in_progress
 责任角色：orchestrator_owner + backend_owner + qa_owner
-最后更新：2026-05-04
+最后更新：2026-05-05
 
 本文记录 Beta 阶段从规划到执行的实际顺序。稳定设计结论需要回写到对应主线、策略、契约或配置文档；本文件只记录阶段执行事实。
 
@@ -39,7 +39,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P2 | `beta-014` | `server-health-check-executor` | completed | 服务器健康检查执行器 | test_dev/staging 资源可执行受控 health check 并回写资源状态 |
 | P1 | `beta-015` | `subagent-model` | completed | 显式 Subagent Instance 模型 | 每个 run 都有 role/runtime/scope/skills/memory 的可审计 subagent |
 | P1 | `beta-016` | `quality-policy-api` | completed | 质量门禁策略和 findings 可解释 API | 控制台可查看 accepted/blocked/needs_rework 的证据 |
-| P1 | `beta-017` | `console-quality-subagent-view` | planned | 控制台展示 Subagent 和质量解释 | Issue Inspector 可看到 subagent、quality explanation 和 rework reason |
+| P1 | `beta-017` | `console-quality-subagent-view` | completed | 控制台展示 Subagent 和质量解释 | Issue Inspector 可看到 subagent、quality explanation 和 rework reason |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -527,3 +527,9 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 退出条件：
 
 - Inspector 能展示 subagent id、runtime、provider、quality report、review status、blocking findings。
+
+完成记录：
+
+- Web Console snapshot 已接入 `subagents`、`quality-reports` 和 `quality explain` API。
+- Issue Inspector 已展示 run id、subagent id、runtime/provider、runtime status、quality report、review status、quality decision、reasons、skills、output contract 和 blocking findings。
+- Quality Gates 面板优先展示 live quality explanation，不再只依赖 demo 静态信号。

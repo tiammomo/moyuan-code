@@ -2,7 +2,7 @@
 
 状态：in_progress
 责任角色：orchestrator_owner + backend_owner + qa_owner
-最后更新：2026-05-04
+最后更新：2026-05-05
 
 本文记录 Phase 1 后的 Beta 阶段执行图。Beta 不重新规划 Phase 1 已完成能力，只在稳定本地 CLI MVP 上扩展控制面 API、任务编排、Provider、Git Provider、服务器资源和发布投产能力。
 
@@ -33,7 +33,7 @@
 | `beta-014` | `server-health-check-executor` | completed | 服务器健康检查执行器和历史记录 | `beta-009`,`beta-011` | `infra_owner` | test_dev/staging 可执行 health scan 并回写资源状态 |
 | `beta-015` | `subagent-model` | completed | 显式 Subagent Instance 数据模型 | `beta-013` | `orchestrator_owner` | 每个 run 都有 role/runtime/scope/skills/memory 的可审计 subagent |
 | `beta-016` | `quality-policy-api` | completed | 质量门禁策略和 findings 可解释 API | `beta-005`,`beta-013` | `quality_owner` | 控制台可查看 accepted/blocked/needs_rework 的证据 |
-| `beta-017` | `console-quality-subagent-view` | planned | 控制台展示 Subagent 和质量解释 | `beta-015`,`beta-016` | `frontend` | Issue Inspector 可看到 subagent、quality explanation 和 rework reason |
+| `beta-017` | `console-quality-subagent-view` | completed | 控制台展示 Subagent 和质量解释 | `beta-015`,`beta-016` | `frontend` | Issue Inspector 可看到 subagent、quality explanation 和 rework reason |
 
 ## 3. 推荐执行顺序
 
@@ -49,7 +49,7 @@
 
 ## 4. 当前执行入口
 
-Beta 第一批计划层能力已完成，`beta-011 controlled-deploy-executor` 到 `beta-016 quality-policy-api` 已完成。下一步准备 `beta-017 console-quality-subagent-view`。
+Beta 第一批计划层能力已完成，`beta-011 controlled-deploy-executor` 到 `beta-017 console-quality-subagent-view` 已完成。下一步建议执行 `Beta -> Phase 2` 收口，冻结控制面可视化入口后进入多模型、Skills 和 Subagent 调度深化。
 
 实现边界：
 

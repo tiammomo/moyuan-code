@@ -229,12 +229,24 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <StatusPill tone={toneForStatus(selectedIssue.status)} label={selectedIssue.status} />
                 <dl>
                   <div>
+                    <dt>Run</dt>
+                    <dd>{selectedIssue.run_id ?? "not started"}</dd>
+                  </div>
+                  <div>
+                    <dt>Subagent</dt>
+                    <dd>{selectedIssue.subagent_id ?? "not assigned"}</dd>
+                  </div>
+                  <div>
                     <dt>Role</dt>
                     <dd>{selectedIssue.role}</dd>
                   </div>
                   <div>
                     <dt>Runtime</dt>
                     <dd>{selectedIssue.runtime ?? "pending"}</dd>
+                  </div>
+                  <div>
+                    <dt>Runtime Status</dt>
+                    <dd>{selectedIssue.runtime_status ?? "pending"}</dd>
                   </div>
                   <div>
                     <dt>Provider</dt>
@@ -244,7 +256,44 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                     <dt>Quality</dt>
                     <dd>{selectedIssue.quality ?? "not started"}</dd>
                   </div>
+                  <div>
+                    <dt>Review</dt>
+                    <dd>{selectedIssue.review_status ?? "not reviewed"}</dd>
+                  </div>
+                  <div>
+                    <dt>Quality Report</dt>
+                    <dd>{selectedIssue.quality_report_id ?? "none"}</dd>
+                  </div>
                 </dl>
+                {selectedIssue.quality_decision ? (
+                  <div className="decisionStrip">
+                    <ShieldCheck size={16} />
+                    <div>
+                      <strong>{selectedIssue.quality_decision}</strong>
+                      <span>{selectedIssue.quality_reasons?.[0] ?? "quality explanation available"}</span>
+                    </div>
+                  </div>
+                ) : null}
+                {selectedIssue.skills && selectedIssue.skills.length > 0 ? (
+                  <div className="chipSection">
+                    <span>Skills</span>
+                    <div className="chipList">
+                      {selectedIssue.skills.map((skill) => (
+                        <code key={skill}>{skill}</code>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {selectedIssue.output_contract && selectedIssue.output_contract.length > 0 ? (
+                  <div className="chipSection">
+                    <span>Output Contract</span>
+                    <div className="chipList">
+                      {selectedIssue.output_contract.map((item) => (
+                        <code key={item}>{item}</code>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {selectedIssue.depends_on && selectedIssue.depends_on.length > 0 ? (
                   <div className="dependencyList">
                     {selectedIssue.depends_on.map((dependency) => (
@@ -252,6 +301,26 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                         <ChevronRight size={13} />
                         {dependency}
                       </span>
+                    ))}
+                  </div>
+                ) : null}
+                {selectedIssue.quality_reasons && selectedIssue.quality_reasons.length > 1 ? (
+                  <div className="reasonList">
+                    {selectedIssue.quality_reasons.slice(1).map((reason) => (
+                      <span key={reason}>{reason}</span>
+                    ))}
+                  </div>
+                ) : null}
+                {selectedIssue.blocking_findings && selectedIssue.blocking_findings.length > 0 ? (
+                  <div className="findingList">
+                    {selectedIssue.blocking_findings.map((finding) => (
+                      <div key={finding.id}>
+                        <strong>
+                          {finding.severity} / {finding.category}
+                        </strong>
+                        <span>{finding.message}</span>
+                        {finding.path ? <code>{finding.path}</code> : null}
+                      </div>
                     ))}
                   </div>
                 ) : null}

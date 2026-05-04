@@ -11,7 +11,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - 后端框架基线：Gin + GORM，Phase 1 本地 State Store 使用 SQLite。
 - 图像生成辅助脚本：Node.js，仅保留在 `scripts/`。
 - Phase 1 已实现最小 CLI 骨架：workspace、auth、logging、git、project comprehension、issue graph、runtime adapter、orchestrator、scheduler、memory、repair、quality gate。
-- Beta 已推进控制面状态 API、issue graph API、需求拆分、并发调度、review/merge decision、Provider Registry/runtime routing、Git Provider push/PR/MR plan、release suggestion、服务器资源 registry 和 deploy/smoke/monitor plan。
+- Beta 已推进控制面状态 API、issue graph API、需求拆分、并发调度、review/merge decision、Provider Registry/runtime routing、Git Provider push/PR/MR plan、release suggestion、服务器资源 registry、deploy/smoke/monitor plan、Subagent 可审计模型和质量解释视图。
 - Phase 1 e2e smoke 已覆盖本地项目和本地 bare remote 模拟远程项目的完整 CLI 链路。
 - Runtime 已捕获 before/after git snapshot、changed files、diff summary，并能阻断脏工作区和保护路径变更。
 - Claude CLI / Codex CLI 已具备 prompt file、cwd、env allowlist、provider env profile、stdout/stderr、result contract 和失败分类的最小调用契约。
@@ -20,7 +20,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - API/State Store 已建立 Gin router 和 GORM SQLite 基线，项目注册会同步 `.moyuan/state.db`。
 - Memory 已具备 record gate、staging、dedup、敏感信息阻断和 compact 自动摘要。
 - Repair 已具备受控 attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
-- 下一批实现重点：受控部署执行器、SSH/云厂商执行边界、真实线上冒烟、生产监控和维护闭环。
+- 下一批实现重点：执行 `Beta -> Phase 2` 收口，进入多模型、Skills、Subagent 调度深化、SSH/云厂商执行边界、真实线上冒烟、生产监控和维护闭环。
 
 ## 本地运行
 
