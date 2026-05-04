@@ -79,7 +79,8 @@ type PRMRPlan struct {
 }
 
 type CreateOptions struct {
-	Approved bool `json:"approved,omitempty"`
+	Approved   bool   `json:"approved,omitempty"`
+	ApprovalID string `json:"approval_id,omitempty"`
 }
 
 type providerAPIConfig struct {
@@ -327,6 +328,35 @@ func Create(ctx context.Context, rootDir string, id string, options CreateOption
 		plan.PRMR.CreatedAt = now
 		return saveCreateResult(rootDir, plan)
 	}
+	if strings.TrimSpace(options.ApprovalID) == "" {
+		plan.PRMR.RemoteStatus = "approval_required"
+		plan.PRMR.CreateDecision = "PR_MR_CREATE_APPROVAL_REQUIRED"
+		plan.PRMR.CreateReason = "approval_id_required_before_remote_write"
+		plan.PRMR.CreatedAt = now
+		return saveCreateResult(rootDir, plan)
+	}
+	approval, found, err := approvals.VerifyApproved(rootDir, options.ApprovalID, approvals.RequestOptions{
+		TargetType: "git_provider_pr_mr",
+		TargetID:   plan.ID,
+		Action:     "git.pr_mr.create",
+	})
+	if err != nil {
+		plan.PRMR.ApprovalID = strings.TrimSpace(options.ApprovalID)
+		plan.PRMR.RemoteStatus = "approval_required"
+		plan.PRMR.CreateDecision = "PR_MR_CREATE_APPROVAL_REQUIRED"
+		plan.PRMR.CreateReason = err.Error()
+		plan.PRMR.CreatedAt = now
+		return saveCreateResult(rootDir, plan)
+	}
+	if !found {
+		plan.PRMR.ApprovalID = strings.TrimSpace(options.ApprovalID)
+		plan.PRMR.RemoteStatus = "approval_required"
+		plan.PRMR.CreateDecision = "PR_MR_CREATE_APPROVAL_REQUIRED"
+		plan.PRMR.CreateReason = "approval_not_found"
+		plan.PRMR.CreatedAt = now
+		return saveCreateResult(rootDir, plan)
+	}
+	plan.PRMR.ApprovalID = approval.ID
 	if plan.PRMR.Type == "" || plan.PRMR.Type == "manual" || !ensureAPICreateMode(rootDir, &plan) {
 		plan.PRMR.RemoteStatus = "manual_required"
 		plan.PRMR.CreateDecision = "PR_MR_CREATE_MANUAL_REQUIRED"

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/workspace"
 )
@@ -83,7 +84,19 @@ func TestPRMRPreviewApprovalAndGitHubCreate(t *testing.T) {
 		t.Fatalf("expected approval required without remote request, requests=%d plan=%+v", requests, approvalRequired.PRMR)
 	}
 
-	previewOnly, ok, err := Create(context.Background(), root, plan.ID, CreateOptions{Approved: true})
+	missingProof, ok, err := Create(context.Background(), root, plan.ID, CreateOptions{Approved: true})
+	if err != nil || !ok {
+		t.Fatalf("create missing approval proof failed ok=%v err=%v", ok, err)
+	}
+	if missingProof.PRMR.CreateDecision != "PR_MR_CREATE_APPROVAL_REQUIRED" || missingProof.PRMR.CreateReason != "approval_id_required_before_remote_write" || requests != 0 {
+		t.Fatalf("expected approval id requirement, requests=%d plan=%+v", requests, missingProof.PRMR)
+	}
+
+	if _, _, err := approvals.Decide(root, approvalRequired.PRMR.ApprovalID, approvals.DecisionOptions{Decision: "approved", DecidedBy: "reviewer", Reason: "test approved"}); err != nil {
+		t.Fatal(err)
+	}
+
+	previewOnly, ok, err := Create(context.Background(), root, plan.ID, CreateOptions{Approved: true, ApprovalID: approvalRequired.PRMR.ApprovalID})
 	if err != nil || !ok {
 		t.Fatalf("create preview-only failed ok=%v err=%v", ok, err)
 	}
@@ -92,7 +105,7 @@ func TestPRMRPreviewApprovalAndGitHubCreate(t *testing.T) {
 	}
 
 	t.Setenv("MOYUAN_ALLOW_GIT_PROVIDER_WRITE", "1")
-	created, ok, err := Create(context.Background(), root, plan.ID, CreateOptions{Approved: true})
+	created, ok, err := Create(context.Background(), root, plan.ID, CreateOptions{Approved: true, ApprovalID: approvalRequired.PRMR.ApprovalID})
 	if err != nil || !ok {
 		t.Fatalf("create remote failed ok=%v err=%v", ok, err)
 	}

@@ -23,6 +23,7 @@ Phase 5 的目标是把 Phase 4 的可审计状态对象推进到“真实外部
 | `phase5-003` | `github-gitee-pr-mr-adapter` | completed | GitHub/Gitee PR/MR preview、create、status refresh 和失败降级 | `phase5-001`,`phase5-002` | `git_owner` | PR/MR 默认 preview，真实 create 需 approval/authz |
 | `phase5-004` | `deployment-smoke-monitor-adapters` | completed | 部署后 smoke/monitor 结果记录、失败阻断和 rollback 建议 | `phase5-001`,`phase5-002` | `devops_owner` | test_dev 可 dry-run/record，production 必须 approval |
 | `phase5-005` | `console-controlled-forms` | completed | Console 增加审批、用户、Token、PR/MR、维护操作表单 | `phase5-001` | `frontend_owner` | 前端只调用受控 API，不直接伪造权威状态 |
+| `phase5-006` | `approval-proof-enforcement` | completed | PR/MR 真实创建必须校验已批准的 approval record，不接受裸 `approved` boolean | `phase5-001`,`phase5-003`,`phase5-005` | `security_owner` + `git_owner` | 远程 create 必须携带匹配 target/action 的 approved approval id |
 
 ## 3. 建议执行顺序
 
@@ -30,6 +31,7 @@ Phase 5 的目标是把 Phase 4 的可审计状态对象推进到“真实外部
 2. 再做 `phase5-002`，让外部 adapter 具备安全拿凭证的前提。
 3. `phase5-003` 和 `phase5-004` 可以并行，但真实外部写操作必须默认 dry-run/preview。
 4. `phase5-005` 在 API 稳定后推进，避免前端表单先行造成状态伪造。
+5. `phase5-006` 作为安全收口，防止真实外部写操作只依赖调用方布尔值。
 
 ## 4. 收口规则
 

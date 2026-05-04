@@ -149,6 +149,26 @@ func Decide(rootDir string, id string, options DecisionOptions) (Record, bool, e
 	return record, true, nil
 }
 
+func VerifyApproved(rootDir string, id string, options RequestOptions) (Record, bool, error) {
+	record, found, err := Load(rootDir, id)
+	if err != nil || !found {
+		return Record{}, found, err
+	}
+	targetType := normalizeToken(options.TargetType)
+	targetID := strings.TrimSpace(options.TargetID)
+	action := normalizeAction(options.Action)
+	if record.Status != "approved" {
+		return record, true, errors.New("approval_not_approved")
+	}
+	if targetType == "" || targetID == "" || action == "" {
+		return record, true, errors.New("approval_verification_scope_required")
+	}
+	if record.TargetType != targetType || record.TargetID != targetID || record.Action != action {
+		return record, true, errors.New("approval_scope_mismatch")
+	}
+	return record, true, nil
+}
+
 func Load(rootDir string, id string) (Record, bool, error) {
 	id, err := validateID(id)
 	if err != nil {

@@ -24,6 +24,7 @@ Phase 4 已完成并通过 readiness：
 | P1 | `phase5-003` | `github-gitee-pr-mr-adapter` | completed | PR/MR preview/create/status adapter | 默认 preview，真实 create 需 authz + approval |
 | P1 | `phase5-004` | `deployment-smoke-monitor-adapters` | completed | smoke/monitor 结果记录和 rollback 建议 | production 必须 approval，结果可审计 |
 | P1 | `phase5-005` | `console-controlled-forms` | completed | Console 增加受控操作表单 | 表单只调用后端受控 API，状态以后端为准 |
+| P0 | `phase5-006` | `approval-proof-enforcement` | completed | PR/MR 真实创建校验 approved approval record | 不能只靠请求体 `approved: true` 执行远程写入 |
 
 ## 3. 执行规划：`phase5-001 auth-context-rbac-middleware`
 
@@ -101,9 +102,9 @@ Phase 4 已完成并通过 readiness：
 范围：
 
 - Git Provider plan 增加 PR/MR preview 和 create 结果字段。
-- CLI 增加 `moyuan git provider preview <plan-id>` 和 `moyuan git provider create <plan-id> [--approved]`。
+- CLI 增加 `moyuan git provider preview <plan-id>` 和 `moyuan git provider create <plan-id> [--approved] [--approval-id <approval-id>]`。
 - API 增加 `/git-provider-plans/:plan_id/preview` 和 `/git-provider-plans/:plan_id/create`。
-- `create` 真实远程写入必须同时满足 approval、authz `git:write`、Secret Resolver `pull_request.create` 用途、`MOYUAN_ALLOW_GIT_PROVIDER_WRITE=1`。
+- `create` 真实远程写入必须同时满足已批准 approval record、authz `git:write`、Secret Resolver `pull_request.create` 用途、`MOYUAN_ALLOW_GIT_PROVIDER_WRITE=1`。
 - GitHub/Gitee adapter 支持构造远程 PR 请求；默认保持 preview-only。
 - 未审批、manual mode、缺少 token、关闭写开关和远程 API 失败都会写回本地 plan，不重复执行 push 或泄露 token。
 
@@ -169,7 +170,31 @@ Phase 4 已完成并通过 readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 9. 验证要求
+## 9. 已完成任务：`phase5-006 approval-proof-enforcement`
+
+范围：
+
+- `approvals.VerifyApproved` 增加 approval record 校验，确认 approval 已批准且 target/action 匹配。
+- Git Provider `create` 不再接受裸 `approved: true` 作为远程写入凭证；必须同时传入 `approval_id`。
+- API `POST /git-provider-plans/:plan_id/create` 支持 `approval_id`。
+- CLI `moyuan git provider create` 支持 `--approval-id <approval-id>`。
+- Console PR/MR create 控制区增加 Approval ID 输入。
+
+非目标：
+
+- 不自动消费、归档或锁定 approval record。
+- 不改变 production deployment 的真实执行阻断策略。
+- 不把 approval 校验扩展到所有历史 `--approved` CLI，本任务先封住真实 PR/MR create。
+
+验证：
+
+- `go test ./internal/gitprovider ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 10. 验证要求
 
 每完成一个 Phase 5 issue，至少运行：
 

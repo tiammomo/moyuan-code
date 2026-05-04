@@ -158,7 +158,7 @@ apps/console/
 | Runtime Recoveries | 查看原生 runtime 失败归档、fallback candidate、resume hint、stdout/stderr 和 diff 摘要预览 |
 | Subagent Backlog | 查看 retry/archive 后进入调度等待的 subagent、失败原因和重试预算 |
 | Visual Assets | 查看架构图 plan、diagram spec、prompt、route decision、render execution、script path 和图片生成状态；支持受控 dry-run render |
-| Git & Release | 查看分支、PR/MR plan、release suggestion 和 tag/push 计划；通过受控按钮触发 PR/MR preview、sync 和 create |
+| Git & Release | 查看分支、PR/MR plan、release suggestion 和 tag/push 计划；通过受控按钮触发 PR/MR preview、sync 和携带 Approval ID 的 create |
 | Server Resources | 查看 test_dev、production 机器、到期、健康和维护窗口；通过受控表单记录续期和退役 |
 | Deployments | 查看部署计划、审批、线上冒烟、监控和 rollback |
 | Logs & Audit | 查看核心日志、审计事件和 trace |

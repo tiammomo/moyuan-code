@@ -62,7 +62,8 @@ type providerOpsRefreshRequest struct {
 }
 
 type gitProviderCreateRequest struct {
-	Approved bool `json:"approved"`
+	Approved   bool   `json:"approved"`
+	ApprovalID string `json:"approval_id"`
 }
 
 type releaseSuggestRequest struct {
@@ -1030,7 +1031,7 @@ func NewRouter(options Options) *gin.Engine {
 			writeError(c, http.StatusBadRequest, "invalid request body")
 			return
 		}
-		plan, found, err := gitprovider.Create(c.Request.Context(), rootDir, c.Param("plan_id"), gitprovider.CreateOptions{Approved: req.Approved})
+		plan, found, err := gitprovider.Create(c.Request.Context(), rootDir, c.Param("plan_id"), gitprovider.CreateOptions{Approved: req.Approved, ApprovalID: req.ApprovalID})
 		if err != nil {
 			writeError(c, http.StatusInternalServerError, err.Error())
 			return

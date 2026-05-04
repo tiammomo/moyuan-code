@@ -67,6 +67,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [resourceActionState, setResourceActionState] = useState<Record<string, ActionState>>({});
   const [gitActionState, setGitActionState] = useState<Record<string, ActionState>>({});
   const [gitCreateApproved, setGitCreateApproved] = useState(false);
+  const [gitCreateApprovalID, setGitCreateApprovalID] = useState("");
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
   const latestDeployment = snapshot.deployments[0];
@@ -378,6 +379,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
     try {
       const payload = await postJSON<GitProviderActionEnvelope>(`/api/projects/${snapshot.project.id}/git-provider-plans/${encodeURIComponent(planID)}/${action}`, {
         approved: action === "create" ? gitCreateApproved : undefined,
+        approval_id: action === "create" ? gitCreateApprovalID : undefined,
       });
       const plan = payload.git_provider_plan;
       if (!plan) {
@@ -1272,6 +1274,10 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <input checked={gitCreateApproved} onChange={(event) => setGitCreateApproved(event.target.checked)} type="checkbox" />
                 <span>Approved create</span>
               </label>
+              <label className="approvalIDInput">
+                <span>Approval ID</span>
+                <input onChange={(event) => setGitCreateApprovalID(event.target.value)} value={gitCreateApprovalID} />
+              </label>
             </div>
             <div className="prmrList">
               {snapshot.git_provider_plans.length > 0 ? (
@@ -1483,6 +1489,7 @@ type GitProviderActionEnvelope = {
     decision?: string;
     pr_mr?: {
       remote_status?: string;
+      approval_id?: string;
       preview_decision?: string;
       create_decision?: string;
       sync_decision?: string;
