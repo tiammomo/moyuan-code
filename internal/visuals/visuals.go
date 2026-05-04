@@ -87,25 +87,29 @@ type RenderOptions struct {
 }
 
 type RenderExecution struct {
-	ID            string       `json:"id"`
-	AssetID       string       `json:"asset_id"`
-	DiagramSpecID string       `json:"diagram_spec_id,omitempty"`
-	DiagramType   string       `json:"diagram_type,omitempty"`
-	Title         string       `json:"title,omitempty"`
-	Mode          string       `json:"mode"`
-	Status        string       `json:"status"`
-	Decision      string       `json:"decision"`
-	Reasons       []string     `json:"reasons"`
-	ProviderID    string       `json:"provider_id,omitempty"`
-	ModelID       string       `json:"model_id,omitempty"`
-	Size          string       `json:"size,omitempty"`
-	PromptPath    string       `json:"prompt_path,omitempty"`
-	SpecPath      string       `json:"spec_path,omitempty"`
-	ImagePath     string       `json:"image_path,omitempty"`
-	ScriptPath    string       `json:"script_path,omitempty"`
-	Steps         []RenderStep `json:"steps"`
-	StartedAt     string       `json:"started_at"`
-	FinishedAt    string       `json:"finished_at,omitempty"`
+	ID               string         `json:"id"`
+	AssetID          string         `json:"asset_id"`
+	DiagramSpecID    string         `json:"diagram_spec_id,omitempty"`
+	DiagramType      string         `json:"diagram_type,omitempty"`
+	Title            string         `json:"title,omitempty"`
+	Mode             string         `json:"mode"`
+	Status           string         `json:"status"`
+	Decision         string         `json:"decision"`
+	Reasons          []string       `json:"reasons"`
+	ProviderID       string         `json:"provider_id,omitempty"`
+	ModelID          string         `json:"model_id,omitempty"`
+	Size             string         `json:"size,omitempty"`
+	PromptPath       string         `json:"prompt_path,omitempty"`
+	SpecPath         string         `json:"spec_path,omitempty"`
+	ImagePath        string         `json:"image_path,omitempty"`
+	ScriptPath       string         `json:"script_path,omitempty"`
+	AuthRef          string         `json:"auth_ref,omitempty"`
+	EnvKeys          []string       `json:"env_keys,omitempty"`
+	Quality          *RenderQuality `json:"quality,omitempty"`
+	PreviewIndexPath string         `json:"preview_index_path,omitempty"`
+	Steps            []RenderStep   `json:"steps"`
+	StartedAt        string         `json:"started_at"`
+	FinishedAt       string         `json:"finished_at,omitempty"`
 }
 
 type RenderStep struct {
@@ -116,6 +120,35 @@ type RenderStep struct {
 	Error      string `json:"error,omitempty"`
 	StartedAt  string `json:"started_at,omitempty"`
 	FinishedAt string `json:"finished_at,omitempty"`
+}
+
+type RenderQuality struct {
+	Status    string         `json:"status"`
+	Checks    []QualityCheck `json:"checks"`
+	CheckedAt string         `json:"checked_at"`
+}
+
+type QualityCheck struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
+}
+
+type PreviewIndexRecord struct {
+	ExecutionID     string `json:"execution_id"`
+	AssetID         string `json:"asset_id"`
+	ProviderID      string `json:"provider_id,omitempty"`
+	ModelID         string `json:"model_id,omitempty"`
+	ImagePath       string `json:"image_path,omitempty"`
+	ExplanationPath string `json:"explanation_path,omitempty"`
+	QualityStatus   string `json:"quality_status"`
+	CreatedAt       string `json:"created_at"`
+}
+
+type scriptAuth struct {
+	AuthRef string
+	APIKey  string
+	BaseURL string
 }
 
 var (
@@ -304,15 +337,20 @@ func RenderAsset(ctx context.Context, rootDir string, options RenderOptions) (Re
 			execution.Reasons = append(execution.Reasons, "image_script_execution_not_enabled")
 			return finishRenderExecution(rootDir, execution)
 		}
-		if os.Getenv("OPENAI_API_KEY") == "" {
-			execution.Reasons = append(execution.Reasons, "image_api_key_missing")
+		auth, authReason, err := resolveScriptAuth(rootDir, asset.ProviderID)
+		if err != nil {
+			return RenderExecution{}, err
+		}
+		if authReason != "" {
+			execution.Reasons = append(execution.Reasons, authReason)
 			return finishRenderExecution(rootDir, execution)
 		}
+		execution.AuthRef = auth.AuthRef
 		if !fsutil.Exists(filepath.Join(rootDir, scriptPath)) {
 			execution.Reasons = append(execution.Reasons, "visual_render_script_missing")
 			return finishRenderExecution(rootDir, execution)
 		}
-		execution = runScript(ctx, rootDir, execution, asset, scriptPath)
+		execution = runScript(ctx, rootDir, execution, asset, scriptPath, auth)
 	default:
 		execution.Reasons = append(execution.Reasons, "visual_render_mode_not_allowed:"+options.Mode)
 	}
@@ -364,38 +402,98 @@ func writeAsset(rootDir string, asset AssetRecord) error {
 	return fsutil.AppendJSONL(filepath.Join(assetsDir(rootDir), "assets.jsonl"), asset)
 }
 
-func runScript(ctx context.Context, rootDir string, execution RenderExecution, asset AssetRecord, scriptPath string) RenderExecution {
+func resolveScriptAuth(rootDir string, providerID string) (scriptAuth, string, error) {
+	providerID = strings.TrimSpace(providerID)
+	if providerID == "" {
+		return scriptAuth{}, "visual_provider_required", nil
+	}
+	provider, found, err := providers.Show(rootDir, providerID)
+	if err != nil {
+		return scriptAuth{}, "", err
+	}
+	if !found {
+		return scriptAuth{}, "visual_provider_not_found:" + providerID, nil
+	}
+	if !provider.Enabled {
+		return scriptAuth{}, "visual_provider_disabled:" + provider.ID, nil
+	}
+	authRef := strings.TrimSpace(provider.AuthRef)
+	if authRef == "" {
+		return scriptAuth{}, "image_provider_auth_ref_missing", nil
+	}
+	if strings.HasPrefix(authRef, "secret:") {
+		return scriptAuth{}, "image_provider_secret_ref_not_supported_for_script", nil
+	}
+	if !strings.HasPrefix(authRef, "env:") {
+		return scriptAuth{}, "image_provider_auth_ref_unsupported", nil
+	}
+	key := strings.TrimSpace(strings.TrimPrefix(authRef, "env:"))
+	if key == "" {
+		return scriptAuth{}, "image_provider_auth_env_required", nil
+	}
+	value := os.Getenv(key)
+	if value == "" {
+		return scriptAuth{}, "image_provider_auth_env_missing:" + key, nil
+	}
+	return scriptAuth{AuthRef: authRef, APIKey: value, BaseURL: strings.TrimSpace(provider.BaseURL)}, "", nil
+}
+
+func runScript(ctx context.Context, rootDir string, execution RenderExecution, asset AssetRecord, scriptPath string, auth scriptAuth) RenderExecution {
 	step := RenderStep{Name: "image_script", Status: "running", Command: renderCommand(scriptPath), StartedAt: time.Now().UTC().Format(time.RFC3339Nano)}
-	env := append(os.Environ(), "IMAGE_SIZE="+asset.Size)
+	env := filterEnvKeys(os.Environ(), "IMAGE_SIZE", "OPENAI_API_KEY", "OPENAI_IMAGE_MODEL", "OPENAI_BASE_URL")
+	env = append(env, "IMAGE_SIZE="+asset.Size, "OPENAI_API_KEY="+auth.APIKey)
+	envKeys := []string{"IMAGE_SIZE", "OPENAI_API_KEY"}
 	if asset.ModelID != "" {
 		env = append(env, "OPENAI_IMAGE_MODEL="+asset.ModelID)
+		envKeys = append(envKeys, "OPENAI_IMAGE_MODEL")
 	}
+	if auth.BaseURL != "" {
+		env = append(env, "OPENAI_BASE_URL="+auth.BaseURL)
+		envKeys = append(envKeys, "OPENAI_BASE_URL")
+	}
+	execution.EnvKeys = envKeys
 	result := process.RunCommandInput(ctx, rootDir, "", env, "node", scriptPath)
-	step.Output = strings.TrimSpace(result.Stdout)
+	rawStdout := result.Stdout
+	step.Output = sanitizeExecutionText(rawStdout)
 	step.Error = sanitizeExecutionText(result.Stderr)
 	step.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	if result.Code == 0 {
-		step.Status = "completed"
-		execution.Status = "completed"
-		execution.Decision = "VISUAL_RENDER_COMPLETED"
-		execution.Reasons = append(execution.Reasons, "image_script_completed")
-		imagePath := outputPathFromScript(step.Output, "Image written:")
+		imagePath := outputPathFromScript(rawStdout, "Image written:")
 		if imagePath != "" {
 			asset.ImagePath = imagePath
 			execution.ImagePath = imagePath
 		}
-		promptPath := outputPathFromScript(step.Output, "Prompt written:")
+		promptPath := outputPathFromScript(rawStdout, "Prompt written:")
 		if promptPath != "" {
 			asset.PromptPath = promptPath
 			execution.PromptPath = promptPath
 		}
-		explanationPath := outputPathFromScript(step.Output, "Explanation written:")
+		explanationPath := outputPathFromScript(rawStdout, "Explanation written:")
 		if explanationPath != "" {
 			asset.ExplanationPath = explanationPath
 		}
-		asset.Status = "rendered"
-		asset.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
-		_ = writeAsset(rootDir, asset)
+		quality := evaluateRenderQuality(rootDir, execution, asset, step)
+		execution.Quality = &quality
+		if quality.Status == "passed" {
+			step.Status = "completed"
+			execution.Status = "completed"
+			execution.Decision = "VISUAL_RENDER_COMPLETED"
+			execution.Reasons = append(execution.Reasons, "image_script_completed", "image_quality_passed")
+			asset.Status = "rendered"
+			asset.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
+			if previewPath, err := writePreviewIndex(rootDir, execution, asset, quality); err == nil {
+				execution.PreviewIndexPath = previewPath
+			}
+			_ = writeAsset(rootDir, asset)
+		} else {
+			step.Status = "failed"
+			execution.Status = "failed"
+			execution.Decision = "VISUAL_RENDER_QUALITY_FAILED"
+			execution.Reasons = append(execution.Reasons, "image_quality_failed")
+			asset.Status = "quality_failed"
+			asset.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
+			_ = writeAsset(rootDir, asset)
+		}
 	} else {
 		step.Status = "failed"
 		execution.Status = "failed"
@@ -404,6 +502,99 @@ func runScript(ctx context.Context, rootDir string, execution RenderExecution, a
 	}
 	execution.Steps = append(execution.Steps, step)
 	return execution
+}
+
+func evaluateRenderQuality(rootDir string, execution RenderExecution, asset AssetRecord, step RenderStep) RenderQuality {
+	quality := RenderQuality{Status: "passed", Checks: []QualityCheck{}, CheckedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+	add := func(name string, passed bool, reason string) {
+		status := "passed"
+		if !passed {
+			status = "failed"
+			quality.Status = "failed"
+		}
+		quality.Checks = append(quality.Checks, QualityCheck{Name: name, Status: status, Reason: reason})
+	}
+	imagePath, imageOK := pathWithinRoot(rootDir, execution.ImagePath)
+	add("image_path_present", execution.ImagePath != "", "image_path_required")
+	add("image_path_within_root", imageOK, "image_path_must_stay_inside_project")
+	add("image_file_exists", imageOK && fsutil.Exists(imagePath), "image_file_missing")
+	add("image_format_supported", hasSupportedImageExtension(execution.ImagePath), "image_format_must_be_png_jpg_or_webp")
+	promptPath, promptOK := pathWithinRoot(rootDir, execution.PromptPath)
+	add("prompt_file_exists", promptOK && fsutil.Exists(promptPath), "prompt_file_missing")
+	specPath, specOK := pathWithinRoot(rootDir, execution.SpecPath)
+	add("spec_file_exists", specOK && fsutil.Exists(specPath), "spec_file_missing")
+	explanationPath, explanationOK := pathWithinRoot(rootDir, asset.ExplanationPath)
+	add("explanation_path_present", asset.ExplanationPath != "", "explanation_path_required")
+	add("explanation_file_exists", explanationOK && fsutil.Exists(explanationPath), "explanation_file_missing")
+	add("script_output_sanitized", !containsSensitiveText(step.Output) && !containsSensitiveText(step.Error), "script_output_contains_sensitive_text")
+	return quality
+}
+
+func writePreviewIndex(rootDir string, execution RenderExecution, asset AssetRecord, quality RenderQuality) (string, error) {
+	path := filepath.Join(previewsDir(rootDir), "index.jsonl")
+	err := fsutil.AppendJSONL(path, PreviewIndexRecord{
+		ExecutionID:     execution.ID,
+		AssetID:         execution.AssetID,
+		ProviderID:      execution.ProviderID,
+		ModelID:         execution.ModelID,
+		ImagePath:       execution.ImagePath,
+		ExplanationPath: asset.ExplanationPath,
+		QualityStatus:   quality.Status,
+		CreatedAt:       time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	return path, err
+}
+
+func pathWithinRoot(rootDir string, candidate string) (string, bool) {
+	candidate = strings.TrimSpace(candidate)
+	if candidate == "" {
+		return "", false
+	}
+	if !filepath.IsAbs(candidate) {
+		candidate = filepath.Join(rootDir, candidate)
+	}
+	rootAbs, err := filepath.Abs(rootDir)
+	if err != nil {
+		return "", false
+	}
+	candidateAbs, err := filepath.Abs(candidate)
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(rootAbs, candidateAbs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return candidateAbs, false
+	}
+	return candidateAbs, true
+}
+
+func hasSupportedImageExtension(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png", ".jpg", ".jpeg", ".webp":
+		return true
+	default:
+		return false
+	}
+}
+
+func containsSensitiveText(value string) bool {
+	return credentialPattern.MatchString(value) || openAIKeyPattern.MatchString(value) || privateIPPattern.MatchString(value)
+}
+
+func filterEnvKeys(env []string, keys ...string) []string {
+	blocked := map[string]bool{}
+	for _, key := range keys {
+		blocked[key] = true
+	}
+	filtered := []string{}
+	for _, item := range env {
+		key, _, ok := strings.Cut(item, "=")
+		if ok && blocked[key] {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
 
 func finishRenderExecution(rootDir string, execution RenderExecution) (RenderExecution, error) {
@@ -434,6 +625,10 @@ func assetsDir(rootDir string) string {
 
 func renderExecutionsDir(rootDir string) string {
 	return filepath.Join(visualsDir(rootDir), "executions")
+}
+
+func previewsDir(rootDir string) string {
+	return filepath.Join(visualsDir(rootDir), "previews")
 }
 
 func normalizeDiagramType(value string) string {

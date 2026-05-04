@@ -301,7 +301,8 @@ Phase 2 当前落地：
 - Diagram plan 会生成脱敏后的 `diagram_spec`、prompt 和 asset record。
 - Provider Route 使用 `image-diagram` 策略检查 `gpt_image_2`；provider 不可用时保留 `route_blocked` asset record。
 - Render execution 默认 `dry_run`，记录脚本预览和 `no_image_api_called`。
-- `script` mode 必须同时满足 `--approved`、`MOYUAN_ALLOW_IMAGE_SCRIPT=1`、`OPENAI_API_KEY` 已存在、脚本文件存在；执行记录不得落明文密钥。
+- `script` mode 必须同时满足 `--approved`、`MOYUAN_ALLOW_IMAGE_SCRIPT=1`、provider `auth_ref` 可解析、脚本文件存在；执行只记录 `auth_ref` 和注入的 env key 名，不记录 token 值。
+- `script` mode 完成后会生成 `quality` 检查结果，并把可预览产物写入 `.moyuan/visuals/previews/index.jsonl`。
 
 注意：
 

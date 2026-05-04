@@ -32,7 +32,7 @@ Phase 2 第一批能力已完成并通过 release readiness：
 | P1 | `phase3-003a` | `visual-render-dry-run-console-action` | completed | Visual Assets 面板触发后端 dry-run render | dry-run action 可见、可反馈 execution id，不调用真实图片 API |
 | P1 | `phase3-004` | `runtime-log-diff-viewer` | completed | Console 展开 runtime 日志、diff summary 和 resume hint | 失败排查证据链可见 |
 | P1 | `phase3-005` | `provider-probe-adapters` | completed | Provider refresh 接入可选轻量探测 adapter | 探测失败可解释，密钥不落盘 |
-| P2 | `phase3-006` | `visual-script-auth-quality` | planned | Visual script mode 接入 auth ref、审计和图片质量检查 | 图片生成可执行且可复核 |
+| P2 | `phase3-006` | `visual-script-auth-quality` | completed | Visual script mode 接入 auth ref、审计和图片质量检查 | 图片生成可执行且可复核 |
 | P2 | `phase3-007` | `release-deploy-control-actions` | planned | Release/deploy/smoke/monitor 动作在 Console 可控 | 发布与部署流水线状态可见 |
 
 ## 3. 已完成任务：`phase3-001 workspace-yaml-schema-validator`
@@ -189,7 +189,25 @@ Phase 2 第一批能力已完成并通过 release readiness：
 - `go test ./internal/api` 通过。
 - `go test ./...` 通过。
 
-## 12. Phase 3 收口规则
+## 12. 已完成任务：`phase3-006 visual-script-auth-quality`
+
+范围：
+
+- `script` render mode 不再直接依赖全局 `OPENAI_API_KEY`，而是从 asset 对应 provider 的 `auth_ref` 解析。
+- 当前单机执行只支持 `env:` auth ref；`secret:` 引用会被标记为未支持，不读取或落盘密钥。
+- Render execution 记录 `auth_ref` 和注入的 env key 名称，例如 `OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_IMAGE_MODEL`、`IMAGE_SIZE`。
+- 脚本 stdout/stderr 会脱敏后保存，产物路径从原始 stdout 解析但不记录 token 值。
+- 成功执行后必须通过 `quality` 检查：图片路径存在、路径不越出项目、格式可接受、prompt/spec 存在、脚本输出无敏感信息。
+- 质量通过后写入 `.moyuan/visuals/previews/index.jsonl`，为 Console 预览索引留出稳定入口。
+
+验证：
+
+- `go test ./internal/visuals` 通过。
+- `go test ./internal/cli` 通过。
+- `go test ./internal/api` 通过。
+- `go test ./...` 通过。
+
+## 13. Phase 3 收口规则
 
 - 每完成一个 Phase 3 issue，必须同步本实施记录和 issue graph。
 - 配置 validator 新增 issue code 时，必须能追溯到 [配置 Schema 规则](../configuration-schema-spec.md)。
