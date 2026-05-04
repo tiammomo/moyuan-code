@@ -27,7 +27,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P0 | `beta-003` | `requirement-to-issues` | completed | 需求丰富、澄清判断和 issue graph 生成 | 用户需求可转为 issues DAG |
 | P1 | `beta-004` | `parallel-orchestration-engine` | completed | 自动并发、等待和 replan | 并发度由系统决策且可审计 |
 | P1 | `beta-005` | `review-merge-pipeline` | completed | 复核通过后合入任务分支 | review gate 阻断未达标代码 |
-| P1 | `beta-006` | `provider-registry-runtime-routing` | in_progress | Provider 和 Runtime 路由基线 | Provider 可配置、校验、路由和审计 |
+| P1 | `beta-006` | `provider-registry-runtime-routing` | completed | Provider 和 Runtime 路由基线 | Provider 可配置、校验、路由和审计 |
+| P1 | `beta-007` | `git-provider-pr-mr` | in_progress | GitHub/Gitee 分支、push、PR/MR 编排 | 任务分支可推送并形成 PR/MR 计划 |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -179,7 +180,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 当前仍不执行 git merge、push 或 PR/MR 创建。
 - 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
 
-## 8. 当前任务：`beta-006 provider-registry-runtime-routing`
+## 8. 已完成任务：`beta-006 provider-registry-runtime-routing`
 
 范围：
 
@@ -198,4 +199,35 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - Provider 可添加、列出、禁用。
 - Provider 配置中的 secret 只能以 env/secret ref 出现。
 - 默认角色可路由到 Claude CLI、Codex CLI 或 Provider。
+- `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 `internal/providers` Provider Registry 和 Route Decision。
+- 已支持 CLI：`moyuan model provider add/list/show/disable`、`moyuan model route`。
+- 已支持 API：`GET/POST /v1/projects/:project_id/providers`、`GET /providers/:provider_id`、`POST /providers/:provider_id/disable`、`POST /provider-route`。
+- Registry 当前写入 `.moyuan/models/providers.json`；只保存 `env:` 或 `secret:` auth ref，不保存明文 key。
+- Scheduler 的默认角色 runtime 已收敛到 Provider 路由默认规则。
+- 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
+
+## 9. 当前任务：`beta-007 git-provider-pr-mr`
+
+范围：
+
+- 新增 Git Provider 最小能力声明：`github`、`gitee`、`generic_git`。
+- 基于 review merge decision 生成 push/PR/MR plan。
+- 支持任务分支推送前检查：clean worktree、remote 存在、review allowed、禁止未审核代码。
+- 支持只创建本地可审计计划，真实 push/PR/MR 作为受控动作。
+
+非目标：
+
+- 不自动合入 main。
+- 不自动发布 release。
+- 不绕过 review/quality gate。
+
+验收：
+
+- 缺失 remote 或认证信息时返回 blocked reason。
+- review 未通过时不允许 push/PR/MR。
+- GitHub/Gitee/generic git 能生成差异化 provider plan。
 - `go test ./...` 通过。

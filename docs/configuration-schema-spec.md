@@ -142,6 +142,8 @@ Provider 专项字段规则：
 
 ## 6. models/providers.yaml
 
+Beta 当前实现先写入 `.moyuan/models/providers.json` 作为运行期 registry 快照，字段应与本节目标 schema 对齐。进入 schema validator 阶段后，`providers.yaml` 作为用户可维护配置，`providers.json` 作为运行审计快照。
+
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `schema_version` | required | 无 | MVP 固定为 `1` |

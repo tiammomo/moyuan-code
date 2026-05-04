@@ -11,6 +11,7 @@ import (
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/memory"
 	"moyuan-code/internal/orchestrator"
+	"moyuan-code/internal/providers"
 	"moyuan-code/internal/quality"
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
@@ -28,6 +29,16 @@ type Options struct {
 
 type requirementPlanRequest struct {
 	Text string `json:"text"`
+}
+
+type routeRequest struct {
+	Role                  string `json:"role"`
+	TaskType              string `json:"task_type"`
+	OutputType            string `json:"output_type"`
+	RequiresRepoEdit      bool   `json:"requires_repo_edit"`
+	IncludesSecrets       bool   `json:"includes_secrets"`
+	IncludesSensitiveCode bool   `json:"includes_sensitive_code"`
+	IncludesProjectMemory bool   `json:"includes_project_memory"`
 }
 
 func NewRouter(options Options) *gin.Engine {
@@ -214,6 +225,113 @@ func NewRouter(options Options) *gin.Engine {
 			status = http.StatusAccepted
 		}
 		c.JSON(status, gin.H{"requirement": plan})
+	})
+	router.GET("/v1/projects/:project_id/providers", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		list, err := providers.List(rootDir)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"providers": list})
+	})
+	router.POST("/v1/projects/:project_id/providers", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req providers.Provider
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		provider, err := providers.Upsert(rootDir, req)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"provider": provider})
+	})
+	router.GET("/v1/projects/:project_id/providers/:provider_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		provider, found, err := providers.Show(rootDir, c.Param("provider_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "provider not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"provider": provider})
+	})
+	router.POST("/v1/projects/:project_id/providers/:provider_id/disable", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		provider, found, err := providers.Disable(rootDir, c.Param("provider_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "provider not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"provider": provider})
+	})
+	router.POST("/v1/projects/:project_id/provider-route", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req routeRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		decision, err := providers.Route(rootDir, providers.RouteRequest(req))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if decision.Blocked {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"route": decision})
 	})
 	router.GET("/v1/projects/:project_id/memory/search", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

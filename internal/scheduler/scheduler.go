@@ -9,6 +9,7 @@ import (
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
+	"moyuan-code/internal/providers"
 	"moyuan-code/internal/workspace"
 )
 
@@ -160,12 +161,7 @@ func roleFor(node issues.Node) string {
 }
 
 func runtimeFor(role string) string {
-	switch role {
-	case "frontend", "architect":
-		return "claude_cli"
-	default:
-		return "codex_cli"
-	}
+	return providers.DefaultRuntimeForRole(role)
 }
 
 func writeScopesFor(node issues.Node) []string {

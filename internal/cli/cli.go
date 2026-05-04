@@ -19,6 +19,7 @@ import (
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/memory"
 	"moyuan-code/internal/orchestrator"
+	"moyuan-code/internal/providers"
 	"moyuan-code/internal/quality"
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
@@ -84,6 +85,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleRepair(argv[1:], cwd)
 	case "review":
 		text, result, exitCode, err = handleReview(argv[1:], cwd)
+	case "model":
+		text, result, exitCode, err = handleModel(argv[1:], cwd)
 	case "logs":
 		text, result, exitCode, err = handleLogs(argv[1:], cwd)
 	default:
@@ -146,6 +149,11 @@ func usage() string {
 		"moyuan repair run <plan-id> [--runtime local_shell] [--prompt <command>]",
 		"moyuan repair status <attempt-id>",
 		"moyuan review merge-decision <issue-id>",
+		"moyuan model provider add --id <id> --vendor <vendor> --api-type <type> [--auth-ref env:KEY]",
+		"moyuan model provider list",
+		"moyuan model provider show <provider>",
+		"moyuan model provider disable <provider>",
+		"moyuan model route --role <role> [--task-type <type>] [--output-type <type>] [--repo-edit]",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -719,6 +727,110 @@ func handleReview(args []string, cwd string) (string, any, int, error) {
 	return "unknown review command\n", nil, 1, nil
 }
 
+func handleModel(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown model command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "provider":
+		return handleModelProvider(args[1:], rootDir)
+	case "route":
+		role := flagValue(args, "--role", "backend")
+		decision, err := providers.Route(rootDir, providers.RouteRequest{
+			Role:                  role,
+			TaskType:              flagValue(args, "--task-type", ""),
+			OutputType:            flagValue(args, "--output-type", ""),
+			RequiresRepoEdit:      hasFlag(args, "--repo-edit"),
+			IncludesSecrets:       hasFlag(args, "--includes-secrets"),
+			IncludesSensitiveCode: hasFlag(args, "--includes-sensitive-code"),
+			IncludesProjectMemory: hasFlag(args, "--includes-project-memory"),
+		})
+		code := 0
+		if decision.Blocked {
+			code = 1
+		}
+		return "", decision, code, err
+	}
+	return "unknown model command\n", nil, 1, nil
+}
+
+func handleModelProvider(args []string, rootDir string) (string, any, int, error) {
+	if len(args) == 0 {
+		return "unknown model provider command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "add":
+		provider := providers.Provider{
+			ID:                   flagValue(args, "--id", ""),
+			Name:                 flagValue(args, "--name", ""),
+			Vendor:               flagValue(args, "--vendor", ""),
+			APIType:              flagValue(args, "--api-type", ""),
+			BaseURL:              flagValue(args, "--base-url", ""),
+			AuthRef:              flagValue(args, "--auth-ref", ""),
+			RuntimeID:            flagValue(args, "--runtime", ""),
+			NativeRuntime:        hasFlag(args, "--native-runtime"),
+			RequireProviderLabel: hasFlag(args, "--require-provider-label"),
+			DataPolicy: providers.DataPolicy{
+				AllowSensitiveCode:     hasFlag(args, "--allow-sensitive-code"),
+				AllowProjectMemory:     hasFlag(args, "--allow-project-memory"),
+				AllowProductionContext: hasFlag(args, "--allow-production-context"),
+			},
+			Models:          modelsFromCLI(args),
+			AllowedUseCases: flagValues(args, "--use-case"),
+		}
+		if provider.ID == "" {
+			return "missing --id\n", nil, 1, nil
+		}
+		if provider.Vendor == "" {
+			return "missing --vendor\n", nil, 1, nil
+		}
+		if provider.APIType == "" {
+			return "missing --api-type\n", nil, 1, nil
+		}
+		provider.Enabled = !hasFlag(args, "--disabled")
+		saved, err := providers.Upsert(rootDir, provider)
+		return "", saved, 0, err
+	case "list":
+		list, err := providers.List(rootDir)
+		return "", list, 0, err
+	case "show":
+		if len(args) < 2 {
+			return "missing provider id\n", nil, 1, nil
+		}
+		provider, ok, err := providers.Show(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", provider, 0, nil
+	case "disable":
+		if len(args) < 2 {
+			return "missing provider id\n", nil, 1, nil
+		}
+		provider, ok, err := providers.Disable(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", provider, 0, nil
+	}
+	return "unknown model provider command\n", nil, 1, nil
+}
+
+func modelsFromCLI(args []string) []providers.Model {
+	values := flagValues(args, "--model")
+	models := []providers.Model{}
+	for _, value := range values {
+		models = append(models, providers.Model{ID: value})
+	}
+	return models
+}
+
 func mustRoot(cwd string) string {
 	if root, ok := workspace.ResolveRoot(cwd); ok {
 		return root
@@ -742,6 +854,16 @@ func hasFlag(args []string, name string) bool {
 		}
 	}
 	return false
+}
+
+func flagValues(args []string, name string) []string {
+	values := []string{}
+	for i, arg := range args {
+		if arg == name && i+1 < len(args) {
+			values = append(values, args[i+1])
+		}
+	}
+	return values
 }
 
 func removeFlag(args []string, name string) []string {

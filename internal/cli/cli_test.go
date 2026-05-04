@@ -307,6 +307,61 @@ func TestRequirementPlanCreatesReadableIssueGraph(t *testing.T) {
 	assertContains(t, weak.stdout, `"missing_verifiable_goal"`)
 }
 
+func TestProviderRegistryCLIManagesProvidersAndRoutesRoles(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	defaults := runCLI(t, root, "model", "provider", "list")
+	assertContains(t, defaults.stdout, `"id": "claude_cli"`)
+	assertContains(t, defaults.stdout, `"id": "codex_cli"`)
+
+	added := runCLI(t, root, "model", "provider", "add",
+		"--id", "glm-main",
+		"--vendor", "zhipu",
+		"--api-type", "openai-compatible",
+		"--auth-ref", "env:GLM_API_KEY",
+		"--model", "glm-4",
+		"--allow-project-memory",
+		"--use-case", "memory_extraction",
+	)
+	assertContains(t, added.stdout, `"id": "glm-main"`)
+	assertContains(t, added.stdout, `"auth_ref": "env:GLM_API_KEY"`)
+	if strings.Contains(added.stdout, "sk-") {
+		t.Fatalf("provider output leaked raw secret-like value: %s", added.stdout)
+	}
+
+	show := runCLI(t, root, "model", "provider", "show", "glm-main")
+	assertContains(t, show.stdout, `"models"`)
+	assertContains(t, show.stdout, `"glm-4"`)
+
+	backend := runCLI(t, root, "model", "route", "--role", "backend", "--repo-edit")
+	assertContains(t, backend.stdout, `"decision": "ROUTE_ALLOWED"`)
+	assertContains(t, backend.stdout, `"runtime_id": "codex_cli"`)
+
+	frontend := runCLI(t, root, "model", "route", "--role", "frontend", "--repo-edit")
+	assertContains(t, frontend.stdout, `"runtime_id": "claude_cli"`)
+
+	memoryRoute := runCLI(t, root, "model", "route", "--role", "memory_curator", "--task-type", "memory_extraction", "--includes-project-memory")
+	assertContains(t, memoryRoute.stdout, `"provider_id": "glm-main"`)
+	assertContains(t, memoryRoute.stdout, `"model_id": "glm-4"`)
+
+	disabled := runCLI(t, root, "model", "provider", "disable", "glm-main")
+	assertContains(t, disabled.stdout, `"enabled": false`)
+
+	rawSecret := runCLIAllowFailure(t, root, "model", "provider", "add",
+		"--id", "bad-provider",
+		"--vendor", "openai",
+		"--api-type", "openai",
+		"--auth-ref", "plain-secret-should-not-be-stored",
+	)
+	if rawSecret.code == 0 {
+		t.Fatalf("expected raw secret provider registration to fail: %s", rawSecret.stdout)
+	}
+	assertContains(t, rawSecret.stderr, "auth_ref_must_be_reference")
+	assertFileContains(t, root, ".moyuan/models/providers.json", `"id": "glm-main"`)
+	assertFileContains(t, root, ".moyuan/logs/audit.jsonl", "provider.route.decided")
+}
+
 func TestQualityReviewHardeningFindingsDriveNeedsRework(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)

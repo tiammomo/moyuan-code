@@ -279,7 +279,9 @@ moyuan agent list
 moyuan agent enable <role>
 moyuan model provider add
 moyuan model provider list
+moyuan model provider show <provider>
 moyuan model provider disable <provider>
+moyuan model route --role <role> [--task-type <type>] [--output-type <type>]
 moyuan model list
 moyuan model test <provider>
 moyuan model health check

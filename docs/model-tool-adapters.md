@@ -21,7 +21,17 @@ Adapter 统一解决：
 
 ## 2. Provider Registry
 
-模型服务商必须先进入 Provider Registry，再被路由策略引用。Registry 的权威配置是 `models/providers.yaml`，运行记录落在 `.moyuan/model-ops/`。
+模型服务商必须先进入 Provider Registry，再被路由策略引用。目标权威配置是 `models/providers.yaml`，运行记录落在 `.moyuan/model-ops/`。
+
+当前 Beta 实现已落地最小 registry：
+
+- 运行期文件：`.moyuan/models/providers.json`。
+- CLI：`moyuan model provider add/list/show/disable`、`moyuan model route`。
+- API：`GET/POST /v1/projects/:project_id/providers`、`GET /v1/projects/:project_id/providers/:provider_id`、`POST /v1/projects/:project_id/providers/:provider_id/disable`、`POST /v1/projects/:project_id/provider-route`。
+- 已实现约束：`auth_ref` 只能是 `env:` 或 `secret:` 引用；不会保存明文 API key。
+- 已实现默认路由：前端和架构类代码任务路由到 `claude_cli`，后端、调优、测试、review 和修复类任务路由到 `codex_cli`，启用后的 API provider 可承担 memory 抽取、规划或图像类任务。
+
+`providers.json` 是 Beta 运行状态快照；后续 schema validator 完成后，再把同字段收敛到 `models/providers.yaml`，并保留 snapshot 用于审计。
 
 纳管对象：
 

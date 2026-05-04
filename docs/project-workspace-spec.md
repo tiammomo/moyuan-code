@@ -29,6 +29,7 @@
     subagents/
   models/
     providers.yaml
+    providers.json
     routing.yaml
   visuals/
     architecture-visuals.yaml
@@ -142,7 +143,8 @@
 | `agents/teams.yaml` | 默认 team、任务类型 team、验证链路 | [Agent 角色与团队概览](./agent-roles-overview.md) |
 | `agents/subagents.yaml` | Subagent 创建、并发、生命周期和委派策略 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `agents/subagents/` | Subagent 实例、父对象、状态、输出和审计索引 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
-| `models/providers.yaml` | 模型服务商 API、账号、模型能力、额度、健康检查和第三方网关 | [模型与工具适配规划](./model-tool-adapters.md) |
+| `models/providers.yaml` | 模型服务商 API、账号、模型能力、额度、健康检查和第三方网关的目标 schema | [模型与工具适配规划](./model-tool-adapters.md) |
+| `models/providers.json` | Beta 运行期 Provider Registry 快照，字段与目标 schema 对齐 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `models/routing.yaml` | 模型路由、fallback、成本策略 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `visuals/architecture-visuals.yaml` | gpt-image-2 架构流程图生成、编辑、讲解和复核策略 | [配置方案](./configuration-guide.md) |
 | `visuals/` | 架构图 spec、prompt、图片资产、讲解文档和索引 | [配置方案](./configuration-guide.md) |
