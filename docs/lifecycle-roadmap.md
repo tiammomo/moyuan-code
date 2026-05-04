@@ -562,9 +562,9 @@ Phase 1 的执行结果：
 
 ## 10. 当前阶段状态
 
-Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力和 Phase 3 第一批配置可执行化/Console 操作流能力已完成。Phase 3 收口记录见 [Phase 3 Release Readiness](./phases/phase3-release-readiness.md)。
+Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力和 Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力已完成。
 
-当前进入 Phase 4，执行入口见 [Phase 4 实现 Issue Graph](./phases/phase4-issue-graph.md) 和 [Phase 4 实施记录](./phases/phase4-next-development-plan.md)。Phase 4 的第一项建议任务是 `phase4-001 audit-log-query-api-console`，用于为审批、团队鉴权、Git PR/MR 同步和服务器维护建立统一审计查询入口。
+当前收口入口见 [Phase 5 Release Readiness](./phases/phase5-release-readiness.md)。下一阶段应先新增独立 issue graph，再推进 approval consumption、真实部署 adapter、CI/CD provider、Console 多页面化和 provider 成本/健康治理。
 
 Phase 1 第一批实现模块：
 

@@ -6,6 +6,7 @@
 
 - [Phase 5 实现 Issue Graph](./phase5-issue-graph.md)：Phase 5 鉴权强制门禁、Secret resolver、真实外部 adapter preview/dry-run 和 Console 表单的依赖图。
 - [Phase 5 实施记录](./phase5-next-development-plan.md)：Phase 5 当前任务、执行范围和验收记录。
+- [Phase 5 Release Readiness](./phase5-release-readiness.md)：Phase 5 鉴权、Secret、PR/MR、部署检查和 Console 受控表单的收口验证。
 - [Phase 4 Release Readiness](./phase4-release-readiness.md)：Phase 4 团队协作、审计、审批、Git PR/MR plan 和服务器维护的收口验证。
 - [Phase 4 实现 Issue Graph](./phase4-issue-graph.md)：Phase 4 团队协作、审计查询、审批记录、Git 协同和服务器维护的依赖图。
 - [Phase 4 实施记录](./phase4-next-development-plan.md)：Phase 4 当前任务、执行范围和验收记录。

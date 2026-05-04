@@ -65,8 +65,9 @@
 
 Phase 1 本地 CLI MVP、Beta 第一批控制面能力、Phase 2、Phase 3 和 Phase 4 第一批能力已完成主要闭环。当前验收和状态入口：
 
+- [Phase 5 Release Readiness](./phases/phase5-release-readiness.md)：Phase 5 鉴权、Secret、PR/MR、部署检查和 Console 受控表单的收口验证。
 - [Phase 5 实现 Issue Graph](./phases/phase5-issue-graph.md)：Phase 5 鉴权强制门禁、Secret resolver、真实外部 adapter preview/dry-run 和 Console 表单的依赖图。
-- [Phase 5 实施记录](./phases/phase5-next-development-plan.md)：Phase 5 当前任务范围、验收标准和执行入口。
+- [Phase 5 实施记录](./phases/phase5-next-development-plan.md)：Phase 5 任务范围、验收标准和完成记录。
 - [Phase 4 Release Readiness](./phases/phase4-release-readiness.md)：Phase 4 团队协作、审计、审批、Git PR/MR plan 和服务器维护的验证命令、产物、边界和剩余风险。
 - [Phase 4 实现 Issue Graph](./phases/phase4-issue-graph.md)：Phase 4 团队协作、审计查询、审批记录、Git 协同和服务器维护的依赖图。
 - [Phase 4 实施记录](./phases/phase4-next-development-plan.md)：Phase 4 当前任务范围、验收标准和执行入口。
