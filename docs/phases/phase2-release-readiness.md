@@ -70,6 +70,13 @@ moyuan model route --strategy low-cost-memory
 moyuan model route --strategy image-diagram
 ```
 
+Workspace：
+
+```bash
+moyuan workspace validate
+moyuan workspace doctor
+```
+
 Runtime recovery：
 
 ```bash
@@ -107,6 +114,7 @@ moyuan visuals renders
 - `.moyuan/visuals/prompts/`
 - `.moyuan/visuals/assets/`
 - `.moyuan/visuals/executions/`
+- `.moyuan/state.db`
 - `.moyuan/logs/`
 
 ## 6. 剩余风险
@@ -122,8 +130,8 @@ moyuan visuals renders
 
 优先级建议：
 
-1. Workspace schema validator 和 `.moyuan/state.db` 索引深化。
-2. Skills 外部 adapter 接入和 recommendation score 与 effectiveness 闭环。
-3. Console 深化日志流、diff 展开、visual asset 图片预览和人工审批动作。
-4. Visual script mode 接入 auth ref、密钥注入审计和图片结果质量检查。
-5. Provider refresh 后续接真实服务商轻量探测 adapter。
+1. Skills 外部 adapter 接入和 recommendation score 与 effectiveness 闭环。
+2. Console 深化日志流、diff 展开、visual asset 图片预览和人工审批动作。
+3. Visual script mode 接入 auth ref、密钥注入审计和图片结果质量检查。
+4. Provider refresh 后续接真实服务商轻量探测 adapter。
+5. Workspace validator 后续接 YAML 解析和字段级 schema contract。

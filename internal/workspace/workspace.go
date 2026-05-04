@@ -82,6 +82,20 @@ type StateFile struct {
 	Access     AccessConfig     `json:"access"`
 }
 
+type ValidationReport struct {
+	Root      string            `json:"root"`
+	Status    string            `json:"status"`
+	Issues    []ValidationIssue `json:"issues"`
+	CheckedAt string            `json:"checked_at"`
+}
+
+type ValidationIssue struct {
+	Severity string `json:"severity"`
+	Code     string `json:"code"`
+	Message  string `json:"message"`
+	Path     string `json:"path,omitempty"`
+}
+
 func DefaultProjectConfig(rootDir string) ProjectConfig {
 	name := filepath.Base(rootDir)
 	cfg := ProjectConfig{SchemaVersion: 1}
@@ -212,6 +226,42 @@ func Load(rootDir string) (Workspace, error) {
 	return ws, nil
 }
 
+func Validate(rootDir string) (ValidationReport, error) {
+	paths := ForRoot(rootDir)
+	report := ValidationReport{
+		Root:      paths.RootDir,
+		Status:    "passed",
+		Issues:    []ValidationIssue{},
+		CheckedAt: time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if !fsutil.Exists(paths.MoyuanDir) {
+		report.add("error", "workspace_dir_missing", ".moyuan directory is missing", paths.MoyuanDir)
+		return report.finish(), nil
+	}
+	for _, required := range []struct {
+		code string
+		path string
+	}{
+		{code: "workspace_state_missing", path: filepath.Join(paths.MoyuanDir, "workspace.json")},
+		{code: "project_config_missing", path: paths.ProjectYAML},
+		{code: "repository_config_missing", path: paths.RepositoryYAML},
+		{code: "access_config_missing", path: paths.AccessYAML},
+	} {
+		if !fsutil.Exists(required.path) {
+			report.add("error", required.code, "required workspace config file is missing", required.path)
+		}
+	}
+	ws, err := Load(paths.RootDir)
+	if err != nil {
+		report.add("error", "workspace_state_unreadable", err.Error(), filepath.Join(paths.MoyuanDir, "workspace.json"))
+		return report.finish(), nil
+	}
+	validateProject(&report, ws.Project)
+	validateRepository(&report, ws.Repository)
+	validateAccess(&report, ws.Access)
+	return report.finish(), nil
+}
+
 func SaveProject(rootDir string, cfg ProjectConfig) error {
 	paths := ForRoot(rootDir)
 	if err := updateState(paths, func(state *StateFile) { state.Project = cfg }); err != nil {
@@ -248,6 +298,103 @@ func updateState(paths Paths, mutate func(*StateFile)) error {
 	}
 	mutate(&state)
 	return fsutil.WriteJSON(filepath.Join(paths.MoyuanDir, "workspace.json"), state)
+}
+
+func validateProject(report *ValidationReport, cfg ProjectConfig) {
+	if cfg.SchemaVersion != 1 {
+		report.add("error", "project_schema_version_invalid", "project schema_version must be 1", ".moyuan/project.yaml")
+	}
+	if strings.TrimSpace(cfg.Project.ID) == "" {
+		report.add("error", "project_id_required", "project.id is required", "project.id")
+	}
+	if strings.TrimSpace(cfg.Project.Name) == "" {
+		report.add("error", "project_name_required", "project.name is required", "project.name")
+	}
+	if strings.TrimSpace(cfg.Project.Root) == "" {
+		report.add("error", "project_root_required", "project.root is required", "project.root")
+	}
+	if strings.TrimSpace(cfg.Project.Type) == "" {
+		report.add("error", "project_type_required", "project.type is required", "project.type")
+	}
+	if len(cfg.Workspace.ProtectedPaths) == 0 {
+		report.add("warning", "protected_paths_empty", "workspace.protected_paths should protect secrets and policy files", "workspace.protected_paths")
+	}
+	if len(cfg.Workspace.WritablePaths) == 0 {
+		report.add("warning", "writable_paths_empty", "workspace.writable_paths should constrain agent edits", "workspace.writable_paths")
+	}
+}
+
+func validateRepository(report *ValidationReport, cfg RepositoryConfig) {
+	if cfg.SchemaVersion != 1 {
+		report.add("error", "repository_schema_version_invalid", "repository schema_version must be 1", ".moyuan/repository.yaml")
+	}
+	sourceType := strings.TrimSpace(cfg.Repository.Source.Type)
+	if sourceType == "" {
+		report.add("error", "repository_source_type_required", "repository.source.type is required", "repository.source.type")
+	}
+	if cfg.Repository.Source.Provider == "" {
+		report.add("error", "repository_provider_required", "repository.source.provider is required", "repository.source.provider")
+	}
+	switch sourceType {
+	case "local_path":
+		if strings.TrimSpace(cfg.Repository.Source.LocalPath) == "" {
+			report.add("error", "repository_local_path_required", "repository.source.local_path is required for local_path source", "repository.source.local_path")
+		}
+	case "remote_git":
+		if cfg.Repository.Source.URL == nil || strings.TrimSpace(*cfg.Repository.Source.URL) == "" {
+			report.add("error", "repository_url_required", "repository.source.url is required for remote_git source", "repository.source.url")
+		}
+	case "":
+	default:
+		report.add("warning", "repository_source_type_unknown", "repository.source.type is not a known source type", "repository.source.type")
+	}
+	if strings.TrimSpace(cfg.Repository.DefaultRemote) == "" {
+		report.add("warning", "default_remote_empty", "repository.default_remote is empty; git sync may need explicit remote", "repository.default_remote")
+	}
+	if cfg.Git.BranchPolicy == nil {
+		report.add("error", "branch_policy_required", "git.branch_policy is required", "git.branch_policy")
+	}
+	if cfg.Git.CommitPolicy == nil {
+		report.add("error", "commit_policy_required", "git.commit_policy is required", "git.commit_policy")
+	}
+}
+
+func validateAccess(report *ValidationReport, cfg AccessConfig) {
+	if cfg.SchemaVersion != 1 {
+		report.add("error", "access_schema_version_invalid", "access schema_version must be 1", ".moyuan/policies/access.yaml")
+	}
+	if strings.TrimSpace(cfg.Access.Mode) == "" {
+		report.add("error", "access_mode_required", "access.mode is required", "access.mode")
+	}
+	if cfg.Access.ProjectRoles == nil || len(cfg.Access.ProjectRoles) == 0 {
+		report.add("error", "project_roles_required", "access.project_roles must define at least one role", "access.project_roles")
+	}
+}
+
+func (report *ValidationReport) add(severity string, code string, message string, path string) {
+	report.Issues = append(report.Issues, ValidationIssue{Severity: severity, Code: code, Message: message, Path: path})
+}
+
+func (report ValidationReport) finish() ValidationReport {
+	hasError := false
+	hasWarning := false
+	for _, issue := range report.Issues {
+		if issue.Severity == "error" {
+			hasError = true
+		}
+		if issue.Severity == "warning" {
+			hasWarning = true
+		}
+	}
+	switch {
+	case hasError:
+		report.Status = "failed"
+	case hasWarning:
+		report.Status = "warning"
+	default:
+		report.Status = "passed"
+	}
+	return report
 }
 
 func renderProjectYAML(cfg ProjectConfig) string {

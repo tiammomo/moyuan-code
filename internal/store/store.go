@@ -20,11 +20,11 @@ type Project struct {
 	ID           string `gorm:"primaryKey" json:"id"`
 	Name         string `gorm:"not null" json:"name"`
 	Root         string `gorm:"uniqueIndex;not null" json:"root"`
-	SourceType   string `json:"source_type"`
-	Provider     string `json:"provider"`
-	OwnerID      string `json:"owner_id"`
+	SourceType   string `gorm:"index" json:"source_type"`
+	Provider     string `gorm:"index" json:"provider"`
+	OwnerID      string `gorm:"index" json:"owner_id"`
 	Status       string `gorm:"index" json:"status"`
-	RegisteredAt string `json:"registered_at"`
+	RegisteredAt string `gorm:"index" json:"registered_at"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -81,6 +81,14 @@ func (s Store) FindProject(id string) (Project, bool, error) {
 		return Project{}, false, nil
 	}
 	return Project{}, false, err
+}
+
+func (s Store) CountProjects() (int64, error) {
+	var count int64
+	if err := s.DB.Model(&Project{}).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (s Store) Close() error {

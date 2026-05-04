@@ -321,7 +321,7 @@ Phase 2 第一批 issue 已完成：
 - 做一次 Phase 2 release readiness 检查，确认文档、API、CLI、Console 和测试状态一致。
 - 将 visual assets、runtime recoveries、subagent backlog 接入 Web Console。
 - 将 `scripts/` 图像生成执行接入受控 CLI/API，但仍保持不阻塞代码质量门禁。
-- 规划下一批 issue：真实 provider 健康检查、schema validator、state store 索引深化、Console 操作流。
+- 规划下一批 issue：真实 provider 健康检查 adapter、字段级 schema contract、Console 操作流。
 
 ## 13. Phase 2 收口规则
 

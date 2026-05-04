@@ -61,6 +61,11 @@ func exercisePhase1Lifecycle(t *testing.T, root string) {
 	doctor := runCLI(t, root, "workspace", "doctor")
 	assertContains(t, doctor.stdout, "project")
 	assertContains(t, doctor.stdout, "repository")
+	assertContains(t, doctor.stdout, `"state_db"`)
+	assertContains(t, doctor.stdout, `"validation"`)
+
+	validate := runCLI(t, root, "workspace", "validate")
+	assertContains(t, validate.stdout, `"status": "passed"`)
 
 	whoami := runCLI(t, root, "auth", "whoami")
 	assertContains(t, whoami.stdout, "local_single_user")

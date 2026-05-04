@@ -43,6 +43,16 @@ func TestGORMStoreMigratesAndUpsertsProjects(t *testing.T) {
 	if len(projects) != 1 {
 		t.Fatalf("projects length = %d", len(projects))
 	}
+	count, err := db.CountProjects()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("project count = %d", count)
+	}
+	if !db.DB.Migrator().HasIndex(&Project{}, "SourceType") || !db.DB.Migrator().HasIndex(&Project{}, "Provider") || !db.DB.Migrator().HasIndex(&Project{}, "RegisteredAt") {
+		t.Fatal("expected state.db project lookup indexes")
+	}
 	if projects[0].Status != "archived" || projects[0].Provider != "github" {
 		t.Fatalf("unexpected project: %+v", projects[0])
 	}

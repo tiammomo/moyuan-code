@@ -142,6 +142,7 @@ func usage() string {
 		"moyuan comprehend [--full] [--since <commit>]",
 		"moyuan status",
 		"moyuan workspace doctor",
+		"moyuan workspace validate",
 		"moyuan git status",
 		"moyuan git branch list",
 		"moyuan git sync [--comprehend]",
@@ -387,12 +388,39 @@ func handleInit(args []string, cwd string) (string, any, int, error) {
 
 func handleWorkspace(args []string, cwd string) (string, any, int, error) {
 	rootDir := mustRoot(cwd)
+	if len(args) > 0 && args[0] == "validate" {
+		report, err := workspace.Validate(rootDir)
+		if err != nil {
+			return "", nil, 1, err
+		}
+		code := 0
+		if report.Status == "failed" {
+			code = 1
+		}
+		return "", report, code, nil
+	}
 	if len(args) > 0 && args[0] == "doctor" {
 		ws, err := workspace.Load(rootDir)
 		if err != nil {
 			return "", nil, 1, err
 		}
-		return "", map[string]any{"root": rootDir, "project": ws.Project, "repository": ws.Repository, "access": ws.Access}, 0, nil
+		report, err := workspace.Validate(rootDir)
+		if err != nil {
+			return "", nil, 1, err
+		}
+		state := map[string]any{"path": store.DefaultPath(rootDir), "available": false, "project_count": 0}
+		db, err := store.Open(rootDir)
+		if err == nil {
+			defer db.Close()
+			count, countErr := db.CountProjects()
+			if countErr == nil {
+				state["project_count"] = count
+			}
+			state["available"] = true
+		} else {
+			state["error"] = err.Error()
+		}
+		return "", map[string]any{"root": rootDir, "project": ws.Project, "repository": ws.Repository, "access": ws.Access, "validation": report, "state_db": state}, 0, nil
 	}
 	return "unknown workspace command\n", nil, 1, nil
 }
