@@ -186,7 +186,7 @@ else if preferred runtime unavailable:
 - Issue 缺少必填字段时不能进入 ready queue。
 - 前后端写入范围不冲突时，可以在契约 accepted 后并发。
 - 后端默认使用 Codex CLI。
-- 前端默认使用 Claude CLI。
+- 前端复杂 UI 首版默认使用 Claude CLI；样式稳定后的前端代码修改、测试、修复和重构可使用 Codex CLI。
 - ready issue 能生成 Subagent Plan。
 - Skill 不兼容时不创建 Subagent。
 - dirty worktree 时不启动自动写入。

@@ -124,7 +124,7 @@ claude mcp ...
 
 ### Claude CLI + MiniMax-M2.7 Profile
 
-前端开发可以使用本地 `claude` CLI 承接代码生成，同时通过 MiniMax 的 Anthropic-compatible endpoint 提供模型能力。Moyuan 的职责是选择 provider、注入运行环境、捕获 diff、执行质量门禁和 review；Claude CLI 只负责在授权 worktree 内生成候选代码。
+前端复杂 UI 首版、视觉探索和高交互页面可以使用本地 `claude` CLI 承接代码生成，同时通过 MiniMax 的 Anthropic-compatible endpoint 提供模型能力。样式基线稳定后的前端代码修改、测试、修复和重构可以改由 Codex CLI 承接。Moyuan 的职责是选择 provider、注入运行环境、捕获 diff、执行质量门禁和 review；Native Runtime 只负责在授权 worktree 内生成候选代码。
 
 推荐登记方式：
 
@@ -147,7 +147,7 @@ export MINIMAX_API_KEY="<local-only>"
 
 运行时效果：
 
-- `model route --role frontend --repo-edit` 会优先选择启用且声明 `frontend` use-case 的 `claude_cli` provider。
+- `model route --role frontend --repo-edit` 会根据 issue intent 选择 Runtime：复杂 UI 首版优先启用且声明 `frontend` use-case 的 `claude_cli` provider；工程修改、测试修复和重构可选择 `codex_cli`。
 - `runtime invoke claude_cli --provider minimax-m27-claude` 会向本次子进程注入 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_MODEL`、`ANTHROPIC_DEFAULT_*_MODEL`、`API_TIMEOUT_MS` 和 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`。
 - `orchestrator run <issue-id> --role frontend --runtime claude_cli` 在未显式传 `--provider` 时，会根据 Provider Route 自动选择匹配 provider。
 - `.moyuan/runtime/*-native.json` 只保存 provider id、model id、command、stdout/stderr 和 `env_keys`；不会保存 `ANTHROPIC_AUTH_TOKEN` 的值。

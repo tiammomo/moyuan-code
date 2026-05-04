@@ -8,11 +8,11 @@
 
 默认分工：
 
-- 前端开发优先使用 `frontend` role 和 `claude_cli`。
+- 前端开发默认使用 `frontend` role。复杂 UI 首版和设计探索可优先 `claude_cli`；样式基线稳定后的前端代码修改、测试、修复和重构可使用 `codex_cli`。
 - 后端开发优先使用 `backend` role 和 `codex_cli`。
 - 后端调优优先使用 `backend_tuning` role 和 `codex_cli`。
 - 复杂契约、架构方案和跨端依赖必须在进入本主线前形成 design/contract issue 或 accepted contract。
-- 当项目启用 `minimax-m27-claude` 等绑定 `claude_cli` 的 provider profile 时，前端 issue 可通过 Claude CLI 使用 MiniMax-M2.7；Moyuan 仍负责 provider route、diff 捕获、质量门禁和合入判断。
+- 当项目启用 `minimax-m27-claude` 等绑定 `claude_cli` 的 provider profile 时，前端 issue 可通过 Claude CLI 使用 MiniMax-M2.7；当 issue 更偏工程修改、测试修复或重构时，也可以路由到 Codex CLI。Moyuan 仍负责 provider route、diff 捕获、质量门禁和合入判断。
 
 ## 2. 输入与输出
 

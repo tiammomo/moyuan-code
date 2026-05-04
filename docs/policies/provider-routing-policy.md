@@ -151,7 +151,7 @@ if output type == architecture_diagram:
 
 ## 10. 验收用例
 
-- 前端代码任务默认路由 Claude CLI。
+- 前端复杂 UI 首版和视觉探索默认路由 Claude CLI；样式稳定后的前端代码修改、测试、修复和重构可以路由 Codex CLI。
 - 后端代码任务默认路由 Codex CLI。
 - 第三方 API 不能接收敏感代码。
 - provider unhealthy 时尝试 fallback。

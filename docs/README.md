@@ -53,7 +53,7 @@
 1. 每个被管理项目都有独立 `.moyuan/` 工作空间、配置、任务状态、Memory 和审计记录。
 2. 所有项目、Git、Runtime、Provider、服务器、发布和模型操作都先建立 `auth_context`。
 3. 用户需求必须先进入需求完善、澄清判断和 Issue Graph，再进入代码开发。
-4. 前端默认交给 Claude CLI，后端和后端调优默认交给 Codex CLI，最终统一回到质量门禁和 review；Web Console 技术栈冻结为 Next.js 16，前端端口 `3000`，后端 API 端口 `8080`。
+4. 前端复杂 UI 首版可优先交给 Claude CLI，样式稳定后的前端代码修改、测试、修复和重构可由 Codex CLI 参与或主导；后端和后端调优默认交给 Codex CLI，最终统一回到质量门禁和 review；Web Console 技术栈冻结为 Next.js 16，前端端口 `3000`，后端 API 端口 `8080`。
 5. AI 生成代码必须通过可运行性、测试覆盖率、重复度、复杂度、架构边界、安全和独立审查。
 6. Memory 只以 [Agent Memory 系统方案](./agent-memory-system.md) 为唯一详细方案，其他文档只引用。
 7. Provider Registry、Skill Registry、Project Registry、Server Resource Registry 和 Agent Runtime Registry 是配置注册表，不是服务注册发现系统。

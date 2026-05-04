@@ -1,6 +1,6 @@
 # Next.js 16 控制台方案
 
-状态：planning-ready
+状态：implementation-started
 责任角色：frontend_architect + product_designer + frontend
 最后更新：2026-05-05
 
@@ -270,11 +270,11 @@ apps/console/
 
 第一阶段：前端骨架
 
-- 创建 `apps/console`。
-- Next.js 16、TypeScript、Tailwind、基础 App Shell。
-- 固定端口 `3000`。
-- 配置 `/api/* -> 127.0.0.1:8080/v1/*` rewrite。
-- 建立 API adapter、Zod schema、错误模型。
+- 创建 `apps/console`。已完成首版。
+- Next.js 16、TypeScript、基础 App Shell。已完成首版。
+- 固定端口 `3000`。已完成。
+- 配置 `/api/* -> 127.0.0.1:8080/v1/*` rewrite。已完成。
+- 建立 API adapter、错误模型和 demo fallback。已完成首版。
 
 第二阶段：可视化核心
 
@@ -302,4 +302,3 @@ apps/console/
 - Approval Drawer。
 - AI Assist Surface。
 - Playwright 主流程覆盖。
-

@@ -166,18 +166,24 @@ review_queue
 | `waiting_user_input` | 用户补充或批准 |
 | `dirty_worktree` | 用户处理本地改动 |
 
-## 7. 前端 Claude / 后端 Codex
+## 7. 前端 Runtime 选择 / 后端 Codex
 
 默认分工：
 
 | Issue 类型 | 默认 Role | 默认 Runtime | 等待条件 |
 | --- | --- | --- | --- |
-| `frontend` | `frontend` | `claude_cli` | UI 需求、接口契约、写入范围 ready |
+| `frontend` | `frontend` | `claude_cli` 或 `codex_cli` | UI 需求、接口契约、写入范围 ready |
 | `backend` | `backend` | `codex_cli` | API 契约、数据模型、写入范围 ready |
 | `backend_tuning` | `backend_tuning` | `codex_cli` | 性能目标、基线指标、测试命令 ready |
 | `contract` | `architect` | `claude_cli` 或 `codex_cli` | 用户需求和项目理解 ready |
 | `test` | `tester` | `codex_cli` | 被测实现 accepted |
 | `review` | `reviewer` | `codex_cli` | diff 和 quality report ready |
+
+前端 Runtime 选择规则：
+
+- 复杂 UI 首版、交互探索、视觉系统调整优先 `claude_cli`。
+- 样式基线已经稳定后的组件修改、状态修复、测试补齐和重构可以使用 `codex_cli`。
+- 无论使用哪个 Runtime，前端 issue 都必须回到同一套 typecheck、build、UI smoke、quality gate 和 review。
 
 前后端合流：
 

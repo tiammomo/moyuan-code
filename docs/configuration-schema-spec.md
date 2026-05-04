@@ -250,9 +250,9 @@ Provider 字段：
 | `agent_runtimes.session_store` | required | 无 | 会话目录 |
 | `agent_runtimes.output_store` | required | 无 | 输出目录 |
 | `agent_runtimes.runtimes` | required | 无 | 至少一个 runtime |
-| `agent_runtimes.routing.task_modes.frontend` | required | 无 | 默认绑定 Claude CLI |
+| `agent_runtimes.routing.task_modes.frontend` | required | 无 | 前端 Runtime 选择策略，至少允许 Claude CLI 或 Codex CLI 之一 |
 | `agent_runtimes.routing.task_modes.backend` | required | 无 | 默认绑定 Codex CLI |
-| `agent_runtimes.role_runtime_defaults.frontend` | required | `claude_cli` | 前端默认 Runtime |
+| `agent_runtimes.role_runtime_defaults.frontend` | required | `claude_cli` | 前端复杂 UI 首版默认 Runtime，可按 issue 策略改用 Codex CLI |
 | `agent_runtimes.role_runtime_defaults.backend` | required | `codex_cli` | 后端默认 Runtime |
 | `agent_runtimes.role_runtime_defaults.backend_tuning` | required | `codex_cli` | 后端调优默认 Runtime |
 | `agent_runtimes.isolation.require_issue_worktree` | required | `true` | 必须为 true |
@@ -431,7 +431,7 @@ Skill Binding 字段：
 - `max_parallel_subagents` 不能为 null。
 - `merge_gate` 不能为空对象。
 - `waiting_policy.queues` 不能缺少 `blocked_queue`、`ready_queue`、`running_queue`、`review_queue`。
-- `waiting_policy.frontend_runtime` 必须引用 `claude_cli`。
+- `waiting_policy.frontend_runtime` 必须引用已启用的前端 Runtime 策略，允许 `claude_cli`、`codex_cli` 或二者组成的候选列表。
 - `waiting_policy.backend_runtime` 必须引用 `codex_cli`。
 - `issue_spec.required_fields` 不能缺少 `acceptance_criteria`、`test_plan`、`write_scopes`、`rollback_or_fix_plan`。
 

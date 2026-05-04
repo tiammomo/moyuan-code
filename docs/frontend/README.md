@@ -1,10 +1,10 @@
 # 前端控制台文档
 
-状态：planning-ready
+状态：implementation-started
 责任角色：frontend_architect + product_designer + frontend
 最后更新：2026-05-05
 
-本目录定义 Moyuan Web Console 的前端技术方案。当前只做文档和实现约束，不代表前端工程已经创建。
+本目录定义 Moyuan Web Console 的前端技术方案。当前已创建第一版可运行控制台工程，后续以前端体验、真实 API 接入和可视化编排能力为主线迭代。
 
 ## 1. 技术结论
 
@@ -13,7 +13,7 @@
 - 后端端口：`8080`。
 - 前端定位：Moyuan Control Console，面向多 Agent 工程运维、代码生命周期、服务器资源和发布投产的工作台。
 - 后端边界：Go/Gin API Server 仍是唯一核心控制面，Next.js 不接管主业务状态。
-- 默认开发分工：前端实现继续优先交给 `frontend` role + `claude_cli`，后端继续优先交给 `backend` role + `codex_cli`。
+- 默认开发分工：复杂 UI 首版、视觉探索和高交互页面可优先使用 `frontend` role + `claude_cli`；样式稳定后的前端代码修改、测试、修复和重构可以由 `codex_cli` 参与或主导；后端继续优先交给 `backend` role + `codex_cli`。
 
 端口约定：
 
@@ -27,6 +27,30 @@ Backend:  http://127.0.0.1:8080
 | 文档 | 作用 |
 | --- | --- |
 | [Next.js 16 控制台方案](./nextjs16-control-console.md) | 前端架构、渲染模式、数据访问、页面结构和质量策略 |
+
+## 2.1 当前实现入口
+
+首个可运行控制台位于：
+
+```text
+apps/console/
+```
+
+本地运行：
+
+```bash
+cd apps/console
+npm install
+npm run dev
+```
+
+验证：
+
+```bash
+npm run typecheck
+npm run build
+npm audit --omit=dev
+```
 
 ## 3. 设计原则
 
@@ -44,4 +68,3 @@ Backend:  http://127.0.0.1:8080
 - Runtime 和 Provider：[模型与工具适配规划](../model-tool-adapters.md)。
 - 鉴权和权限：[鉴权与访问控制策略](../policies/auth-access-policy.md)、[权限模型](../foundations/permission-model.md)。
 - 发布投产：[DevOps 发布投产主线](../mainlines/devops-release-deployment.md)。
-

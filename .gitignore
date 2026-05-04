@@ -1,5 +1,9 @@
 # Dependencies
 node_modules/
+.next/
+*.tsbuildinfo
+apps/console/.next/
+apps/console/out/
 
 # Environment and secrets
 .env
@@ -22,6 +26,7 @@ pnpm-debug.log*
 /coverage.out
 
 # Moyuan runtime state
+.moyuan/state.db
 .moyuan/logs/
 .moyuan/worktrees/
 .moyuan/runtimes/

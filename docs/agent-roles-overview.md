@@ -42,7 +42,7 @@ Subagent = Orchestrator 为某个 issue/run/repair/release 创建的一次执行
 | `architect` | 架构方案、接口契约、跨模块设计 | `claude_cli` | design / ADR |
 | `backend` | 后端功能实现 | `codex_cli` | backend diff、tests |
 | `backend_tuning` | 后端性能调优 | `codex_cli` | benchmark、optimization diff |
-| `frontend` | 前端功能、组件和交互 | `claude_cli` | frontend diff、UI validation |
+| `frontend` | 前端功能、组件和交互 | `claude_cli` 或 `codex_cli` | frontend diff、UI validation |
 | `tester` | 测试设计、补齐和执行 | `codex_cli` | test report |
 | `quality_guard` | 重复度、复杂度、架构边界和质量门禁 | `codex_cli` | quality report |
 | `reviewer` | 独立代码审查 | `codex_cli` | review findings |
@@ -114,7 +114,8 @@ verify:
 
 | 场景 | 默认分配 |
 | --- | --- |
-| 前端开发、UI 交互、复杂页面实现 | `frontend` + `claude_cli` |
+| 复杂 UI 首版、视觉探索、高交互页面 | `frontend` + `claude_cli` |
+| 样式稳定后的前端代码修改、测试、修复、重构 | `frontend` + `codex_cli` |
 | 后端开发、测试补齐、质量修复 | `backend` / `tester` / `quality_guard` + `codex_cli` |
 | 后端调优、性能定位、回归验证 | `backend_tuning` + `codex_cli` |
 | 需求拆分和架构方案 | `requirement_refiner` / `architect` + `claude_cli` |

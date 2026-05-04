@@ -105,7 +105,7 @@ Golden fixture 变更规则：
 
 ### Multi-Agent 执行
 
-- frontend issue 默认路由 Claude CLI。
+- frontend issue 按 intent 路由：复杂 UI 首版默认 Claude CLI，样式稳定后的工程修改、测试、修复和重构可路由 Codex CLI。
 - backend、test、review 默认路由 Codex CLI。
 - Runtime 输出不符合契约时不能 accepted。
 - Subagent 不能自行创建无限子任务。

@@ -105,7 +105,7 @@
 - 新项目接入后自动 full comprehension。
 - 每次远程同步后自动 incremental comprehension。
 - 用户需求先经过澄清判断和 Issue Graph 拆分。
-- 前端默认 Claude CLI，后端和后端调优默认 Codex CLI。
+- 前端复杂 UI 首版可默认 Claude CLI，样式稳定后的前端工程修改可路由 Codex CLI；后端和后端调优默认 Codex CLI。
 - Web Console 默认 Next.js 16，前端端口 `3000`，Go/Gin API 后端端口 `8080`。
 - 每个 issue 使用独立分支或 worktree。
 - 每个 issue 都经过测试、质量门禁和 review。

@@ -28,9 +28,12 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 go test ./...
 go run ./cmd/moyuan --help
 ./bin/moyuan --help
+cd apps/console && npm run dev
 ```
 
 如果本机没有全局 Go，可先安装 Go 1.22+ 后再运行以上命令。
+
+Web Console 本地端口为 `127.0.0.1:3000`，Go/Gin API 本地端口为 `127.0.0.1:8080`。
 
 ## Phase 1 示例
 
