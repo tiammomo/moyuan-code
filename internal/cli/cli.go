@@ -136,6 +136,8 @@ func usage() string {
 		"moyuan memory candidates",
 		"moyuan memory compact",
 		"moyuan repair signal --type <type> --summary <text>",
+		"moyuan repair run <plan-id> [--runtime local_shell] [--prompt <command>]",
+		"moyuan repair status <attempt-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -614,6 +616,30 @@ func handleRepair(args []string, cwd string) (string, any, int, error) {
 			return "", nil, 1, err
 		}
 		return "", map[string]any{"signal": signal, "candidate": candidate, "repair_plan": plan}, 0, nil
+	case "run":
+		if len(args) < 2 {
+			return "missing repair plan id\n", nil, 1, nil
+		}
+		runtimeID := flagValue(args, "--runtime", "local_shell")
+		prompt := flagValue(args, "--prompt", "")
+		attempt, err := repair.RunAttempt(context.Background(), rootDir, args[1], runtimeID, prompt)
+		code := 0
+		if attempt.Status != "" && attempt.Status != "repaired" {
+			code = 1
+		}
+		return "", attempt, code, err
+	case "status":
+		if len(args) < 2 {
+			return "missing repair attempt id\n", nil, 1, nil
+		}
+		attempt, ok, err := repair.LoadAttempt(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", attempt, 0, nil
 	}
 	return "unknown repair command\n", nil, 1, nil
 }

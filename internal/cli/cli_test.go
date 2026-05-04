@@ -173,6 +173,50 @@ func TestMemoryRecordGateStagesDedupesRejectsAndCompacts(t *testing.T) {
 	assertFileContains(t, root, ".moyuan/logs/memory.jsonl", "memory.candidate.evaluated")
 }
 
+func TestRepairControlledLoopRunsQualityAndStopsAfterMaxAttempts(t *testing.T) {
+	root := createTempRepo(t)
+	brokenSource := "package phase1smoke\n\nfunc Ready() bool { return false }\n"
+	if err := os.WriteFile(filepath.Join(root, "smoke.go"), []byte(brokenSource), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commitAll(t, root, "introduce failing readiness")
+	runCLI(t, root, "project", "add", "--local", root)
+
+	signal := runCLI(t, root, "repair", "signal", "--type", "test_failure", "--summary", "Ready returns false and go test fails")
+	assertContains(t, signal.stdout, "CONFIRMED_BUG")
+	assertContains(t, signal.stdout, `"quality_gate_required": true`)
+	planID := decodeRepairPlanID(t, signal.stdout)
+
+	fixedSource := "package phase1smoke\n\nfunc Ready() bool { return true }\n"
+	first := runCLI(t, root, "repair", "run", planID, "--runtime", "local_shell", "--prompt", "printf '"+fixedSource+"' > smoke.go")
+	assertContains(t, first.stdout, `"status": "repaired"`)
+	assertContains(t, first.stdout, `"quality_status": "passed"`)
+	assertContains(t, first.stdout, `"review_status": "accepted"`)
+	assertContains(t, first.stdout, `"memory_status": "recorded"`)
+	firstAttemptID := decodeRepairAttemptID(t, first.stdout)
+
+	status := runCLI(t, root, "repair", "status", firstAttemptID)
+	assertContains(t, status.stdout, `"status": "repaired"`)
+	assertContains(t, status.stdout, `"runtime_status": "completed"`)
+
+	assertFileExists(t, root, ".moyuan/repair/attempts.jsonl")
+	assertFileExists(t, root, ".moyuan/repair/attempts/"+firstAttemptID+".json")
+	assertFileContains(t, root, ".moyuan/logs/run.jsonl", "self_repair.repair.completed")
+	assertFileContains(t, root, ".moyuan/memory/records.jsonl", "Repair succeeded")
+
+	commitAll(t, root, "first repair attempt")
+	second := runCLI(t, root, "repair", "run", planID, "--runtime", "local_shell", "--prompt", "printf retry > repair-second.txt")
+	assertContains(t, second.stdout, `"status": "repaired"`)
+	commitAll(t, root, "second repair attempt")
+
+	third := runCLIAllowFailure(t, root, "repair", "run", planID, "--runtime", "local_shell", "--prompt", "printf retry > repair-third.txt")
+	if third.code == 0 {
+		t.Fatalf("expected third repair attempt to be blocked: %s", third.stdout)
+	}
+	assertContains(t, third.stdout, `"status": "blocked"`)
+	assertContains(t, third.stdout, "max_attempts_exceeded")
+}
+
 func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)
@@ -386,6 +430,36 @@ func decodeQualityReportID(t *testing.T, raw string) string {
 		t.Fatalf("missing quality_report.id in output: %s", raw)
 	}
 	return payload.QualityReport.ID
+}
+
+func decodeRepairPlanID(t *testing.T, raw string) string {
+	t.Helper()
+	var payload struct {
+		RepairPlan struct {
+			ID string `json:"id"`
+		} `json:"repair_plan"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode repair plan id: %v\n%s", err, raw)
+	}
+	if payload.RepairPlan.ID == "" {
+		t.Fatalf("missing repair_plan.id in output: %s", raw)
+	}
+	return payload.RepairPlan.ID
+}
+
+func decodeRepairAttemptID(t *testing.T, raw string) string {
+	t.Helper()
+	var payload struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode repair attempt id: %v\n%s", err, raw)
+	}
+	if payload.ID == "" {
+		t.Fatalf("missing repair attempt id in output: %s", raw)
+	}
+	return payload.ID
 }
 
 func runCLI(t *testing.T, root string, args ...string) cliResult {

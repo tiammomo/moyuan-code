@@ -19,6 +19,7 @@
 - `phase1-017 quality-review-hardening` 已输出结构化 findings、review_status，并用 protected path、敏感文件、runtime risk 和大 diff 阻断 accepted。
 - 后端框架口径已切换为 `Gin + GORM`，并建立 `internal/api` Gin router、`internal/store` GORM SQLite store 基线。
 - `phase1-018 memory-record-gate` 已补齐 candidate score、staging、dedup、敏感信息阻断、长期 record 元数据和 compact 自动摘要。
+- `phase1-019 repair-controlled-loop` 已补齐 repair attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
 - 当前测试覆盖已经包含 package unit test、CLI smoke 和 Phase 1 e2e smoke。
 
 下一步目标不是继续铺更多模块，而是把“能跑通、能审计、能复核、能失败恢复”的 MVP 闭环做实。
@@ -33,8 +34,8 @@
 | Done | `phase1-016` | `orchestrator-state-machine` | 持久化 issue/run 状态流转，连接 quality、review 和 rework | `phase1-014`,`phase1-015` | issue/run 状态可查询，accepted/needs_rework 可追踪，issue graph/schedule 可同步 |
 | Done | `phase1-017` | `quality-review-hardening` | 强化质量复核：diff review、secret scan、重复/复杂度/保护路径检查 | `phase1-014`,`phase1-016` | 结构化 findings 和 review_status 可阻断 accepted |
 | Done | `phase1-018` | `memory-record-gate` | 将当前 memory stub 升级为 record gate、staging、dedup、compact 最小闭环 | `phase1-007`,`phase1-016` | 可记录项目事实和运行经验，compact 可自动产生摘要 |
-| P1 | `phase1-019` | `repair-controlled-loop` | 将 runtime signal、bug candidate、repair attempt 接入受控修复闭环 | `phase1-016`,`phase1-017`,`phase1-018` | 修复必须补回归测试并重新通过 quality gate |
-| P2 | `phase1-020` | `docs-release-readiness` | 更新 README、CLI help、e2e 说明和 Phase 1 验收记录 | `phase1-013`~`phase1-019` | 用户可按文档复现 Phase 1 MVP |
+| Done | `phase1-019` | `repair-controlled-loop` | 将 runtime signal、bug candidate、repair attempt 接入受控修复闭环 | `phase1-016`,`phase1-017`,`phase1-018` | 修复必须补回归测试并重新通过 quality gate |
+| P1 | `phase1-020` | `docs-release-readiness` | 更新 README、CLI help、e2e 说明和 Phase 1 验收记录 | `phase1-013`~`phase1-019` | 用户可按文档复现 Phase 1 MVP |
 
 ## 3. 推荐执行顺序
 
@@ -44,7 +45,7 @@
 4. `phase1-016 orchestrator-state-machine` 已完成，issue/run 状态不再只停留在单次命令输出。
 5. `phase1-017 quality-review-hardening` 已完成，质量复核可以向状态机返回可阻断结论。
 6. `phase1-018 memory-record-gate` 已完成，Memory 具备 record gate 和 compact 最小闭环。
-7. 下一步做 `phase1-019 repair-controlled-loop`，最后做 `phase1-020 docs-release-readiness`。
+7. `phase1-019 repair-controlled-loop` 已完成，下一步做 `phase1-020 docs-release-readiness`。
 
 ## 4. 任务详情
 
@@ -189,6 +190,8 @@
 
 ### `phase1-019 repair-controlled-loop`
 
+状态：已完成。
+
 范围：
 
 - 将 runtime signal 分类为 non_bug、bug_candidate、confirmed_bug、enhancement。
@@ -200,6 +203,14 @@
 - repair attempt 有最大重试次数和失败转人工规则。
 - 自动修复不能直接提交或合入。
 - 成功修复会生成 memory candidate。
+
+实现：
+
+- `repair signal` 继续生成 runtime signal、bug candidate 和 repair plan。
+- `repair run <plan-id>` 只允许低风险 confirmed bug 执行，并受 `max_attempts` 限制。
+- repair run 通过 Runtime Adapter 执行修复 prompt，随后强制进入 Quality Gate 和 review 判定。
+- repair run 不自动提交、不自动合入；成功后写入 repair attempt 状态和修复经验 Memory。
+- `repair status <attempt-id>` 可查询 attempt 状态、runtime status、quality status 和 review status。
 
 ### `phase1-020 docs-release-readiness`
 

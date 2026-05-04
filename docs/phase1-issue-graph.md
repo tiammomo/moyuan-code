@@ -31,8 +31,9 @@
 - `phase1-017 quality-review-hardening`：已实现结构化 findings、review_status、protected path、敏感文件、runtime risk、大 diff 阻断和 Markdown/JSON 报告同步。
 - `phase1-017a gin-gorm-baseline`：已切换后端框架口径为 Gin + GORM，新增 `internal/api` Gin router、`internal/store` GORM SQLite store，并让项目注册同步 `.moyuan/state.db`。
 - `phase1-018 memory-record-gate`：已实现 candidate score、staging、dedup、敏感信息阻断、record 元数据、`memory candidates` 和 compact 自动摘要。
+- `phase1-019 repair-controlled-loop`：已实现受控 repair attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
 
-下一轮进入 `phase1-019 repair-controlled-loop`，将 runtime signal、bug candidate 和 repair attempt 接入受控修复闭环。下一批任务的执行顺序、验收标准和 git 同步规则见 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)。
+下一轮进入 `phase1-020 docs-release-readiness`，收口 README、CLI help、e2e 说明、Phase 1 验收记录和剩余风险。下一批任务的执行顺序、验收标准和 git 同步规则见 [Phase 1 下一步开发任务规划](./phase1-next-development-plan.md)。
 
 ## 1. 目标
 
