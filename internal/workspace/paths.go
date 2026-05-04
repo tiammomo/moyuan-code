@@ -10,88 +10,96 @@ import (
 const DirName = ".moyuan"
 
 type Paths struct {
-	RootDir           string
-	MoyuanDir         string
-	ProjectYAML       string
-	RepositoryYAML    string
-	AccessYAML        string
-	ProvidersYAML     string
-	RoutingYAML       string
-	VisualsYAML       string
-	AgentRuntimesYAML string
-	PermissionsJSON   string
-	LoggingJSON       string
-	AuthDir           string
-	LogsDir           string
-	LifecycleDir      string
-	EpicsDir          string
-	IssuesDir         string
-	IssueGraphsDir    string
-	SchedulesDir      string
-	RunsDir           string
-	QualityDir        string
-	ReviewsDir        string
-	BranchesDir       string
-	MergeReportsDir   string
-	PullRequestsDir   string
-	ReleasesDir       string
-	DeploymentsDir    string
-	ComprehensionDir  string
-	MemoryDir         string
-	AgentsDir         string
-	RuntimesDir       string
-	SkillsDir         string
-	RuntimeDir        string
-	OrchestratorDir   string
-	SchedulerDir      string
-	RepairDir         string
-	ResourcesDir      string
-	TmpDir            string
-	LocksDir          string
+	RootDir             string
+	MoyuanDir           string
+	ProjectYAML         string
+	RepositoryYAML      string
+	AccessYAML          string
+	ProvidersYAML       string
+	RoutingYAML         string
+	VisualsYAML         string
+	AgentRuntimesYAML   string
+	ServerResourcesYAML string
+	EnvironmentsYAML    string
+	ReleaseYAML         string
+	BudgetYAML          string
+	PermissionsJSON     string
+	LoggingJSON         string
+	AuthDir             string
+	LogsDir             string
+	LifecycleDir        string
+	EpicsDir            string
+	IssuesDir           string
+	IssueGraphsDir      string
+	SchedulesDir        string
+	RunsDir             string
+	QualityDir          string
+	ReviewsDir          string
+	BranchesDir         string
+	MergeReportsDir     string
+	PullRequestsDir     string
+	ReleasesDir         string
+	DeploymentsDir      string
+	ComprehensionDir    string
+	MemoryDir           string
+	AgentsDir           string
+	RuntimesDir         string
+	SkillsDir           string
+	RuntimeDir          string
+	OrchestratorDir     string
+	SchedulerDir        string
+	RepairDir           string
+	ResourcesDir        string
+	TmpDir              string
+	LocksDir            string
 }
 
 func ForRoot(rootDir string) Paths {
 	rootDir, _ = filepath.Abs(rootDir)
 	moyuanDir := filepath.Join(rootDir, DirName)
 	return Paths{
-		RootDir:           rootDir,
-		MoyuanDir:         moyuanDir,
-		ProjectYAML:       filepath.Join(moyuanDir, "project.yaml"),
-		RepositoryYAML:    filepath.Join(moyuanDir, "repository.yaml"),
-		AccessYAML:        filepath.Join(moyuanDir, "policies", "access.yaml"),
-		ProvidersYAML:     filepath.Join(moyuanDir, "models", "providers.yaml"),
-		RoutingYAML:       filepath.Join(moyuanDir, "models", "routing.yaml"),
-		VisualsYAML:       filepath.Join(moyuanDir, "visuals", "architecture-visuals.yaml"),
-		AgentRuntimesYAML: filepath.Join(moyuanDir, "runtimes", "agent-runtimes.yaml"),
-		PermissionsJSON:   filepath.Join(moyuanDir, "policies", "permissions.json"),
-		LoggingJSON:       filepath.Join(moyuanDir, "policies", "logging.json"),
-		AuthDir:           filepath.Join(moyuanDir, "auth"),
-		LogsDir:           filepath.Join(moyuanDir, "logs"),
-		LifecycleDir:      filepath.Join(moyuanDir, "lifecycle"),
-		EpicsDir:          filepath.Join(moyuanDir, "lifecycle", "epics"),
-		IssuesDir:         filepath.Join(moyuanDir, "lifecycle", "issues"),
-		IssueGraphsDir:    filepath.Join(moyuanDir, "lifecycle", "issue-graphs"),
-		SchedulesDir:      filepath.Join(moyuanDir, "lifecycle", "schedules"),
-		RunsDir:           filepath.Join(moyuanDir, "lifecycle", "runs"),
-		QualityDir:        filepath.Join(moyuanDir, "lifecycle", "quality"),
-		ReviewsDir:        filepath.Join(moyuanDir, "lifecycle", "reviews"),
-		BranchesDir:       filepath.Join(moyuanDir, "lifecycle", "branches"),
-		MergeReportsDir:   filepath.Join(moyuanDir, "lifecycle", "merge-reports"),
-		PullRequestsDir:   filepath.Join(moyuanDir, "lifecycle", "pull-requests"),
-		ReleasesDir:       filepath.Join(moyuanDir, "lifecycle", "releases"),
-		DeploymentsDir:    filepath.Join(moyuanDir, "lifecycle", "deployments"),
-		ComprehensionDir:  filepath.Join(moyuanDir, "comprehension"),
-		MemoryDir:         filepath.Join(moyuanDir, "memory"),
-		AgentsDir:         filepath.Join(moyuanDir, "agents"),
-		RuntimesDir:       filepath.Join(moyuanDir, "runtimes"),
-		SkillsDir:         filepath.Join(moyuanDir, "skills"),
-		RuntimeDir:        filepath.Join(moyuanDir, "runtime"),
-		OrchestratorDir:   filepath.Join(moyuanDir, "orchestrator"),
-		SchedulerDir:      filepath.Join(moyuanDir, "scheduler"),
-		RepairDir:         filepath.Join(moyuanDir, "repair"),
-		ResourcesDir:      filepath.Join(moyuanDir, "resources"),
-		TmpDir:            filepath.Join(moyuanDir, "tmp"),
-		LocksDir:          filepath.Join(moyuanDir, ".locks"),
+		RootDir:             rootDir,
+		MoyuanDir:           moyuanDir,
+		ProjectYAML:         filepath.Join(moyuanDir, "project.yaml"),
+		RepositoryYAML:      filepath.Join(moyuanDir, "repository.yaml"),
+		AccessYAML:          filepath.Join(moyuanDir, "policies", "access.yaml"),
+		ProvidersYAML:       filepath.Join(moyuanDir, "models", "providers.yaml"),
+		RoutingYAML:         filepath.Join(moyuanDir, "models", "routing.yaml"),
+		VisualsYAML:         filepath.Join(moyuanDir, "visuals", "architecture-visuals.yaml"),
+		AgentRuntimesYAML:   filepath.Join(moyuanDir, "runtimes", "agent-runtimes.yaml"),
+		ServerResourcesYAML: filepath.Join(moyuanDir, "policies", "server-resources.yaml"),
+		EnvironmentsYAML:    filepath.Join(moyuanDir, "policies", "environments.yaml"),
+		ReleaseYAML:         filepath.Join(moyuanDir, "policies", "release.yaml"),
+		BudgetYAML:          filepath.Join(moyuanDir, "policies", "budget.yaml"),
+		PermissionsJSON:     filepath.Join(moyuanDir, "policies", "permissions.json"),
+		LoggingJSON:         filepath.Join(moyuanDir, "policies", "logging.json"),
+		AuthDir:             filepath.Join(moyuanDir, "auth"),
+		LogsDir:             filepath.Join(moyuanDir, "logs"),
+		LifecycleDir:        filepath.Join(moyuanDir, "lifecycle"),
+		EpicsDir:            filepath.Join(moyuanDir, "lifecycle", "epics"),
+		IssuesDir:           filepath.Join(moyuanDir, "lifecycle", "issues"),
+		IssueGraphsDir:      filepath.Join(moyuanDir, "lifecycle", "issue-graphs"),
+		SchedulesDir:        filepath.Join(moyuanDir, "lifecycle", "schedules"),
+		RunsDir:             filepath.Join(moyuanDir, "lifecycle", "runs"),
+		QualityDir:          filepath.Join(moyuanDir, "lifecycle", "quality"),
+		ReviewsDir:          filepath.Join(moyuanDir, "lifecycle", "reviews"),
+		BranchesDir:         filepath.Join(moyuanDir, "lifecycle", "branches"),
+		MergeReportsDir:     filepath.Join(moyuanDir, "lifecycle", "merge-reports"),
+		PullRequestsDir:     filepath.Join(moyuanDir, "lifecycle", "pull-requests"),
+		ReleasesDir:         filepath.Join(moyuanDir, "lifecycle", "releases"),
+		DeploymentsDir:      filepath.Join(moyuanDir, "lifecycle", "deployments"),
+		ComprehensionDir:    filepath.Join(moyuanDir, "comprehension"),
+		MemoryDir:           filepath.Join(moyuanDir, "memory"),
+		AgentsDir:           filepath.Join(moyuanDir, "agents"),
+		RuntimesDir:         filepath.Join(moyuanDir, "runtimes"),
+		SkillsDir:           filepath.Join(moyuanDir, "skills"),
+		RuntimeDir:          filepath.Join(moyuanDir, "runtime"),
+		OrchestratorDir:     filepath.Join(moyuanDir, "orchestrator"),
+		SchedulerDir:        filepath.Join(moyuanDir, "scheduler"),
+		RepairDir:           filepath.Join(moyuanDir, "repair"),
+		ResourcesDir:        filepath.Join(moyuanDir, "resources"),
+		TmpDir:              filepath.Join(moyuanDir, "tmp"),
+		LocksDir:            filepath.Join(moyuanDir, ".locks"),
 	}
 }
 

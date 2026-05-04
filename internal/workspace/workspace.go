@@ -316,6 +316,10 @@ func Validate(rootDir string) (ValidationReport, error) {
 	validateRoutingConfigFile(&report, paths.RoutingYAML)
 	validateVisualsConfigFile(&report, paths.VisualsYAML)
 	validateAgentRuntimesConfigFile(&report, paths.AgentRuntimesYAML)
+	validateServerResourcesConfigFile(&report, paths.ServerResourcesYAML)
+	validateEnvironmentsConfigFile(&report, paths.EnvironmentsYAML)
+	validateReleaseConfigFile(&report, paths.ReleaseYAML)
+	validateBudgetConfigFile(&report, paths.BudgetYAML)
 	if stateFound {
 		validateStateDrift(&report, state, project, projectFound, repository, repositoryFound, access, accessFound)
 	}

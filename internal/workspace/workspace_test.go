@@ -427,6 +427,155 @@ agent_runtimes:
 	}
 }
 
+func TestValidateDevOpsPolicyYAMLConfigs(t *testing.T) {
+	root := t.TempDir()
+	if _, err := Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	paths := ForRoot(root)
+	if err := fsutil.WriteText(paths.ServerResourcesYAML, `schema_version: 1
+server_resources:
+  enabled: true
+registry: ".moyuan/resources/hosts.json"
+categories:
+  development: {}
+  production: {}
+access_policy:
+  require_owner: true
+inventory_checks:
+  enabled: true
+hosts:
+  - id: prod-1
+    category: production
+    owner: ops
+    auth_ref: "secret:prod-1-ssh"
+    lifecycle:
+      expires_at: "2027-05-05"
+`); err != nil {
+		t.Fatal(err)
+	}
+	if err := fsutil.WriteText(paths.EnvironmentsYAML, `schema_version: 1
+environments:
+  production:
+    resource_group: production-main
+    approval_required: true
+    artifact:
+      type: binary
+    deploy:
+      strategy: rolling
+    healthcheck:
+      path: /health
+    smoke_tests:
+      - production-smoke
+    rollback:
+      strategy: previous_release
+`); err != nil {
+		t.Fatal(err)
+	}
+	if err := fsutil.WriteText(paths.ReleaseYAML, `schema_version: 1
+release:
+  auto_suggest: true
+  mode: branch_only
+  remote_providers:
+    - github
+  default_batch:
+    max_issues: 6
+  gates:
+    require_release_note: true
+    require_coverage_passed: true
+    require_rollback_plan: true
+  git:
+    release_branch: "release/{version}"
+  deployment:
+    enabled: false
+`); err != nil {
+		t.Fatal(err)
+	}
+	if err := fsutil.WriteText(paths.BudgetYAML, `schema_version: 1
+budget:
+  max_parallel_issues: 2
+  max_parallel_model_calls: 3
+  max_daily_model_cost_usd: null
+  max_task_runtime_minutes: 60
+  fallback_to_low_cost_model: true
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Validate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "passed" {
+		t.Fatalf("expected valid devops configs to pass, got %+v", report)
+	}
+}
+
+func TestValidateDevOpsPolicyYAMLConfigFailures(t *testing.T) {
+	root := t.TempDir()
+	if _, err := Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	paths := ForRoot(root)
+	if err := fsutil.WriteText(paths.ServerResourcesYAML, `schema_version: 1
+server_resources:
+  enabled: true
+hosts:
+  - id: prod-1
+    category: production
+`); err != nil {
+		t.Fatal(err)
+	}
+	if err := fsutil.WriteText(paths.EnvironmentsYAML, `schema_version: 1
+environments:
+  production:
+    approval_required: false
+    artifact:
+      type: binary
+`); err != nil {
+		t.Fatal(err)
+	}
+	if err := fsutil.WriteText(paths.ReleaseYAML, `schema_version: 1
+release:
+  mode: branch_only
+  default_batch: {}
+  gates:
+    require_release_note: false
+    require_coverage_passed: false
+    require_rollback_plan: false
+  git: {}
+  deployment:
+    enabled: true
+`); err != nil {
+		t.Fatal(err)
+	}
+	if err := fsutil.WriteText(paths.BudgetYAML, `schema_version: 1
+budget:
+  max_parallel_issues: 0
+  max_parallel_model_calls: 0
+  max_daily_model_cost_usd: -1
+  max_task_runtime_minutes: 0
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Validate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" ||
+		!hasValidationIssue(report, "server_resources_section_required") ||
+		!hasValidationIssue(report, "production_host_auth_ref_required") ||
+		!hasValidationIssue(report, "production_approval_required") ||
+		!hasValidationIssue(report, "production_smoke_tests_required") ||
+		!hasValidationIssue(report, "release_remote_providers_required") ||
+		!hasValidationIssue(report, "release_deployment_must_be_disabled") ||
+		!hasValidationIssue(report, "budget_positive_integer_required") ||
+		!hasValidationIssue(report, "budget_daily_cost_must_be_null_or_positive") {
+		t.Fatalf("expected devops policy validation failures, got %+v", report)
+	}
+}
+
 func hasValidationIssue(report ValidationReport, code string) bool {
 	for _, issue := range report.Issues {
 		if issue.Code == code {

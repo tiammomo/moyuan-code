@@ -671,7 +671,8 @@ Phase 3 当前落地：
 - `.moyuan/models/routing.yaml` 已纳入可选校验：当文件存在时会校验 policies、primary provider、fallback provider 和明文密钥禁用。
 - `.moyuan/visuals/architecture-visuals.yaml` 已纳入可选校验：当文件存在时会校验 provider policy、diagram types、pipeline、diagram spec、`gpt_image_2.model` 和 `safety.strip_secrets`。
 - `.moyuan/runtimes/agent-runtimes.yaml` 已纳入可选校验：当文件存在时会校验 Native Runtime、auth、provider env profile、health check、audit diff capture、role defaults 和质量门禁。
-- 后续 `phase3-002` 继续扩展到 provider、routing、visual、runtime、server、release 和 budget 配置域。
+- `.moyuan/policies/server-resources.yaml`、`environments.yaml`、`release.yaml`、`budget.yaml` 已纳入可选校验：当文件存在时会校验生产资源、部署环境、发布门禁、发布模式互斥和并发预算。
+- `phase3-002 workspace-schema-coverage-expansion` 已完成首轮覆盖，后续新增配置域必须继续补 issue code、测试和本表映射。
 
 机器校验必须能输出：
 
