@@ -21,8 +21,8 @@
 | `beta-002` | `issue-graph-api` | completed | 暴露 epic/issue graph/schedule 查询接口，为 Web Console 和编排可视化做准备 | `beta-001` | `orchestrator_owner` | 可读取 issue graph、ready/blocked/review 队列和 blocked reason |
 | `beta-003` | `requirement-to-issues` | completed | 将用户需求丰富、澄清判断、验收标准和 issue graph 生成接入 CLI/API | `beta-002` | `orchestrator_owner` | 需求可生成用户可见 issue graph，并标注依赖 |
 | `beta-004` | `parallel-orchestration-engine` | completed | 根据依赖、写入范围、runtime slot 和风险自动决定并发度 | `beta-003` | `scheduler_owner` | ready queue 可并发调度，冲突 issue 自动等待 |
-| `beta-005` | `review-merge-pipeline` | in_progress | issue 完成后执行复核、风格检查、门禁、合入或返工 | `beta-004` | `quality_owner` | review 通过后才允许合入任务分支 |
-| `beta-006` | `provider-registry-runtime-routing` | planned | 管理 GPT、Claude、GLM、MiniMax、第三方 API 和 CLI agent runtime | `beta-001` | `adapter_owner` | Provider 可配置、校验、路由和审计 |
+| `beta-005` | `review-merge-pipeline` | completed | issue 完成后执行复核、风格检查、门禁、合入或返工 | `beta-004` | `quality_owner` | review 通过后才允许合入任务分支 |
+| `beta-006` | `provider-registry-runtime-routing` | in_progress | 管理 GPT、Claude、GLM、MiniMax、第三方 API 和 CLI agent runtime | `beta-001` | `adapter_owner` | Provider 可配置、校验、路由和审计 |
 | `beta-007` | `git-provider-pr-mr` | planned | GitHub/Gitee 认证、分支、push、PR/MR 创建和状态回读 | `beta-005` | `git_owner` | 可推送任务分支并创建 PR/MR |
 | `beta-008` | `release-branch-pipeline` | planned | 版本分支、release 建议、tag、GitHub/Gitee 发布记录 | `beta-007` | `release_owner` | 可按积累量建议发版并发布到 Git provider |
 | `beta-009` | `server-resource-registry` | planned | 测试机/生产机、到期时间、配置、权限、健康和维护记录 | `beta-001` | `infra_owner` | 服务器资源可登记、查询、审计 |
@@ -39,7 +39,7 @@
 
 ## 4. 当前执行入口
 
-当前执行 `beta-005 review-merge-pipeline`。
+当前执行 `beta-006 provider-registry-runtime-routing`。
 
 实现边界：
 

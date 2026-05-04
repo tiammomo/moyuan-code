@@ -245,6 +245,11 @@ func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 	plan := runCLI(t, root, "orchestrator", "plan", "phase1-epic")
 	assertContains(t, plan.stdout, `"ready_queue": []`)
 
+	mergeDecision := runCLI(t, root, "review", "merge-decision", "phase1-001")
+	assertContains(t, mergeDecision.stdout, `"status": "ready_to_merge"`)
+	assertContains(t, mergeDecision.stdout, `"decision": "MERGE_ALLOWED"`)
+	assertFileContains(t, root, ".moyuan/lifecycle/reviews/merge-decisions.jsonl", `"decision":"MERGE_ALLOWED"`)
+
 	needsRework := runCLIAllowFailure(t, root, "orchestrator", "run", "phase1-002", "--runtime", "local_shell", "--prompt", "printf blocked > .env")
 	if needsRework.code == 0 {
 		t.Fatalf("expected needs_rework to return non-zero: %s", needsRework.stdout)
@@ -262,6 +267,9 @@ func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
 	assertContains(t, needsReworkRun.stdout, `"runtime_status": "blocked"`)
 	assertContains(t, needsRework.stdout, `"review_status": "rejected"`)
 	assertContains(t, needsRework.stdout, `"category": "protected_path"`)
+	blockedMerge := runCLIAllowFailure(t, root, "review", "merge-decision", "phase1-002")
+	assertContains(t, blockedMerge.stdout, `"status": "blocked"`)
+	assertContains(t, blockedMerge.stdout, `"issue_not_accepted"`)
 
 	assertFileExists(t, root, ".moyuan/orchestrator/issue-states/phase1-001.json")
 	assertFileExists(t, root, ".moyuan/orchestrator/issue-states/phase1-002.json")

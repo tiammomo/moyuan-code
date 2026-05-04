@@ -14,6 +14,7 @@ import (
 	"moyuan-code/internal/quality"
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
+	"moyuan-code/internal/review"
 	"moyuan-code/internal/scheduler"
 	"moyuan-code/internal/store"
 )
@@ -166,6 +167,27 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"quality_report": report})
+	})
+	router.POST("/v1/projects/:project_id/issues/:issue_id/merge-decision", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		decision, err := review.DecideMerge(rootDir, c.Param("issue_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if decision.Status != "ready_to_merge" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"merge_decision": decision})
 	})
 	router.POST("/v1/projects/:project_id/requirements/plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

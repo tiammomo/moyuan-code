@@ -47,6 +47,7 @@ go run ./cmd/moyuan --help
 ./bin/moyuan repair run <repair-plan-id> --prompt "修复命令" --root /path/to/repo
 ./bin/moyuan repair status <repair-attempt-id> --root /path/to/repo
 ./bin/moyuan quality check phase1-001 --root /path/to/repo
+./bin/moyuan review merge-decision phase1-001 --root /path/to/repo
 ```
 
 所有被管理项目的配置、状态、日志、项目理解和质量报告都会写入项目内 `.moyuan/`。

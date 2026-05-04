@@ -26,7 +26,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | P0 | `beta-002` | `issue-graph-api` | completed | API 可展示 issue graph、schedule 和队列 | issue graph 可被前端可视化读取 |
 | P0 | `beta-003` | `requirement-to-issues` | completed | 需求丰富、澄清判断和 issue graph 生成 | 用户需求可转为 issues DAG |
 | P1 | `beta-004` | `parallel-orchestration-engine` | completed | 自动并发、等待和 replan | 并发度由系统决策且可审计 |
-| P1 | `beta-005` | `review-merge-pipeline` | in_progress | 复核通过后合入任务分支 | review gate 阻断未达标代码 |
+| P1 | `beta-005` | `review-merge-pipeline` | completed | 复核通过后合入任务分支 | review gate 阻断未达标代码 |
+| P1 | `beta-006` | `provider-registry-runtime-routing` | in_progress | Provider 和 Runtime 路由基线 | Provider 可配置、校验、路由和审计 |
 
 ## 3. 已完成任务：`beta-001 state-query-api`
 
@@ -148,7 +149,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - API schedule 读取已返回 scheduler plan，包含 dispatch 决策。
 - 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
 
-## 7. 当前任务：`beta-005 review-merge-pipeline`
+## 7. 已完成任务：`beta-005 review-merge-pipeline`
 
 范围：
 
@@ -167,4 +168,34 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - accepted issue + accepted quality report 可得到 ready_to_merge。
 - rejected quality report 必须得到 needs_rework。
 - 缺失质量报告或 issue 未 accepted 时必须 blocked。
+- `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 `internal/review` merge decision 模块。
+- 已支持 CLI：`moyuan review merge-decision <issue-id>`。
+- 已支持 API：`POST /v1/projects/:project_id/issues/:issue_id/merge-decision`。
+- merge decision 会写入 `.moyuan/lifecycle/reviews/merge-decisions/` 和 JSONL 记录。
+- 当前仍不执行 git merge、push 或 PR/MR 创建。
+- 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
+
+## 8. 当前任务：`beta-006 provider-registry-runtime-routing`
+
+范围：
+
+- 新增 Provider Registry 最小读写模型。
+- 支持配置 GPT、Claude、GLM、MiniMax、第三方 API 和 CLI runtime 的 metadata。
+- 支持不泄露 secret 的 provider list/show/route。
+
+非目标：
+
+- 不真实调用外部模型 API。
+- 不保存明文 API key。
+- 不改变 Native Runtime 已有调用契约。
+
+验收：
+
+- Provider 可添加、列出、禁用。
+- Provider 配置中的 secret 只能以 env/secret ref 出现。
+- 默认角色可路由到 Claude CLI、Codex CLI 或 Provider。
 - `go test ./...` 通过。

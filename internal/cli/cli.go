@@ -22,6 +22,7 @@ import (
 	"moyuan-code/internal/quality"
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
+	"moyuan-code/internal/review"
 	runrecord "moyuan-code/internal/run"
 	"moyuan-code/internal/runtime"
 	"moyuan-code/internal/store"
@@ -81,6 +82,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleMemory(argv[1:], cwd)
 	case "repair":
 		text, result, exitCode, err = handleRepair(argv[1:], cwd)
+	case "review":
+		text, result, exitCode, err = handleReview(argv[1:], cwd)
 	case "logs":
 		text, result, exitCode, err = handleLogs(argv[1:], cwd)
 	default:
@@ -142,6 +145,7 @@ func usage() string {
 		"moyuan repair signal --type <type> --summary <text>",
 		"moyuan repair run <plan-id> [--runtime local_shell] [--prompt <command>]",
 		"moyuan repair status <attempt-id>",
+		"moyuan review merge-decision <issue-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -690,6 +694,29 @@ func handleLogs(args []string, cwd string) (string, any, int, error) {
 		return "", nil, 0, nil
 	}
 	return strings.Join(lines, "\n") + "\n", nil, 0, nil
+}
+
+func handleReview(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown review command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "merge-decision":
+		if len(args) < 2 {
+			return "missing issue id\n", nil, 1, nil
+		}
+		decision, err := review.DecideMerge(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		code := 0
+		if decision.Status != "ready_to_merge" {
+			code = 1
+		}
+		return "", decision, code, nil
+	}
+	return "unknown review command\n", nil, 1, nil
 }
 
 func mustRoot(cwd string) string {

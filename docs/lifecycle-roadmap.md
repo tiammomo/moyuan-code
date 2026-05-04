@@ -258,6 +258,7 @@ moyuan git status
 moyuan git branch list
 moyuan quality check <task-id>
 moyuan quality report <run-id>
+moyuan review merge-decision <issue-id>
 moyuan bug list
 moyuan bug show <bug-id>
 moyuan logs tail
