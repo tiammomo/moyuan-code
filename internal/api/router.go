@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"moyuan-code/internal/controlplane"
+	"moyuan-code/internal/issues"
 	"moyuan-code/internal/memory"
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/quality"
@@ -20,6 +21,17 @@ const Version = "phase1-gin-gorm"
 type Options struct {
 	RootDir string
 	Store   *store.Store
+}
+
+type scheduleView struct {
+	Epic          issues.Epic       `json:"epic"`
+	Nodes         []issues.Node     `json:"nodes"`
+	ReadyQueue    []string          `json:"ready_queue"`
+	BlockedQueue  []string          `json:"blocked_queue"`
+	RunningQueue  []string          `json:"running_queue"`
+	ReviewQueue   []string          `json:"review_queue"`
+	BlockedReason map[string]string `json:"blocked_reason"`
+	Parallelism   int               `json:"parallelism"`
 }
 
 func NewRouter(options Options) *gin.Engine {
@@ -72,6 +84,48 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"issue": state})
+	})
+	router.GET("/v1/projects/:project_id/epics/:epic_id/issue-graph", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		graph, found, err := issues.LoadGraph(rootDir, c.Param("epic_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "issue graph not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"issue_graph": graph})
+	})
+	router.GET("/v1/projects/:project_id/epics/:epic_id/schedule", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		graph, found, err := issues.LoadGraph(rootDir, c.Param("epic_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "schedule not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"schedule": scheduleViewFor(graph)})
 	})
 	router.GET("/v1/projects/:project_id/runs/:run_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
@@ -216,4 +270,41 @@ func queryLimit(c *gin.Context, fallback int) int {
 
 func writeError(c *gin.Context, status int, message string) {
 	c.JSON(status, gin.H{"error": message})
+}
+
+func scheduleViewFor(graph issues.Graph) scheduleView {
+	view := scheduleView{
+		Epic:          graph.Epic,
+		Nodes:         graph.Nodes,
+		ReadyQueue:    []string{},
+		BlockedQueue:  []string{},
+		RunningQueue:  []string{},
+		ReviewQueue:   []string{},
+		BlockedReason: map[string]string{},
+	}
+	for _, node := range graph.Nodes {
+		switch node.Status {
+		case "ready":
+			view.ReadyQueue = append(view.ReadyQueue, node.ID)
+		case "blocked":
+			view.BlockedQueue = append(view.BlockedQueue, node.ID)
+			view.BlockedReason[node.ID] = blockedReasonFor(node)
+		case "running", "quality_checking", "verifying":
+			view.RunningQueue = append(view.RunningQueue, node.ID)
+		case "reviewing":
+			view.ReviewQueue = append(view.ReviewQueue, node.ID)
+		}
+	}
+	view.Parallelism = len(view.ReadyQueue)
+	if view.Parallelism > 1 {
+		view.Parallelism = 1
+	}
+	return view
+}
+
+func blockedReasonFor(node issues.Node) string {
+	if len(node.DependsOn) == 0 {
+		return "blocked"
+	}
+	return "waiting_dependencies: " + strings.Join(node.DependsOn, ",")
 }

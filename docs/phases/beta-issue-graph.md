@@ -18,8 +18,8 @@
 | ID | Issue | 状态 | 主要范围 | 依赖 | 建议角色 | 退出条件 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `beta-001` | `state-query-api` | completed | Gin API 查询 project、issue、run、quality、memory、repair 的当前状态 | Phase 1 | `backend_owner` | API 可按 project id 读取核心状态，缺失资源返回 404，测试覆盖 |
-| `beta-002` | `issue-graph-api` | in_progress | 暴露 epic/issue graph/schedule 查询接口，为 Web Console 和编排可视化做准备 | `beta-001` | `orchestrator_owner` | 可读取 issue graph、ready/blocked/review 队列和 blocked reason |
-| `beta-003` | `requirement-to-issues` | planned | 将用户需求丰富、澄清判断、验收标准和 issue graph 生成接入 CLI/API | `beta-002` | `orchestrator_owner` | 需求可生成用户可见 issue graph，并标注依赖 |
+| `beta-002` | `issue-graph-api` | completed | 暴露 epic/issue graph/schedule 查询接口，为 Web Console 和编排可视化做准备 | `beta-001` | `orchestrator_owner` | 可读取 issue graph、ready/blocked/review 队列和 blocked reason |
+| `beta-003` | `requirement-to-issues` | in_progress | 将用户需求丰富、澄清判断、验收标准和 issue graph 生成接入 CLI/API | `beta-002` | `orchestrator_owner` | 需求可生成用户可见 issue graph，并标注依赖 |
 | `beta-004` | `parallel-orchestration-engine` | planned | 根据依赖、写入范围、runtime slot 和风险自动决定并发度 | `beta-003` | `scheduler_owner` | ready queue 可并发调度，冲突 issue 自动等待 |
 | `beta-005` | `review-merge-pipeline` | planned | issue 完成后执行复核、风格检查、门禁、合入或返工 | `beta-004` | `quality_owner` | review 通过后才允许合入任务分支 |
 | `beta-006` | `provider-registry-runtime-routing` | planned | 管理 GPT、Claude、GLM、MiniMax、第三方 API 和 CLI agent runtime | `beta-001` | `adapter_owner` | Provider 可配置、校验、路由和审计 |
@@ -39,7 +39,7 @@
 
 ## 4. 当前执行入口
 
-当前执行 `beta-002 issue-graph-api`。
+当前执行 `beta-003 requirement-to-issues`。
 
 实现边界：
 

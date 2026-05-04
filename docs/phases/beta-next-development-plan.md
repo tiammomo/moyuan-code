@@ -23,8 +23,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
 | P0 | `beta-001` | `state-query-api` | completed | 控制面 API 可查询项目核心状态 | API + 测试 + 文档同步 |
-| P0 | `beta-002` | `issue-graph-api` | in_progress | API 可展示 issue graph、schedule 和队列 | issue graph 可被前端可视化读取 |
-| P0 | `beta-003` | `requirement-to-issues` | planned | 需求丰富、澄清判断和 issue graph 生成 | 用户需求可转为 issues DAG |
+| P0 | `beta-002` | `issue-graph-api` | completed | API 可展示 issue graph、schedule 和队列 | issue graph 可被前端可视化读取 |
+| P0 | `beta-003` | `requirement-to-issues` | in_progress | 需求丰富、澄清判断和 issue graph 生成 | 用户需求可转为 issues DAG |
 | P1 | `beta-004` | `parallel-orchestration-engine` | planned | 自动并发、等待和 replan | 并发度由系统决策且可审计 |
 | P1 | `beta-005` | `review-merge-pipeline` | planned | 复核通过后合入任务分支 | review gate 阻断未达标代码 |
 
@@ -62,7 +62,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 已覆盖 GORM Store、controlplane fallback、状态读取和 404 行为。
 - 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
 
-## 4. 当前任务：`beta-002 issue-graph-api`
+## 4. 已完成任务：`beta-002 issue-graph-api`
 
 范围：
 
@@ -81,4 +81,32 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 已有 Phase 1 issue graph 可通过 API 读取。
 - 缺失项目返回 404。
 - 缺失 epic 返回 404。
+- `go test ./...` 通过。
+
+完成记录：
+
+- 已新增 issue graph 和 schedule 只读 API。
+- schedule view 包含 ready queue、blocked queue、running queue、review queue、blocked reason 和当前并发度。
+- 读取 API 不调用会写入状态的 scheduler build，避免 GET 请求改变项目状态。
+- 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
+
+## 5. 当前任务：`beta-003 requirement-to-issues`
+
+范围：
+
+- 新增 requirement planner 最小模块。
+- 支持把用户任务描述整理为 requirement、clarification decision、acceptance criteria、test plan 和 issue graph draft。
+- 提供 CLI/API 入口，先支持启发式拆分，不调用外部模型。
+
+非目标：
+
+- 不执行 issue。
+- 不自动并发调度。
+- 不创建远程 GitHub/Gitee issue。
+
+验收：
+
+- 用户输入一段任务描述后，可生成稳定 epic 和 issues。
+- 任务描述过短或缺少目标时，返回 clarification required。
+- 生成的 issue graph 可被 `beta-002` 的 API 读取。
 - `go test ./...` 通过。

@@ -14,6 +14,7 @@ import (
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/fsutil"
 	gitadapter "moyuan-code/internal/git"
+	"moyuan-code/internal/issues"
 	"moyuan-code/internal/memory"
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/repair"
@@ -91,6 +92,9 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, err := issues.GeneratePhase1(root); err != nil {
+		t.Fatal(err)
+	}
 
 	result, err := orchestrator.RunIssue(context.Background(), root, "phase1-001", "local_shell", "printf api-state")
 	if err != nil {
@@ -125,6 +129,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 
 	router := NewRouter(Options{RootDir: root, Store: &db})
 	assertGETContains(t, router, "/v1/projects/managed", http.StatusOK, `"project"`, `"managed"`)
+	assertGETContains(t, router, "/v1/projects/managed/epics/phase1-epic/issue-graph", http.StatusOK, `"issue_graph"`, `"phase1-013"`)
+	assertGETContains(t, router, "/v1/projects/managed/epics/phase1-epic/schedule", http.StatusOK, `"schedule"`, `"ready_queue"`, `"blocked_reason"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)
 	assertGETContains(t, router, "/v1/projects/managed/runs/"+result.RunID, http.StatusOK, `"run"`, `"completed"`)
 	assertGETContains(t, router, "/v1/projects/managed/quality/"+result.QualityReport.ID, http.StatusOK, `"quality_report"`, `"accepted"`)
@@ -132,6 +138,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/memory/candidates?limit=5", http.StatusOK, `"candidates"`, `"recorded"`)
 	assertGETContains(t, router, "/v1/projects/managed/repair/attempts/"+attempt.ID, http.StatusOK, `"repair_attempt"`, `"repaired"`)
 	assertGETContains(t, router, "/v1/projects/missing", http.StatusNotFound, `"project not found"`)
+	assertGETContains(t, router, "/v1/projects/managed/epics/missing/issue-graph", http.StatusNotFound, `"issue graph not found"`)
+	assertGETContains(t, router, "/v1/projects/managed/epics/missing/schedule", http.StatusNotFound, `"schedule not found"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/missing", http.StatusNotFound, `"issue state not found"`)
 }
 
