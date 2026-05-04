@@ -52,8 +52,9 @@ Moyuan Code 文档分为九层：
 | Workspace 目录和 schema 索引 | `project-workspace-spec.md` | 不展开完整配置 |
 | 配置分层、闭环和关键片段 | `configuration-guide.md` | 其他文档只给局部片段或引用 |
 | 配置字段规则 | `configuration-schema-spec.md` | 其他文档不重复 required/nullable 表 |
-| 仓库接入与 Git Adapter | `repository-onboarding-git-management.md` | 项目理解细节回到主线和策略 |
-| 项目阅读理解 | `mainlines/project-comprehension.md`、`policies/project-comprehension-policy.md` | Git Adapter 只说明触发点 |
+| 仓库接入与 Git Provider Adapter | `repository-onboarding-git-management.md` | 项目理解细节回到主线和策略 |
+| Git Provider 接入配置 | `git-provider-integration.md` | 服务商认证、能力声明和降级规则只在这里展开 |
+| 项目阅读理解 | `mainlines/project-comprehension.md`、`policies/project-comprehension-policy.md` | Git Provider Adapter 只说明触发点 |
 | Issue 编排和并发调度 | `issue-orchestration.md` | Agent 文档不重复 issue graph |
 | 工程流程规范 | `engineering-process-standards.md` | Git、Issue、质量、发布文档只引用规则，不重复阈值 |
 | 质量门禁 | `code-lifecycle-quality-gates.md` | Issue 文档只引用 gate 结果 |

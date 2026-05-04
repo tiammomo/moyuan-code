@@ -18,7 +18,7 @@
 | 审批 | Approval | 对高风险操作的结构化人工确认记录 | 不是聊天确认文本 | [鉴权与访问控制策略](../policies/auth-access-policy.md) |
 | 被管理项目 | Project | Moyuan 接入和管理的软件项目 | 不是 Moyuan 自身仓库 | [项目工作空间规范](../project-workspace-spec.md) |
 | 工作空间 | Workspace | 每个项目独立的 `.moyuan/` 配置、状态和产物目录 | 不是源代码目录本身 | [项目工作空间规范](../project-workspace-spec.md) |
-| 仓库 | Repository | 被管理项目的 Git 仓库，可以来自本地路径或远程 URL | 不等同于 Workspace | [仓库接入与 Git Adapter](../repository-onboarding-git-management.md) |
+| 仓库 | Repository | 被管理项目的 Git 仓库，可以来自本地路径或远程 URL | 不等同于 Workspace | [仓库接入与 Git Provider Adapter](../repository-onboarding-git-management.md) |
 | 项目理解 | Project Comprehension | 对项目结构、模块、命令、依赖和风险的阅读理解结果 | 不是一次性摘要 | [项目接入与阅读理解主线](../mainlines/project-comprehension.md) |
 | 项目画像 | Project Profile | 项目理解后的稳定画像，包括技术栈、模块、命令和风险 | 不是完整源码复制 | [项目接入与阅读理解主线](../mainlines/project-comprehension.md) |
 | 模块地图 | Module Map | 项目模块边界、职责和依赖关系 | 不是文件树的简单罗列 | [项目接入与阅读理解主线](../mainlines/project-comprehension.md) |
@@ -62,7 +62,7 @@
 | Repair Attempt | Repair Attempt | 一次自动或半自动修复尝试，必须受写入范围、质量门禁和 review 控制 | 不是绕过流程的热修 | [自我修复契约](../contracts/self-repair-contract.md) |
 | Improvement Record | Improvement Record | 成功修复或重复问题产生的能力增强候选 | 不是自动生效的策略变更 | [自我修复契约](../contracts/self-repair-contract.md) |
 | Worktree | Worktree | Git worktree，用于隔离并行 issue 开发 | 不是长期分支策略 | [Issues 编排与并发调度](../issue-orchestration.md) |
-| Task Branch | Task Branch | 单个 issue 或 task 的开发分支 | 不是 release branch | [仓库接入与 Git Adapter](../repository-onboarding-git-management.md) |
+| Task Branch | Task Branch | 单个 issue 或 task 的开发分支 | 不是 release branch | [仓库接入与 Git Provider Adapter](../repository-onboarding-git-management.md) |
 | Epic Branch | Epic Branch | 一个 Epic 的集成分支，用于合并已验收 issues | 不是默认主分支 | [Issues 编排与并发调度](../issue-orchestration.md) |
 | Release Branch | Release Branch | 发布候选分支 | 不是任务开发分支 | [DevOps 发布投产主线](../mainlines/devops-release-deployment.md) |
 | Release | Release | 从 accepted issues 到版本分支、回归、tag、PR/MR 和发布记录的过程 | 不等同于部署 | [DevOps 发布投产主线](../mainlines/devops-release-deployment.md) |

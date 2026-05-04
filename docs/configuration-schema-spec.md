@@ -22,7 +22,31 @@
 - `null` 只表示“显式无值”，不等同于空字符串。
 - 空字符串不得用于表示未配置；未配置应使用 `null` 或省略字段。
 
-## 2. project.yaml
+## 2. 配置域索引
+
+本文是配置字段规则的唯一详细表。为避免实现阶段查找困难，配置域按以下顺序维护：
+
+| 配置域 | 章节 | 配置文件 |
+| --- | --- | --- |
+| Project | [3](#3-projectyaml) | `project.yaml` |
+| Repository / Git | [4](#4-repositoryyaml) | `repository.yaml` |
+| Access | [5](#5-policiesaccessyaml) | `policies/access.yaml` |
+| Provider Registry | [6](#6-modelsprovidersyaml) | `models/providers.yaml` |
+| Provider Routing | [7](#7-modelsroutingyaml) | `models/routing.yaml` |
+| Visuals | [8](#8-visualsarchitecture-visualsyaml) | `visuals/architecture-visuals.yaml` |
+| Agent Runtime | [9](#9-runtimesagent-runtimesyaml) | `runtimes/agent-runtimes.yaml` |
+| Agent Role / Team / Subagent | [10-12](#10-agentsrolesyaml) | `agents/*.yaml` |
+| Skill Registry | [13](#13-skillsregistryyamlskillsenabledyamlskillsbindingsyaml) | `skills/*.yaml` |
+| Permission / Secret | [14-15](#14-policiespermissionsyaml) | `policies/permissions.yaml`、`policies/secrets.yaml` |
+| Orchestration / Quality / Comprehension | [16-18](#16-policiesorchestrationyaml) | `policies/orchestration.yaml`、`policies/code-quality.yaml`、`policies/comprehension.yaml` |
+| Memory / Logging | [19-20](#19-policiesmemoryyaml) | `policies/memory.yaml`、`policies/logging.yaml` |
+| Server / Environment / Release | [21-23](#21-policiesserver-resourcesyaml) | `policies/server-resources.yaml`、`policies/environments.yaml`、`policies/release.yaml` |
+| Budget / Engineering | [24-25](#24-policiesbudgetyaml) | `policies/budget.yaml`、`policies/engineering.yaml` |
+| Validation / MVP | [26-28](#26-配置校验顺序) | 校验顺序、最小配置、机器校验 |
+
+配置分层和样例只在 [配置方案](./configuration-guide.md) 展开，`.moyuan/` 目录位置只在 [项目工作空间规范](./project-workspace-spec.md) 展开。
+
+## 3. project.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -47,7 +71,7 @@
 - `workspace.protected_paths` 不允许为空数组。
 - `workspace.writable_paths` 不允许为空数组。
 
-## 3. repository.yaml
+## 4. repository.yaml
 
 通用字段：
 
@@ -68,7 +92,8 @@
 | --- | --- | --- |
 | `source.type = local_path` | `repository.source.url` | must_be_null_when |
 | `source.type = remote_git` | `repository.source.local_path` | must_be_null_when |
-| `source.provider != github` | `repository.github` | must_be_null_when |
+| `source.type = local_path` | `repository.provider_config` | must_be_null_when |
+| `source.type = remote_git` | `repository.provider_config` | conditional_required |
 
 Git 策略：
 
@@ -87,12 +112,13 @@ Git 策略：
 | `git.commit_policy.require_issue_ref` | required | `true` | 必须关联 issue |
 | `git.commit_policy.require_quality_ref` | required | `true` | 必须关联质量报告 |
 
-GitHub 字段规则：
+Provider 专项字段规则：
 
-- 由 [GitHub 接入配置](./github-integration.md) 维护。
-- `repository.github` 只有在 `repository.source.provider = github` 时允许出现。
+- 由 [Git Provider 接入配置](./git-provider-integration.md) 维护。
+- `repository.provider_config` 只有在 `repository.source.type = remote_git` 时允许出现。
+- `repository.github`、`repository.gitee`、`repository.gitlab` 这类旧式 provider 专项字段进入实现时应迁移到 `repository.provider_config`。
 
-## 4. policies/access.yaml
+## 5. policies/access.yaml
 
 `policies/access.yaml` 只保存项目级访问策略和角色映射，不保存用户密码、API Token 明文、session secret 或云凭证明文。用户、组织、会话、Token 和成员关系的控制面对象见 [平台用户与访问控制主线](./mainlines/platform-user-access.md)。
 
@@ -114,7 +140,7 @@ GitHub 字段规则：
 | `access.mode = team_server` | `access.local_owner_id` | must_be_null_when |
 | 任意条件 | `password`、`api_token`、`session_secret` | must_be_null_when |
 
-## 5. models/providers.yaml
+## 6. models/providers.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -166,7 +192,7 @@ Provider 字段：
 | `type = claude-code` | `models` | must_be_empty_when |
 | `type = image-generation-api` | `capabilities.code_edit` | must_be_null_when |
 
-## 6. models/routing.yaml
+## 7. models/routing.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -182,7 +208,7 @@ Provider 字段：
 - 第三方安全文本策略中 `allow_code_context` 必须为 `false`。
 - 第三方安全文本策略中 `allow_project_memory` 必须为 `false`。
 
-## 7. visuals/architecture-visuals.yaml
+## 8. visuals/architecture-visuals.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -202,7 +228,7 @@ Provider 字段：
 - `gpt_image_2.prompt_template` 不允许为空字符串；可省略或填路径。
 - 图像 prompt 中必须不包含 secret、私网 IP、token、`.env` 明文。
 
-## 8. runtimes/agent-runtimes.yaml
+## 9. runtimes/agent-runtimes.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -245,7 +271,7 @@ Runtime 字段：
 | `provider = claude_code` | `invocation.ask` | must_be_null_when |
 | `provider = codex` | `invocation.one_shot` | must_be_null_when |
 
-## 9. agents/roles.yaml
+## 10. agents/roles.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -261,7 +287,7 @@ Runtime 字段：
 - `tools` 不允许为空数组。
 - `default_model_policy` 不允许为空字符串。
 
-## 10. agents/teams.yaml
+## 11. agents/teams.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -276,7 +302,7 @@ Runtime 字段：
 - 一个可执行 team 不能同时让 `planners`、`implementers`、`verifiers` 都为空。
 - release team 可以让 `implementers` 为空，但 `verifiers` 不应为空。
 
-## 11. agents/subagents.yaml
+## 12. agents/subagents.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -295,7 +321,7 @@ Runtime 字段：
 - `max_parallel_subagents` 不能为 null。
 - `require_parent`、`require_output_contract`、`require_skill_compatibility_check` 必须为 true。
 
-## 12. skills/registry.yaml、skills/enabled.yaml、skills/bindings.yaml
+## 13. skills/registry.yaml、skills/enabled.yaml、skills/bindings.yaml
 
 Skill Registry 字段：
 
@@ -330,7 +356,7 @@ Skill Binding 字段：
 - `supported_roles` 和 `task_types` 不允许为空数组。
 - `target_type = subagent` 时，`target_id` 必须引用已存在 subagent。
 
-## 13. policies/permissions.yaml
+## 14. policies/permissions.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -348,7 +374,7 @@ Skill Binding 字段：
 - 生产部署启用时，`commands.require_approval` 不能为空。
 - secret 访问不能出现在 `commands.allow` 中。
 
-## 14. policies/secrets.yaml
+## 15. policies/secrets.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -364,7 +390,7 @@ Skill Binding 字段：
 - `usage` 不允许为空数组。
 - 不需要投产、远程私有仓库、registry、第三方 API 时，`secrets` 可以为空对象。
 
-## 15. policies/orchestration.yaml
+## 16. policies/orchestration.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -389,7 +415,7 @@ Skill Binding 字段：
 - `waiting_policy.backend_runtime` 必须引用 `codex_cli`。
 - `issue_spec.required_fields` 不能缺少 `acceptance_criteria`、`test_plan`、`write_scopes`、`rollback_or_fix_plan`。
 
-## 16. policies/code-quality.yaml
+## 17. policies/code-quality.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -419,7 +445,7 @@ Skill Binding 字段：
 - `self_repair.require_approval_for` 不能为空数组。
 - 覆盖率低于阈值时，`coverage.exemptions.*.approval_id` 条件必填。
 
-## 17. policies/comprehension.yaml
+## 18. policies/comprehension.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -435,7 +461,7 @@ Skill Binding 字段：
 - `mode.initial` 不允许为空。
 - `mode.after_pull` 不允许为空。
 
-## 18. policies/memory.yaml
+## 19. policies/memory.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -454,7 +480,7 @@ Skill Binding 字段：
 - `retrieval.top_k` 不能为 null。
 - `compact.triggers` 不能为空对象。
 
-## 19. policies/logging.yaml
+## 20. policies/logging.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -471,7 +497,7 @@ Skill Binding 字段：
 - `streams.audit` 不允许为空。
 - `streams.error` 不允许为空。
 
-## 20. policies/server-resources.yaml
+## 21. policies/server-resources.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -490,7 +516,7 @@ Skill Binding 字段：
 - `category = production` 的 host 不能缺少 `owner`、`auth_ref`、`lifecycle.expires_at`。
 - `cloud.enabled = false` 时，`cloud.account`、`cloud.instance_id` 可以为 null。
 
-## 21. policies/environments.yaml
+## 22. policies/environments.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -510,7 +536,7 @@ Skill Binding 字段：
 - `production.approval_required` 必须为 true。
 - `production.rollback` 不允许为空。
 
-## 22. policies/release.yaml
+## 23. policies/release.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -532,7 +558,7 @@ Skill Binding 字段：
 - `mode = deploy_to_environment` 时，`release.deployment` 不能为 null。
 - `release.gates.require_release_note`、`release.gates.require_coverage_passed`、`release.gates.require_rollback_plan` 必须为 true。
 
-## 23. policies/budget.yaml
+## 24. policies/budget.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -547,7 +573,7 @@ Skill Binding 字段：
 
 - 无预算限制时，`max_daily_model_cost_usd` 必须为 null，不使用 0 表示无限制。
 
-## 24. policies/engineering.yaml
+## 25. policies/engineering.yaml
 
 | 字段 | 规则 | 默认值 | 说明 |
 | --- | --- | --- | --- |
@@ -566,7 +592,7 @@ Skill Binding 字段：
 - `engineering.coverage.default_thresholds.changed_files` 不允许为 null。
 - `engineering.release.require_release_note`、`engineering.release.require_rollback_plan` 必须为 true。
 
-## 25. 配置校验顺序
+## 26. 配置校验顺序
 
 系统校验配置时按以下顺序：
 
@@ -580,7 +606,7 @@ Skill Binding 字段：
 8. 权限和敏感信息规则。
 9. provider/runtime/secret/resource 可用性。
 
-## 26. MVP 最小配置
+## 27. MVP 最小配置
 
 必须存在且通过 schema 校验：
 
@@ -609,7 +635,7 @@ Skill Binding 字段：
 - `policies/environments.yaml`，不启用部署时可为空对象。
 - `skills/enabled.yaml`，skills 未启用时可为空数组，但文件仍应存在。
 
-## 27. 进入实现前必须补的机器校验
+## 28. 进入实现前必须补的机器校验
 
 本文是人类可读 schema 规则。进入实现前必须转换为：
 

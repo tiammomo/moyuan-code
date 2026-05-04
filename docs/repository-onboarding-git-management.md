@@ -1,4 +1,4 @@
-# 仓库接入与 Git Adapter
+# 仓库接入与 Git Provider Adapter
 
 本文只定义仓库接入、Git Provider Adapter 和远程同步后的阅读理解触发边界。
 
@@ -8,7 +8,7 @@
 | --- | --- |
 | 项目阅读理解流程、full/incremental/diff 模式 | [项目接入与阅读理解主线](./mainlines/project-comprehension.md) |
 | Git 分支、worktree、合入和用户改动保护策略 | [Git 分支策略](./policies/git-branch-policy.md) |
-| GitHub token、SSH、必填和可空字段 | [GitHub 接入配置](./github-integration.md) |
+| GitHub、Gitee、GitLab、generic Git 的认证和能力差异 | [Git Provider 接入配置](./git-provider-integration.md) |
 | Issue 分支、integration branch 和并发工作区 | [Issues 编排与并发调度](./issue-orchestration.md) |
 | 配置字段必填、可空和必须为空 | [配置 Schema 规则](./configuration-schema-spec.md) |
 
@@ -37,9 +37,11 @@
 | 远程仓库 | 解析 URL -> 识别 provider -> 校验认证 -> clone -> 初始化 `.moyuan/` -> full comprehension | clone workspace、remote metadata |
 | 远程同步 | fetch/pull/rebase/merge -> diff commits -> incremental comprehension -> stale memory marking | comprehension event、profile patch |
 
-## 3. Provider 能力
+## 3. Adapter 能力边界
 
-Provider Adapter 必须声明能力，Orchestrator 只调用声明为可用的动作。
+Git Provider Adapter 只负责 Git 与远程平台能力，不负责需求拆分、代码生成、质量审核或发布决策。
+
+Adapter 必须声明能力，Orchestrator 只调用声明为可用的动作。
 
 | Provider | 必需能力 | 可选能力 |
 | --- | --- | --- |
@@ -61,6 +63,8 @@ capabilities:
 auth:
   methods: [ssh, https_token, credential_helper]
 ```
+
+认证方式、token 权限、PR/MR 字段和服务商差异由 [Git Provider 接入配置](./git-provider-integration.md) 维护。
 
 ## 4. Git 触发点
 

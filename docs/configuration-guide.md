@@ -64,7 +64,7 @@
 | 文件 | 职责 | 是否最小闭环必需 | 投产必需 | 详细规则 |
 | --- | --- | --- | --- | --- |
 | `project.yaml` | 项目基础信息、技术栈、工作区边界 | 是 | 是 | [配置 Schema 规则](./configuration-schema-spec.md) |
-| `repository.yaml` | 本地/远程仓库、remote、分支策略 | 是 | 是 | [仓库接入与 Git Adapter](./repository-onboarding-git-management.md) |
+| `repository.yaml` | 本地/远程仓库、remote、分支策略 | 是 | 是 | [仓库接入与 Git Provider Adapter](./repository-onboarding-git-management.md) |
 | `models/providers.yaml` | GPT、Claude、GLM、MiniMax、第三方 API、gpt-image-2 账号引用 | 是 | 是 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `models/routing.yaml` | planning、coding、review、memory、image generation 路由 | 是 | 是 | [模型与工具适配规划](./model-tool-adapters.md) |
 | `runtimes/agent-runtimes.yaml` | Claude CLI、Codex CLI 等原生 Runtime | 是 | 是 | [Runtime Adapter 契约](./contracts/runtime-adapter-contract.md) |

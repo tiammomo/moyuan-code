@@ -25,7 +25,7 @@
 | 多 Agent 编排 | role、team、handoff、输出契约 | [Agent 角色与团队概览](./agent-roles-overview.md) |
 | Subagent 与 Skills | Subagent 生命周期、Skill Registry、推荐、绑定和效果反馈 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | Issues 编排 | 自动拆分 issues、依赖图、并发调度、ready queue | [Issues 编排与并发调度](./issue-orchestration.md) |
-| 仓库接入与理解 | 本地/远程仓库、Git 分支、项目阅读理解 | [项目接入与阅读理解主线](./mainlines/project-comprehension.md)、[仓库接入与 Git Adapter](./repository-onboarding-git-management.md) |
+| 仓库接入与理解 | 本地/远程仓库、Git 分支、项目阅读理解 | [项目接入与阅读理解主线](./mainlines/project-comprehension.md)、[仓库接入与 Git Provider Adapter](./repository-onboarding-git-management.md) |
 | 项目工作空间 | `.moyuan/` schema 索引 | [项目工作空间规范](./project-workspace-spec.md) |
 | 质量门禁 | 测试、重复度、复杂度、review、返工 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) |
 | 工程流程规范 | commit、issue、回退后 fix、发版和测试覆盖率 | [工程流程规范](./engineering-process-standards.md) |

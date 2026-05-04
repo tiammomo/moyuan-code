@@ -105,7 +105,7 @@ epic integration branch accepted
 - `.moyuan/policies/permissions.yaml`
 - `.moyuan/policies/release.yaml`
 
-GitHub 细节见 [GitHub 接入配置](../github-integration.md)。
+远程 Git Provider 细节见 [Git Provider 接入配置](../git-provider-integration.md)。
 
 ## 7. Workspace 产物
 

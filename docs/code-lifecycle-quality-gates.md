@@ -113,13 +113,7 @@ quality_gates:
   coverage:
     required: true
     block_on_regression: true
-    thresholds:
-      line: 80
-      branch: 70
-      function: 80
-      statement: 80
-      changed_files: 85
-      new_code: 85
+    thresholds_ref: .moyuan/policies/engineering.yaml#engineering.coverage.default_thresholds
 ```
 
 ### 重复代码门禁
@@ -140,7 +134,7 @@ quality_gates:
   duplication:
     required: true
     block_on_new_duplicate: true
-    max_new_duplicate_ratio: 0.08
+    thresholds_ref: .moyuan/policies/code-quality.yaml#gates.duplication
     ignore:
       - generated/**
       - snapshots/**
@@ -167,12 +161,7 @@ quality_gates:
   complexity:
     required: true
     block_on_regression: true
-    thresholds:
-      max_function_lines: 80
-      max_file_added_lines_without_design_review: 300
-      max_cyclomatic_complexity: 10
-      max_nesting_depth: 4
-      max_parameters: 6
+    thresholds_ref: .moyuan/policies/code-quality.yaml#gates.complexity
 ```
 
 ### 架构边界门禁
@@ -270,26 +259,15 @@ gates:
   coverage:
     enabled: true
     severity: blocker
-    thresholds:
-      line: 80
-      branch: 70
-      function: 80
-      statement: 80
-      changed_files: 85
-      new_code: 85
+    thresholds_ref: .moyuan/policies/engineering.yaml#engineering.coverage.default_thresholds
   duplication:
     enabled: true
     severity: blocker
-    max_new_duplicate_ratio: 0.08
+    thresholds_ref: .moyuan/policies/code-quality.yaml#gates.duplication
   complexity:
     enabled: true
     severity: blocker
-    thresholds:
-      max_function_lines: 80
-      max_file_added_lines_without_design_review: 300
-      max_cyclomatic_complexity: 10
-      max_nesting_depth: 4
-      max_parameters: 6
+    thresholds_ref: .moyuan/policies/code-quality.yaml#gates.complexity
   architecture:
     enabled: true
     severity: blocker

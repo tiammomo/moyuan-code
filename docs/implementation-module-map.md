@@ -198,7 +198,7 @@ cli/api
 
 权威文档：
 
-- [仓库接入与 Git Adapter](./repository-onboarding-git-management.md)
+- [仓库接入与 Git Provider Adapter](./repository-onboarding-git-management.md)
 - [Git 分支策略](./policies/git-branch-policy.md)
 
 ### `release` 和 `server-resources`

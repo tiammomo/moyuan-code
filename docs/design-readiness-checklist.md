@@ -37,7 +37,7 @@
 | [配置 Schema 规则](./configuration-schema-spec.md) | 配置字段哪些必填、可选、可为空、必须为空 | 核心 YAML 字段规则明确 |
 | [Issues 编排与并发调度](./issue-orchestration.md) | 任务如何拆分、依赖和并发 | Issue Graph、ready queue、合入门禁明确 |
 | [工程流程规范](./engineering-process-standards.md) | commit、issue、fix、release 和 coverage 是否统一 | 提交、issue、回退修复、发版和覆盖率规则明确 |
-| [仓库接入与 Git Adapter](./repository-onboarding-git-management.md) | 项目如何接入和理解 | 本地/远程接入、full/incremental comprehension 明确 |
+| [仓库接入与 Git Provider Adapter](./repository-onboarding-git-management.md) | 项目如何接入和理解 | 本地/远程接入、full/incremental comprehension 明确 |
 | [代码生命周期质量门禁](./code-lifecycle-quality-gates.md) | AI 代码如何避免垃圾代码 | 测试、重复、复杂度、架构、安全、review 明确 |
 | [Agent 角色与团队概览](./agent-roles-overview.md) | 多 Agent 如何分工 | role、team、memory scope、输出契约明确 |
 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) | Subagent 和 skills 是否显式建模 | Subagent 生命周期、Skill Registry、绑定、效果反馈明确 |
@@ -98,8 +98,8 @@
 - 本地路径接入。
 - 远程 Git 接入。
 - GitHub/Gitee/GitLab/generic git provider 边界。
-- GitHub 连接配置的必填、可选、可为空字段。
-- GitHub token 或 SSH key 的权限和 secret 引用策略。
+- Git Provider 连接配置的必填、可选、可为空字段。
+- token、SSH key、credential helper 或 App 凭证的权限和 secret 引用策略。
 - 初始化 `.moyuan/`。
 - 首次 full comprehension。
 - 拉取远程分支后的 incremental comprehension。
