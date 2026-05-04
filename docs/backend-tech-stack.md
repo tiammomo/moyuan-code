@@ -102,6 +102,7 @@ go env GOPATH GOMODCACHE GOROOT
 go mod download
 go test ./...
 go run ./cmd/moyuan --help
+./bin/moyuan --help
 gofmt -w .
 ```
 

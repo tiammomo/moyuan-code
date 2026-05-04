@@ -16,6 +16,11 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Go local build output
+/moyuan
+/dist/
+/coverage.out
+
 # Moyuan runtime state
 .moyuan/logs/
 .moyuan/worktrees/

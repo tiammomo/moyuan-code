@@ -6,6 +6,29 @@
 
 本文把冻结后的 Phase 1 执行入口拆成可执行 issue graph。它只覆盖本地 CLI MVP，不覆盖 team_server、Web Console、生产部署和 Beta 能力。
 
+## 0. 当前实现进度
+
+当前进入 Phase 1 实施阶段，控制面已切换为 Go。
+
+已完成第一轮骨架：
+
+- `phase1-001 workspace-core`：已实现 `.moyuan/` 初始化、核心目录、`project.yaml`、`repository.yaml`、`policies/access.yaml` 和内部 `workspace.json` 状态缓存。
+- `phase1-002 auth-context`：已实现 local owner、`whoami` 和基础 `auth_context` 审计事件。
+- `phase1-003 logging-audit`：已实现 run、audit、quality、git JSONL 日志。
+- `phase1-004 cli-bootstrap`：已实现 Go CLI 入口和 `bin/moyuan` wrapper。
+- `phase1-005 git-adapter-basics`：已实现本地绑定、远程 clone、status、branch list、fetch sync。
+- `phase1-007 project-comprehension`：已实现 full/incremental comprehension 的启发式项目画像、模块地图、命令识别和 memory candidate。
+- `phase1-010 quality-gates-core`：已实现 build、lint、test 命令执行和 quality report。
+
+下一轮继续补齐：
+
+- `phase1-006 runtime-adapters-core`
+- `phase1-008 orchestrator-core`
+- `phase1-009 scheduler-core`
+- `phase1-011 memory-basics`
+- `phase1-012 repair-basics`
+- `phase1-013 e2e-smoke`
+
 ## 1. 目标
 
 - 让 Phase 1 的实现顺序、依赖关系和并发边界可见。
