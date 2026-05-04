@@ -183,6 +183,30 @@ func TestMemoryRecordGateStagesDedupesRejectsAndCompacts(t *testing.T) {
 	assertFileContains(t, root, ".moyuan/logs/memory.jsonl", "memory.candidate.evaluated")
 }
 
+func TestSkillsCLIRegistersListsAndDisablesSkillDefinitions(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	added := runCLI(t, root, "skills", "add", "--id", "/tdd", "--source", "github:mattpocock/skills", "--risk", "low", "--role", "backend", "--role", "tester", "--tag", "quality", "--tool", "go-test")
+	assertContains(t, added.stdout, `"id": "tdd"`)
+	assertContains(t, added.stdout, `"enabled": true`)
+
+	list := runCLI(t, root, "skills", "list")
+	assertContains(t, list.stdout, `"source": "github:mattpocock/skills"`)
+	assertContains(t, list.stdout, `"compatible_roles"`)
+
+	disabled := runCLI(t, root, "skills", "disable", "tdd")
+	assertContains(t, disabled.stdout, `"enabled": false`)
+	assertFileContains(t, root, ".moyuan/skills/registry.json", `"id": "tdd"`)
+	assertFileContains(t, root, ".moyuan/skills/events.jsonl", "skill.disabled")
+
+	rejected := runCLIAllowFailure(t, root, "skills", "add", "--id", "bad-secret", "--source", "local", "--auth-ref", "sk-plain-secret")
+	if rejected.code == 0 {
+		t.Fatalf("expected plain secret skill auth ref to be rejected: %s", rejected.stdout)
+	}
+	assertContains(t, rejected.stderr, "auth_ref_must_be_reference")
+}
+
 func TestRepairControlledLoopRunsQualityAndStopsAfterMaxAttempts(t *testing.T) {
 	root := createTempRepo(t)
 	brokenSource := "package phase1smoke\n\nfunc Ready() bool { return false }\n"

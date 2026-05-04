@@ -30,6 +30,7 @@ import (
 	runrecord "moyuan-code/internal/run"
 	"moyuan-code/internal/runtime"
 	"moyuan-code/internal/serverresources"
+	"moyuan-code/internal/skills"
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/subagent"
 	"moyuan-code/internal/textutil"
@@ -92,6 +93,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleReview(argv[1:], cwd)
 	case "model":
 		text, result, exitCode, err = handleModel(argv[1:], cwd)
+	case "skills":
+		text, result, exitCode, err = handleSkills(argv[1:], cwd)
 	case "release":
 		text, result, exitCode, err = handleRelease(ctx, argv[1:], cwd)
 	case "resources":
@@ -173,6 +176,9 @@ func usage() string {
 		"moyuan model provider show <provider>",
 		"moyuan model provider disable <provider>",
 		"moyuan model route --role <role> [--task-type <type>] [--output-type <type>] [--repo-edit]",
+		"moyuan skills add --id <id> --source <source> [--role backend] [--tag tdd]",
+		"moyuan skills list",
+		"moyuan skills disable <skill-id>",
 		"moyuan release suggest [--version v0.1.0] [--min-issues 3]",
 		"moyuan release show <release-id>",
 		"moyuan resources add --id <id> --environment test_dev --host <host>",
@@ -929,6 +935,53 @@ func handleModelProvider(args []string, rootDir string) (string, any, int, error
 		return "", provider, 0, nil
 	}
 	return "unknown model provider command\n", nil, 1, nil
+}
+
+func handleSkills(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown skills command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "add":
+		skill := skills.Definition{
+			ID:              flagValue(args, "--id", ""),
+			Name:            flagValue(args, "--name", ""),
+			Source:          flagValue(args, "--source", ""),
+			Version:         flagValue(args, "--version", ""),
+			Description:     flagValue(args, "--description", ""),
+			Enabled:         !hasFlag(args, "--disabled"),
+			RiskLevel:       flagValue(args, "--risk", ""),
+			CompatibleRoles: flagValues(args, "--role"),
+			Tags:            flagValues(args, "--tag"),
+			RequiredTools:   flagValues(args, "--tool"),
+			AuthRef:         flagValue(args, "--auth-ref", ""),
+		}
+		if skill.ID == "" {
+			return "missing --id\n", nil, 1, nil
+		}
+		if skill.Source == "" {
+			return "missing --source\n", nil, 1, nil
+		}
+		saved, err := skills.Upsert(rootDir, skill)
+		return "", saved, 0, err
+	case "list":
+		list, err := skills.List(rootDir)
+		return "", list, 0, err
+	case "disable":
+		if len(args) < 2 {
+			return "missing skill id\n", nil, 1, nil
+		}
+		skill, ok, err := skills.Disable(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", skill, 0, nil
+	}
+	return "unknown skills command\n", nil, 1, nil
 }
 
 func handleRelease(ctx context.Context, args []string, cwd string) (string, any, int, error) {

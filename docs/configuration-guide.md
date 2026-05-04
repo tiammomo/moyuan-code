@@ -39,8 +39,9 @@
     agent-runtimes.yaml
   skills/
     enabled.yaml
-    registry.yaml
+    registry.json
     bindings.yaml
+    events.jsonl
   visuals/
     architecture-visuals.yaml
   policies/
@@ -72,7 +73,7 @@
 | `agents/teams.yaml` | feature、repair、release 等 team 编排 | 是 | 是 | [Agent 角色与团队概览](./agent-roles-overview.md) |
 | `agents/subagents.yaml` | Subagent 创建、并发、父对象和输出契约 | 是 | 是 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `skills/enabled.yaml` | 启用的 skills | 否 | 否 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
-| `skills/registry.yaml` | Skill Registry | 否 | 否 | [Subagent 与 Skill 契约](./contracts/subagent-skill-contract.md) |
+| `skills/registry.json` | Phase 2 运行期 Skill Registry | 否 | 否 | [Subagent 与 Skill 契约](./contracts/subagent-skill-contract.md) |
 | `skills/bindings.yaml` | Skill 绑定 | 否 | 否 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `policies/access.yaml` | 项目级角色、审批入口、审计开关 | 是 | 是 | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |
 | `policies/permissions.yaml` | 文件、命令、网络、密钥、Git 和部署权限边界 | 是 | 是 | [权限模型](./foundations/permission-model.md) |

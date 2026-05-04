@@ -24,7 +24,7 @@
 
 | ID | Issue | 状态 | 主要范围 | 依赖 | 建议角色 | 退出条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `phase2-001` | `skill-registry-store-api` | planned | Skill Definition、来源、版本、风险、适配 role 和启用状态落盘/API/CLI | Beta | `skills_owner` | 可登记、查询、禁用 skill，配置不保存明文密钥 |
+| `phase2-001` | `skill-registry-store-api` | completed | Skill Definition、来源、版本、风险、适配 role 和启用状态落盘/API/CLI | Beta | `skills_owner` | 可登记、查询、禁用 skill，配置不保存明文密钥 |
 | `phase2-002` | `find-skills-recommendation-adapter` | planned | 接入或封装 `find-skills` 推荐入口，生成推荐理由和候选绑定 | `phase2-001` | `adapter_owner` | 项目/issue/role 可得到 skills 推荐结果并落盘 |
 | `phase2-003` | `role-skill-binding-policy` | planned | role、issue、subagent 的 skill binding 策略和冲突规则 | `phase2-001`,`phase2-002` | `orchestrator_owner` | Agent 执行前可解析启用 skills 和禁止项 |
 | `phase2-004` | `skill-effectiveness-feedback` | planned | 记录 skill 对质量、返工、耗时和 review 的影响 | `phase2-003` | `qa_owner` | Skill 效果能影响后续推荐、降权和禁用 |
@@ -45,7 +45,7 @@
 
 ## 5. 当前执行入口
 
-下一步执行 `phase2-001 skill-registry-store-api`。
+下一步执行 `phase2-002 find-skills-recommendation-adapter`。
 
 实现边界：
 

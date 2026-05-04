@@ -21,6 +21,7 @@ import (
 	"moyuan-code/internal/review"
 	"moyuan-code/internal/scheduler"
 	"moyuan-code/internal/serverresources"
+	"moyuan-code/internal/skills"
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/subagent"
 )
@@ -821,6 +822,66 @@ func NewRouter(options Options) *gin.Engine {
 			status = http.StatusAccepted
 		}
 		c.JSON(status, gin.H{"route": decision})
+	})
+	router.GET("/v1/projects/:project_id/skills", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		list, err := skills.List(rootDir)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"skills": list})
+	})
+	router.POST("/v1/projects/:project_id/skills", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req skills.Definition
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		skill, err := skills.Upsert(rootDir, req)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"skill": skill})
+	})
+	router.POST("/v1/projects/:project_id/skills/:skill_id/disable", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		skill, found, err := skills.Disable(rootDir, c.Param("skill_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "skill not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"skill": skill})
 	})
 	router.GET("/v1/projects/:project_id/memory/search", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

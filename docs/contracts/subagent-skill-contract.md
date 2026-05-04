@@ -120,17 +120,16 @@ export interface SkillDefinition {
   id: string;
   name: string;
   version: string;
-  source: "builtin" | "project" | "organization" | "marketplace" | "manual";
+  source: string;
   description: string;
-  supportedRoles: string[];
-  taskTypes: string[];
+  compatibleRoles: string[];
+  tags: string[];
   requiredTools: string[];
-  memoryScopes: string[];
+  authRef?: string;
   riskLevel: "low" | "medium" | "high";
-  inputContractRef?: string;
-  outputContractRef?: string;
-  validationCommands: string[];
   enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SkillBinding {
@@ -159,6 +158,13 @@ export interface SkillRecommendation {
   decision: "bind" | "reject" | "needs_approval";
 }
 ```
+
+Phase 2 当前实现边界：
+
+- 存储位置：`.moyuan/skills/registry.json`。
+- 事件流：`.moyuan/skills/events.jsonl`。
+- `authRef` 只能是 `env:` 或 `secret:` 引用，不能保存明文 API key、token 或 SSH key。
+- 当前阶段只支持登记、查询、禁用和审计；推荐、绑定和效果反馈由后续 Phase 2 issues 实现。
 
 ## 6. Skill 效果接口
 

@@ -176,6 +176,15 @@ subagent_parallelism = min(
 
 Skill Registry 负责保存可用 skills、来源、版本、能力标签、适配 role、风险和效果数据。
 
+Phase 2 当前落地：
+
+- 运行期权威文件：`.moyuan/skills/registry.json`。
+- 变更事件流：`.moyuan/skills/events.jsonl`。
+- CLI：`moyuan skills add`、`moyuan skills list`、`moyuan skills disable <skill-id>`。
+- API：`GET /v1/projects/:project_id/skills`、`POST /v1/projects/:project_id/skills`、`POST /v1/projects/:project_id/skills/:skill_id/disable`。
+- 当前只做 registry、去重、禁用和审计；不安装第三方 skill，不执行 skill prompt，不修改 Subagent 调度。
+- `auth_ref` 只能保存 `env:` 或 `secret:` 引用，不能保存 API key、token 或其他明文凭证。
+
 每个 Skill 必须声明：
 
 - `id`
@@ -330,7 +339,8 @@ Subagent 必须遵守：
 | `.moyuan/agents/teams.yaml` | Team 与验证链路 |
 | `.moyuan/agents/subagents.yaml` | Subagent 创建、并发、生命周期和委派策略 |
 | `.moyuan/skills/enabled.yaml` | 项目启用 skills |
-| `.moyuan/skills/registry.yaml` | skill registry 索引 |
+| `.moyuan/skills/registry.json` | Phase 2 运行期 skill registry 索引 |
+| `.moyuan/skills/events.jsonl` | skill registry 变更事件 |
 | `.moyuan/skills/effectiveness/` | skill 使用效果 |
 | `.moyuan/policies/orchestration.yaml` | issue/subagent 并发和等待规则 |
 | `.moyuan/runtimes/agent-runtimes.yaml` | Runtime 调用和隔离 |
