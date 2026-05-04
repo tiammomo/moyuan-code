@@ -117,7 +117,7 @@ interface StateChangedEvent extends LogEvent {
 | 代码开发 | subagent.created、subagent.dispatched、runtime_started、runtime_completed、quality_started、review_completed |
 | Subagent 与 Skills | subagent.planned、subagent.completed、subagent.failed、skill.recommended、skill.bound、skill.effectiveness.recorded |
 | 运行反馈与自我修复 | self_repair.signal.captured、self_repair.bug.classified、self_repair.repair.planned、self_repair.repair.completed |
-| 代码管理 | branch_created、worktree_created、commit.created、commit.blocked、merge_attempted、merge_completed、git_provider.plan.created、git_provider.status.synced |
+| 代码管理 | branch_created、worktree_created、commit.created、commit.blocked、merge_attempted、merge_completed、git_provider.plan.created、git_provider.status.synced、git_provider.pr_mr.previewed、git_provider.pr_mr.create |
 | 服务器资源管理 | host_added、resource_check_completed、expiration_alert_created、server_resource.maintenance_scan、server_resource.renewed、server_resource.retired |
 | DevOps 发布投产 | release_suggested、release_branch_created、release.coverage_checked、release_note.generated、deploy_started、smoke_completed、rollback_started |
 

@@ -20,7 +20,7 @@ Phase 5 的目标是把 Phase 4 的可审计状态对象推进到“真实外部
 | --- | --- | --- | --- | --- | --- | --- |
 | `phase5-001` | `auth-context-rbac-middleware` | completed | API middleware 解析 session/API token/service account，输出 AuthContext，并执行最小 RBAC | Phase 4 readiness | `security_owner` + `api_owner` | 高风险 API 不能绕过 authz decision，拒绝/允许都有 audit event |
 | `phase5-002` | `secret-ref-resolver` | completed | 支持 `secret:` 和 `env:` 引用解析、用途校验、脱敏和 adapter 注入 | `phase5-001` | `security_owner` + `adapter_owner` | secret 明文不落盘，adapter 只拿到允许的环境变量 |
-| `phase5-003` | `github-gitee-pr-mr-adapter` | planned | GitHub/Gitee PR/MR preview、create、status refresh 和失败降级 | `phase5-001`,`phase5-002` | `git_owner` | PR/MR 默认 preview，真实 create 需 approval/authz |
+| `phase5-003` | `github-gitee-pr-mr-adapter` | completed | GitHub/Gitee PR/MR preview、create、status refresh 和失败降级 | `phase5-001`,`phase5-002` | `git_owner` | PR/MR 默认 preview，真实 create 需 approval/authz |
 | `phase5-004` | `deployment-smoke-monitor-adapters` | planned | 部署后 smoke/monitor 结果记录、失败阻断和 rollback 建议 | `phase5-001`,`phase5-002` | `devops_owner` | test_dev 可 dry-run/record，production 必须 approval |
 | `phase5-005` | `console-controlled-forms` | planned | Console 增加审批、用户、Token、PR/MR、维护操作表单 | `phase5-001` | `frontend_owner` | 前端只调用受控 API，不直接伪造权威状态 |
 

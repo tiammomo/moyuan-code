@@ -25,15 +25,15 @@ Git Provider 接入必须支持：
 
 Git Provider 文档只定义远程服务商差异，不重复项目阅读理解、Issue 编排和质量门禁。
 
-当前 Beta 实现已落地最小 Git Provider plan：
+当前已落地 Git Provider plan、preview、create guard 和状态同步：
 
-- CLI：`moyuan git provider plan <issue-id>`、`moyuan git provider list`、`moyuan git provider show <plan-id>`、`moyuan git provider sync <plan-id>`。
-- API：`POST /v1/projects/:project_id/issues/:issue_id/git-provider-plan`、`GET /v1/projects/:project_id/git-provider-plans`、`GET /v1/projects/:project_id/git-provider-plans/:plan_id`、`POST /v1/projects/:project_id/git-provider-plans/:plan_id/sync`。
+- CLI：`moyuan git provider plan <issue-id>`、`list`、`show <plan-id>`、`sync <plan-id>`、`preview <plan-id>`、`create <plan-id> [--approved]`。
+- API：`POST /v1/projects/:project_id/issues/:issue_id/git-provider-plan`、`GET /v1/projects/:project_id/git-provider-plans`、`GET /v1/projects/:project_id/git-provider-plans/:plan_id`、`POST /v1/projects/:project_id/git-provider-plans/:plan_id/sync`、`POST /v1/projects/:project_id/git-provider-plans/:plan_id/preview`、`POST /v1/projects/:project_id/git-provider-plans/:plan_id/create`。
 - 输出位置：`.moyuan/lifecycle/pull-requests/`。
-- 当前只生成可审计 push/PR/MR plan，不真实执行 push、PR/MR 创建或合并。
+- 默认只生成可审计 push/PR/MR plan 和 preview，不真实执行 push、PR/MR 创建或合并。
 - 已接入门禁：dirty worktree、remote 缺失、review merge decision 未通过时阻断。
 - `github`、`gitee`、`gitlab` 会输出 PR/MR 计划和远程 compare/new 链接；缺少 API auth 时降级为 manual create mode。`generic_git` 只输出 push plan 和手动 PR/MR 指引。
-- Phase 4 已支持 plan 列表和状态同步记录；当前 sync 只记录 `manual_required`、`api_auth_missing` 或 adapter 未启用，不调用远程 API。
+- Phase 5 已支持 GitHub/Gitee create adapter：必须 `--approved`、authz `git:write`、`secret` resolver 通过，并设置 `MOYUAN_ALLOW_GIT_PROVIDER_WRITE=1` 才会调用远程 API；否则保持 preview-only。
 
 ## 2. Provider 类型
 
@@ -223,6 +223,7 @@ parse repository url
 
 - token、SSH key、App private key 不得写入 YAML 明文。
 - 日志只记录 secret id，不记录 secret value。
+- GitHub/Gitee PR/MR 创建 token 通过 [Secret Resolver 契约](./contracts/secret-resolver-contract.md) 解析，用途必须包含 `pull_request.create`。
 - PR/MR body 不得包含 secret、`.env`、私网 IP、生产凭证。
 - 第三方模型不得接收 token、credential helper 输出或完整远程凭证上下文。
 - 图像 prompt 不得包含远程仓库密钥、私有 endpoint 或内部 IP。

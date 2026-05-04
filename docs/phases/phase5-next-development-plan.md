@@ -21,7 +21,7 @@ Phase 4 已完成并通过 readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase5-001` | `auth-context-rbac-middleware` | completed | API middleware 解析身份并执行最小 RBAC | 受保护 API 有 allow/deny 决策和 audit event |
 | P0 | `phase5-002` | `secret-ref-resolver` | completed | 安全解析 `secret:`/`env:` 引用并注入 adapter | Secret 明文不出现在响应、日志、Memory、prompt 或测试 fixture |
-| P1 | `phase5-003` | `github-gitee-pr-mr-adapter` | planned | PR/MR preview/create/status adapter | 默认 preview，真实 create 需 authz + approval |
+| P1 | `phase5-003` | `github-gitee-pr-mr-adapter` | completed | PR/MR preview/create/status adapter | 默认 preview，真实 create 需 authz + approval |
 | P1 | `phase5-004` | `deployment-smoke-monitor-adapters` | planned | smoke/monitor 结果记录和 rollback 建议 | production 必须 approval，结果可审计 |
 | P1 | `phase5-005` | `console-controlled-forms` | planned | Console 增加受控操作表单 | 表单只调用后端受控 API，状态以后端为准 |
 
@@ -96,7 +96,32 @@ Phase 4 已完成并通过 readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 6. 验证要求
+## 6. 已完成任务：`phase5-003 github-gitee-pr-mr-adapter`
+
+范围：
+
+- Git Provider plan 增加 PR/MR preview 和 create 结果字段。
+- CLI 增加 `moyuan git provider preview <plan-id>` 和 `moyuan git provider create <plan-id> [--approved]`。
+- API 增加 `/git-provider-plans/:plan_id/preview` 和 `/git-provider-plans/:plan_id/create`。
+- `create` 真实远程写入必须同时满足 approval、authz `git:write`、Secret Resolver `pull_request.create` 用途、`MOYUAN_ALLOW_GIT_PROVIDER_WRITE=1`。
+- GitHub/Gitee adapter 支持构造远程 PR 请求；默认保持 preview-only。
+- 未审批、manual mode、缺少 token、关闭写开关和远程 API 失败都会写回本地 plan，不重复执行 push 或泄露 token。
+
+非目标：
+
+- 不自动 merge PR/MR。
+- 不读取 GitHub/Gitee review 审批状态。
+- 不绕过现有 review merge decision 和质量门禁。
+
+验证：
+
+- `go test ./internal/gitprovider ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 7. 验证要求
 
 每完成一个 Phase 5 issue，至少运行：
 

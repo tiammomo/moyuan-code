@@ -61,6 +61,10 @@ type providerOpsRefreshRequest struct {
 	Approved        bool   `json:"approved"`
 }
 
+type gitProviderCreateRequest struct {
+	Approved bool `json:"approved"`
+}
+
 type releaseSuggestRequest struct {
 	Version   string `json:"version"`
 	MinIssues int    `json:"min_issues"`
@@ -989,6 +993,57 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"git_provider_plan": plan})
+	})
+	router.POST("/v1/projects/:project_id/git-provider-plans/:plan_id/preview", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plan, found, err := gitprovider.Preview(rootDir, c.Param("plan_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "git provider plan not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"git_provider_plan": plan})
+	})
+	router.POST("/v1/projects/:project_id/git-provider-plans/:plan_id/create", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req gitProviderCreateRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		plan, found, err := gitprovider.Create(c.Request.Context(), rootDir, c.Param("plan_id"), gitprovider.CreateOptions{Approved: req.Approved})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "git provider plan not found")
+			return
+		}
+		status := http.StatusOK
+		if plan.PRMR.CreateDecision == "PR_MR_CREATE_APPROVAL_REQUIRED" || plan.PRMR.CreateDecision == "PR_MR_CREATE_PREVIEW_ONLY" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"git_provider_plan": plan})
 	})
 	router.POST("/v1/projects/:project_id/releases/suggest", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
@@ -1975,6 +2030,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "resource.retire", Risk: "high", Scopes: []string{"resource:write"}}, true
 	case "/v1/projects/:project_id/git-provider-plans/:plan_id/sync":
 		return authzRule{Action: "git.provider.sync", Risk: "high", Scopes: []string{"git:write"}}, true
+	case "/v1/projects/:project_id/git-provider-plans/:plan_id/create":
+		return authzRule{Action: "git.provider.create", Risk: "high", Scopes: []string{"git:write"}}, true
 	default:
 		return protectedAuthzRuleByRawPath(method, rawPath)
 	}
@@ -1999,6 +2056,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "resource.retire", Risk: "high", Scopes: []string{"resource:write"}}, true
 	case strings.Contains(rawPath, "/git-provider-plans/") && strings.HasSuffix(rawPath, "/sync"):
 		return authzRule{Action: "git.provider.sync", Risk: "high", Scopes: []string{"git:write"}}, true
+	case strings.Contains(rawPath, "/git-provider-plans/") && strings.HasSuffix(rawPath, "/create"):
+		return authzRule{Action: "git.provider.create", Risk: "high", Scopes: []string{"git:write"}}, true
 	default:
 		return authzRule{}, false
 	}

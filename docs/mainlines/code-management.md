@@ -140,8 +140,8 @@ epic integration branch accepted
 当前实现基线：
 
 - Git Provider plan 已支持创建、查询、列表和同步状态记录。
-- PR/MR plan 会记录 provider、base branch、target branch、remote link、remote status 和 sync decision。
-- 当前只生成受控计划和手动/降级状态，不真实 push、创建 PR/MR 或合并。
+- PR/MR plan 会记录 provider、base branch、target branch、remote link、remote status、preview decision、create decision 和 sync decision。
+- 默认只生成受控计划和 preview；真实 GitHub/Gitee PR/MR create 必须通过 approval、authz、secret resolver 和写开关，不自动合并。
 
 ## 9. 验收标准
 

@@ -148,6 +148,10 @@ func usage() string {
 		"moyuan git sync [--comprehend]",
 		"moyuan git provider plan <issue-id>",
 		"moyuan git provider show <plan-id>",
+		"moyuan git provider list",
+		"moyuan git provider sync <plan-id>",
+		"moyuan git provider preview <plan-id>",
+		"moyuan git provider create <plan-id> [--approved]",
 		"moyuan requirement plan --text <text>",
 		"moyuan issue graph <epic-id>",
 		"moyuan issue schedule <epic-id>",
@@ -509,6 +513,30 @@ func handleGit(ctx context.Context, args []string, cwd string) (string, any, int
 				return "missing plan id\n", nil, 1, nil
 			}
 			plan, ok, err := gitprovider.SyncStatus(ctx, rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", plan, 0, nil
+		case "preview":
+			if len(args) < 3 {
+				return "missing plan id\n", nil, 1, nil
+			}
+			plan, ok, err := gitprovider.Preview(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", plan, 0, nil
+		case "create":
+			if len(args) < 3 {
+				return "missing plan id\n", nil, 1, nil
+			}
+			plan, ok, err := gitprovider.Create(ctx, rootDir, args[2], gitprovider.CreateOptions{Approved: hasFlag(args, "--approved")})
 			if err != nil {
 				return "", nil, 1, err
 			}
