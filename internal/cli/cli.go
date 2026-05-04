@@ -179,6 +179,9 @@ func usage() string {
 		"moyuan skills add --id <id> --source <source> [--role backend] [--tag tdd]",
 		"moyuan skills list",
 		"moyuan skills recommend --role backend [--task-type testing] [--risk medium]",
+		"moyuan skills bind --skill <skill-id> --target-type role --target backend",
+		"moyuan skills bindings",
+		"moyuan skills binding disable <binding-id>",
 		"moyuan skills disable <skill-id>",
 		"moyuan release suggest [--version v0.1.0] [--min-issues 3]",
 		"moyuan release show <release-id>",
@@ -979,6 +982,31 @@ func handleSkills(args []string, cwd string) (string, any, int, error) {
 			Limit:     limit,
 		})
 		return "", report, 0, err
+	case "bind":
+		binding, err := skills.UpsertBinding(rootDir, skills.Binding{
+			ID:         flagValue(args, "--id", ""),
+			SkillID:    flagValue(args, "--skill", ""),
+			TargetType: flagValue(args, "--target-type", ""),
+			TargetID:   flagValue(args, "--target", ""),
+			Priority:   skills.PriorityFromString(flagValue(args, "--priority", "")),
+			Status:     flagValue(args, "--status", "enabled"),
+			Config:     skills.ConfigFromPairs(flagValues(args, "--config")),
+		})
+		return "", binding, 0, err
+	case "bindings":
+		bindings, err := skills.ListBindings(rootDir)
+		return "", bindings, 0, err
+	case "binding":
+		if len(args) >= 3 && args[1] == "disable" {
+			binding, ok, err := skills.DisableBinding(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", binding, 0, nil
+		}
 	case "disable":
 		if len(args) < 2 {
 			return "missing skill id\n", nil, 1, nil

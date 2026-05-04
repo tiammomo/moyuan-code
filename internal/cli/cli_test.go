@@ -199,6 +199,15 @@ func TestSkillsCLIRegistersListsAndDisablesSkillDefinitions(t *testing.T) {
 	assertContains(t, recommendation.stdout, `"skill_id": "tdd"`)
 	assertFileContains(t, root, ".moyuan/skills/recommendations.jsonl", `"role":"backend"`)
 
+	bound := runCLI(t, root, "skills", "bind", "--skill", "tdd", "--target-type", "role", "--target", "backend")
+	assertContains(t, bound.stdout, `"id": "binding-role-backend-tdd"`)
+	assertContains(t, bound.stdout, `"status": "enabled"`)
+	bindings := runCLI(t, root, "skills", "bindings")
+	assertContains(t, bindings.stdout, `"skill_id": "tdd"`)
+	unbound := runCLI(t, root, "skills", "binding", "disable", "binding-role-backend-tdd")
+	assertContains(t, unbound.stdout, `"status": "disabled"`)
+	assertFileContains(t, root, ".moyuan/skills/bindings.json", `"id": "binding-role-backend-tdd"`)
+
 	disabled := runCLI(t, root, "skills", "disable", "tdd")
 	assertContains(t, disabled.stdout, `"enabled": false`)
 	assertFileContains(t, root, ".moyuan/skills/registry.json", `"id": "tdd"`)

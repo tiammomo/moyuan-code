@@ -134,13 +134,14 @@ export interface SkillDefinition {
 
 export interface SkillBinding {
   id: string;
-  projectId: string;
   skillId: string;
   targetType: "project" | "role" | "issue" | "subagent";
   targetId: string;
   priority: number;
-  config: Record<string, unknown>;
-  status: "candidate" | "enabled" | "disabled" | "deprecated";
+  config: Record<string, string>;
+  status: "candidate" | "enabled" | "disabled";
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SkillRecommendation {
@@ -168,6 +169,10 @@ Phase 2 当前实现边界：
 - 当前阶段支持 registry 登记、查询、禁用、审计和本地规则 recommendation；绑定和效果反馈由后续 Phase 2 issues 实现。
 - 推荐入口：`moyuan skills recommend --role <role>`、`POST /v1/projects/:project_id/skills/recommend`。
 - 推荐结果不等于自动绑定，不能直接扩大 Subagent 写入范围。
+- 绑定存储：`.moyuan/skills/bindings.json`。
+- 绑定事件：`.moyuan/skills/bindings.events.jsonl`。
+- 绑定入口：`moyuan skills bind --skill <skill-id> --target-type role --target backend`、`GET/POST /v1/projects/:project_id/skills/bindings`。
+- `enabled` binding 必须引用存在且启用的 skill；高风险 skill 不能直接绑定到 project 级默认范围。
 
 ## 6. Skill 效果接口
 

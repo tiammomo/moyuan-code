@@ -26,7 +26,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `phase2-001` | `skill-registry-store-api` | completed | Skill Definition、来源、版本、风险、适配 role 和启用状态落盘/API/CLI | Beta | `skills_owner` | 可登记、查询、禁用 skill，配置不保存明文密钥 |
 | `phase2-002` | `find-skills-recommendation-adapter` | completed | 接入或封装 `find-skills` 推荐入口，生成推荐理由和候选绑定 | `phase2-001` | `adapter_owner` | 项目/issue/role 可得到 skills 推荐结果并落盘 |
-| `phase2-003` | `role-skill-binding-policy` | planned | role、issue、subagent 的 skill binding 策略和冲突规则 | `phase2-001`,`phase2-002` | `orchestrator_owner` | Agent 执行前可解析启用 skills 和禁止项 |
+| `phase2-003` | `role-skill-binding-policy` | completed | role、issue、subagent 的 skill binding 策略和冲突规则 | `phase2-001`,`phase2-002` | `orchestrator_owner` | Agent 执行前可解析启用 skills 和禁止项 |
 | `phase2-004` | `skill-effectiveness-feedback` | planned | 记录 skill 对质量、返工、耗时和 review 的影响 | `phase2-003` | `qa_owner` | Skill 效果能影响后续推荐、降权和禁用 |
 | `phase2-005` | `provider-health-quota-usage` | planned | Provider 健康、额度、用量、成本、第三方标识和数据策略扩展 | `beta-006` | `adapter_owner` | Provider 可展示可用性、额度风险和路由阻断原因 |
 | `phase2-006` | `task-model-strategy-switch` | planned | 同一任务按策略切换模型、Runtime 和 fallback | `phase2-005` | `orchestrator_owner` | 同一 issue 可审计地切换模型策略且不绕过质量门禁 |
@@ -45,7 +45,7 @@
 
 ## 5. 当前执行入口
 
-下一步执行 `phase2-003 role-skill-binding-policy`。
+下一步执行 `phase2-004 skill-effectiveness-feedback`。
 
 实现边界：
 

@@ -52,8 +52,9 @@
   skills/
     enabled.yaml
     registry.json
-    bindings.yaml
+    bindings.json
     events.jsonl
+    bindings.events.jsonl
     effectiveness/
     recommendations.jsonl
   memory/
@@ -163,7 +164,8 @@
 | `skills/enabled.yaml` | 启用 skills、skill source | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `skills/registry.json` | Phase 2 运行期 Skill Registry，记录版本、来源、适配 role、风险和启用状态 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `skills/events.jsonl` | Skill Registry 变更审计流 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
-| `skills/bindings.yaml` | project、role、issue、subagent 级 skill 绑定 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
+| `skills/bindings.json` | Phase 2 运行期 project、role、issue、subagent 级 skill 绑定 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
+| `skills/bindings.events.jsonl` | Skill Binding 变更审计流 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `skills/effectiveness/` | skill 使用效果、质量影响、返工和降权依据 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `memory/` | 长期记忆、候选、暂存、索引、审计 | [Agent Memory 系统方案](./agent-memory-system.md) |
 | `logs/` | run、agent、model、git、quality、release、memory、audit 和 error 核心日志 | [配置方案](./configuration-guide.md) |

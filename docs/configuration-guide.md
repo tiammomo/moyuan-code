@@ -40,8 +40,9 @@
   skills/
     enabled.yaml
     registry.json
-    bindings.yaml
+    bindings.json
     events.jsonl
+    bindings.events.jsonl
   visuals/
     architecture-visuals.yaml
   policies/
@@ -74,7 +75,7 @@
 | `agents/subagents.yaml` | Subagent 创建、并发、父对象和输出契约 | 是 | 是 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `skills/enabled.yaml` | 启用的 skills | 否 | 否 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `skills/registry.json` | Phase 2 运行期 Skill Registry | 否 | 否 | [Subagent 与 Skill 契约](./contracts/subagent-skill-contract.md) |
-| `skills/bindings.yaml` | Skill 绑定 | 否 | 否 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
+| `skills/bindings.json` | Phase 2 运行期 Skill 绑定 | 否 | 否 | [Subagent 与 Skills 系统方案](./subagents-skills-system.md) |
 | `policies/access.yaml` | 项目级角色、审批入口、审计开关 | 是 | 是 | [平台用户与访问控制主线](./mainlines/platform-user-access.md) |
 | `policies/permissions.yaml` | 文件、命令、网络、密钥、Git 和部署权限边界 | 是 | 是 | [权限模型](./foundations/permission-model.md) |
 | `policies/orchestration.yaml` | Issue Graph、并发、等待队列和合入门禁 | 是 | 是 | [Issues 编排与并发调度](./issue-orchestration.md) |

@@ -884,6 +884,66 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusCreated, gin.H{"skill_recommendation": report})
 	})
+	router.GET("/v1/projects/:project_id/skills/bindings", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		bindings, err := skills.ListBindings(rootDir)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"skill_bindings": bindings})
+	})
+	router.POST("/v1/projects/:project_id/skills/bindings", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req skills.Binding
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		binding, err := skills.UpsertBinding(rootDir, req)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"skill_binding": binding})
+	})
+	router.POST("/v1/projects/:project_id/skills/bindings/:binding_id/disable", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		binding, found, err := skills.DisableBinding(rootDir, c.Param("binding_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "skill binding not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"skill_binding": binding})
+	})
 	router.POST("/v1/projects/:project_id/skills/:skill_id/disable", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
