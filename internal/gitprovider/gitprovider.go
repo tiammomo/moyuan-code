@@ -371,6 +371,19 @@ func Create(ctx context.Context, rootDir string, id string, options CreateOption
 		plan.PRMR.CreatedAt = now
 		return saveCreateResult(rootDir, plan)
 	}
+	if _, _, err := approvals.ConsumeApproved(rootDir, approval.ID, approvals.ConsumeOptions{
+		TargetType: "git_provider_pr_mr",
+		TargetID:   plan.ID,
+		Action:     "git.pr_mr.create",
+		ConsumedBy: "git_provider_adapter",
+		Reason:     "remote PR/MR create",
+	}); err != nil {
+		plan.PRMR.RemoteStatus = "approval_required"
+		plan.PRMR.CreateDecision = "PR_MR_CREATE_APPROVAL_REQUIRED"
+		plan.PRMR.CreateReason = err.Error()
+		plan.PRMR.CreatedAt = now
+		return saveCreateResult(rootDir, plan)
+	}
 	created, err := createRemotePRMR(ctx, rootDir, plan)
 	if err != nil {
 		plan.PRMR.RemoteStatus = "create_failed"

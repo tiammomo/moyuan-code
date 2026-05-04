@@ -112,6 +112,20 @@ func TestPRMRPreviewApprovalAndGitHubCreate(t *testing.T) {
 	if requests != 1 || created.PRMR.CreateDecision != "PR_MR_CREATED" || created.PRMR.RemoteID != "42" || created.PRMR.RemoteStatus != "open" {
 		t.Fatalf("unexpected created result requests=%d plan=%+v", requests, created.PRMR)
 	}
+	consumed, found, err := approvals.Load(root, approvalRequired.PRMR.ApprovalID)
+	if err != nil || !found {
+		t.Fatalf("approval load failed found=%v err=%v", found, err)
+	}
+	if consumed.Status != "consumed" || consumed.Decision != "APPROVAL_CONSUMED" {
+		t.Fatalf("expected consumed approval, got %+v", consumed)
+	}
+	replay, ok, err := Create(context.Background(), root, plan.ID, CreateOptions{Approved: true, ApprovalID: approvalRequired.PRMR.ApprovalID})
+	if err != nil || !ok {
+		t.Fatalf("create replay failed ok=%v err=%v", ok, err)
+	}
+	if requests != 1 || replay.PRMR.CreateDecision != "PR_MR_CREATE_APPROVAL_REQUIRED" || replay.PRMR.CreateReason != "approval_not_approved" {
+		t.Fatalf("expected replay blocked, requests=%d plan=%+v", requests, replay.PRMR)
+	}
 	assertFileDoesNotContain(t, filepath.Join(workspace.ForRoot(root).LogsDir, "audit.jsonl"), "github-secret-token")
 	assertFileDoesNotContain(t, planPath(root, plan.ID), "github-secret-token")
 	assertFileDoesNotContain(t, filepath.Join(workspace.ForRoot(root).PullRequestsDir, "plans.jsonl"), "github-secret-token")

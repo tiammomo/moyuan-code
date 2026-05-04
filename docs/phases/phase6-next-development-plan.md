@@ -1,6 +1,6 @@
 # Phase 6 实施记录
 
-状态：planned
+状态：in_progress
 责任角色：orchestrator_owner + security_owner + devops_owner + git_owner + provider_owner + frontend_owner + qa_owner
 最后更新：2026-05-05
 
@@ -20,7 +20,7 @@ Phase 5 已完成并通过 readiness：
 
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase6-001` | `approval-consumption-replay-guard` | planned | approval record 消费和重放防护 | 已消费 approval 不能再次触发真实外部写入 |
+| P0 | `phase6-001` | `approval-consumption-replay-guard` | completed | approval record 消费和重放防护 | 已消费 approval 不能再次触发真实外部写入 |
 | P1 | `phase6-002` | `deployment-ssh-preview-adapter` | planned | 部署 adapter preview/dry-run/execute 状态模型 | 生产真实执行继续默认关闭 |
 | P1 | `phase6-003` | `ci-cd-release-provider-adapter` | planned | release/tag/workflow provider adapter | 远程发布动作可审计且可降级 |
 | P1 | `phase6-004` | `provider-cost-health-telemetry` | planned | Provider quota/cost/health 反馈 | 路由能读取 provider 健康和预算信号 |
@@ -48,7 +48,30 @@ Phase 5 已完成并通过 readiness：
 - `go test ./internal/approvals ./internal/gitprovider ./internal/cli ./internal/api` 通过。
 - `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
 
-## 4. 验证要求
+## 4. 已完成任务：`phase6-001 approval-consumption-replay-guard`
+
+范围：
+
+- `approvals` 增加 `ConsumeApproved`，将已批准 record 标记为 `consumed` 并写入 `approval.consumed` audit event。
+- `VerifyApproved` 对 `consumed` approval 不再通过。
+- Git Provider 远程 PR/MR create 在真正调用 provider API 前消费 approval record。
+- preview-only 和写开关未开启场景不消费 approval。
+- 回归测试覆盖 approval 消费和同一 approval id 重放阻断。
+
+非目标：
+
+- 不实现 approval 自动过期和多人会签。
+- 不改变 deployment 生产真实执行默认阻断策略。
+
+验证：
+
+- `go test ./internal/approvals ./internal/gitprovider ./internal/cli ./internal/api` 通过。
+- `go test ./...` 通过。
+- `npm run typecheck` 通过。
+- `npm run build` 通过。
+- `git diff --check` 通过。
+
+## 5. 验证要求
 
 每完成一个 Phase 6 issue，至少运行：
 

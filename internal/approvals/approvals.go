@@ -32,6 +32,14 @@ type DecisionOptions struct {
 	Reason    string `json:"reason,omitempty"`
 }
 
+type ConsumeOptions struct {
+	TargetType string `json:"target_type"`
+	TargetID   string `json:"target_id"`
+	Action     string `json:"action"`
+	ConsumedBy string `json:"consumed_by,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+}
+
 type ListOptions struct {
 	Status string
 	Limit  int
@@ -49,9 +57,12 @@ type Record struct {
 	RequestReason  string         `json:"request_reason,omitempty"`
 	DecidedBy      string         `json:"decided_by,omitempty"`
 	DecisionReason string         `json:"decision_reason,omitempty"`
+	ConsumedBy     string         `json:"consumed_by,omitempty"`
+	ConsumeReason  string         `json:"consume_reason,omitempty"`
 	Metadata       map[string]any `json:"metadata,omitempty"`
 	RequestedAt    string         `json:"requested_at"`
 	DecidedAt      string         `json:"decided_at,omitempty"`
+	ConsumedAt     string         `json:"consumed_at,omitempty"`
 }
 
 var (
@@ -166,6 +177,33 @@ func VerifyApproved(rootDir string, id string, options RequestOptions) (Record, 
 	if record.TargetType != targetType || record.TargetID != targetID || record.Action != action {
 		return record, true, errors.New("approval_scope_mismatch")
 	}
+	return record, true, nil
+}
+
+func ConsumeApproved(rootDir string, id string, options ConsumeOptions) (Record, bool, error) {
+	record, found, err := VerifyApproved(rootDir, id, RequestOptions{
+		TargetType: options.TargetType,
+		TargetID:   options.TargetID,
+		Action:     options.Action,
+	})
+	if err != nil || !found {
+		return record, found, err
+	}
+	record.Status = "consumed"
+	record.Decision = "APPROVAL_CONSUMED"
+	record.ConsumedBy = normalizeActor(options.ConsumedBy)
+	record.ConsumeReason = strings.TrimSpace(options.Reason)
+	record.ConsumedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	if err := save(rootDir, record); err != nil {
+		return Record{}, true, err
+	}
+	_ = logging.Log(rootDir, "audit", "approval.consumed", map[string]any{
+		"approval_id": record.ID,
+		"target_type": record.TargetType,
+		"target_id":   record.TargetID,
+		"action":      record.Action,
+		"consumed_by": record.ConsumedBy,
+	})
 	return record, true, nil
 }
 

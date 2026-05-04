@@ -37,8 +37,25 @@ func TestApprovalLifecycle(t *testing.T) {
 	if !found || decided.Status != "approved" || decided.Decision != "APPROVAL_APPROVED" {
 		t.Fatalf("expected approved record, got found=%v record=%+v", found, decided)
 	}
+	verified, found, err := VerifyApproved(root, record.ID, RequestOptions{TargetType: "deployment", TargetID: "deployment-prod", Action: "deploy.production"})
+	if err != nil || !found || verified.ID != record.ID {
+		t.Fatalf("expected approval verification, found=%v record=%+v err=%v", found, verified, err)
+	}
 	if _, _, err := Decide(root, record.ID, DecisionOptions{Decision: "approved"}); err == nil {
 		t.Fatal("expected already decided approval to fail")
+	}
+	consumed, found, err := ConsumeApproved(root, record.ID, ConsumeOptions{
+		TargetType: "deployment",
+		TargetID:   "deployment-prod",
+		Action:     "deploy.production",
+		ConsumedBy: "deploy-adapter",
+		Reason:     "production execution",
+	})
+	if err != nil || !found || consumed.Status != "consumed" || consumed.Decision != "APPROVAL_CONSUMED" {
+		t.Fatalf("expected consumed approval, found=%v record=%+v err=%v", found, consumed, err)
+	}
+	if _, _, err := VerifyApproved(root, record.ID, RequestOptions{TargetType: "deployment", TargetID: "deployment-prod", Action: "deploy.production"}); err == nil {
+		t.Fatal("expected consumed approval verification to fail")
 	}
 	if _, _, err := Decide(root, "../bad", DecisionOptions{Decision: "approved"}); !IsInvalidIDError(err) {
 		t.Fatalf("expected invalid approval id to fail, got %v", err)

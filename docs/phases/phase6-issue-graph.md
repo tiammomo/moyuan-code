@@ -1,6 +1,6 @@
 # Phase 6 实现 Issue Graph
 
-状态：planned
+状态：in_progress
 责任角色：orchestrator_owner + security_owner + devops_owner + git_owner + provider_owner + frontend_owner + qa_owner
 最后更新：2026-05-05
 
@@ -18,7 +18,7 @@ Phase 6 的目标是在 Phase 5 的强制门禁基础上，推进真实外部执
 
 | ID | Issue | 状态 | 主要范围 | 依赖 | 建议角色 | 退出条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `phase6-001` | `approval-consumption-replay-guard` | planned | approval record 消费、重放防护和 PR/MR create 接入 | Phase 5 readiness | `security_owner` + `git_owner` | 已消费 approval 不能再次触发真实 PR/MR create |
+| `phase6-001` | `approval-consumption-replay-guard` | completed | approval record 消费、重放防护和 PR/MR create 接入 | Phase 5 readiness | `security_owner` + `git_owner` | 已消费 approval 不能再次触发真实 PR/MR create |
 | `phase6-002` | `deployment-ssh-preview-adapter` | planned | SSH/云厂商 deployment adapter 的 preview/dry-run/execute 状态模型 | `phase6-001` | `devops_owner` | 生产执行仍需 approval，test_dev/staging 可形成可审计 dry-run |
 | `phase6-003` | `ci-cd-release-provider-adapter` | planned | GitHub/Gitee release、tag、workflow run 和回归状态同步 | `phase6-001` | `git_owner` + `release_manager` | release 发布只在质量门禁和审批满足时生成远程动作 |
 | `phase6-004` | `provider-cost-health-telemetry` | planned | Provider quota/cost/health 采集、预算状态和路由反馈 | Phase 5 readiness | `provider_owner` | Provider 路由能读取健康、额度和成本信号 |
