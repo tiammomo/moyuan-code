@@ -1,6 +1,6 @@
 # Beta 实现 Issue Graph
 
-状态：in_progress
+状态：completed
 责任角色：orchestrator_owner + backend_owner + qa_owner
 最后更新：2026-05-05
 
@@ -49,7 +49,7 @@
 
 ## 4. 当前执行入口
 
-Beta 第一批计划层能力已完成，`beta-011 controlled-deploy-executor` 到 `beta-017 console-quality-subagent-view` 已完成。下一步建议执行 `Beta -> Phase 2` 收口，冻结控制面可视化入口后进入多模型、Skills 和 Subagent 调度深化。
+Beta 第一批计划层能力已完成，`beta-011 controlled-deploy-executor` 到 `beta-017 console-quality-subagent-view` 已完成。Phase 2 入口已创建，后续执行转入 [Phase 2 实现 Issue Graph](./phase2-issue-graph.md)。
 
 实现边界：
 

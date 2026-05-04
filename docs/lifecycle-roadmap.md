@@ -560,6 +560,12 @@ Phase 1 的执行结果：
 - Native Runtime 只能通过 Runtime Adapter 调用，不能绕过 Orchestrator、Workspace、Logging 和 Quality Gate。
 - 设计债务记录在 [设计就绪门禁](./design-readiness-checklist.md)，跟随对应模块实现补齐。
 
+## 10. 当前阶段状态
+
+Beta 第一批控制面能力已完成，收口记录见 [Beta 实施记录](./phases/beta-next-development-plan.md)。当前进入 Phase 2，执行入口见 [Phase 2 实现 Issue Graph](./phases/phase2-issue-graph.md) 和 [Phase 2 实施记录](./phases/phase2-next-development-plan.md)。
+
+Phase 2 的第一项实现任务是 `phase2-001 skill-registry-store-api`，用于建立 Skill Definition、启用状态、风险、适配 role 和 API/CLI 的稳定底座。
+
 Phase 1 第一批实现模块：
 
 | 顺序 | 模块 | 最小交付 |

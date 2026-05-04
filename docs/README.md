@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 1 本地 CLI MVP 已完成主要闭环，Beta 阶段已完成第一批控制面 API、issue 编排、Subagent 可视化和质量解释能力，下一步执行 `Beta -> Phase 2` 收口。
+当前阶段：Phase 1 本地 CLI MVP 和 Beta 第一批控制面能力已完成，进入 Phase 2 多模型、Skills、Native Runtime 和 Subagent 调度深化。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 

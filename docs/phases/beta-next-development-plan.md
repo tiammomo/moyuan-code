@@ -1,6 +1,6 @@
 # Beta 实施记录
 
-状态：in_progress
+状态：completed
 责任角色：orchestrator_owner + backend_owner + qa_owner
 最后更新：2026-05-05
 
@@ -459,7 +459,7 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - Health scan report 写入 `.moyuan/resources/checks/`，汇总写入 `.moyuan/resources/checks.jsonl`，并记录 `server_resource.health_scan` 审计日志。
 - HTTP health check 当前只允许 localhost/127.0.0.1，production 未审批时强制阻断。
 
-## 17. 下一步任务建议
+## 17. 后续任务完成记录
 
 ### `beta-015 subagent-model`
 

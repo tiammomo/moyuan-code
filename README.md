@@ -1,6 +1,6 @@
 # Moyuan Code
 
-Moyuan Code 是面向代码开发全生命周期的多 Agent 编排框架。当前 `Phase 1` 本地 CLI MVP 已完成主要闭环，进入 Beta 阶段控制面 API、issue 编排和生产级能力扩展。
+Moyuan Code 是面向代码开发全生命周期的多 Agent 编排框架。当前 `Phase 1` 本地 CLI MVP 和 Beta 第一批控制面能力已完成，进入 Phase 2 多模型、Skills、Native Runtime 和 Subagent 调度深化。
 
 核心设计入口见 [docs/README.md](./docs/README.md)。
 Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
@@ -20,7 +20,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - API/State Store 已建立 Gin router 和 GORM SQLite 基线，项目注册会同步 `.moyuan/state.db`。
 - Memory 已具备 record gate、staging、dedup、敏感信息阻断和 compact 自动摘要。
 - Repair 已具备受控 attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
-- 下一批实现重点：执行 `Beta -> Phase 2` 收口，进入多模型、Skills、Subagent 调度深化、SSH/云厂商执行边界、真实线上冒烟、生产监控和维护闭环。
+- 下一批实现重点：Phase 2 `skill-registry-store-api`，随后进入 `find-skills` 推荐、role-skill binding、provider 健康/额度/用量、模型策略切换和 Subagent 调度深化。
 
 ## 本地运行
 
