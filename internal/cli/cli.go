@@ -133,6 +133,7 @@ func usage() string {
 		"moyuan orchestrator run status <run-id>",
 		"moyuan memory add --summary <text> [--kind fact]",
 		"moyuan memory search <query>",
+		"moyuan memory candidates",
 		"moyuan memory compact",
 		"moyuan repair signal --type <type> --summary <text>",
 		"moyuan logs tail [--stream run] [--limit 20]",
@@ -562,8 +563,8 @@ func handleMemory(args []string, cwd string) (string, any, int, error) {
 			return "missing --summary\n", nil, 1, nil
 		}
 		kind := flagValue(args, "--kind", "fact")
-		record, err := memory.Add(rootDir, kind, summary, []string{}, "cli")
-		return "", record, 0, err
+		decision, err := memory.Submit(rootDir, kind, summary, []string{}, "cli")
+		return "", decision, 0, err
 	case "search":
 		query := ""
 		if len(args) > 1 {
@@ -580,6 +581,9 @@ func handleMemory(args []string, cwd string) (string, any, int, error) {
 	case "compact":
 		summary, err := memory.Compact(rootDir)
 		return "", summary, 0, err
+	case "candidates":
+		decisions, err := memory.ListCandidates(rootDir, 20)
+		return "", decisions, 0, err
 	}
 	return "unknown memory command\n", nil, 1, nil
 }

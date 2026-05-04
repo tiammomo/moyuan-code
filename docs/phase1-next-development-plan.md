@@ -18,6 +18,7 @@
 - `phase1-016 orchestrator-state-machine` 已持久化 issue/run 状态、转移历史、accepted/needs_rework 结论，并同步 issue graph/schedule。
 - `phase1-017 quality-review-hardening` 已输出结构化 findings、review_status，并用 protected path、敏感文件、runtime risk 和大 diff 阻断 accepted。
 - 后端框架口径已切换为 `Gin + GORM`，并建立 `internal/api` Gin router、`internal/store` GORM SQLite store 基线。
+- `phase1-018 memory-record-gate` 已补齐 candidate score、staging、dedup、敏感信息阻断、长期 record 元数据和 compact 自动摘要。
 - 当前测试覆盖已经包含 package unit test、CLI smoke 和 Phase 1 e2e smoke。
 
 下一步目标不是继续铺更多模块，而是把“能跑通、能审计、能复核、能失败恢复”的 MVP 闭环做实。
@@ -31,8 +32,8 @@
 | Done | `phase1-015` | `native-runtime-adapters` | 补齐 Claude CLI / Codex CLI 的真实调用契约和失败降级 | `phase1-014` | fake CLI 测试通过，CLI 缺失和非零退出有明确分类 |
 | Done | `phase1-016` | `orchestrator-state-machine` | 持久化 issue/run 状态流转，连接 quality、review 和 rework | `phase1-014`,`phase1-015` | issue/run 状态可查询，accepted/needs_rework 可追踪，issue graph/schedule 可同步 |
 | Done | `phase1-017` | `quality-review-hardening` | 强化质量复核：diff review、secret scan、重复/复杂度/保护路径检查 | `phase1-014`,`phase1-016` | 结构化 findings 和 review_status 可阻断 accepted |
-| P1 | `phase1-018` | `memory-record-gate` | 将当前 memory stub 升级为 record gate、staging、dedup、compact 最小闭环 | `phase1-007`,`phase1-016` | 可记录项目事实和运行经验，compact 可自动产生摘要 |
-| P2 | `phase1-019` | `repair-controlled-loop` | 将 runtime signal、bug candidate、repair attempt 接入受控修复闭环 | `phase1-016`,`phase1-017`,`phase1-018` | 修复必须补回归测试并重新通过 quality gate |
+| Done | `phase1-018` | `memory-record-gate` | 将当前 memory stub 升级为 record gate、staging、dedup、compact 最小闭环 | `phase1-007`,`phase1-016` | 可记录项目事实和运行经验，compact 可自动产生摘要 |
+| P1 | `phase1-019` | `repair-controlled-loop` | 将 runtime signal、bug candidate、repair attempt 接入受控修复闭环 | `phase1-016`,`phase1-017`,`phase1-018` | 修复必须补回归测试并重新通过 quality gate |
 | P2 | `phase1-020` | `docs-release-readiness` | 更新 README、CLI help、e2e 说明和 Phase 1 验收记录 | `phase1-013`~`phase1-019` | 用户可按文档复现 Phase 1 MVP |
 
 ## 3. 推荐执行顺序
@@ -42,8 +43,8 @@
 3. `phase1-015 native-runtime-adapters` 已完成，Claude CLI / Codex CLI 已从 health check 占位推进到可执行契约。
 4. `phase1-016 orchestrator-state-machine` 已完成，issue/run 状态不再只停留在单次命令输出。
 5. `phase1-017 quality-review-hardening` 已完成，质量复核可以向状态机返回可阻断结论。
-6. 下一步做 `phase1-018 memory-record-gate`。
-6. 最后做 `phase1-019 repair-controlled-loop` 和 `phase1-020 docs-release-readiness`。
+6. `phase1-018 memory-record-gate` 已完成，Memory 具备 record gate 和 compact 最小闭环。
+7. 下一步做 `phase1-019 repair-controlled-loop`，最后做 `phase1-020 docs-release-readiness`。
 
 ## 4. 任务详情
 
@@ -165,6 +166,8 @@
 
 ### `phase1-018 memory-record-gate`
 
+状态：已完成。
+
 范围：
 
 - 实现 memory candidate 的 score、staging、dedup、record gate 和 compact。
@@ -176,6 +179,13 @@
 - 低分或敏感候选不会进入长期 memory。
 - compact 能基于新增 memory 自动生成摘要。
 - 每条 memory 都有 source、scope、confidence、created_by 和 trace。
+
+实现：
+
+- `memory add` 会先输出 gate decision，并将 candidate 写入 `.moyuan/memory/candidates.jsonl` 和 `.moyuan/memory/staging.jsonl`。
+- 高价值候选写入 `.moyuan/memory/records.jsonl`，低分候选保持 staged，重复候选为 deduped，敏感候选为 rejected。
+- `memory candidates` 可查看最近 gate decision。
+- 每次记录长期 memory 后会自动生成 `compact-latest.json` 和 `.moyuan/memory/compactions/*.json`。
 
 ### `phase1-019 repair-controlled-loop`
 
@@ -212,8 +222,7 @@
 - `phase1-013` 已完成，作为后续实现的回归基线。
 - `phase1-014` 已完成，runtime、git、orchestrator 和 quality 的共同字段已有回归基线。
 - `phase1-015` 已完成，后续可在真实 CLI 安装环境中继续增强 session resume 和结构化输出解析。
-- `phase1-017` 已完成，`phase1-018` 可以开始接入 memory gate。
-- `phase1-019` 等 `phase1-016`、`phase1-017`、`phase1-018` 完成后再做。
+- `phase1-018` 已完成，`phase1-019 repair-controlled-loop` 可以开始接入受控修复。
 
 ## 6. 每轮实现门禁
 

@@ -111,7 +111,9 @@ func exercisePhase1Lifecycle(t *testing.T, root string) {
 	assertContains(t, orchestrated.stdout, `"issue_state"`)
 	assertContains(t, orchestrated.stdout, `"run_state"`)
 
-	runCLI(t, root, "memory", "add", "--kind", "fact", "--summary", "phase1 memory fact")
+	addMemory := runCLI(t, root, "memory", "add", "--kind", "fact", "--summary", "phase1 memory fact should be used by future project quality tasks")
+	assertContains(t, addMemory.stdout, `"status": "recorded"`)
+	assertContains(t, addMemory.stdout, `"confidence"`)
 	search := runCLI(t, root, "memory", "search", "phase1")
 	assertContains(t, search.stdout, "phase1 memory fact")
 	compact := runCLI(t, root, "memory", "compact")
@@ -124,6 +126,51 @@ func exercisePhase1Lifecycle(t *testing.T, root string) {
 	assertContains(t, logs.stdout, "runtime.completed")
 
 	assertLifecycleArtifacts(t, root)
+}
+
+func TestMemoryRecordGateStagesDedupesRejectsAndCompacts(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	valuableSummary := "phase1 memory record gate must remember quality test policy for future issue runs"
+	recorded := runCLI(t, root, "memory", "add", "--kind", "decision", "--summary", valuableSummary)
+	assertContains(t, recorded.stdout, `"status": "recorded"`)
+	assertContains(t, recorded.stdout, `"scope": "quality"`)
+	assertContains(t, recorded.stdout, `"created_by": "cli"`)
+	assertContains(t, recorded.stdout, `"trace_id"`)
+
+	duplicate := runCLI(t, root, "memory", "add", "--kind", "decision", "--summary", valuableSummary)
+	assertContains(t, duplicate.stdout, `"status": "deduped"`)
+	assertContains(t, duplicate.stdout, `"duplicate_of"`)
+
+	staged := runCLI(t, root, "memory", "add", "--kind", "fact", "--summary", "tiny")
+	assertContains(t, staged.stdout, `"status": "staged"`)
+	assertContains(t, staged.stdout, "below_record_threshold")
+
+	rejected := runCLI(t, root, "memory", "add", "--kind", "fact", "--summary", "-----BEGIN PRIVATE KEY----- should not be stored")
+	assertContains(t, rejected.stdout, `"status": "rejected"`)
+	assertContains(t, rejected.stdout, "sensitive_content")
+	assertFileContains(t, root, ".moyuan/memory/candidates.jsonl", "[REDACTED_PRIVATE_KEY]")
+
+	search := runCLI(t, root, "memory", "search", "PRIVATE KEY")
+	if strings.TrimSpace(search.stdout) != "" {
+		t.Fatalf("sensitive memory should not be searchable: %s", search.stdout)
+	}
+
+	candidates := runCLI(t, root, "memory", "candidates")
+	assertContains(t, candidates.stdout, `"status": "recorded"`)
+	assertContains(t, candidates.stdout, `"status": "deduped"`)
+	assertContains(t, candidates.stdout, `"status": "staged"`)
+	assertContains(t, candidates.stdout, `"status": "rejected"`)
+
+	compact := runCLI(t, root, "memory", "compact")
+	assertContains(t, compact.stdout, `"strategy": "phase1-record-gate-summary"`)
+	assertContains(t, compact.stdout, `"records_seen": 1`)
+	assertContains(t, compact.stdout, `"topics"`)
+	assertFileExists(t, root, ".moyuan/memory/staging.jsonl")
+	assertGlob(t, root, ".moyuan/memory/compactions/*.json")
+	assertFileContains(t, root, ".moyuan/memory/records.jsonl", `"confidence":`)
+	assertFileContains(t, root, ".moyuan/logs/memory.jsonl", "memory.candidate.evaluated")
 }
 
 func TestOrchestratorStateMachinePersistsAcceptedAndNeedsRework(t *testing.T) {
@@ -478,7 +525,9 @@ func assertLifecycleArtifacts(t *testing.T, root string) {
 	assertGlob(t, root, ".moyuan/lifecycle/quality/reports/*.md")
 	assertGlob(t, root, ".moyuan/orchestrator/*-result.json")
 	assertFileExists(t, root, ".moyuan/memory/records.jsonl")
+	assertFileExists(t, root, ".moyuan/memory/staging.jsonl")
 	assertFileExists(t, root, ".moyuan/memory/compact-latest.json")
+	assertGlob(t, root, ".moyuan/memory/compactions/*.json")
 	assertFileExists(t, root, ".moyuan/repair/signals.jsonl")
 	assertFileExists(t, root, ".moyuan/repair/bug-candidates.jsonl")
 	assertGlob(t, root, ".moyuan/repair/repair-plan-*.json")
