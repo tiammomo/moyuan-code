@@ -174,6 +174,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertPostContains(t, router, "/v1/projects/managed/providers", `{"id":"bad-api","vendor":"openai","api_type":"openai","auth_ref":"plain-secret-should-not-be-stored","enabled":true}`, http.StatusBadRequest, `"auth_ref_must_be_reference"`)
 	assertPostContains(t, router, "/v1/projects/managed/skills", `{"id":"tdd","source":"github:mattpocock/skills","enabled":true,"risk_level":"low","compatible_roles":["backend","tester"],"tags":["quality"]}`, http.StatusCreated, `"skill"`, `"tdd"`)
 	assertGETContains(t, router, "/v1/projects/managed/skills", http.StatusOK, `"skills"`, `"github:mattpocock/skills"`)
+	assertPostContains(t, router, "/v1/projects/managed/skills/recommend", `{"role":"backend","task_type":"quality","risk_level":"medium"}`, http.StatusCreated, `"skill_recommendation"`, `"tdd"`)
 	assertPostContains(t, router, "/v1/projects/managed/skills/tdd/disable", `{}`, http.StatusOK, `"skill"`, `"enabled":false`)
 	assertPostContains(t, router, "/v1/projects/managed/skills", `{"id":"bad-secret","source":"local","auth_ref":"sk-plain-secret"}`, http.StatusBadRequest, `"auth_ref_must_be_reference"`)
 	assertGETContains(t, router, "/v1/projects/managed/memory/search?q=Beta&limit=1", http.StatusOK, `"records"`, `Beta API should expose`)

@@ -184,6 +184,8 @@ Phase 2 当前落地：
 - API：`GET /v1/projects/:project_id/skills`、`POST /v1/projects/:project_id/skills`、`POST /v1/projects/:project_id/skills/:skill_id/disable`。
 - 当前只做 registry、去重、禁用和审计；不安装第三方 skill，不执行 skill prompt，不修改 Subagent 调度。
 - `auth_ref` 只能保存 `env:` 或 `secret:` 引用，不能保存 API key、token 或其他明文凭证。
+- 推荐结果写入 `.moyuan/skills/recommendations.jsonl`，当前实现本地规则 fallback；外部 `find-skills` 网络调用后续接入。
+- 推荐 CLI/API：`moyuan skills recommend --role <role>`、`POST /v1/projects/:project_id/skills/recommend`。
 
 每个 Skill 必须声明：
 

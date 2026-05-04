@@ -178,6 +178,7 @@ func usage() string {
 		"moyuan model route --role <role> [--task-type <type>] [--output-type <type>] [--repo-edit]",
 		"moyuan skills add --id <id> --source <source> [--role backend] [--tag tdd]",
 		"moyuan skills list",
+		"moyuan skills recommend --role backend [--task-type testing] [--risk medium]",
 		"moyuan skills disable <skill-id>",
 		"moyuan release suggest [--version v0.1.0] [--min-issues 3]",
 		"moyuan release show <release-id>",
@@ -968,6 +969,16 @@ func handleSkills(args []string, cwd string) (string, any, int, error) {
 	case "list":
 		list, err := skills.List(rootDir)
 		return "", list, 0, err
+	case "recommend":
+		limit, _ := strconv.Atoi(flagValue(args, "--limit", "5"))
+		report, err := skills.Recommend(rootDir, skills.RecommendOptions{
+			IssueID:   flagValue(args, "--issue", ""),
+			Role:      flagValue(args, "--role", "backend"),
+			TaskType:  flagValue(args, "--task-type", ""),
+			RiskLevel: flagValue(args, "--risk", "medium"),
+			Limit:     limit,
+		})
+		return "", report, 0, err
 	case "disable":
 		if len(args) < 2 {
 			return "missing skill id\n", nil, 1, nil

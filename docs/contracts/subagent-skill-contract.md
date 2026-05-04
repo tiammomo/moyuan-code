@@ -163,8 +163,11 @@ Phase 2 当前实现边界：
 
 - 存储位置：`.moyuan/skills/registry.json`。
 - 事件流：`.moyuan/skills/events.jsonl`。
+- 推荐结果：`.moyuan/skills/recommendations.jsonl`。
 - `authRef` 只能是 `env:` 或 `secret:` 引用，不能保存明文 API key、token 或 SSH key。
-- 当前阶段只支持登记、查询、禁用和审计；推荐、绑定和效果反馈由后续 Phase 2 issues 实现。
+- 当前阶段支持 registry 登记、查询、禁用、审计和本地规则 recommendation；绑定和效果反馈由后续 Phase 2 issues 实现。
+- 推荐入口：`moyuan skills recommend --role <role>`、`POST /v1/projects/:project_id/skills/recommend`。
+- 推荐结果不等于自动绑定，不能直接扩大 Subagent 写入范围。
 
 ## 6. Skill 效果接口
 

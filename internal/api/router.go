@@ -862,6 +862,28 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusCreated, gin.H{"skill": skill})
 	})
+	router.POST("/v1/projects/:project_id/skills/recommend", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req skills.RecommendOptions
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		report, err := skills.Recommend(rootDir, req)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"skill_recommendation": report})
+	})
 	router.POST("/v1/projects/:project_id/skills/:skill_id/disable", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
