@@ -9,6 +9,7 @@ import (
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
+	"moyuan-code/internal/providers"
 	"moyuan-code/internal/quality"
 	runrecord "moyuan-code/internal/run"
 	"moyuan-code/internal/runtime"
@@ -27,16 +28,46 @@ type Result struct {
 	CreatedAt     string         `json:"created_at"`
 }
 
+type RunOptions struct {
+	RuntimeID  string `json:"runtime_id"`
+	ProviderID string `json:"provider_id,omitempty"`
+	ModelID    string `json:"model_id,omitempty"`
+	Role       string `json:"role"`
+	Prompt     string `json:"prompt"`
+}
+
 func Plan(rootDir string, epicID string) (scheduler.Plan, error) {
 	return scheduler.Build(rootDir, epicID, 1)
 }
 
 func RunIssue(ctx context.Context, rootDir string, issueID string, runtimeID string, prompt string) (Result, error) {
+	return RunIssueWithOptions(ctx, rootDir, issueID, RunOptions{RuntimeID: runtimeID, Role: "backend", Prompt: prompt})
+}
+
+func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, options RunOptions) (Result, error) {
 	if issueID == "" {
 		issueID = "task-unknown"
 	}
-	if runtimeID == "" {
-		runtimeID = "local_shell"
+	if options.RuntimeID == "" {
+		options.RuntimeID = "local_shell"
+	}
+	if options.Role == "" {
+		options.Role = "backend"
+	}
+	if options.ProviderID == "" && options.RuntimeID != "local_shell" {
+		decision, err := providers.Route(rootDir, providers.RouteRequest{
+			Role:                  options.Role,
+			RequiresRepoEdit:      true,
+			IncludesSensitiveCode: true,
+			IncludesProjectMemory: true,
+		})
+		if err != nil {
+			return Result{}, err
+		}
+		if !decision.Blocked && decision.RuntimeID == options.RuntimeID {
+			options.ProviderID = decision.ProviderID
+			options.ModelID = decision.ModelID
+		}
 	}
 	authCtx, err := auth.NewContext(rootDir, "issue.run", "normal")
 	if err != nil {
@@ -44,7 +75,15 @@ func RunIssue(ctx context.Context, rootDir string, issueID string, runtimeID str
 	}
 	graph, _, _ := issues.LoadGraph(rootDir, "phase1-epic")
 	_ = graph
-	run, err := runrecord.Create(rootDir, issueID, map[string]any{"issue_id": issueID, "auth_context": authCtx, "mode": "orchestrated"})
+	run, err := runrecord.Create(rootDir, issueID, map[string]any{
+		"issue_id":     issueID,
+		"auth_context": authCtx,
+		"mode":         "orchestrated",
+		"role":         options.Role,
+		"runtime_id":   options.RuntimeID,
+		"provider_id":  options.ProviderID,
+		"model_id":     options.ModelID,
+	})
 	if err != nil {
 		return Result{}, err
 	}
@@ -58,12 +97,14 @@ func RunIssue(ctx context.Context, rootDir string, issueID string, runtimeID str
 		RunID:          run.ID,
 		ProjectID:      workspace.ForRoot(rootDir).RootDir,
 		IssueID:        issueID,
-		Role:           "backend",
-		RuntimeID:      runtimeID,
+		Role:           options.Role,
+		RuntimeID:      options.RuntimeID,
+		ProviderID:     options.ProviderID,
+		ModelID:        options.ModelID,
 		Mode:           "code",
 		WorkspaceRoot:  rootDir,
 		WorktreePath:   rootDir,
-		Prompt:         prompt,
+		Prompt:         options.Prompt,
 		ProtectedPaths: protectedPaths(rootDir),
 	})
 	if err != nil {
@@ -72,7 +113,7 @@ func RunIssue(ctx context.Context, rootDir string, issueID string, runtimeID str
 		return Result{}, err
 	}
 	if _, err := transitionRun(rootDir, issueID, run.ID, "collecting_outputs", "", func(state *RunState) {
-		state.RuntimeID = runtimeID
+		state.RuntimeID = options.RuntimeID
 		state.RuntimeStatus = rt.Status
 	}); err != nil {
 		return Result{}, err
@@ -100,7 +141,7 @@ func RunIssue(ctx context.Context, rootDir string, issueID string, runtimeID str
 		runStatus = "failed"
 	}
 	runState, err := transitionRun(rootDir, issueID, run.ID, runStatus, status, func(state *RunState) {
-		state.RuntimeID = runtimeID
+		state.RuntimeID = options.RuntimeID
 		state.RuntimeStatus = rt.Status
 		state.QualityStatus = report.Status
 		state.QualityReportID = report.ID

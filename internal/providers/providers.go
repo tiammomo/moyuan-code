@@ -125,6 +125,39 @@ func Show(rootDir string, id string) (Provider, bool, error) {
 	return Provider{}, false, nil
 }
 
+func ResolveRuntimeProvider(rootDir string, runtimeID string, providerID string) (Provider, bool, error) {
+	registry, err := Load(rootDir)
+	if err != nil {
+		return Provider{}, false, err
+	}
+	runtimeID = normalizeToken(runtimeID)
+	providerID = normalizeID(providerID)
+	if providerID != "" {
+		provider, ok := providerByID(registry, providerID)
+		if !ok {
+			return Provider{}, false, fmt.Errorf("provider_not_found:%s", providerID)
+		}
+		if !provider.Enabled {
+			return Provider{}, false, fmt.Errorf("provider_disabled:%s", provider.ID)
+		}
+		if !runtimeMatches(provider, runtimeID) {
+			return Provider{}, false, fmt.Errorf("provider_runtime_mismatch:%s", provider.ID)
+		}
+		return provider, true, nil
+	}
+	for _, provider := range registry.Providers {
+		if provider.Enabled && provider.ID == runtimeID && runtimeMatches(provider, runtimeID) {
+			return provider, true, nil
+		}
+	}
+	for _, provider := range registry.Providers {
+		if provider.Enabled && runtimeMatches(provider, runtimeID) {
+			return provider, true, nil
+		}
+	}
+	return Provider{}, false, nil
+}
+
 func Upsert(rootDir string, provider Provider) (Provider, error) {
 	registry, err := Load(rootDir)
 	if err != nil {
@@ -212,6 +245,9 @@ func Decide(registry Registry, request RouteRequest) RouteDecision {
 	}
 	if request.RequiresRepoEdit {
 		runtimeID := defaultRuntimeForRole(request.Role)
+		if decision, ok := firstMatchingRuntimeProvider(registry, request, runtimeID, "role_provider_override"); ok {
+			return decision
+		}
 		return providerDecision(registry, request, runtimeID, "role_runtime_default")
 	}
 	if request.TaskType == "memory_extraction" || request.TaskType == "memory_compaction" {
@@ -467,6 +503,23 @@ func firstMatchingAPIProvider(registry Registry, request RouteRequest, vendors [
 	return RouteDecision{}, false
 }
 
+func firstMatchingRuntimeProvider(registry Registry, request RouteRequest, runtimeID string, reason string) (RouteDecision, bool) {
+	runtimeID = normalizeToken(runtimeID)
+	for _, provider := range registry.Providers {
+		if !provider.Enabled || provider.ID == runtimeID || !runtimeMatches(provider, runtimeID) {
+			continue
+		}
+		if len(provider.AllowedUseCases) > 0 && !matchesUseCase(provider.AllowedUseCases, request) {
+			continue
+		}
+		if violation := dataPolicyViolation(provider, request); violation != "" {
+			continue
+		}
+		return allowed(provider, reason), true
+	}
+	return RouteDecision{}, false
+}
+
 func providerByID(registry Registry, id string) (Provider, bool) {
 	id = normalizeToken(id)
 	for _, provider := range registry.Providers {
@@ -497,6 +550,27 @@ func contains(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func matchesUseCase(allowed []string, request RouteRequest) bool {
+	candidates := []string{request.TaskType, request.Role, request.OutputType}
+	for _, candidate := range candidates {
+		if candidate != "" && contains(allowed, candidate) {
+			return true
+		}
+	}
+	return false
+}
+
+func runtimeMatches(provider Provider, runtimeID string) bool {
+	runtimeID = normalizeToken(runtimeID)
+	if runtimeID == "" {
+		return false
+	}
+	if normalizeToken(provider.RuntimeID) == runtimeID {
+		return true
+	}
+	return normalizeToken(provider.ID) == runtimeID && provider.RuntimeID == ""
 }
 
 func isThirdParty(provider Provider) bool {

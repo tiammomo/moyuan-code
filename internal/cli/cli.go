@@ -147,9 +147,9 @@ func usage() string {
 		"moyuan quality check <task-id>",
 		"moyuan quality report <report-id>",
 		"moyuan runtime health <runtime-id>",
-		"moyuan runtime invoke <runtime-id> --prompt <command>",
+		"moyuan runtime invoke <runtime-id> --prompt <command> [--provider <provider-id>] [--model <model-id>]",
 		"moyuan orchestrator plan <epic-id>",
-		"moyuan orchestrator run <issue-id> [--runtime local_shell] [--prompt <command>]",
+		"moyuan orchestrator run <issue-id> [--role backend] [--runtime local_shell] [--provider <provider-id>] [--prompt <command>]",
 		"moyuan orchestrator status <issue-id>",
 		"moyuan orchestrator issue status <issue-id>",
 		"moyuan orchestrator run status <run-id>",
@@ -566,7 +566,15 @@ func handleRuntime(ctx context.Context, args []string, cwd string) (string, any,
 		if err != nil {
 			return "", nil, 1, err
 		}
-		result, err := runtime.Invoke(ctx, rootDir, runtime.Invocation{RunID: run.ID, RuntimeID: runtimeID, IssueID: "runtime-invoke", Prompt: prompt, WorktreePath: rootDir})
+		result, err := runtime.Invoke(ctx, rootDir, runtime.Invocation{
+			RunID:        run.ID,
+			RuntimeID:    runtimeID,
+			ProviderID:   flagValue(args, "--provider", ""),
+			ModelID:      flagValue(args, "--model", ""),
+			IssueID:      "runtime-invoke",
+			Prompt:       prompt,
+			WorktreePath: rootDir,
+		})
 		if err != nil {
 			return "", nil, 1, err
 		}
@@ -609,7 +617,13 @@ func handleOrchestrator(ctx context.Context, args []string, cwd string) (string,
 		}
 		runtimeID := flagValue(args, "--runtime", "local_shell")
 		prompt := flagValue(args, "--prompt", "")
-		result, err := orchestrator.RunIssue(ctx, rootDir, issueID, runtimeID, prompt)
+		result, err := orchestrator.RunIssueWithOptions(ctx, rootDir, issueID, orchestrator.RunOptions{
+			RuntimeID:  runtimeID,
+			ProviderID: flagValue(args, "--provider", ""),
+			ModelID:    flagValue(args, "--model", ""),
+			Role:       flagValue(args, "--role", "backend"),
+			Prompt:     prompt,
+		})
 		code := 0
 		if result.Status != "" && result.Status != "accepted" {
 			code = 1

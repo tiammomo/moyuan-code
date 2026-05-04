@@ -38,6 +38,8 @@
 if task requires repository edits:
   if role == frontend:
     USE_CLAUDE_CLI
+    if an enabled provider profile is bound to claude_cli and allows frontend:
+      inject provider env profile, for example MiniMax-M2.7
   else if role == backend or backend_tuning:
     USE_CODEX_CLI
   else if role == reviewer or tester:
@@ -61,6 +63,18 @@ else if subagent.type == verification_subagent:
   USE_CODEX_CLI or trusted API
 else if skill requires shell_exec or file_write:
   require Native Agent Runtime
+```
+
+Native Runtime profile 选择规则：
+
+```text
+if runtime_id == claude_cli and role == frontend:
+  prefer enabled provider where runtime_id == claude_cli and allowed_use_cases contains frontend
+  require data_policy to allow sensitive code and project memory when repository context is included
+  inject only whitelisted ANTHROPIC_* variables
+else if runtime_id == codex_cli:
+  prefer enabled provider where runtime_id == codex_cli and allowed_use_cases matches role/task
+  inject only whitelisted OPENAI_* variables
 ```
 
 ## 5. 敏感数据路由树

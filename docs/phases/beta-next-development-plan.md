@@ -191,12 +191,13 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 新增 Provider Registry 最小读写模型。
 - 支持配置 GPT、Claude、GLM、MiniMax、第三方 API 和 CLI runtime 的 metadata。
 - 支持不泄露 secret 的 provider list/show/route。
+- 支持绑定 Native Runtime 的 provider env profile，例如 `minimax-m27-claude` -> `claude_cli` -> `MiniMax-M2.7`。
 
 非目标：
 
 - 不真实调用外部模型 API。
 - 不保存明文 API key。
-- 不改变 Native Runtime 已有调用契约。
+- 不让 provider 绕过 Native Runtime 的 diff、quality gate、review 和 protected path 控制。
 
 验收：
 
@@ -211,6 +212,8 @@ Phase 1 本地 CLI MVP 已完成，验收入口见 [Phase 1 Release Readiness](.
 - 已支持 CLI：`moyuan model provider add/list/show/disable`、`moyuan model route`。
 - 已支持 API：`GET/POST /v1/projects/:project_id/providers`、`GET /providers/:provider_id`、`POST /providers/:provider_id/disable`、`POST /provider-route`。
 - Registry 当前写入 `.moyuan/models/providers.json`；只保存 `env:` 或 `secret:` auth ref，不保存明文 key。
+- Runtime 调用可通过 `--provider` 显式选择 provider，并只把 `auth_ref` 解析成子进程环境变量；native metadata 只记录 `env_keys`。
+- Orchestrator 在 `--role frontend --runtime claude_cli` 且未显式传 provider 时，会基于 Provider Route 选择匹配 provider。
 - Scheduler 的默认角色 runtime 已收敛到 Provider 路由默认规则。
 - 验证命令：`PATH=/tmp/moyuan-go-apt/usr/lib/go-1.22/bin:$PATH go test ./...`。
 

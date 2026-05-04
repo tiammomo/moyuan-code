@@ -30,6 +30,7 @@ Adapter 统一解决：
 - API：`GET/POST /v1/projects/:project_id/providers`、`GET /v1/projects/:project_id/providers/:provider_id`、`POST /v1/projects/:project_id/providers/:provider_id/disable`、`POST /v1/projects/:project_id/provider-route`。
 - 已实现约束：`auth_ref` 只能是 `env:` 或 `secret:` 引用；不会保存明文 API key。
 - 已实现默认路由：前端和架构类代码任务路由到 `claude_cli`，后端、调优、测试、review 和修复类任务路由到 `codex_cli`，启用后的 API provider 可承担 memory 抽取、规划或图像类任务。
+- 已实现 provider env profile：绑定到 `claude_cli` 或 `codex_cli` 的 provider 可在 Native Runtime 调用时注入 `base_url`、模型名和 `auth_ref` 对应的环境变量；runtime metadata 只记录 `env_keys`，不记录 token 值。
 
 `providers.json` 是 Beta 运行状态快照；后续 schema validator 完成后，再把同字段收敛到 `models/providers.yaml`，并保留 snapshot 用于审计。
 
@@ -120,6 +121,42 @@ claude mcp ...
 - Moyuan 只生成必要的上下文和策略，不直接覆盖用户已有 `.claude/` 配置。
 - 对文件写入和命令执行做 Moyuan 自身审计。
 - Claude Code 生成的代码必须回到 Moyuan 质量门禁；不能因为 Claude Code 已执行自检就直接合入。
+
+### Claude CLI + MiniMax-M2.7 Profile
+
+前端开发可以使用本地 `claude` CLI 承接代码生成，同时通过 MiniMax 的 Anthropic-compatible endpoint 提供模型能力。Moyuan 的职责是选择 provider、注入运行环境、捕获 diff、执行质量门禁和 review；Claude CLI 只负责在授权 worktree 内生成候选代码。
+
+推荐登记方式：
+
+```bash
+export MINIMAX_API_KEY="<local-only>"
+
+./bin/moyuan model provider add \
+  --id minimax-m27-claude \
+  --name "MiniMax M2.7 via Claude CLI" \
+  --vendor minimax \
+  --api-type anthropic-compatible \
+  --base-url https://api.minimaxi.com/anthropic \
+  --auth-ref env:MINIMAX_API_KEY \
+  --runtime claude_cli \
+  --model MiniMax-M2.7 \
+  --use-case frontend \
+  --allow-sensitive-code \
+  --allow-project-memory
+```
+
+运行时效果：
+
+- `model route --role frontend --repo-edit` 会优先选择启用且声明 `frontend` use-case 的 `claude_cli` provider。
+- `runtime invoke claude_cli --provider minimax-m27-claude` 会向本次子进程注入 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_MODEL`、`ANTHROPIC_DEFAULT_*_MODEL`、`API_TIMEOUT_MS` 和 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`。
+- `orchestrator run <issue-id> --role frontend --runtime claude_cli` 在未显式传 `--provider` 时，会根据 Provider Route 自动选择匹配 provider。
+- `.moyuan/runtime/*-native.json` 只保存 provider id、model id、command、stdout/stderr 和 `env_keys`；不会保存 `ANTHROPIC_AUTH_TOKEN` 的值。
+
+约束：
+
+- `auth_ref` 必须是 `env:MINIMAX_API_KEY` 或后续 secret manager 引用；不能写明文 key。
+- 当前 Native Runtime 只解析 `env:`；`secret:` 会保留为目标 schema，但在本地执行器接入 secret manager 前不直接解析。
+- 允许处理代码上下文的 provider 必须显式开启 `allow_sensitive_code` 和 `allow_project_memory`，否则只能作为低风险规划、摘要或 memory 抽取候选。
 
 ## 5. Codex Adapter
 

@@ -22,7 +22,7 @@
 | `beta-003` | `requirement-to-issues` | completed | 将用户需求丰富、澄清判断、验收标准和 issue graph 生成接入 CLI/API | `beta-002` | `orchestrator_owner` | 需求可生成用户可见 issue graph，并标注依赖 |
 | `beta-004` | `parallel-orchestration-engine` | completed | 根据依赖、写入范围、runtime slot 和风险自动决定并发度 | `beta-003` | `scheduler_owner` | ready queue 可并发调度，冲突 issue 自动等待 |
 | `beta-005` | `review-merge-pipeline` | completed | issue 完成后执行复核、风格检查、门禁、合入或返工 | `beta-004` | `quality_owner` | review 通过后才允许合入任务分支 |
-| `beta-006` | `provider-registry-runtime-routing` | completed | 管理 GPT、Claude、GLM、MiniMax、第三方 API 和 CLI agent runtime | `beta-001` | `adapter_owner` | Provider 可配置、校验、路由和审计 |
+| `beta-006` | `provider-registry-runtime-routing` | completed | 管理 GPT、Claude、GLM、MiniMax、第三方 API、CLI agent runtime 和 provider env profile | `beta-001` | `adapter_owner` | Provider 可配置、校验、路由、环境注入和审计 |
 | `beta-007` | `git-provider-pr-mr` | completed | GitHub/Gitee 认证、分支、push、PR/MR 创建和状态回读 | `beta-005` | `git_owner` | 可推送任务分支并创建 PR/MR |
 | `beta-008` | `release-branch-pipeline` | completed | 版本分支、release 建议、tag、GitHub/Gitee 发布记录 | `beta-007` | `release_owner` | 可按积累量建议发版并发布到 Git provider |
 | `beta-009` | `server-resource-registry` | completed | 测试机/生产机、到期时间、配置、权限、健康和维护记录 | `beta-001` | `infra_owner` | 服务器资源可登记、查询、审计 |

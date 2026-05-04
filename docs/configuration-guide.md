@@ -176,6 +176,12 @@ agent_runtimes:
     claude_cli:
       type: native_agent_cli
       command: claude
+      provider_env_profile:
+        enabled: true
+        allowed_env_keys:
+          - ANTHROPIC_BASE_URL
+          - ANTHROPIC_AUTH_TOKEN
+          - ANTHROPIC_MODEL
     codex_cli:
       type: native_agent_cli
       command: codex
@@ -183,6 +189,24 @@ agent_runtimes:
     frontend: claude_cli
     backend: codex_cli
     backend_tuning: codex_cli
+```
+
+MiniMax-M2.7 作为 Claude CLI 前端 profile 的最小登记：
+
+```bash
+export MINIMAX_API_KEY="<local-only>"
+
+moyuan model provider add \
+  --id minimax-m27-claude \
+  --vendor minimax \
+  --api-type anthropic-compatible \
+  --base-url https://api.minimaxi.com/anthropic \
+  --auth-ref env:MINIMAX_API_KEY \
+  --runtime claude_cli \
+  --model MiniMax-M2.7 \
+  --use-case frontend \
+  --allow-sensitive-code \
+  --allow-project-memory
 ```
 
 最小编排片段：

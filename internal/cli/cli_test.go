@@ -601,6 +601,43 @@ func TestNativeRuntimeAdaptersUseFakeClaudeAndCodexCLI(t *testing.T) {
 	assertGlob(t, root, ".moyuan/runtime/*-native.json")
 }
 
+func TestClaudeRuntimeProviderEnvProfileInjectsMiniMax(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+	t.Setenv("MINIMAX_TEST_AUTH", "runtime-auth-value")
+	restorePath := prependClaudeEnvRuntimeCLI(t)
+	defer restorePath()
+
+	added := runCLI(t, root, "model", "provider", "add",
+		"--id", "minimax-m27-claude",
+		"--name", "MiniMax M2.7 via Claude CLI",
+		"--vendor", "minimax",
+		"--api-type", "anthropic-compatible",
+		"--base-url", "https://api.minimaxi.com/anthropic",
+		"--auth-ref", "env:MINIMAX_TEST_AUTH",
+		"--runtime", "claude_cli",
+		"--model", "MiniMax-M2.7",
+		"--use-case", "frontend",
+		"--allow-sensitive-code",
+		"--allow-project-memory",
+	)
+	assertContains(t, added.stdout, `"auth_ref": "env:MINIMAX_TEST_AUTH"`)
+
+	route := runCLI(t, root, "model", "route", "--role", "frontend", "--repo-edit")
+	assertContains(t, route.stdout, `"provider_id": "minimax-m27-claude"`)
+	assertContains(t, route.stdout, `"model_id": "MiniMax-M2.7"`)
+
+	result := runCLI(t, root, "runtime", "invoke", "claude_cli", "--provider", "minimax-m27-claude", "--prompt", "render frontend shell")
+	assertContains(t, result.stdout, `"provider_id": "minimax-m27-claude"`)
+	assertContains(t, result.stdout, `"model_id": "MiniMax-M2.7"`)
+	assertFileContains(t, root, "claude-env.txt", "base-ok")
+	assertFileContains(t, root, "claude-env.txt", "auth-ok")
+	assertFileContains(t, root, "claude-env.txt", "model-ok")
+	assertFileContains(t, root, ".moyuan/models/providers.json", `"auth_ref": "env:MINIMAX_TEST_AUTH"`)
+	assertGlob(t, root, ".moyuan/runtime/*-native.json")
+	assertRuntimeMetadataDoesNotContain(t, root, "runtime-auth-value")
+}
+
 func TestNativeRuntimeAdaptersClassifyUnavailableAndFailedCLI(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)
@@ -798,6 +835,20 @@ printf 'codex output\n' > codex-output.txt
 	return withPath(t, dir)
 }
 
+func prependClaudeEnvRuntimeCLI(t *testing.T) func() {
+	t.Helper()
+	dir := t.TempDir()
+	writeExecutable(t, filepath.Join(dir, "claude"), `#!/bin/sh
+{
+	if [ "$ANTHROPIC_BASE_URL" = "https://api.minimaxi.com/anthropic" ]; then printf 'base-ok\n'; else printf 'base-missing\n'; fi
+	if [ "$ANTHROPIC_AUTH_TOKEN" = "runtime-auth-value" ]; then printf 'auth-ok\n'; else printf 'auth-missing\n'; fi
+	if [ "$ANTHROPIC_MODEL" = "MiniMax-M2.7" ]; then printf 'model-ok\n'; else printf 'model-missing\n'; fi
+} > claude-env.txt
+printf 'fake claude completed\n'
+`)
+	return withPath(t, dir)
+}
+
 func prependFailingCodex(t *testing.T) func() {
 	t.Helper()
 	dir := t.TempDir()
@@ -900,6 +951,26 @@ func assertGlob(t *testing.T, root string, pattern string) {
 	}
 	if len(matches) == 0 {
 		t.Fatalf("expected at least one match for %s", filepath.Join(root, filepath.FromSlash(pattern)))
+	}
+}
+
+func assertRuntimeMetadataDoesNotContain(t *testing.T, root string, needle string) {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(root, ".moyuan", "runtime", "*-native.json"))
+	if err != nil {
+		t.Fatalf("bad runtime metadata glob: %v", err)
+	}
+	if len(matches) == 0 {
+		t.Fatal("expected native runtime metadata")
+	}
+	for _, match := range matches {
+		data, err := os.ReadFile(match)
+		if err != nil {
+			t.Fatalf("read %s: %v", match, err)
+		}
+		if strings.Contains(string(data), needle) {
+			t.Fatalf("runtime metadata leaked secret value in %s", match)
+		}
 	}
 }
 

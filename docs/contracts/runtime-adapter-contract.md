@@ -35,6 +35,8 @@ interface RuntimeInvocation {
   role: string;
   skill_binding_ids: string[];
   runtime_id: string;
+  provider_id?: string;
+  model_id?: string;
   mode: "ask" | "code" | "review" | "test" | "plan";
   workspace_root: string;
   worktree_path: string;
@@ -46,6 +48,10 @@ interface RuntimeInvocation {
   allowed_commands: string[];
   timeout_seconds: number;
   env_refs: string[];
+  provider_env_profile?: {
+    enabled: boolean;
+    allowed_env_keys: string[];
+  };
 }
 ```
 
@@ -56,6 +62,8 @@ interface RuntimeResult {
   run_id: string;
   subagent_id?: string;
   runtime_id: string;
+  provider_id?: string;
+  model_id?: string;
   status:
     | "completed"
     | "failed"
@@ -88,8 +96,16 @@ interface RuntimeResult {
   }>;
   memory_candidates: string[];
   native_session_id?: string;
+  env_keys?: string[];
 }
 ```
+
+Provider env profile 规则：
+
+- Native Runtime 只能接收白名单环境变量，不能继承完整用户环境。
+- `provider_id` 指向 Provider Registry；`auth_ref` 在执行前解析为子进程环境变量，结果文件和日志只记录 `env_keys`。
+- `claude_cli` 可注入 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN` 和模型相关变量，用于 MiniMax-M2.7 等 Anthropic-compatible provider。
+- Runtime Adapter 不负责决定代码是否可合入，所有 diff 必须回到质量门禁和 review。
 
 ## 5. 执行约束
 

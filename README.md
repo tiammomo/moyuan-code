@@ -14,7 +14,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - Beta 已推进控制面状态 API、issue graph API、需求拆分、并发调度、review/merge decision、Provider Registry/runtime routing、Git Provider push/PR/MR plan、release suggestion、服务器资源 registry 和 deploy/smoke/monitor plan。
 - Phase 1 e2e smoke 已覆盖本地项目和本地 bare remote 模拟远程项目的完整 CLI 链路。
 - Runtime 已捕获 before/after git snapshot、changed files、diff summary，并能阻断脏工作区和保护路径变更。
-- Claude CLI / Codex CLI 已具备 prompt file、cwd、env allowlist、stdout/stderr、result contract 和失败分类的最小调用契约。
+- Claude CLI / Codex CLI 已具备 prompt file、cwd、env allowlist、provider env profile、stdout/stderr、result contract 和失败分类的最小调用契约。
 - Orchestrator 已持久化 issue/run 状态机，并支持查询 accepted、needs_rework、runtime 和 quality 状态。
 - Quality 已输出结构化 findings 和 review_status，能因敏感文件、保护路径、runtime 风险和大 diff 阻断 accepted。
 - API/State Store 已建立 Gin router 和 GORM SQLite 基线，项目注册会同步 `.moyuan/state.db`。
@@ -51,6 +51,8 @@ go run ./cmd/moyuan --help
 ./bin/moyuan review merge-decision phase1-001 --root /path/to/repo
 ./bin/moyuan model provider add --id glm-main --vendor zhipu --api-type openai-compatible --auth-ref env:GLM_API_KEY --root /path/to/repo
 ./bin/moyuan model route --role backend --repo-edit --root /path/to/repo
+./bin/moyuan model provider add --id minimax-m27-claude --vendor minimax --api-type anthropic-compatible --base-url https://api.minimaxi.com/anthropic --auth-ref env:MINIMAX_API_KEY --runtime claude_cli --model MiniMax-M2.7 --use-case frontend --allow-sensitive-code --allow-project-memory --root /path/to/repo
+./bin/moyuan runtime invoke claude_cli --provider minimax-m27-claude --prompt "实现前端 issue" --root /path/to/repo
 ./bin/moyuan git provider plan phase1-001 --root /path/to/repo
 ./bin/moyuan release suggest --version v0.1.0 --root /path/to/repo
 ./bin/moyuan resources add --id dev-1 --environment test_dev --host 10.0.0.10 --provider local_vm --owner dev --auth-ref env:DEV_SERVER_SSH_KEY --root /path/to/repo

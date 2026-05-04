@@ -284,6 +284,8 @@ moyuan model provider list
 moyuan model provider show <provider>
 moyuan model provider disable <provider>
 moyuan model route --role <role> [--task-type <type>] [--output-type <type>]
+moyuan model provider add --id minimax-m27-claude --vendor minimax --api-type anthropic-compatible --base-url https://api.minimaxi.com/anthropic --auth-ref env:MINIMAX_API_KEY --runtime claude_cli --model MiniMax-M2.7 --use-case frontend
+moyuan runtime invoke claude_cli --provider minimax-m27-claude --prompt "<frontend task>"
 moyuan model list
 moyuan model test <provider>
 moyuan model health check
@@ -435,7 +437,7 @@ moyuan repo pr create <task-id>
 - 接入至少 2 个国产模型 API。
 - 支持 GLM、MiniMax、GPT、Claude 和第三方 API 网关登记、检测、禁用和用量记录。
 - 支持 gpt-image-2 生成项目架构图、流程图、部署拓扑图和配套讲解。
-- 支持 Claude CLI 和 Codex CLI 作为 Native Agent Runtime 调用、会话恢复、diff 捕获和失败降级。
+- 支持 Claude CLI 和 Codex CLI 作为 Native Agent Runtime 调用、provider env profile、会话恢复、diff 捕获和失败降级。
 - 实现模型路由策略。
 - 实现 `find-skills` 推荐入口。
 - 实现 role-skill 动态绑定。

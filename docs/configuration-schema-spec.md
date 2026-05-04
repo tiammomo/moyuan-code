@@ -166,6 +166,9 @@ Account 字段：
 | `auth_ref` | required | 必须是 secret 或 env 引用 |
 | `enabled` | required | 是否启用 |
 | `data_policy` | required | 数据策略 |
+| `runtime_id` | optional, nullable | 绑定 Native Runtime 时填写，例如 `claude_cli` |
+| `allowed_use_cases` | optional | 可为空；代码 provider 建议声明 `frontend`、`backend`、`review` 等 |
+| `models` | optional | 绑定 API 或兼容 API 的 CLI profile 时可填写模型 id |
 
 必须为空：
 
@@ -174,6 +177,13 @@ Account 字段：
 | `api_type = claude-code` | `base_url` | must_be_null_when |
 | `api_type = codex` 且使用本地 CLI | `base_url` | must_be_null_when |
 | `vendor != third_party` | `upstream_vendor` | must_be_null_when |
+
+Native Runtime profile 特例：
+
+- `api_type = anthropic-compatible` 且 `runtime_id = claude_cli` 时，`base_url` 必填，`auth_ref` 必须引用环境变量或 secret manager，`models` 至少包含一个模型 id。
+- `runtime_id = claude_cli` 的 MiniMax profile 推荐模型 id 为 `MiniMax-M2.7`。
+- `runtime_id = claude_cli` 且需要处理前端代码时，`allowed_use_cases` 必须包含 `frontend`，并显式声明数据策略是否允许代码上下文和项目 memory。
+- 运行期只允许把 `auth_ref` 解析成子进程环境变量；`.moyuan/models/providers.json`、`.moyuan/runtime/*-native.json` 和日志中必须不出现 token 值。
 
 Provider 字段：
 
@@ -258,6 +268,8 @@ Runtime 字段：
 | `command` | required | CLI 命令 |
 | `auth.mode` | required | `env` 或 `local_cli_login` |
 | `auth.auth_ref` | optional, nullable | 本地已登录可为空 |
+| `provider_env_profile.enabled` | optional | 是否允许从 Provider Registry 注入运行环境 |
+| `provider_env_profile.allowed_env_keys` | conditional_required | 允许注入的环境变量白名单 |
 | `health_check.command` | required | 健康检查命令 |
 | `invocation` | required | 调用参数 |
 | `context` | required | 上下文注入策略 |
@@ -270,8 +282,14 @@ Runtime 字段：
 | 条件 | 字段 | 规则 |
 | --- | --- | --- |
 | `auth.mode = local_cli_login` 且依赖本地登录 | `auth.auth_ref` | nullable |
+| `provider_env_profile.enabled = false` | `provider_env_profile.allowed_env_keys` | must_be_empty_when |
 | `provider = claude_code` | `invocation.ask` | must_be_null_when |
 | `provider = codex` | `invocation.one_shot` | must_be_null_when |
+
+默认 provider env profile 白名单：
+
+- `claude_cli`：`ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_MODEL`、`ANTHROPIC_DEFAULT_SONNET_MODEL`、`ANTHROPIC_DEFAULT_OPUS_MODEL`、`ANTHROPIC_DEFAULT_HAIKU_MODEL`、`API_TIMEOUT_MS`、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`。
+- `codex_cli`：`OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`。
 
 ## 10. agents/roles.yaml
 

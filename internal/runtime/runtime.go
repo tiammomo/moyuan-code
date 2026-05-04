@@ -21,6 +21,8 @@ type Invocation struct {
 	IssueID        string   `json:"issue_id"`
 	Role           string   `json:"role"`
 	RuntimeID      string   `json:"runtime_id"`
+	ProviderID     string   `json:"provider_id,omitempty"`
+	ModelID        string   `json:"model_id,omitempty"`
 	Mode           string   `json:"mode"`
 	WorkspaceRoot  string   `json:"workspace_root"`
 	WorktreePath   string   `json:"worktree_path"`
@@ -51,6 +53,8 @@ type Result struct {
 	RunID            string                 `json:"run_id"`
 	SubagentID       string                 `json:"subagent_id,omitempty"`
 	RuntimeID        string                 `json:"runtime_id"`
+	ProviderID       string                 `json:"provider_id,omitempty"`
+	ModelID          string                 `json:"model_id,omitempty"`
 	Status           string                 `json:"status"`
 	Summary          string                 `json:"summary"`
 	ChangedFiles     []string               `json:"changed_files"`
@@ -141,7 +145,7 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 			summary = strings.TrimSpace(res.Stderr)
 		}
 	} else if isNativeRuntime(invocation.RuntimeID) {
-		cmd, nativeSummary, _, err := runNativeCLI(ctx, rootDir, invocation, command)
+		cmd, nativeSummary, nativeProviderID, nativeModelID, _, err := runNativeCLI(ctx, rootDir, invocation, command)
 		if err != nil {
 			return Result{}, err
 		}
@@ -151,6 +155,12 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 		}
 		commands = append(commands, cmd)
 		summary = nativeSummary
+		if nativeProviderID != "" {
+			invocation.ProviderID = nativeProviderID
+		}
+		if nativeModelID != "" {
+			invocation.ModelID = nativeModelID
+		}
 		if summary == "" {
 			summary = "native runtime completed"
 		}
@@ -178,6 +188,8 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 		RunID:            invocation.RunID,
 		SubagentID:       invocation.SubagentID,
 		RuntimeID:        invocation.RuntimeID,
+		ProviderID:       invocation.ProviderID,
+		ModelID:          invocation.ModelID,
 		Status:           status,
 		Summary:          summary,
 		ChangedFiles:     diff.ChangedFiles,

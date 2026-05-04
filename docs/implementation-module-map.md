@@ -154,6 +154,7 @@ cli/api
 
 - 统一 Claude CLI、Codex CLI、模型 API 和 Shell 的调用。
 - 管理 Runtime Session。
+- 从 Provider Registry 解析 provider env profile，并向 Native Runtime 子进程注入允许的环境变量。
 - 捕获 stdout、stderr、exit code、diff、输出契约和错误类型。
 - 支持降级、超时、resume 和审计。
 

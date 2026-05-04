@@ -12,6 +12,7 @@
 - 后端开发优先使用 `backend` role 和 `codex_cli`。
 - 后端调优优先使用 `backend_tuning` role 和 `codex_cli`。
 - 复杂契约、架构方案和跨端依赖必须在进入本主线前形成 design/contract issue 或 accepted contract。
+- 当项目启用 `minimax-m27-claude` 等绑定 `claude_cli` 的 provider profile 时，前端 issue 可通过 Claude CLI 使用 MiniMax-M2.7；Moyuan 仍负责 provider route、diff 捕获、质量门禁和合入判断。
 
 ## 2. 输入与输出
 
@@ -40,6 +41,7 @@ ready issue
   -> load issue spec and accepted contracts
   -> load project context and scoped memory
   -> select role, team, skills, runtime and provider
+  -> inject provider env profile into native runtime
   -> create subagent instances
   -> prepare issue branch/worktree
   -> dispatch Claude/Codex runtime
