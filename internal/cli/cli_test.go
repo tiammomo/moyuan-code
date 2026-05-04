@@ -11,147 +11,268 @@ import (
 	"testing"
 )
 
-func TestLocalProjectAddCreatesWorkspaceOwnerComprehensionGraphAndQualityReport(t *testing.T) {
-	root := createTempRepo(t)
+func TestPhase1E2ESmokeCoversLocalAndRemoteProjectLifecycle(t *testing.T) {
+	t.Run("local project", func(t *testing.T) {
+		root := createTempRepo(t)
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	code := Run(context.Background(), []string{"project", "add", "--local", root, "--root", root}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("project add failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
-	}
-	if !strings.Contains(stdout.String(), "project added:") {
-		t.Fatalf("unexpected stdout: %s", stdout.String())
+		result := runCLI(t, root, "project", "add", "--local", root)
+		assertContains(t, result.stdout, "project added:")
+		assertFileContains(t, root, ".moyuan/projects.json", root)
+
+		exercisePhase1Lifecycle(t, root)
+	})
+
+	t.Run("remote project", func(t *testing.T) {
+		source := createTempRepo(t)
+		remote := createBareRemote(t, source)
+		controlRoot := t.TempDir()
+		dest := filepath.Join(t.TempDir(), "managed-remote")
+
+		result := runCLI(t, controlRoot, "project", "add", "--remote", remote, "--dest", dest)
+		assertContains(t, result.stdout, "project added:")
+		assertFileContains(t, controlRoot, ".moyuan/projects.json", dest)
+
+		list := runCLI(t, controlRoot, "project", "list")
+		assertContains(t, list.stdout, dest)
+
+		exercisePhase1Lifecycle(t, dest)
+
+		sync := runCLI(t, dest, "git", "sync", "--comprehend")
+		assertContains(t, sync.stdout, "remote")
+		assertFileContains(t, dest, ".moyuan/comprehension/events.jsonl", `"mode":"incremental"`)
+	})
+}
+
+type cliResult struct {
+	stdout string
+	stderr string
+	code   int
+}
+
+func exercisePhase1Lifecycle(t *testing.T, root string) {
+	t.Helper()
+
+	assertCoreWorkspaceArtifacts(t, root)
+
+	doctor := runCLI(t, root, "workspace", "doctor")
+	assertContains(t, doctor.stdout, "project")
+	assertContains(t, doctor.stdout, "repository")
+
+	whoami := runCLI(t, root, "auth", "whoami")
+	assertContains(t, whoami.stdout, "local_single_user")
+
+	full := runCLI(t, root, "comprehend", "--full")
+	assertContains(t, full.stdout, `"mode": "full"`)
+
+	status := runCLI(t, root, "git", "status")
+	assertContains(t, status.stdout, `"isRepo": true`)
+
+	branches := runCLI(t, root, "git", "branch", "list")
+	if strings.TrimSpace(branches.stdout) == "" {
+		t.Fatalf("expected git branch list to return at least one branch")
 	}
 
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"auth", "whoami", "--root", root}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("whoami failed: %s", stderr.String())
-	}
-	if !strings.Contains(stdout.String(), "local_single_user") {
-		t.Fatalf("whoami missing local_single_user: %s", stdout.String())
-	}
+	graph := runCLI(t, root, "issue", "graph", "phase1-epic")
+	assertContains(t, graph.stdout, "phase1-013")
 
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"issue", "graph", "phase1-epic", "--root", root}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("issue graph failed: %s", stderr.String())
-	}
-	if !strings.Contains(stdout.String(), "phase1-001") {
-		t.Fatalf("issue graph missing phase1-001: %s", stdout.String())
-	}
+	schedule := runCLI(t, root, "issue", "schedule", "phase1-epic")
+	assertContains(t, schedule.stdout, "ready_queue")
 
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"quality", "check", "phase1-001", "--root", root}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("quality check failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
-	}
-	var report struct {
-		Status string `json:"status"`
-		Checks []struct {
-			Type    string  `json:"type"`
-			Command *string `json:"command"`
-		} `json:"checks"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
-		t.Fatalf("decode quality report: %v\n%s", err, stdout.String())
-	}
+	plan := runCLI(t, root, "orchestrator", "plan", "phase1-epic")
+	assertContains(t, plan.stdout, "blocked_reason")
+
+	health := runCLI(t, root, "runtime", "health", "local_shell")
+	assertContains(t, health.stdout, `"ok": true`)
+
+	runtimeResult := runCLI(t, root, "runtime", "invoke", "local_shell", "--prompt", "printf runtime-ok")
+	assertContains(t, runtimeResult.stdout, "runtime-ok")
+
+	qualityResult := runCLI(t, root, "quality", "check", "phase1-001")
+	report := decodeQualityReport(t, qualityResult.stdout)
 	if report.Status != "passed" {
-		t.Fatalf("quality report status = %s", report.Status)
+		t.Fatalf("quality report status = %s\n%s", report.Status, qualityResult.stdout)
 	}
-	foundTest := false
-	for _, check := range report.Checks {
-		if check.Type == "test" && check.Command != nil && *check.Command == "npm test" {
-			foundTest = true
+	if report.ID == "" {
+		t.Fatalf("quality report missing id: %s", qualityResult.stdout)
+	}
+	if !report.HasCheck("test", "go test ./...") {
+		t.Fatalf("quality report missing go test check: %+v", report.Checks)
+	}
+
+	reportResult := runCLI(t, root, "quality", "report", report.ID)
+	assertContains(t, reportResult.stdout, report.ID)
+
+	orchestrated := runCLI(t, root, "orchestrator", "run", "phase1-001", "--runtime", "local_shell", "--prompt", "printf orchestrator-ok")
+	assertContains(t, orchestrated.stdout, "accepted")
+
+	runCLI(t, root, "memory", "add", "--kind", "fact", "--summary", "phase1 memory fact")
+	search := runCLI(t, root, "memory", "search", "phase1")
+	assertContains(t, search.stdout, "phase1 memory fact")
+	compact := runCLI(t, root, "memory", "compact")
+	assertContains(t, compact.stdout, "records_seen")
+
+	repair := runCLI(t, root, "repair", "signal", "--type", "test_failure", "--summary", "sample test failure")
+	assertContains(t, repair.stdout, "CONFIRMED_BUG")
+
+	logs := runCLI(t, root, "logs", "tail", "--stream", "run", "--limit", "50")
+	assertContains(t, logs.stdout, "runtime.completed")
+
+	assertLifecycleArtifacts(t, root)
+}
+
+type qualityReport struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Checks []struct {
+		Type    string  `json:"type"`
+		Command *string `json:"command"`
+		Status  string  `json:"status"`
+	} `json:"checks"`
+}
+
+func (r qualityReport) HasCheck(typ string, command string) bool {
+	for _, check := range r.Checks {
+		if check.Type == typ && check.Command != nil && *check.Command == command && check.Status == "passed" {
+			return true
 		}
 	}
-	if !foundTest {
-		t.Fatalf("quality report missing npm test check: %+v", report.Checks)
-	}
+	return false
+}
 
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"orchestrator", "plan", "phase1-epic", "--root", root}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("orchestrator plan failed: %s", stderr.String())
+func decodeQualityReport(t *testing.T, raw string) qualityReport {
+	t.Helper()
+	var report qualityReport
+	if err := json.Unmarshal([]byte(raw), &report); err != nil {
+		t.Fatalf("decode quality report: %v\n%s", err, raw)
 	}
-	if !strings.Contains(stdout.String(), "ready_queue") {
-		t.Fatalf("orchestrator plan missing ready_queue: %s", stdout.String())
-	}
+	return report
+}
 
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"runtime", "invoke", "local_shell", "--prompt", "printf runtime-ok", "--root", root}, &stdout, &stderr)
+func runCLI(t *testing.T, root string, args ...string) cliResult {
+	t.Helper()
+	argv := append([]string{}, args...)
+	if root != "" {
+		argv = append(argv, "--root", root)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), argv, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("runtime invoke failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
+		t.Fatalf("moyuan %s failed: code=%d stdout=%s stderr=%s", strings.Join(args, " "), code, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "runtime-ok") {
-		t.Fatalf("runtime output missing: %s", stdout.String())
-	}
-
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"orchestrator", "run", "phase1-001", "--runtime", "local_shell", "--prompt", "printf orchestrator-ok", "--root", root}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("orchestrator run failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
-	}
-	if !strings.Contains(stdout.String(), "accepted") {
-		t.Fatalf("orchestrator run not accepted: %s", stdout.String())
-	}
-
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"memory", "add", "--kind", "fact", "--summary", "phase1 memory fact", "--root", root}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("memory add failed: %s", stderr.String())
-	}
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"memory", "search", "phase1", "--root", root}, &stdout, &stderr)
-	if code != 0 || !strings.Contains(stdout.String(), "phase1 memory fact") {
-		t.Fatalf("memory search failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
-	}
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"memory", "compact", "--root", root}, &stdout, &stderr)
-	if code != 0 || !strings.Contains(stdout.String(), "records_seen") {
-		t.Fatalf("memory compact failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
-	}
-
-	stdout.Reset()
-	stderr.Reset()
-	code = Run(context.Background(), []string{"repair", "signal", "--type", "test_failure", "--summary", "sample test failure", "--root", root}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("repair signal failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
-	}
-	if !strings.Contains(stdout.String(), "CONFIRMED_BUG") {
-		t.Fatalf("repair classification missing: %s", stdout.String())
-	}
+	return cliResult{stdout: stdout.String(), stderr: stderr.String(), code: code}
 }
 
 func createTempRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	run(t, root, "git", "init", "-q")
-	packageJSON := `{"type":"module","scripts":{"test":"node --test"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(packageJSON), 0o644); err != nil {
+	goMod := "module example.com/phase1smoke\n\ngo 1.22\n"
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(goMod), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	run(t, root, "git", "add", "package.json")
+	source := "package phase1smoke\n\nfunc Ready() bool { return true }\n"
+	if err := os.WriteFile(filepath.Join(root, "smoke.go"), []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	testSource := "package phase1smoke\n\nimport \"testing\"\n\nfunc TestReady(t *testing.T) {\n\tif !Ready() {\n\t\tt.Fatal(\"not ready\")\n\t}\n}\n"
+	if err := os.WriteFile(filepath.Join(root, "smoke_test.go"), []byte(testSource), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(t, root, "git", "add", "go.mod", "smoke.go", "smoke_test.go")
 	run(t, root, "git", "-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-qm", "init")
 	return root
+}
+
+func createBareRemote(t *testing.T, source string) string {
+	t.Helper()
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	run(t, "", "git", "clone", "--bare", source, remote)
+	return remote
 }
 
 func run(t *testing.T, cwd string, command string, args ...string) {
 	t.Helper()
 	cmd := exec.Command(command, args...)
-	cmd.Dir = cwd
+	if cwd != "" {
+		cmd.Dir = cwd
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("%s %v failed: %v\n%s", command, args, err, string(out))
+	}
+}
+
+func assertCoreWorkspaceArtifacts(t *testing.T, root string) {
+	t.Helper()
+	assertFileExists(t, root, ".moyuan/project.yaml")
+	assertFileExists(t, root, ".moyuan/repository.yaml")
+	assertFileExists(t, root, ".moyuan/policies/access.yaml")
+	assertFileExists(t, root, ".moyuan/workspace.json")
+	assertFileExists(t, root, ".moyuan/auth/owner.json")
+	assertFileExists(t, root, ".moyuan/comprehension/project-profile.md")
+	assertFileExists(t, root, ".moyuan/comprehension/module-map.md")
+	assertFileExists(t, root, ".moyuan/comprehension/commands.md")
+	assertFileExists(t, root, ".moyuan/comprehension/events.jsonl")
+	assertFileExists(t, root, ".moyuan/lifecycle/issue-graphs/phase1-epic.json")
+	assertFileExists(t, root, ".moyuan/lifecycle/schedules/phase1-epic.json")
+	assertFileExists(t, root, ".moyuan/memory/candidates.jsonl")
+	assertFileExists(t, root, ".moyuan/logs/run.jsonl")
+	assertFileExists(t, root, ".moyuan/logs/audit.jsonl")
+}
+
+func assertLifecycleArtifacts(t *testing.T, root string) {
+	t.Helper()
+	assertGlob(t, root, ".moyuan/runtime/*.json")
+	assertGlob(t, root, ".moyuan/lifecycle/runs/*.json")
+	assertGlob(t, root, ".moyuan/lifecycle/quality/reports/*.json")
+	assertGlob(t, root, ".moyuan/lifecycle/quality/reports/*.md")
+	assertGlob(t, root, ".moyuan/orchestrator/*-result.json")
+	assertFileExists(t, root, ".moyuan/memory/records.jsonl")
+	assertFileExists(t, root, ".moyuan/memory/compact-latest.json")
+	assertFileExists(t, root, ".moyuan/repair/signals.jsonl")
+	assertFileExists(t, root, ".moyuan/repair/bug-candidates.jsonl")
+	assertGlob(t, root, ".moyuan/repair/repair-plan-*.json")
+	assertFileExists(t, root, ".moyuan/logs/quality.jsonl")
+	assertFileExists(t, root, ".moyuan/logs/memory.jsonl")
+}
+
+func assertFileExists(t *testing.T, root string, rel string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("expected file to exist: %s: %v", path, err)
+	}
+	if info.IsDir() {
+		t.Fatalf("expected file, got directory: %s", path)
+	}
+}
+
+func assertFileContains(t *testing.T, root string, rel string, needle string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	assertContains(t, string(data), needle)
+}
+
+func assertGlob(t *testing.T, root string, pattern string) {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
+	if err != nil {
+		t.Fatalf("bad glob %s: %v", pattern, err)
+	}
+	if len(matches) == 0 {
+		t.Fatalf("expected at least one match for %s", filepath.Join(root, filepath.FromSlash(pattern)))
+	}
+}
+
+func assertContains(t *testing.T, value string, needle string) {
+	t.Helper()
+	if !strings.Contains(value, needle) {
+		t.Fatalf("expected output to contain %q\n%s", needle, value)
 	}
 }

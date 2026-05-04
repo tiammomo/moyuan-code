@@ -12,8 +12,9 @@
 
 - `workspace`、`auth`、`logging`、`git`、`comprehension`、`issue graph`、`runtime adapter`、`orchestrator`、`scheduler`、`quality`、`memory`、`repair` 都已有 Go package 和 CLI 入口。
 - `local_shell` runtime 已能执行并落盘结果。
+- `phase1-013 e2e-smoke` 已覆盖本地项目和本地 bare remote 模拟远程项目的端到端 CLI 链路。
 - Claude CLI / Codex CLI 目前只有 health check 占位，还没有真实 prompt contract、diff capture 和 fallback contract。
-- 当前测试覆盖以 package unit test 和 CLI smoke 为主，还缺少真实端到端 e2e。
+- 当前测试覆盖已经包含 package unit test、CLI smoke 和 Phase 1 e2e smoke。
 
 下一步目标不是继续铺更多模块，而是把“能跑通、能审计、能复核、能失败恢复”的 MVP 闭环做实。
 
@@ -21,7 +22,7 @@
 
 | 优先级 | ID | 任务 | 目标 | 依赖 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase1-013` | `e2e-smoke` | 用本地仓库和远程仓库样例验证完整 CLI 闭环 | `phase1-001`~`phase1-012` | e2e 脚本可重复执行，断言关键 `.moyuan/` 产物存在 |
+| Done | `phase1-013` | `e2e-smoke` | 用本地仓库和远程仓库样例验证完整 CLI 闭环 | `phase1-001`~`phase1-012` | 已由 Go e2e smoke 覆盖本地项目和本地 bare remote 模拟远程项目 |
 | P0 | `phase1-014` | `runtime-diff-capture` | 为 runtime run 捕获 before/after git 状态、changed files 和 diff summary | `phase1-005`,`phase1-006`,`phase1-008` | 每次 run 都能知道改了什么，dirty worktree 可被阻断 |
 | P0 | `phase1-015` | `native-runtime-adapters` | 补齐 Claude CLI / Codex CLI 的真实调用契约和失败降级 | `phase1-014` | fake CLI 测试通过，真实 CLI 缺失时降级信息明确 |
 | P1 | `phase1-016` | `orchestrator-state-machine` | 持久化 issue/run 状态流转，连接 quality、review 和 rework | `phase1-014`,`phase1-015` | issue 能从 ready 到 running/review/accepted/needs_rework 可追踪 |
@@ -32,8 +33,8 @@
 
 ## 3. 推荐执行顺序
 
-1. 先做 `phase1-013 e2e-smoke`，把当前 CLI 骨架的真实可用性固定下来。
-2. 再做 `phase1-014 runtime-diff-capture`，否则后续 Native Runtime 修改代码后无法可靠复核。
+1. `phase1-013 e2e-smoke` 已完成，当前 CLI 骨架有可重复 e2e 基线。
+2. 下一步做 `phase1-014 runtime-diff-capture`，否则后续 Native Runtime 修改代码后无法可靠复核。
 3. 然后做 `phase1-015 native-runtime-adapters`，把 Claude CLI / Codex CLI 从 health check 占位推进到可执行契约。
 4. 接着做 `phase1-016 orchestrator-state-machine`，让 issue/run 状态不只停留在单次命令输出。
 5. 并行推进 `phase1-017 quality-review-hardening` 和 `phase1-018 memory-record-gate`，但二者都不能绕过 orchestrator 状态机。
@@ -42,6 +43,8 @@
 ## 4. 任务详情
 
 ### `phase1-013 e2e-smoke`
+
+状态：已完成。
 
 范围：
 
@@ -54,6 +57,12 @@
 - 脚本可在干净临时目录重复运行。
 - 能断言 `.moyuan/project.yaml`、`.moyuan/repository.yaml`、`.moyuan/comprehension/*`、`.moyuan/runtime/*`、`.moyuan/quality/*`、`.moyuan/logs/*` 存在。
 - 失败时输出具体命令、stdout、stderr 和临时目录路径。
+
+实现：
+
+- e2e smoke 位于 `internal/cli/cli_test.go`。
+- 远程项目通过本地 bare git repo 模拟，不依赖 GitHub/Gitee 网络。
+- 验证命令为 `go test ./...`。
 
 ### `phase1-014 runtime-diff-capture`
 
@@ -157,7 +166,7 @@
 
 当前阶段推荐低并发：
 
-- `phase1-013` 单独执行，先固定验收基线。
+- `phase1-013` 已完成，作为后续实现的回归基线。
 - `phase1-014` 单独执行，因为它会影响 runtime、git、orchestrator 和 quality 的共同字段。
 - `phase1-015` 可以在 `phase1-014` 完成后由 adapter owner 独立推进。
 - `phase1-017` 和 `phase1-018` 可以并行，但写入范围必须隔离：前者写 `quality/review`，后者写 `memory`。
