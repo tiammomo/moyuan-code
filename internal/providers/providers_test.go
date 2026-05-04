@@ -1,6 +1,9 @@
 package providers
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -258,6 +261,60 @@ func TestProviderOpsRefreshUpdatesLocalSignals(t *testing.T) {
 	}
 	if result.Updated != 0 || result.Skipped != 1 || result.Decisions[0].Reason != "provider_disabled" {
 		t.Fatalf("expected disabled provider to be skipped: %+v", result)
+	}
+}
+
+func TestProviderOpsRefreshCanRunOptionalHTTPProbe(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	probeHits := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		probeHits++
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("unexpected probe path: %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer probe-token" {
+			t.Fatalf("unexpected probe auth header")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer server.Close()
+	t.Setenv("PROBE_API_KEY", "probe-token")
+
+	if _, err := Upsert(root, Provider{
+		ID:      "glm-probe",
+		Vendor:  "zhipu",
+		APIType: "openai-compatible",
+		BaseURL: server.URL + "/v1",
+		AuthRef: "env:PROBE_API_KEY",
+		Enabled: true,
+		Models:  []Model{{ID: "glm-4"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := RefreshOps(root, OpsRefreshOptions{ProviderID: "glm-probe", Probe: true, ProbeTimeoutMS: 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Updated != 1 || probeHits != 1 {
+		t.Fatalf("unexpected probe refresh result: hits=%d result=%+v", probeHits, result)
+	}
+	if result.Providers[0].Health.Status != "ok" || result.Providers[0].Health.Reason != "probe_ok:openai_compatible_models" {
+		t.Fatalf("expected probe health to be ok, got %+v", result.Providers[0].Health)
+	}
+	if result.Decisions[0].ProbeStatus != "ok" || result.Decisions[0].ProbeReason != "probe_ok:openai_compatible_models" {
+		t.Fatalf("expected probe decision metadata, got %+v", result.Decisions[0])
+	}
+	registry, err := Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(fmt.Sprintf("%+v", registry), "probe-token") {
+		t.Fatalf("provider registry leaked probe token")
 	}
 }
 

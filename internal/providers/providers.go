@@ -3,6 +3,8 @@ package providers
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -103,6 +105,8 @@ type OpsSnapshot struct {
 type OpsRefreshOptions struct {
 	ProviderID      string `json:"provider_id,omitempty"`
 	IncludeDisabled bool   `json:"include_disabled,omitempty"`
+	Probe           bool   `json:"probe,omitempty"`
+	ProbeTimeoutMS  int    `json:"probe_timeout_ms,omitempty"`
 }
 
 type OpsRefreshResult struct {
@@ -121,6 +125,8 @@ type OpsRefreshDecision struct {
 	HealthStatus string `json:"health_status,omitempty"`
 	QuotaStatus  string `json:"quota_status,omitempty"`
 	CostStatus   string `json:"cost_status,omitempty"`
+	ProbeStatus  string `json:"probe_status,omitempty"`
+	ProbeReason  string `json:"probe_reason,omitempty"`
 }
 
 type RouteRequest struct {
@@ -340,7 +346,7 @@ func RefreshOps(rootDir string, options OpsRefreshOptions) (OpsRefreshResult, er
 			result.Decisions = append(result.Decisions, OpsRefreshDecision{ProviderID: provider.ID, Status: "skipped", Reason: "provider_disabled"})
 			continue
 		}
-		snapshot := refreshSnapshotFor(provider)
+		snapshot := refreshSnapshotFor(provider, options)
 		updated, ok, err := UpdateOps(rootDir, provider.ID, snapshot)
 		if err != nil {
 			return OpsRefreshResult{}, err
@@ -352,19 +358,25 @@ func RefreshOps(rootDir string, options OpsRefreshOptions) (OpsRefreshResult, er
 		}
 		result.Updated++
 		result.Providers = append(result.Providers, updated)
-		result.Decisions = append(result.Decisions, OpsRefreshDecision{
+		decision := OpsRefreshDecision{
 			ProviderID:   updated.ID,
 			Status:       "updated",
 			Reason:       updated.Health.Reason,
 			HealthStatus: updated.Health.Status,
 			QuotaStatus:  updated.Quota.Status,
 			CostStatus:   updated.Cost.Status,
-		})
+		}
+		if options.Probe {
+			decision.ProbeStatus = updated.Health.Status
+			decision.ProbeReason = updated.Health.Reason
+		}
+		result.Decisions = append(result.Decisions, decision)
 	}
 	_ = logging.Log(rootDir, "audit", "provider.ops.refreshed", map[string]any{
 		"provider_id": options.ProviderID,
 		"updated":     result.Updated,
 		"skipped":     result.Skipped,
+		"probe":       options.Probe,
 	})
 	return result, nil
 }
@@ -717,9 +729,13 @@ func availabilityViolation(provider Provider) string {
 	return ""
 }
 
-func refreshSnapshotFor(provider Provider) OpsSnapshot {
+func refreshSnapshotFor(provider Provider, options OpsRefreshOptions) OpsSnapshot {
+	health := refreshHealth(provider)
+	if options.Probe && provider.Enabled && !provider.NativeRuntime && health.Status == "ok" {
+		health = probeProviderHealth(provider, options.ProbeTimeoutMS)
+	}
 	snapshot := OpsSnapshot{
-		Health: refreshHealth(provider),
+		Health: health,
 		Quota:  refreshQuota(provider.Quota),
 		Usage:  refreshUsage(provider.Usage),
 		Cost:   refreshCost(provider.Cost),
@@ -750,6 +766,108 @@ func refreshHealth(provider Provider) Health {
 		return Health{Status: "unhealthy", Reason: "base_url_missing", LastCheckedAt: health.LastCheckedAt}
 	}
 	return health
+}
+
+func probeProviderHealth(provider Provider, timeoutMS int) Health {
+	checkedAt := now()
+	probeURL, adapter, ok := providerProbeURL(provider)
+	if !ok {
+		return Health{Status: "degraded", Reason: "probe_adapter_unsupported", LastCheckedAt: checkedAt}
+	}
+	authToken, authStatus, authReason := probeAuthToken(provider.AuthRef)
+	switch authStatus {
+	case "ok":
+	case "skipped":
+		return Health{Status: "degraded", Reason: authReason, LastCheckedAt: checkedAt}
+	default:
+		return Health{Status: "unhealthy", Reason: authReason, LastCheckedAt: checkedAt}
+	}
+	timeout := 3 * time.Second
+	if timeoutMS > 0 {
+		timeout = time.Duration(timeoutMS) * time.Millisecond
+	}
+	req, err := http.NewRequest(http.MethodGet, probeURL, nil)
+	if err != nil {
+		return Health{Status: "unhealthy", Reason: "probe_request_invalid", LastCheckedAt: checkedAt}
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "moyuan-code-provider-probe/1")
+	if strings.Contains(provider.APIType, "anthropic") {
+		req.Header.Set("x-api-key", authToken)
+		req.Header.Set("anthropic-version", "2023-06-01")
+	} else {
+		req.Header.Set("Authorization", "Bearer "+authToken)
+	}
+	resp, err := (&http.Client{Timeout: timeout}).Do(req)
+	if err != nil {
+		return Health{Status: "unhealthy", Reason: "probe_request_failed", LastCheckedAt: checkedAt}
+	}
+	defer resp.Body.Close()
+	switch {
+	case resp.StatusCode >= 200 && resp.StatusCode < 400:
+		return Health{Status: "ok", Reason: "probe_ok:" + adapter, LastCheckedAt: checkedAt}
+	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+		return Health{Status: "unhealthy", Reason: fmt.Sprintf("probe_auth_failed:http_%d", resp.StatusCode), LastCheckedAt: checkedAt}
+	case resp.StatusCode == http.StatusTooManyRequests:
+		return Health{Status: "degraded", Reason: "probe_rate_limited:http_429", LastCheckedAt: checkedAt}
+	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed:
+		return Health{Status: "degraded", Reason: fmt.Sprintf("probe_endpoint_not_supported:http_%d", resp.StatusCode), LastCheckedAt: checkedAt}
+	case resp.StatusCode >= 500:
+		return Health{Status: "unhealthy", Reason: fmt.Sprintf("probe_upstream_error:http_%d", resp.StatusCode), LastCheckedAt: checkedAt}
+	default:
+		return Health{Status: "degraded", Reason: fmt.Sprintf("probe_unexpected_status:http_%d", resp.StatusCode), LastCheckedAt: checkedAt}
+	}
+}
+
+func providerProbeURL(provider Provider) (string, string, bool) {
+	base, err := url.Parse(strings.TrimSpace(provider.BaseURL))
+	if err != nil || base.Scheme == "" || base.Host == "" {
+		return "", "", false
+	}
+	apiType := normalizeToken(provider.APIType)
+	if strings.Contains(apiType, "openai") || provider.Vendor == "openai" || apiType == "image" {
+		appendProbePath(base, "models")
+		return base.String(), "openai_compatible_models", true
+	}
+	if strings.Contains(apiType, "anthropic") {
+		return base.String(), "anthropic_compatible_base", true
+	}
+	if strings.Contains(apiType, "compatible") || isThirdParty(provider) {
+		appendProbePath(base, "models")
+		return base.String(), "generic_compatible_models", true
+	}
+	return "", "", false
+}
+
+func appendProbePath(base *url.URL, segment string) {
+	path := strings.TrimRight(base.Path, "/")
+	if strings.HasSuffix(path, "/"+segment) {
+		base.Path = path
+		return
+	}
+	base.Path = path + "/" + segment
+}
+
+func probeAuthToken(authRef string) (string, string, string) {
+	authRef = strings.TrimSpace(authRef)
+	if authRef == "" {
+		return "", "missing", "auth_ref_missing"
+	}
+	if strings.HasPrefix(authRef, "env:") {
+		key := strings.TrimSpace(strings.TrimPrefix(authRef, "env:"))
+		if key == "" {
+			return "", "missing", "auth_ref_env_required"
+		}
+		token := os.Getenv(key)
+		if token == "" {
+			return "", "missing", "auth_ref_env_missing:" + key
+		}
+		return token, "ok", "auth_ref_env_present:" + key
+	}
+	if strings.HasPrefix(authRef, "secret:") {
+		return "", "skipped", "probe_secret_ref_not_resolved"
+	}
+	return "", "invalid", "auth_ref_unsupported"
 }
 
 func refreshQuota(existing Quota) Quota {

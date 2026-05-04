@@ -31,7 +31,7 @@ Phase 2 第一批能力已完成并通过 release readiness：
 | P1 | `phase3-003` | `console-operation-actions` | planned | Console 增加受控操作入口和后端 preview/dry-run 对齐 | 高风险动作不能绕过 approval/authz |
 | P1 | `phase3-003a` | `visual-render-dry-run-console-action` | completed | Visual Assets 面板触发后端 dry-run render | dry-run action 可见、可反馈 execution id，不调用真实图片 API |
 | P1 | `phase3-004` | `runtime-log-diff-viewer` | completed | Console 展开 runtime 日志、diff summary 和 resume hint | 失败排查证据链可见 |
-| P1 | `phase3-005` | `provider-probe-adapters` | planned | Provider refresh 接入可选轻量探测 adapter | 探测失败可解释，密钥不落盘 |
+| P1 | `phase3-005` | `provider-probe-adapters` | completed | Provider refresh 接入可选轻量探测 adapter | 探测失败可解释，密钥不落盘 |
 | P2 | `phase3-006` | `visual-script-auth-quality` | planned | Visual script mode 接入 auth ref、审计和图片质量检查 | 图片生成可执行且可复核 |
 | P2 | `phase3-007` | `release-deploy-control-actions` | planned | Release/deploy/smoke/monitor 动作在 Console 可控 | 发布与部署流水线状态可见 |
 
@@ -171,7 +171,25 @@ Phase 2 第一批能力已完成并通过 release readiness：
 - `npm run typecheck` 通过。
 - `npm run build` 通过。
 
-## 11. Phase 3 收口规则
+## 11. 已完成任务：`phase3-005 provider-probe-adapters`
+
+范围：
+
+- `model provider refresh` 增加可选 `--probe` 和 `--probe-timeout-ms`。
+- `POST /v1/projects/:project_id/providers/ops/refresh` 增加可选 `probe` 和 `probe_timeout_ms`。
+- 默认 refresh 仍只做本地 runtime、`auth_ref/base_url`、quota、usage 和 cost 刷新，不外呼模型服务商。
+- `probe=true` 时，API provider 通过轻量 HTTP probe 检查可达性和鉴权状态；OpenAI-compatible、generic compatible 和 Anthropic-compatible 分别有 adapter。
+- 探测只从 `env:` 解析 token；`secret:` 引用在当前单机模式下标记为 degraded，不读取或落盘密钥。
+- Refresh decision 会返回 `probe_status` 和 `probe_reason`，便于 Console 和 CLI 解释失败。
+
+验证：
+
+- `go test ./internal/providers` 通过。
+- `go test ./internal/cli` 通过。
+- `go test ./internal/api` 通过。
+- `go test ./...` 通过。
+
+## 12. Phase 3 收口规则
 
 - 每完成一个 Phase 3 issue，必须同步本实施记录和 issue graph。
 - 配置 validator 新增 issue code 时，必须能追溯到 [配置 Schema 规则](../configuration-schema-spec.md)。

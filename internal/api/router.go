@@ -53,6 +53,8 @@ type routeRequest struct {
 type providerOpsRefreshRequest struct {
 	ProviderID      string `json:"provider_id"`
 	IncludeDisabled bool   `json:"include_disabled"`
+	Probe           bool   `json:"probe"`
+	ProbeTimeoutMS  int    `json:"probe_timeout_ms"`
 }
 
 type releaseSuggestRequest struct {
@@ -1006,6 +1008,8 @@ func NewRouter(options Options) *gin.Engine {
 		result, err := providers.RefreshOps(rootDir, providers.OpsRefreshOptions{
 			ProviderID:      req.ProviderID,
 			IncludeDisabled: req.IncludeDisabled,
+			Probe:           req.Probe,
+			ProbeTimeoutMS:  req.ProbeTimeoutMS,
 		})
 		if err != nil {
 			writeError(c, http.StatusInternalServerError, err.Error())
