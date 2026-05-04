@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 1 本地 CLI MVP、Beta 第一批控制面能力和 Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力已完成，进入 Phase 3 配置可执行化和 Console 操作流增强。
+当前阶段：Phase 1 本地 CLI MVP、Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力和 Phase 3 第一批配置可执行化/Console 操作流能力已完成，进入 Phase 4 团队协作、审计、审批和生产维护增强。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
@@ -62,10 +62,13 @@
 
 ## 当前实施入口
 
-Phase 1 本地 CLI MVP、Beta 第一批控制面能力和 Phase 2 第一批能力已完成主要闭环。当前验收和状态入口：
+Phase 1 本地 CLI MVP、Beta 第一批控制面能力、Phase 2 第一批能力和 Phase 3 第一批能力已完成主要闭环。当前验收和状态入口：
 
+- [Phase 4 实现 Issue Graph](./phases/phase4-issue-graph.md)：Phase 4 团队协作、审计查询、审批记录、Git 协同和服务器维护的依赖图。
+- [Phase 4 实施记录](./phases/phase4-next-development-plan.md)：Phase 4 当前任务范围、验收标准和执行入口。
+- [Phase 3 Release Readiness](./phases/phase3-release-readiness.md)：Phase 3 第一批能力的验证命令、产物、边界和剩余风险。
 - [Phase 3 实现 Issue Graph](./phases/phase3-issue-graph.md)：Phase 3 配置可执行化、Console 操作流、Provider 探测和发布部署控制的依赖图。
-- [Phase 3 实施记录](./phases/phase3-next-development-plan.md)：Phase 3 当前任务范围、验收标准和完成记录。
+- [Phase 3 实施记录](./phases/phase3-next-development-plan.md)：Phase 3 已完成任务范围、验收标准和完成记录。
 - [Phase 2 Release Readiness](./phases/phase2-release-readiness.md)：Phase 2 第一批能力的验证命令、产物、边界和剩余风险。
 - [Phase 2 实现 Issue Graph](./phases/phase2-issue-graph.md)：Phase 2 已完成 issue graph 和依赖关系。
 - [Phase 2 实施记录](./phases/phase2-next-development-plan.md)：Phase 2 完成任务、验收标准和收口规则。

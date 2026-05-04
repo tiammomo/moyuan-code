@@ -1,10 +1,10 @@
 # Phase 3 实施记录
 
-状态：in_progress
+状态：ready_for_next_phase
 责任角色：orchestrator_owner + config_owner + frontend_owner + adapter_owner + qa_owner
 最后更新：2026-05-05
 
-本文记录 Phase 3 的实际执行顺序。稳定设计结论需要回写到配置、策略、契约、Console 或相关主线文档；本文件只记录阶段执行事实。
+本文记录 Phase 3 的实际执行顺序。稳定设计结论需要回写到配置、策略、契约、Console 或相关主线文档；本文件只记录阶段执行事实。当前第一批任务已完成，阶段验收见 [Phase 3 Release Readiness](./phase3-release-readiness.md)。
 
 ## 1. 当前基线
 
@@ -28,7 +28,7 @@ Phase 2 第一批能力已完成并通过 release readiness：
 | P0 | `phase3-002c` | `visuals-yaml-schema-validator` | completed | 将 `visuals/architecture-visuals.yaml` 纳入 workspace validate | 图像流水线策略、安全和 gpt-image-2 配置错误可被阻断 |
 | P0 | `phase3-002d` | `agent-runtimes-yaml-schema-validator` | completed | 将 `runtimes/agent-runtimes.yaml` 纳入 workspace validate | Claude/Codex Runtime 配置错误可被阻断 |
 | P0 | `phase3-002e` | `devops-policy-yaml-validator` | completed | 将 `server-resources.yaml`、`environments.yaml`、`release.yaml`、`budget.yaml` 纳入 workspace validate | 生产资源、发布部署和并发预算配置错误可被阻断 |
-| P1 | `phase3-003` | `console-operation-actions` | planned | Console 增加受控操作入口和后端 preview/dry-run 对齐 | 高风险动作不能绕过 approval/authz |
+| P1 | `phase3-003` | `console-operation-actions` | completed | Console 增加受控操作入口和后端 preview/dry-run 对齐 | 高风险动作不能绕过 approval/authz |
 | P1 | `phase3-003a` | `visual-render-dry-run-console-action` | completed | Visual Assets 面板触发后端 dry-run render | dry-run action 可见、可反馈 execution id，不调用真实图片 API |
 | P1 | `phase3-004` | `runtime-log-diff-viewer` | completed | Console 展开 runtime 日志、diff summary 和 resume hint | 失败排查证据链可见 |
 | P1 | `phase3-005` | `provider-probe-adapters` | completed | Provider refresh 接入可选轻量探测 adapter | 探测失败可解释，密钥不落盘 |
@@ -228,3 +228,10 @@ Phase 2 第一批能力已完成并通过 release readiness：
 - 每完成一个 Phase 3 issue，必须同步本实施记录和 issue graph。
 - 配置 validator 新增 issue code 时，必须能追溯到 [配置 Schema 规则](../configuration-schema-spec.md)。
 - Console 操作流只能调用后端受控 API，不允许在前端直接改变权威状态。
+
+## 15. Phase 3 收口结论
+
+- `phase3-001` 到 `phase3-007` 已全部完成。
+- 后端配置 validator、Provider probe、Visual script auth/quality 和 release/deploy controlled API 已进入可测试状态。
+- Console 已完成 Phase 3 第一批操作工作台能力：Visual dry-run、Runtime artifacts、Release suggest、Deploy dry-run 和 Health scan。
+- 当前阶段不再继续追加 Phase 3 issue；后续团队协作、审计查询、审批记录、Git PR/MR 同步、服务器续费维护进入 Phase 4。

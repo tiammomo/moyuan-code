@@ -455,24 +455,24 @@ moyuan repo pr create <task-id>
 - Subagent 能被创建、调度、重试、归档和审计。
 - Skill 效果能影响后续推荐、降权或禁用。
 
-### Phase 3：Memory 强化
+### Phase 3：配置可执行化与 Console 操作流
 
 目标：
 
-- 实现 Record Gate。
-- 实现轻量抽取和 memory candidates。
-- 实现暂存去重和异步写入。
-- 实现关键词 + 向量混合检索。
-- 实现 memory approval 和 curator。
-- 实现 bug signature、root cause、fix pattern 和 regression test 的 Memory candidate。
+- `.moyuan/*.yaml` 从文档样例升级为可读取、可校验、可阻断执行的配置事实源。
+- Provider、Routing、Visual、Runtime、Server Resource、Environment、Release 和 Budget 配置进入 workspace validator。
+- Console 从观察面板升级为受控操作工作台。
+- Provider refresh 支持可选轻量 probe，默认不外呼。
+- Visual script mode 支持 auth ref、密钥注入审计、质量检查和预览索引。
+- Release/deploy/smoke/monitor 操作以 suggest、dry-run、health scan 和状态记录为默认边界。
 
 验收：
 
-- 新任务可以检索历史决策、项目事实和 lessons。
-- 项目理解结果可以转为 memory candidates。
-- 过时和冲突 memory 能被标记。
-- 敏感信息不会进入长期 memory。
-- 类似 bug 再次出现时能检索历史修复经验。
+- `moyuan workspace validate` 可以发现核心 YAML 配置错误、条件必填、互斥字段、明文密钥和状态漂移。
+- Console 只能调用后端受控 API，不能直接绕过审批和质量门禁。
+- Provider probe 和 Visual script mode 均不落盘明文密钥，stdout/stderr 必须脱敏。
+- Visual 产物需要质量检查和 preview index。
+- 发布、部署和服务器巡检动作有可见状态，真实生产部署默认不执行。
 
 ### Phase 3.5：运行反馈与自我修复
 
@@ -562,9 +562,9 @@ Phase 1 的执行结果：
 
 ## 10. 当前阶段状态
 
-Beta 第一批控制面能力和 Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力已完成。Phase 2 收口记录见 [Phase 2 Release Readiness](./phases/phase2-release-readiness.md)。当前进入 Phase 3，执行入口见 [Phase 3 实现 Issue Graph](./phases/phase3-issue-graph.md) 和 [Phase 3 实施记录](./phases/phase3-next-development-plan.md)。
+Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力和 Phase 3 第一批配置可执行化/Console 操作流能力已完成。Phase 3 收口记录见 [Phase 3 Release Readiness](./phases/phase3-release-readiness.md)。
 
-Phase 3 的第一项实现任务是 `phase3-001 workspace-yaml-schema-validator`，用于让 `.moyuan/*.yaml` 从文档配置升级为可读取、可校验、可阻断执行的配置事实源。
+当前进入 Phase 4，执行入口见 [Phase 4 实现 Issue Graph](./phases/phase4-issue-graph.md) 和 [Phase 4 实施记录](./phases/phase4-next-development-plan.md)。Phase 4 的第一项建议任务是 `phase4-001 audit-log-query-api-console`，用于为审批、团队鉴权、Git PR/MR 同步和服务器维护建立统一审计查询入口。
 
 Phase 1 第一批实现模块：
 
@@ -599,7 +599,7 @@ Phase 1 仍不覆盖的能力：
 
 这些能力进入 Beta/Production 阶段继续拆分。
 
-## 10. 进入实施前的冻结清单
+## 11. 进入实施前的冻结清单
 
 在正式拆 issue 和写代码前，以下内容视为冻结，不再改动口径，除非出现新的架构决策：
 

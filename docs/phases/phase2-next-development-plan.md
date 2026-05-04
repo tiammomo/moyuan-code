@@ -1,10 +1,10 @@
 # Phase 2 实施记录
 
-状态：in_progress
+状态：ready_for_next_phase
 责任角色：orchestrator_owner + adapter_owner + skills_owner + qa_owner
 最后更新：2026-05-05
 
-本文记录 Phase 2 阶段从规划到执行的实际顺序。稳定设计结论需要回写到 `subagents-skills-system.md`、`model-tool-adapters.md`、策略、契约或配置文档；本文件只记录阶段执行事实。
+本文记录 Phase 2 阶段从规划到执行的实际顺序。稳定设计结论需要回写到 `subagents-skills-system.md`、`model-tool-adapters.md`、策略、契约或配置文档；本文件只记录阶段执行事实。当前第一批任务已完成，阶段验收见 [Phase 2 Release Readiness](./phase2-release-readiness.md)。
 
 ## 1. 当前基线
 

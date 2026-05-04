@@ -663,7 +663,7 @@ Skill Binding 字段：
 - Zod schema，或
 - TypeScript 类型 + runtime validator。
 
-Phase 3 当前落地：
+Phase 3 已落地：
 
 - `moyuan workspace validate` 已开始读取用户可编辑的 `.moyuan/project.yaml`、`.moyuan/repository.yaml` 和 `.moyuan/policies/access.yaml`。
 - 当前 validator 会检查 YAML 解析错误、`schema_version`、核心必填字段、`local_path`/`remote_git` 互斥、`local_single_user`/`team_server` 条件必填、`workspace.json` 与 YAML 的关键字段漂移。
