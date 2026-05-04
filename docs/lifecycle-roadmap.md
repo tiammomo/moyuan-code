@@ -562,9 +562,9 @@ Phase 1 的执行结果：
 
 ## 10. 当前阶段状态
 
-Beta 第一批控制面能力已完成，收口记录见 [Beta 实施记录](./phases/beta-next-development-plan.md)。当前进入 Phase 2，执行入口见 [Phase 2 实现 Issue Graph](./phases/phase2-issue-graph.md) 和 [Phase 2 实施记录](./phases/phase2-next-development-plan.md)。
+Beta 第一批控制面能力和 Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力已完成。Phase 2 收口记录见 [Phase 2 Release Readiness](./phases/phase2-release-readiness.md)。当前进入 Phase 3，执行入口见 [Phase 3 实现 Issue Graph](./phases/phase3-issue-graph.md) 和 [Phase 3 实施记录](./phases/phase3-next-development-plan.md)。
 
-Phase 2 的第一项实现任务是 `phase2-001 skill-registry-store-api`，用于建立 Skill Definition、启用状态、风险、适配 role 和 API/CLI 的稳定底座。
+Phase 3 的第一项实现任务是 `phase3-001 workspace-yaml-schema-validator`，用于让 `.moyuan/*.yaml` 从文档配置升级为可读取、可校验、可阻断执行的配置事实源。
 
 Phase 1 第一批实现模块：
 

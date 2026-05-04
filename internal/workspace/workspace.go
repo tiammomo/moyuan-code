@@ -8,60 +8,62 @@ import (
 
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/textutil"
+
+	"gopkg.in/yaml.v3"
 )
 
 type ProjectConfig struct {
-	SchemaVersion int `json:"schema_version"`
+	SchemaVersion int `json:"schema_version" yaml:"schema_version"`
 	Project       struct {
-		ID          string  `json:"id"`
-		Name        string  `json:"name"`
-		Root        string  `json:"root"`
-		Type        string  `json:"type"`
-		Description *string `json:"description"`
-	} `json:"project"`
+		ID          string  `json:"id" yaml:"id"`
+		Name        string  `json:"name" yaml:"name"`
+		Root        string  `json:"root" yaml:"root"`
+		Type        string  `json:"type" yaml:"type"`
+		Description *string `json:"description" yaml:"description"`
+	} `json:"project" yaml:"project"`
 	Stack struct {
-		Languages       []string `json:"languages"`
-		Frameworks      []string `json:"frameworks"`
-		PackageManagers []string `json:"package_managers"`
-		BuildCommands   []string `json:"build_commands"`
-		TestCommands    []string `json:"test_commands"`
-		LintCommands    []string `json:"lint_commands"`
-	} `json:"stack"`
+		Languages       []string `json:"languages" yaml:"languages"`
+		Frameworks      []string `json:"frameworks" yaml:"frameworks"`
+		PackageManagers []string `json:"package_managers" yaml:"package_managers"`
+		BuildCommands   []string `json:"build_commands" yaml:"build_commands"`
+		TestCommands    []string `json:"test_commands" yaml:"test_commands"`
+		LintCommands    []string `json:"lint_commands" yaml:"lint_commands"`
+	} `json:"stack" yaml:"stack"`
 	Workspace struct {
-		ProtectedPaths []string `json:"protected_paths"`
-		WritablePaths  []string `json:"writable_paths"`
-	} `json:"workspace"`
+		ProtectedPaths []string `json:"protected_paths" yaml:"protected_paths"`
+		WritablePaths  []string `json:"writable_paths" yaml:"writable_paths"`
+	} `json:"workspace" yaml:"workspace"`
 }
 
 type RepositoryConfig struct {
-	SchemaVersion int `json:"schema_version"`
+	SchemaVersion int `json:"schema_version" yaml:"schema_version"`
 	Repository    struct {
 		Source struct {
-			Type      string  `json:"type"`
-			Provider  string  `json:"provider"`
-			LocalPath string  `json:"local_path,omitempty"`
-			URL       *string `json:"url"`
-			ClonePath *string `json:"clone_path"`
-		} `json:"source"`
-		DefaultRemote string  `json:"default_remote"`
-		DefaultBranch *string `json:"default_branch"`
-	} `json:"repository"`
+			Type      string  `json:"type" yaml:"type"`
+			Provider  string  `json:"provider" yaml:"provider"`
+			LocalPath string  `json:"local_path,omitempty" yaml:"local_path,omitempty"`
+			URL       *string `json:"url" yaml:"url"`
+			ClonePath *string `json:"clone_path" yaml:"clone_path"`
+		} `json:"source" yaml:"source"`
+		DefaultRemote string  `json:"default_remote" yaml:"default_remote"`
+		DefaultBranch *string `json:"default_branch" yaml:"default_branch"`
+	} `json:"repository" yaml:"repository"`
 	Git struct {
-		BranchPolicy map[string]any `json:"branch_policy"`
-		CommitPolicy map[string]any `json:"commit_policy"`
-	} `json:"git"`
+		BranchPolicy map[string]any `json:"branch_policy" yaml:"branch_policy"`
+		CommitPolicy map[string]any `json:"commit_policy" yaml:"commit_policy"`
+	} `json:"git" yaml:"git"`
 }
 
 type AccessConfig struct {
-	SchemaVersion int `json:"schema_version"`
+	SchemaVersion int `json:"schema_version" yaml:"schema_version"`
 	Access        struct {
-		Mode           string              `json:"mode"`
-		LocalOwnerID   *string             `json:"local_owner_id"`
-		OrganizationID *string             `json:"organization_id"`
-		ProjectRoles   map[string][]string `json:"project_roles"`
-		ApprovalPolicy map[string]any      `json:"approval_policy"`
-		Audit          map[string]any      `json:"audit"`
-	} `json:"access"`
+		Mode           string              `json:"mode" yaml:"mode"`
+		LocalOwnerID   *string             `json:"local_owner_id" yaml:"local_owner_id"`
+		OrganizationID *string             `json:"organization_id" yaml:"organization_id"`
+		ProjectRoles   map[string][]string `json:"project_roles" yaml:"project_roles"`
+		ApprovalPolicy map[string]any      `json:"approval_policy" yaml:"approval_policy"`
+		Audit          map[string]any      `json:"audit" yaml:"audit"`
+	} `json:"access" yaml:"access"`
 }
 
 type Workspace struct {
@@ -143,7 +145,9 @@ func DefaultRepositoryConfig(rootDir string) RepositoryConfig {
 
 func DefaultAccessConfig() AccessConfig {
 	cfg := AccessConfig{SchemaVersion: 1}
+	localOwnerID := "local-owner"
 	cfg.Access.Mode = "local_single_user"
+	cfg.Access.LocalOwnerID = &localOwnerID
 	cfg.Access.ProjectRoles = map[string][]string{"owner": {"*"}}
 	cfg.Access.ApprovalPolicy = map[string]any{}
 	cfg.Access.Audit = map[string]any{"enabled": true}
@@ -218,11 +222,26 @@ func Load(rootDir string) (Workspace, error) {
 		ws.Project = state.Project
 		ws.Repository = state.Repository
 		ws.Access = state.Access
-		return ws, nil
+	} else {
+		ws.Project = DefaultProjectConfig(rootDir)
+		ws.Repository = DefaultRepositoryConfig(rootDir)
+		ws.Access = DefaultAccessConfig()
 	}
-	ws.Project = DefaultProjectConfig(rootDir)
-	ws.Repository = DefaultRepositoryConfig(rootDir)
-	ws.Access = DefaultAccessConfig()
+	if found, err := readYAMLConfig(paths.ProjectYAML, &ws.Project); err != nil {
+		return ws, err
+	} else if !found && ws.Project.SchemaVersion == 0 {
+		ws.Project = DefaultProjectConfig(rootDir)
+	}
+	if found, err := readYAMLConfig(paths.RepositoryYAML, &ws.Repository); err != nil {
+		return ws, err
+	} else if !found && ws.Repository.SchemaVersion == 0 {
+		ws.Repository = DefaultRepositoryConfig(rootDir)
+	}
+	if found, err := readYAMLConfig(paths.AccessYAML, &ws.Access); err != nil {
+		return ws, err
+	} else if !found && ws.Access.SchemaVersion == 0 {
+		ws.Access = DefaultAccessConfig()
+	}
 	return ws, nil
 }
 
@@ -251,14 +270,51 @@ func Validate(rootDir string) (ValidationReport, error) {
 			report.add("error", required.code, "required workspace config file is missing", required.path)
 		}
 	}
-	ws, err := Load(paths.RootDir)
+
+	state := StateFile{}
+	stateFound, err := fsutil.ReadJSON(filepath.Join(paths.MoyuanDir, "workspace.json"), &state)
 	if err != nil {
 		report.add("error", "workspace_state_unreadable", err.Error(), filepath.Join(paths.MoyuanDir, "workspace.json"))
 		return report.finish(), nil
 	}
-	validateProject(&report, ws.Project)
-	validateRepository(&report, ws.Repository)
-	validateAccess(&report, ws.Access)
+	if stateFound {
+		if state.SchemaVer != 1 {
+			report.add("error", "workspace_state_schema_version_invalid", "workspace state schema_ver must be 1", ".moyuan/workspace.json")
+		}
+		validateProject(&report, state.Project)
+		validateRepository(&report, state.Repository)
+		validateAccess(&report, state.Access)
+	}
+
+	var project ProjectConfig
+	projectFound, err := readYAMLConfig(paths.ProjectYAML, &project)
+	if err != nil {
+		report.add("error", "project_config_unreadable", err.Error(), paths.ProjectYAML)
+	}
+	if projectFound && err == nil {
+		validateProject(&report, project)
+	}
+
+	var repository RepositoryConfig
+	repositoryFound, err := readYAMLConfig(paths.RepositoryYAML, &repository)
+	if err != nil {
+		report.add("error", "repository_config_unreadable", err.Error(), paths.RepositoryYAML)
+	}
+	if repositoryFound && err == nil {
+		validateRepository(&report, repository)
+	}
+
+	var access AccessConfig
+	accessFound, err := readYAMLConfig(paths.AccessYAML, &access)
+	if err != nil {
+		report.add("error", "access_config_unreadable", err.Error(), paths.AccessYAML)
+	}
+	if accessFound && err == nil {
+		validateAccess(&report, access)
+	}
+	if stateFound {
+		validateStateDrift(&report, state, project, projectFound, repository, repositoryFound, access, accessFound)
+	}
 	return report.finish(), nil
 }
 
@@ -300,6 +356,14 @@ func updateState(paths Paths, mutate func(*StateFile)) error {
 	return fsutil.WriteJSON(filepath.Join(paths.MoyuanDir, "workspace.json"), state)
 }
 
+func readYAMLConfig(path string, target any) (bool, error) {
+	text, found, err := fsutil.ReadText(path)
+	if err != nil || !found {
+		return found, err
+	}
+	return true, yaml.Unmarshal([]byte(text), target)
+}
+
 func validateProject(report *ValidationReport, cfg ProjectConfig) {
 	if cfg.SchemaVersion != 1 {
 		report.add("error", "project_schema_version_invalid", "project schema_version must be 1", ".moyuan/project.yaml")
@@ -317,10 +381,10 @@ func validateProject(report *ValidationReport, cfg ProjectConfig) {
 		report.add("error", "project_type_required", "project.type is required", "project.type")
 	}
 	if len(cfg.Workspace.ProtectedPaths) == 0 {
-		report.add("warning", "protected_paths_empty", "workspace.protected_paths should protect secrets and policy files", "workspace.protected_paths")
+		report.add("error", "protected_paths_empty", "workspace.protected_paths must protect secrets and policy files", "workspace.protected_paths")
 	}
 	if len(cfg.Workspace.WritablePaths) == 0 {
-		report.add("warning", "writable_paths_empty", "workspace.writable_paths should constrain agent edits", "workspace.writable_paths")
+		report.add("error", "writable_paths_empty", "workspace.writable_paths must constrain agent edits", "workspace.writable_paths")
 	}
 }
 
@@ -340,22 +404,42 @@ func validateRepository(report *ValidationReport, cfg RepositoryConfig) {
 		if strings.TrimSpace(cfg.Repository.Source.LocalPath) == "" {
 			report.add("error", "repository_local_path_required", "repository.source.local_path is required for local_path source", "repository.source.local_path")
 		}
+		if cfg.Repository.Source.URL != nil && strings.TrimSpace(*cfg.Repository.Source.URL) != "" {
+			report.add("error", "repository_url_must_be_null_for_local_path", "repository.source.url must be null for local_path source", "repository.source.url")
+		}
 	case "remote_git":
 		if cfg.Repository.Source.URL == nil || strings.TrimSpace(*cfg.Repository.Source.URL) == "" {
 			report.add("error", "repository_url_required", "repository.source.url is required for remote_git source", "repository.source.url")
 		}
+		if strings.TrimSpace(cfg.Repository.Source.LocalPath) != "" {
+			report.add("error", "repository_local_path_must_be_empty_for_remote_git", "repository.source.local_path must be empty for remote_git source", "repository.source.local_path")
+		}
 	case "":
 	default:
-		report.add("warning", "repository_source_type_unknown", "repository.source.type is not a known source type", "repository.source.type")
+		report.add("error", "repository_source_type_unknown", "repository.source.type is not a known source type", "repository.source.type")
 	}
 	if strings.TrimSpace(cfg.Repository.DefaultRemote) == "" {
 		report.add("warning", "default_remote_empty", "repository.default_remote is empty; git sync may need explicit remote", "repository.default_remote")
 	}
 	if cfg.Git.BranchPolicy == nil {
 		report.add("error", "branch_policy_required", "git.branch_policy is required", "git.branch_policy")
+	} else {
+		if strings.TrimSpace(mapString(cfg.Git.BranchPolicy, "mode")) == "" {
+			report.add("error", "branch_policy_mode_required", "git.branch_policy.mode is required", "git.branch_policy.mode")
+		}
+		if strings.TrimSpace(mapString(cfg.Git.BranchPolicy, "naming")) == "" {
+			report.add("error", "branch_policy_naming_required", "git.branch_policy.naming is required", "git.branch_policy.naming")
+		}
 	}
 	if cfg.Git.CommitPolicy == nil {
 		report.add("error", "commit_policy_required", "git.commit_policy is required", "git.commit_policy")
+	} else {
+		if _, ok := cfg.Git.CommitPolicy["enabled"]; !ok {
+			report.add("error", "commit_policy_enabled_required", "git.commit_policy.enabled is required", "git.commit_policy.enabled")
+		}
+		if strings.TrimSpace(mapString(cfg.Git.CommitPolicy, "format")) == "" {
+			report.add("error", "commit_policy_format_required", "git.commit_policy.format is required", "git.commit_policy.format")
+		}
 	}
 }
 
@@ -369,6 +453,57 @@ func validateAccess(report *ValidationReport, cfg AccessConfig) {
 	if cfg.Access.ProjectRoles == nil || len(cfg.Access.ProjectRoles) == 0 {
 		report.add("error", "project_roles_required", "access.project_roles must define at least one role", "access.project_roles")
 	}
+	switch cfg.Access.Mode {
+	case "local_single_user":
+		if cfg.Access.LocalOwnerID == nil || strings.TrimSpace(*cfg.Access.LocalOwnerID) == "" {
+			report.add("error", "access_local_owner_required", "access.local_owner_id is required for local_single_user mode", "access.local_owner_id")
+		}
+		if cfg.Access.OrganizationID != nil && strings.TrimSpace(*cfg.Access.OrganizationID) != "" {
+			report.add("error", "access_organization_id_must_be_null", "access.organization_id must be null for local_single_user mode", "access.organization_id")
+		}
+	case "team_server":
+		if cfg.Access.OrganizationID == nil || strings.TrimSpace(*cfg.Access.OrganizationID) == "" {
+			report.add("error", "access_organization_id_required", "access.organization_id is required for team_server mode", "access.organization_id")
+		}
+		if cfg.Access.LocalOwnerID != nil && strings.TrimSpace(*cfg.Access.LocalOwnerID) != "" {
+			report.add("error", "access_local_owner_must_be_null", "access.local_owner_id must be null for team_server mode", "access.local_owner_id")
+		}
+	case "":
+	default:
+		report.add("error", "access_mode_unknown", "access.mode is not a known access mode", "access.mode")
+	}
+	if !mapBool(cfg.Access.Audit, "enabled") {
+		report.add("error", "access_audit_enabled_required", "access.audit.enabled must be true", "access.audit.enabled")
+	}
+}
+
+func validateStateDrift(report *ValidationReport, state StateFile, project ProjectConfig, projectFound bool, repository RepositoryConfig, repositoryFound bool, access AccessConfig, accessFound bool) {
+	if projectFound && state.Project.Project.ID != "" && project.Project.ID != "" && state.Project.Project.ID != project.Project.ID {
+		report.add("warning", "project_yaml_state_drift", "project.yaml and workspace.json project.id differ", "project.id")
+	}
+	if repositoryFound && state.Repository.Repository.Source.Type != "" && repository.Repository.Source.Type != "" && state.Repository.Repository.Source.Type != repository.Repository.Source.Type {
+		report.add("warning", "repository_yaml_state_drift", "repository.yaml and workspace.json repository.source.type differ", "repository.source.type")
+	}
+	if accessFound && state.Access.Access.Mode != "" && access.Access.Mode != "" && state.Access.Access.Mode != access.Access.Mode {
+		report.add("warning", "access_yaml_state_drift", "policies/access.yaml and workspace.json access.mode differ", "access.mode")
+	}
+}
+
+func mapString(values map[string]any, key string) string {
+	value, ok := values[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return fmt.Sprint(value)
+}
+
+func mapBool(values map[string]any, key string) bool {
+	value, ok := values[key]
+	if !ok {
+		return false
+	}
+	boolean, ok := value.(bool)
+	return ok && boolean
 }
 
 func (report *ValidationReport) add(severity string, code string, message string, path string) {

@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+- [Phase 3 实现 Issue Graph](./phase3-issue-graph.md)：Phase 3 配置可执行化、Console 操作流、Provider 探测和发布部署控制的依赖图。
+- [Phase 3 实施记录](./phase3-next-development-plan.md)：Phase 3 当前任务、执行范围和验收记录。
 - [Phase 2 实现 Issue Graph](./phase2-issue-graph.md)：Phase 2 多模型、Skills、Native Runtime 和 Subagent 调度深化的依赖图。
 - [Phase 2 实施记录](./phase2-next-development-plan.md)：Phase 2 当前任务、执行范围和验收记录。
 - [Phase 2 Release Readiness](./phase2-release-readiness.md)：Phase 2 第一批能力的收口验证、运行入口和剩余风险。

@@ -657,11 +657,17 @@ Skill Binding 字段：
 
 ## 28. 进入实现前必须补的机器校验
 
-本文是人类可读 schema 规则。进入实现前必须转换为：
+本文是人类可读 schema 规则。机器校验需要逐步转换为：
 
 - JSON Schema，或
 - Zod schema，或
 - TypeScript 类型 + runtime validator。
+
+Phase 3 当前落地：
+
+- `moyuan workspace validate` 已开始读取用户可编辑的 `.moyuan/project.yaml`、`.moyuan/repository.yaml` 和 `.moyuan/policies/access.yaml`。
+- 当前 validator 会检查 YAML 解析错误、`schema_version`、核心必填字段、`local_path`/`remote_git` 互斥、`local_single_user`/`team_server` 条件必填、`workspace.json` 与 YAML 的关键字段漂移。
+- 后续 `phase3-002` 继续扩展到 provider、routing、visual、runtime、server、release 和 budget 配置域。
 
 机器校验必须能输出：
 
