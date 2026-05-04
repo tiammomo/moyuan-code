@@ -431,26 +431,50 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
 
           <div className="panel">
-            <PanelTitle icon={<Sparkles size={18} />} title="Visual Assets" meta={`${snapshot.visual_assets.length} plans`} />
+            <PanelTitle
+              icon={<Sparkles size={18} />}
+              title="Visual Assets"
+              meta={`${snapshot.visual_assets.length} plans / ${snapshot.visual_render_executions.length} renders`}
+            />
             <div className="signalList">
-              {snapshot.visual_assets.length > 0 ? (
-                snapshot.visual_assets.map((asset) => (
-                  <div className="signalItem" key={asset.id}>
-                    <div className="signalHeader">
-                      <strong>{asset.title}</strong>
-                      <StatusPill tone={toneForStatus(asset.status)} label={asset.status} />
+              {snapshot.visual_assets.length > 0 || snapshot.visual_render_executions.length > 0 ? (
+                <>
+                  {snapshot.visual_assets.map((asset) => (
+                    <div className="signalItem" key={asset.id}>
+                      <div className="signalHeader">
+                        <strong>{asset.title}</strong>
+                        <StatusPill tone={toneForStatus(asset.status)} label={asset.status} />
+                      </div>
+                      <span>
+                        {asset.diagram_type} / {asset.size}
+                      </span>
+                      <div className="signalMeta">
+                        {asset.provider_id ? <code>{asset.provider_id}</code> : null}
+                        {asset.model_id ? <code>{asset.model_id}</code> : null}
+                        <code>{shortPath(asset.prompt_path || asset.spec_path)}</code>
+                      </div>
+                      {asset.route_reason ? <small>{asset.route_reason}</small> : null}
                     </div>
-                    <span>
-                      {asset.diagram_type} / {asset.size}
-                    </span>
-                    <div className="signalMeta">
-                      {asset.provider_id ? <code>{asset.provider_id}</code> : null}
-                      {asset.model_id ? <code>{asset.model_id}</code> : null}
-                      <code>{shortPath(asset.prompt_path || asset.spec_path)}</code>
+                  ))}
+                  {snapshot.visual_render_executions.map((execution) => (
+                    <div className="signalItem" key={execution.id}>
+                      <div className="signalHeader">
+                        <strong>{execution.title || compactID(execution.asset_id || execution.id)}</strong>
+                        <StatusPill tone={toneForStatus(execution.status)} label={execution.mode} />
+                      </div>
+                      <span>
+                        {execution.decision} / {execution.step_count} steps
+                      </span>
+                      <div className="signalMeta">
+                        <code>{execution.status}</code>
+                        {execution.provider_id ? <code>{execution.provider_id}</code> : null}
+                        {execution.script_path ? <code>{shortPath(execution.script_path)}</code> : null}
+                        {execution.image_path ? <code>{shortPath(execution.image_path)}</code> : null}
+                      </div>
+                      {execution.reasons[0] ? <small>{execution.reasons[0]}</small> : null}
                     </div>
-                    {asset.route_reason ? <small>{asset.route_reason}</small> : null}
-                  </div>
-                ))
+                  ))}
+                </>
               ) : (
                 <div className="emptyState">No visual assets planned</div>
               )}

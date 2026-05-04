@@ -22,6 +22,7 @@ export const demoSnapshot: ConsoleSnapshot = {
     runs: 2,
     recoveries: 1,
     visual_assets: 1,
+    visual_render_executions: 1,
   },
   issues: [
     {
@@ -313,6 +314,28 @@ export const demoSnapshot: ConsoleSnapshot = {
       route_reason: "image-diagram strategy matched visual architecture output",
       created_at: "2026-05-05T00:30:00.000Z",
       updated_at: "2026-05-05T00:30:00.000Z",
+    },
+  ],
+  visual_render_executions: [
+    {
+      id: "visual-render-visual-diagram-multi-agent-20260505003000-dry-run",
+      asset_id: "visual-diagram-multi-agent-20260505003000",
+      diagram_spec_id: "diagram-multi-agent-20260505003000",
+      diagram_type: "multi_agent",
+      title: "多 Agent Issue 编排流程图",
+      mode: "dry_run",
+      status: "completed",
+      decision: "VISUAL_RENDER_DRY_RUN",
+      reasons: ["no_image_api_called"],
+      provider_id: "gpt_image_2",
+      model_id: "gpt-image-2",
+      size: "3072x2048",
+      prompt_path: ".moyuan/visuals/prompts/diagram-multi-agent-20260505003000.prompt.md",
+      spec_path: ".moyuan/visuals/specs/diagram-multi-agent-20260505003000.json",
+      script_path: "scripts/generate-multi-agent-flow-image.js",
+      step_count: 1,
+      started_at: "2026-05-05T00:34:00.000Z",
+      finished_at: "2026-05-05T00:34:00.000Z",
     },
   ],
   quality_explanations: [

@@ -16,6 +16,7 @@ import type {
   SubagentBacklogItem,
   SubagentSummary,
   VisualAssetSummary,
+  VisualRenderExecutionSummary,
 } from "./types";
 
 const apiBase = process.env.MOYUAN_API_BASE_URL ?? "http://127.0.0.1:8080/v1";
@@ -63,6 +64,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     subagentsResponse,
     recoveriesResponse,
     visualAssetsResponse,
+    visualRenderExecutionsResponse,
     qualityReportsResponse,
     memoryResponse,
   ] = await Promise.all([
@@ -78,6 +80,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ subagents: unknown[] }>>(`/projects/${project.id}/subagents?limit=12`),
     apiGet<ApiEnvelope<{ runtime_recoveries: unknown[] }>>(`/projects/${project.id}/runtime-recoveries?limit=6`),
     apiGet<ApiEnvelope<{ visual_assets: unknown[] }>>(`/projects/${project.id}/visuals/assets?limit=6`),
+    apiGet<ApiEnvelope<{ visual_render_executions: unknown[] }>>(`/projects/${project.id}/visuals/render-executions?limit=6`),
     apiGet<ApiEnvelope<{ quality_reports: unknown[] }>>(`/projects/${project.id}/quality-reports?limit=8`),
     apiGet<ApiEnvelope<{ candidates: unknown[] }>>(`/projects/${project.id}/memory/candidates?limit=3`),
   ]);
@@ -95,6 +98,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const subagents = normalizeSubagents(subagentsResponse?.subagents ?? []);
   const recoveries = normalizeRuntimeRecoveries(recoveriesResponse?.runtime_recoveries ?? []);
   const visualAssets = normalizeVisualAssets(visualAssetsResponse?.visual_assets ?? []);
+  const visualRenderExecutions = normalizeVisualRenderExecutions(visualRenderExecutionsResponse?.visual_render_executions ?? []);
   const qualityReports = normalizeQualityReports(qualityReportsResponse?.quality_reports ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
@@ -117,6 +121,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       runs: runs.length,
       recoveries: recoveries.length,
       visual_assets: visualAssets.length,
+      visual_render_executions: visualRenderExecutions.length,
     },
     issues: issues.length > 0 ? issues : demoSnapshot.issues,
     schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
@@ -129,6 +134,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     subagents,
     runtime_recoveries: recoveries,
     visual_assets: visualAssets,
+    visual_render_executions: visualRenderExecutions,
     quality_explanations: qualityExplanations,
     timeline: timeline.length > 0 ? timeline : demoSnapshot.timeline,
     quality: qualitySignals.length > 0 ? qualitySignals : demoSnapshot.quality,
@@ -367,6 +373,30 @@ function normalizeVisualAssets(rawAssets: unknown[]): VisualAssetSummary[] {
       updated_at: readString(raw, "updated_at", ""),
     };
   });
+}
+
+function normalizeVisualRenderExecutions(rawExecutions: unknown[]): VisualRenderExecutionSummary[] {
+  return rawExecutions.map((raw, index) => ({
+    id: readString(raw, "id", `visual-render-${index + 1}`),
+    asset_id: readString(raw, "asset_id", ""),
+    diagram_spec_id: readString(raw, "diagram_spec_id", ""),
+    diagram_type: readString(raw, "diagram_type", ""),
+    title: readString(raw, "title", ""),
+    mode: readString(raw, "mode", "dry_run"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    provider_id: readString(raw, "provider_id", ""),
+    model_id: readString(raw, "model_id", ""),
+    size: readString(raw, "size", ""),
+    prompt_path: readString(raw, "prompt_path", ""),
+    spec_path: readString(raw, "spec_path", ""),
+    image_path: readString(raw, "image_path", ""),
+    script_path: readString(raw, "script_path", ""),
+    step_count: readObjectArray(raw, "steps").length,
+    started_at: readString(raw, "started_at", ""),
+    finished_at: readString(raw, "finished_at", ""),
+  }));
 }
 
 function normalizeQualityReports(rawReports: unknown[]) {

@@ -180,6 +180,28 @@ export type VisualAssetSummary = {
   updated_at?: string;
 };
 
+export type VisualRenderExecutionSummary = {
+  id: string;
+  asset_id: string;
+  diagram_spec_id?: string;
+  diagram_type?: string;
+  title?: string;
+  mode: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  provider_id?: string;
+  model_id?: string;
+  size?: string;
+  prompt_path?: string;
+  spec_path?: string;
+  image_path?: string;
+  script_path?: string;
+  step_count: number;
+  started_at?: string;
+  finished_at?: string;
+};
+
 export type QualityCheck = {
   type: string;
   command?: string;
@@ -246,6 +268,7 @@ export type ConsoleSnapshot = {
     runs: number;
     recoveries: number;
     visual_assets: number;
+    visual_render_executions: number;
   };
   issues: IssueNode[];
   schedule: ScheduleItem[];
@@ -258,6 +281,7 @@ export type ConsoleSnapshot = {
   subagents: SubagentSummary[];
   runtime_recoveries: RuntimeRecoverySummary[];
   visual_assets: VisualAssetSummary[];
+  visual_render_executions: VisualRenderExecutionSummary[];
   quality_explanations: QualityExplanation[];
   timeline: TimelineEvent[];
   quality: QualitySignal[];

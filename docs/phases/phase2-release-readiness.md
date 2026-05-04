@@ -15,7 +15,7 @@
 - Native Runtime recovery archive。
 - Subagent retry/archive state 和 scheduler backlog。
 - Visual diagram plan、diagram spec、prompt 和 asset index。
-- Console Phase 2 observability：runtime recoveries、subagent backlog、visual assets。
+- Console Phase 2 observability：runtime recoveries、subagent backlog、visual assets、visual render executions。
 
 不在本次收口内：
 
@@ -124,7 +124,7 @@ moyuan visuals renders
 - Runtime recovery 只归档上下文和建议 fallback candidate，不自动 resume。
 - Subagent retry/archive 已进入调度输入，但还没有生产级队列和 worker。
 - Visual render execution 默认不执行真实图像 API；script mode 需要 approval、运行开关和环境密钥。
-- Console 已有 Phase 2 可视化入口，但还未展开到完整日志、diff 和图片预览。
+- Console 已有 Phase 2 可视化入口，并能展示 visual render execution；但还未展开到完整日志、diff 和图片预览。
 
 ## 7. 下一批建议
 
