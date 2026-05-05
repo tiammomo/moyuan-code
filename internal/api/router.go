@@ -3497,6 +3497,32 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusAccepted, gin.H{"write_adapter_executions": report})
 	})
+	router.GET("/v1/projects/:project_id/operations/write-adapter-recoveries", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		report, err := operations.ListWriteAdapterRecoveries(rootDir, operations.WriteAdapterRecoveryOptions{
+			ExecutionID:     c.Query("execution_id"),
+			ExecutionPlanID: c.Query("execution_plan_id"),
+			AdapterID:       c.Query("adapter_id"),
+			Status:          c.Query("status"),
+			Decision:        c.Query("decision"),
+			FailureClass:    c.Query("failure_class"),
+			RecoveryAction:  c.Query("recovery_action"),
+			Limit:           queryLimit(c, 20),
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"write_adapter_recoveries": report})
+	})
 	router.GET("/v1/projects/:project_id/operations/:operation_type/:operation_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

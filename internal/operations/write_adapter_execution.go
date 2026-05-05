@@ -682,6 +682,9 @@ func finishWriteAdapterExecution(rootDir string, execution WriteAdapterExecution
 	}); err != nil {
 		return WriteAdapterExecution{}, err
 	}
+	if _, err := recordWriteAdapterRecovery(rootDir, execution); err != nil {
+		return WriteAdapterExecution{}, err
+	}
 	return execution, nil
 }
 

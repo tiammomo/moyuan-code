@@ -266,6 +266,10 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	adapterExecutionList := runCLI(t, root, "operations", "write-adapter-executions", "list", "--execution-plan-id", "missing-execution-plan", "--limit", "5")
 	assertContains(t, adapterExecutionList.stdout, `"write_adapter_executions"`)
 	assertContains(t, adapterExecutionList.stdout, `"missing-execution-plan"`)
+
+	adapterRecoveryList := runCLI(t, root, "operations", "write-adapter-recoveries", "list", "--failure-class", "execution_plan_missing", "--limit", "5")
+	assertContains(t, adapterRecoveryList.stdout, `"write_adapter_recoveries"`)
+	assertContains(t, adapterRecoveryList.stdout, `"WRITE_ADAPTER_RECOVERY_REPAIR_RECOMMENDED"`)
 }
 
 func TestControlLoopCLIRunsDurableIdempotentSteps(t *testing.T) {

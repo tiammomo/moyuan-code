@@ -272,6 +272,7 @@ func usage() string {
 		"moyuan operations write-execution-plans list [--review-packet-id <id>] [--mode preview|apply] [--status <status>] [--decision <decision>] [--limit 20]",
 		"moyuan operations write-adapter-executions create --execution-plan-id <id> [--mode preview|apply] [--adapter-id <id>] [--limit 20]",
 		"moyuan operations write-adapter-executions list [--execution-plan-id <id>] [--mode preview|apply] [--adapter-id <id>] [--status <status>] [--decision <decision>] [--limit 20]",
+		"moyuan operations write-adapter-recoveries list [--execution-id <id>] [--execution-plan-id <id>] [--adapter-id <id>] [--status <status>] [--decision <decision>] [--failure-class <class>] [--limit 20]",
 		"moyuan control-loop run [--step <type>] [--idempotency-key <key>] [--retry-budget 0] [--environment <env>] [--deployment-execution-id <id>]",
 		"moyuan control-loop queue add [--step <type>] [--environment <env>] [--maintenance-window always|due:YYYY-MM-DD|after:RFC3339|between:HH:MM-HH:MM] [--due-at RFC3339] [--retry-budget 0] [--admission-id <id>] [--remote-rehearsal-id <id>] [--review-packet-id <id>]",
 		"moyuan control-loop queue list [--status <status>] [--environment <env>] [--limit 20]",
@@ -2067,6 +2068,27 @@ func handleOperations(args []string, cwd string) (string, any, int, error) {
 		}
 		report, err := operations.CreateWriteAdapterExecutions(rootDir, options)
 		return "", map[string]any{"write_adapter_executions": report}, 0, err
+	case "write-adapter-recoveries":
+		action := "list"
+		subargs := args[1:]
+		if len(subargs) > 0 && !strings.HasPrefix(subargs[0], "--") {
+			action = subargs[0]
+			subargs = subargs[1:]
+		}
+		if action != "list" {
+			return "unknown operations write-adapter-recoveries command\n", nil, 1, nil
+		}
+		report, err := operations.ListWriteAdapterRecoveries(rootDir, operations.WriteAdapterRecoveryOptions{
+			ExecutionID:     flagValue(subargs, "--execution-id", ""),
+			ExecutionPlanID: flagValue(subargs, "--execution-plan-id", ""),
+			AdapterID:       flagValue(subargs, "--adapter-id", ""),
+			Status:          flagValue(subargs, "--status", ""),
+			Decision:        flagValue(subargs, "--decision", ""),
+			FailureClass:    flagValue(subargs, "--failure-class", ""),
+			RecoveryAction:  flagValue(subargs, "--recovery-action", ""),
+			Limit:           flagInt(subargs, "--limit", 20),
+		})
+		return "", map[string]any{"write_adapter_recoveries": report}, 0, err
 	}
 	return "unknown operations command\n", nil, 1, nil
 }

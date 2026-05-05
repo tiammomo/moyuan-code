@@ -147,6 +147,8 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const writeExecutionPlans = writeExecutionPlanReport?.plans ?? [];
   const writeAdapterExecutionReport = snapshot.write_adapter_executions;
   const writeAdapterExecutions = writeAdapterExecutionReport?.executions ?? [];
+  const writeAdapterRecoveryReport = snapshot.write_adapter_recoveries;
+  const writeAdapterRecoveries = writeAdapterRecoveryReport?.recoveries ?? [];
   const controlLoopQueue = snapshot.control_loop_queue ?? [];
   const decisionEntries = decisionLedger?.entries ?? [];
   const latestControlLoopRun = snapshot.control_loop_runs[0];
@@ -2103,6 +2105,58 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 </>
               ) : (
                 <div className="emptyState">No write adapter executions</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle
+              icon={<Wrench size={18} />}
+              title="Write Adapter Recovery"
+              meta={writeAdapterRecoveryReport ? `${writeAdapterRecoveryReport.recovery_count} recoveries` : "not generated"}
+            />
+            <div className="signalList">
+              {writeAdapterRecoveryReport ? (
+                <>
+                  <div className="signalItem">
+                    <div className="signalHeader">
+                      <strong>{compactID(writeAdapterRecoveryReport.id)}</strong>
+                      <StatusPill tone={writeAdapterRecoveryReport.open_count > 0 ? "warning" : "ok"} label={`${writeAdapterRecoveryReport.open_count} open`} />
+                    </div>
+                    <span>
+                      repair {writeAdapterRecoveryReport.repair_count} / retry {writeAdapterRecoveryReport.retry_count} / handoff{" "}
+                      {writeAdapterRecoveryReport.handoff_count}
+                    </span>
+                    <div className="signalMeta">
+                      {Object.entries(writeAdapterRecoveryReport.by_failure)
+                        .slice(0, 3)
+                        .map(([failure, count]) => (
+                          <code key={failure}>
+                            {failure}:{count}
+                          </code>
+                        ))}
+                    </div>
+                  </div>
+                  {writeAdapterRecoveries.slice(0, 4).map((recovery) => (
+                    <div className="signalItem" key={recovery.id}>
+                      <div className="signalHeader">
+                        <strong>{recovery.failure_class}</strong>
+                        <StatusPill tone={recovery.handoff_required ? "warning" : recovery.repair_allowed ? "blocked" : "ok"} label={recovery.decision} />
+                      </div>
+                      <span>
+                        {recovery.adapter_id || "adapter"} / {recovery.recovery_action} / {compactID(recovery.execution_id)}
+                      </span>
+                      <div className="signalMeta">
+                        <code>{recovery.repair_allowed ? "repair" : "no repair"}</code>
+                        <code>{recovery.retry_allowed ? "retry" : "no retry"}</code>
+                        <code>{recovery.handoff_required ? "handoff" : "no handoff"}</code>
+                        {recovery.evidence_refs.length ? <code>{recovery.evidence_refs.length} evidence</code> : null}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="emptyState">No write adapter recoveries</div>
               )}
             </div>
           </div>

@@ -1381,6 +1381,47 @@ export type WriteAdapterExecutionReportSummary = {
   executions: WriteAdapterExecutionSummary[];
 };
 
+export type WriteAdapterRecoverySummary = {
+  id: string;
+  execution_id: string;
+  execution_plan_id?: string;
+  operation_type?: string;
+  operation_id?: string;
+  provider?: string;
+  environment?: string;
+  adapter_id?: string;
+  mode?: string;
+  source_status: string;
+  source_decision: string;
+  status: string;
+  decision: string;
+  failure_class: string;
+  recovery_action: string;
+  repair_allowed: boolean;
+  retry_allowed: boolean;
+  handoff_required: boolean;
+  review_required: boolean;
+  reasons: string[];
+  evidence_refs: string[];
+  created_at?: string;
+};
+
+export type WriteAdapterRecoveryReportSummary = {
+  id: string;
+  generated_at?: string;
+  recovery_count: number;
+  open_count: number;
+  repair_count: number;
+  retry_count: number;
+  handoff_count: number;
+  by_adapter: Record<string, number>;
+  by_status: Record<string, number>;
+  by_decision: Record<string, number>;
+  by_failure: Record<string, number>;
+  by_action: Record<string, number>;
+  recoveries: WriteAdapterRecoverySummary[];
+};
+
 export type ControlLoopQueueItemSummary = {
   id: string;
   status: string;
@@ -1550,6 +1591,7 @@ export type ConsoleSnapshot = {
   write_review_packets?: WriteReviewPacketReportSummary;
   write_execution_plans?: WriteExecutionPlanReportSummary;
   write_adapter_executions?: WriteAdapterExecutionReportSummary;
+  write_adapter_recoveries?: WriteAdapterRecoveryReportSummary;
   control_loop_queue?: ControlLoopQueueItemSummary[];
   git_provider_plans: GitProviderPlanSummary[];
   auth_sessions: AuthSessionSummary[];

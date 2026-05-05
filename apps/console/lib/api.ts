@@ -70,6 +70,8 @@ import type {
   WriteAdapterExecutionReportSummary,
   WriteAdapterExecutionSummary,
   WriteAdapterGuardSummary,
+  WriteAdapterRecoveryReportSummary,
+  WriteAdapterRecoverySummary,
   WriteAdapterRollbackBindingSummary,
   WriteAdapterSandboxSummary,
   WriteExecutionPlanReportSummary,
@@ -171,6 +173,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     writeReviewPacketsResponse,
     writeExecutionPlansResponse,
     writeAdapterExecutionsResponse,
+    writeAdapterRecoveriesResponse,
     controlLoopQueueResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
@@ -233,6 +236,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ write_review_packets: unknown }>>(`/projects/${project.id}/operations/write-review-packets?limit=20`),
     apiGet<ApiEnvelope<{ write_execution_plans: unknown }>>(`/projects/${project.id}/operations/write-execution-plans?limit=20`),
     apiGet<ApiEnvelope<{ write_adapter_executions: unknown }>>(`/projects/${project.id}/operations/write-adapter-executions?limit=20`),
+    apiGet<ApiEnvelope<{ write_adapter_recoveries: unknown }>>(`/projects/${project.id}/operations/write-adapter-recoveries?limit=20`),
     apiGet<ApiEnvelope<{ control_loop_queue: unknown[] }>>(`/projects/${project.id}/control-loop/queue?limit=20`),
   ]);
 
@@ -298,6 +302,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const writeReviewPackets = normalizeWriteReviewPacketReport(writeReviewPacketsResponse?.write_review_packets);
   const writeExecutionPlans = normalizeWriteExecutionPlanReport(writeExecutionPlansResponse?.write_execution_plans);
   const writeAdapterExecutions = normalizeWriteAdapterExecutionReport(writeAdapterExecutionsResponse?.write_adapter_executions);
+  const writeAdapterRecoveries = normalizeWriteAdapterRecoveryReport(writeAdapterRecoveriesResponse?.write_adapter_recoveries);
   const controlLoopQueue = normalizeControlLoopQueue(controlLoopQueueResponse?.control_loop_queue ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
@@ -390,6 +395,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     write_review_packets: writeReviewPackets,
     write_execution_plans: writeExecutionPlans,
     write_adapter_executions: writeAdapterExecutions,
+    write_adapter_recoveries: writeAdapterRecoveries,
     control_loop_queue: controlLoopQueue,
     git_provider_plans: gitProviderPlans,
     auth_sessions: authSessions,
@@ -1675,6 +1681,55 @@ function normalizeWriteAdapterRollbackBinding(raw: unknown): WriteAdapterRollbac
     runbook_ref: readString(raw, "runbook_ref", ""),
     action_count: readNumber(raw, "action_count"),
     step_count: readNumber(raw, "step_count"),
+  };
+}
+
+function normalizeWriteAdapterRecoveryReport(raw: unknown): WriteAdapterRecoveryReportSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const summary = readUnknown(raw, "summary");
+  return {
+    id: readString(raw, "id", "write-adapter-recoveries"),
+    generated_at: readString(raw, "generated_at", ""),
+    recovery_count: readNumber(summary, "recovery_count"),
+    open_count: readNumber(summary, "open_count"),
+    repair_count: readNumber(summary, "repair_count"),
+    retry_count: readNumber(summary, "retry_count"),
+    handoff_count: readNumber(summary, "handoff_count"),
+    by_adapter: readNumberMap(summary, "by_adapter"),
+    by_status: readNumberMap(summary, "by_status"),
+    by_decision: readNumberMap(summary, "by_decision"),
+    by_failure: readNumberMap(summary, "by_failure"),
+    by_action: readNumberMap(summary, "by_action"),
+    recoveries: readObjectArray(raw, "recoveries").map(normalizeWriteAdapterRecovery),
+  };
+}
+
+function normalizeWriteAdapterRecovery(raw: unknown, index: number): WriteAdapterRecoverySummary {
+  return {
+    id: readString(raw, "id", `write-adapter-recovery-${index + 1}`),
+    execution_id: readString(raw, "execution_id", ""),
+    execution_plan_id: readString(raw, "execution_plan_id", ""),
+    operation_type: readString(raw, "operation_type", ""),
+    operation_id: readString(raw, "operation_id", ""),
+    provider: readString(raw, "provider", ""),
+    environment: readString(raw, "environment", ""),
+    adapter_id: readString(raw, "adapter_id", ""),
+    mode: readString(raw, "mode", ""),
+    source_status: readString(raw, "source_status", "unknown"),
+    source_decision: readString(raw, "source_decision", "unknown"),
+    status: readString(raw, "status", "open"),
+    decision: readString(raw, "decision", "unknown"),
+    failure_class: readString(raw, "failure_class", "unknown"),
+    recovery_action: readString(raw, "recovery_action", "manual_handoff"),
+    repair_allowed: readBoolean(raw, "repair_allowed"),
+    retry_allowed: readBoolean(raw, "retry_allowed"),
+    handoff_required: readBoolean(raw, "handoff_required"),
+    review_required: readBoolean(raw, "review_required"),
+    reasons: readArray(raw, "reasons"),
+    evidence_refs: readArray(raw, "evidence_refs"),
+    created_at: readString(raw, "created_at", ""),
   };
 }
 

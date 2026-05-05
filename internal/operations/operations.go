@@ -448,6 +448,39 @@ func Timeline(rootDir string, options TimelineOptions) ([]TimelineItem, error) {
 		})
 	}
 
+	adapterRecoveryReport, err := ListWriteAdapterRecoveries(rootDir, WriteAdapterRecoveryOptions{Limit: sourceLimit})
+	if err != nil {
+		return nil, err
+	}
+	for _, recovery := range adapterRecoveryReport.Recoveries {
+		refs, err := evidenceRefs(rootDir, "write_adapter_recovery", recovery.ID, recovery.EvidenceRefs)
+		if err != nil {
+			return nil, err
+		}
+		add(TimelineItem{
+			ID:           recovery.ID,
+			Type:         "write_adapter_recovery",
+			Operation:    "operations.write_adapter_recovery.record",
+			Status:       recovery.Status,
+			Decision:     recovery.Decision,
+			Reasons:      append([]string{}, recovery.Reasons...),
+			PrimaryRef:   recovery.ExecutionID,
+			SecondaryRef: recovery.ExecutionPlanID,
+			Environment:  recovery.Environment,
+			EvidenceRefs: refs,
+			Timestamp:    recovery.CreatedAt,
+			Metadata: map[string]any{
+				"adapter_id":       recovery.AdapterID,
+				"failure_class":    recovery.FailureClass,
+				"recovery_action":  recovery.RecoveryAction,
+				"repair_allowed":   recovery.RepairAllowed,
+				"retry_allowed":    recovery.RetryAllowed,
+				"handoff_required": recovery.HandoffRequired,
+				"source_decision":  recovery.SourceDecision,
+			},
+		})
+	}
+
 	admissions, err := deployment.ListReleaseAdmissions(rootDir, sourceLimit)
 	if err != nil {
 		return nil, err

@@ -4,6 +4,9 @@
 
 ## 当前阶段
 
+- [Phase 26 实现 Issue Graph](./phase26-issue-graph.md)：Phase 26 Write Adapter Failure Recovery Record 的依赖图。
+- [Phase 26 实施记录](./phase26-next-development-plan.md)：Phase 26 当前任务、执行范围和验收记录。
+- [Phase 26 Release Readiness](./phase26-release-readiness.md)：Phase 26 Write Adapter Failure Recovery Record 的收口验证。
 - [Phase 25 实现 Issue Graph](./phase25-issue-graph.md)：Phase 25 SSH Adapter Sandbox 与 Rollback Binding 的依赖图。
 - [Phase 25 实施记录](./phase25-next-development-plan.md)：Phase 25 当前任务、执行范围和验收记录。
 - [Phase 25 Release Readiness](./phase25-release-readiness.md)：Phase 25 SSH Adapter Sandbox 与 Rollback Binding 的收口验证。

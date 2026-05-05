@@ -443,6 +443,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/operations/write-execution-plans?limit=5&review_packet_id=missing-review-packet", http.StatusOK, `"write_execution_plans"`, `"missing-review-packet"`)
 	assertPostContains(t, router, "/v1/projects/managed/operations/write-adapter-executions", `{"execution_plan_id":"missing-execution-plan","mode":"preview","limit":5}`, http.StatusAccepted, `"write_adapter_executions"`, `"WRITE_ADAPTER_EXECUTION_PLAN_MISSING"`, `"external_write_performed":false`)
 	assertGETContains(t, router, "/v1/projects/managed/operations/write-adapter-executions?limit=5&execution_plan_id=missing-execution-plan", http.StatusOK, `"write_adapter_executions"`, `"missing-execution-plan"`)
+	assertGETContains(t, router, "/v1/projects/managed/operations/write-adapter-recoveries?limit=5&failure_class=execution_plan_missing", http.StatusOK, `"write_adapter_recoveries"`, `"WRITE_ADAPTER_RECOVERY_REPAIR_RECOMMENDED"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/"+evidenceRecords[0].ParentID+"/post-deployment-history", http.StatusOK, `"post_deployment_history"`, `"execution_blocked"`)
 	assertPostContains(t, router, "/v1/projects/managed/post-deployment-verifications", `{"execution_id":"`+evidenceRecords[0].ParentID+`","monitor_limit":5}`, http.StatusAccepted, `"post_deployment_verification"`, `"POST_DEPLOYMENT_VERIFICATION_ATTENTION_REQUIRED"`)
 	verifications, err := deployment.ListPostDeploymentVerifications(root, 1)

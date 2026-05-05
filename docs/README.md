@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 25 已完成 readiness 收口。
+当前阶段：Phase 26 已完成 readiness 收口。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
@@ -63,8 +63,11 @@
 
 ## 当前实施入口
 
-Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 25 已完成主要闭环。当前验收和状态入口：
+Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 26 已完成主要闭环。当前验收和状态入口：
 
+- [Phase 26 实现 Issue Graph](./phases/phase26-issue-graph.md)：Write Adapter Failure Recovery Record 的依赖图。
+- [Phase 26 实施记录](./phases/phase26-next-development-plan.md)：Phase 26 当前任务、验收标准和执行记录。
+- [Phase 26 Release Readiness](./phases/phase26-release-readiness.md)：Phase 26 完成范围、门禁结论、保留边界和后续真实 adapter 入口建议。
 - [Phase 25 实现 Issue Graph](./phases/phase25-issue-graph.md)：SSH Adapter Sandbox 与 Rollback Binding 的依赖图。
 - [Phase 25 实施记录](./phases/phase25-next-development-plan.md)：Phase 25 当前任务、验收标准和执行记录。
 - [Phase 25 Release Readiness](./phases/phase25-release-readiness.md)：Phase 25 完成范围、门禁结论、保留边界和后续真实 adapter 入口建议。

@@ -936,6 +936,42 @@ func TestSSHAdapterSandboxCommandStatusBlocksShellControlTokens(t *testing.T) {
 	}
 }
 
+func TestWriteAdapterRecoveryRecordsBlockedExecution(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	report, err := CreateWriteAdapterExecutions(root, WriteAdapterExecutionOptions{ExecutionPlanID: "missing-execution-plan", Mode: "preview", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.ExecutionCount != 1 || report.Executions[0].Status != "blocked" {
+		t.Fatalf("expected blocked adapter execution, got %+v", report)
+	}
+	recoveryReport, err := ListWriteAdapterRecoveries(root, WriteAdapterRecoveryOptions{ExecutionID: report.Executions[0].ID, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recoveryReport.Summary.RecoveryCount != 1 || recoveryReport.Summary.RepairCount != 1 || recoveryReport.Summary.OpenCount != 1 {
+		t.Fatalf("expected one open repair recovery, got %+v", recoveryReport.Summary)
+	}
+	recovery := recoveryReport.Recoveries[0]
+	if recovery.FailureClass != "execution_plan_missing" || recovery.Decision != "WRITE_ADAPTER_RECOVERY_REPAIR_RECOMMENDED" || !recovery.RepairAllowed || recovery.ExternalWritePerformed {
+		t.Fatalf("unexpected adapter recovery record: %+v", recovery)
+	}
+	loaded, found, err := LoadWriteAdapterRecovery(root, recovery.ID)
+	if err != nil || !found || loaded.ID != recovery.ID {
+		t.Fatalf("expected persisted recovery, found=%v err=%v loaded=%+v", found, err, loaded)
+	}
+	timeline, err := Timeline(root, TimelineOptions{Type: "write_adapter_recovery", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(timeline) != 1 || timeline[0].ID != recovery.ID || len(timeline[0].EvidenceRefs) == 0 {
+		t.Fatalf("expected recovery in timeline with evidence, got %+v", timeline)
+	}
+}
+
 func timelineContainsType(items []TimelineItem, typ string) bool {
 	for _, item := range items {
 		if item.Type == typ {
