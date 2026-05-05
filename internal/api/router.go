@@ -1699,6 +1699,31 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"operation_detail": detail})
 	})
+	router.POST("/v1/projects/:project_id/operations/:operation_type/:operation_id/repair-candidate", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		candidate, found, err := repair.CandidateFromOperation(rootDir, c.Param("operation_type"), c.Param("operation_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "operation not found")
+			return
+		}
+		status := http.StatusCreated
+		if candidate.Decision != "REPAIR_CANDIDATE_CREATED" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"operation_repair_candidate": candidate})
+	})
 	router.POST("/v1/projects/:project_id/requirements/plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -2138,6 +2163,44 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"candidates": candidates})
+	})
+	router.GET("/v1/projects/:project_id/repair/operation-candidates", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		candidates, err := repair.ListOperationRepairCandidates(rootDir, queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"operation_repair_candidates": candidates})
+	})
+	router.GET("/v1/projects/:project_id/repair/operation-candidates/:candidate_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		candidate, found, err := repair.LoadOperationRepairCandidate(rootDir, c.Param("candidate_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "operation repair candidate not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"operation_repair_candidate": candidate})
 	})
 	router.GET("/v1/projects/:project_id/repair/attempts/:attempt_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

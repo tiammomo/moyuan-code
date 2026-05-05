@@ -1057,6 +1057,26 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <div className="emptyState">No runtime recovery archived</div>
               )}
             </div>
+            <div className="signalList">
+              {snapshot.operation_repair_candidates.length > 0 ? (
+                snapshot.operation_repair_candidates.slice(0, 3).map((candidate) => (
+                  <div className="signalItem" key={candidate.id}>
+                    <div className="signalHeader">
+                      <strong>{compactID(candidate.operation_id || candidate.id)}</strong>
+                      <StatusPill tone={toneForStatus(candidate.failure_class)} label={candidate.failure_class} />
+                    </div>
+                    <span>{`${candidate.decision} / ${candidate.signal_type}`}</span>
+                    <div className="signalMeta">
+                      {candidate.repair_plan_id ? <code>{compactID(candidate.repair_plan_id)}</code> : null}
+                      {candidate.evidence_refs.length > 0 ? <code>{candidate.evidence_refs.length} evidence</code> : null}
+                      {candidate.review_required ? <code>review required</code> : null}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState compact">No operation repair candidates</div>
+              )}
+            </div>
           </div>
 
           <div className="panel">
@@ -1981,6 +2001,8 @@ function toneForStatus(status: string): StatusTone {
     status === "monitor_failed" ||
     status === "execution_failed" ||
     status === "execution_blocked" ||
+    status === "operation_failed" ||
+    status === "operation_blocked" ||
     status === "check_failed"
   )
     return "blocked";

@@ -559,6 +559,27 @@ export const demoSnapshot: ConsoleSnapshot = {
       updated_at: "2026-05-05T00:24:00.000Z",
     },
   ],
+  operation_repair_candidates: [
+    {
+      id: "operation-repair-candidate-deploy-exec-smoke",
+      status: "review_required",
+      decision: "REPAIR_CANDIDATE_CREATED",
+      operation_type: "deployment",
+      operation_id: "deploy-exec-smoke",
+      operation: "deployment.execute.local_shell",
+      operation_status: "failed",
+      operation_decision: "DEPLOY_SMOKE_FAILED",
+      failure_class: "smoke_failed",
+      signal_type: "smoke_failure",
+      signal_id: "signal-deploy-smoke",
+      bug_candidate_id: "bug-deploy-smoke",
+      repair_plan_id: "repair-plan-deploy-smoke",
+      evidence_refs: ["evidence-deploy-smoke"],
+      reasons: ["operation_smoke_failed"],
+      review_required: true,
+      created_at: "2026-05-05T00:28:00.000Z",
+    },
+  ],
   visual_assets: [
     {
       id: "visual-diagram-multi-agent-20260505003000",

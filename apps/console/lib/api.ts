@@ -15,6 +15,7 @@ import type {
   MaintenanceRecordSummary,
   OperationDetailSummary,
   OperationHistoryItem,
+  OperationRepairCandidateSummary,
   PostDeploymentHistorySummary,
   ProjectSummary,
   ProviderSummary,
@@ -83,6 +84,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     runsResponse,
     subagentsResponse,
     recoveriesResponse,
+    operationRepairCandidatesResponse,
     visualAssetsResponse,
     visualRenderExecutionsResponse,
     qualityReportsResponse,
@@ -111,6 +113,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ runs: unknown[] }>>(`/projects/${project.id}/runs?limit=12`),
     apiGet<ApiEnvelope<{ subagents: unknown[] }>>(`/projects/${project.id}/subagents?limit=12`),
     apiGet<ApiEnvelope<{ runtime_recoveries: unknown[] }>>(`/projects/${project.id}/runtime-recoveries?limit=6`),
+    apiGet<ApiEnvelope<{ operation_repair_candidates: unknown[] }>>(`/projects/${project.id}/repair/operation-candidates?limit=4`),
     apiGet<ApiEnvelope<{ visual_assets: unknown[] }>>(`/projects/${project.id}/visuals/assets?limit=6`),
     apiGet<ApiEnvelope<{ visual_render_executions: unknown[] }>>(`/projects/${project.id}/visuals/render-executions?limit=6`),
     apiGet<ApiEnvelope<{ quality_reports: unknown[] }>>(`/projects/${project.id}/quality-reports?limit=8`),
@@ -141,6 +144,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const runs = normalizeRuns(runsResponse?.runs ?? []);
   const subagents = normalizeSubagents(subagentsResponse?.subagents ?? []);
   const recoveries = normalizeRuntimeRecoveries(recoveriesResponse?.runtime_recoveries ?? []);
+  const operationRepairCandidates = normalizeOperationRepairCandidates(operationRepairCandidatesResponse?.operation_repair_candidates ?? []);
   const visualAssets = normalizeVisualAssets(visualAssetsResponse?.visual_assets ?? []);
   const visualRenderExecutions = normalizeVisualRenderExecutions(visualRenderExecutionsResponse?.visual_render_executions ?? []);
   const qualityReports = normalizeQualityReports(qualityReportsResponse?.quality_reports ?? []);
@@ -193,6 +197,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     runs,
     subagents,
     runtime_recoveries: recoveries,
+    operation_repair_candidates: operationRepairCandidates,
     visual_assets: visualAssets,
     visual_render_executions: visualRenderExecutions,
     quality_explanations: qualityExplanations,
@@ -620,6 +625,28 @@ function normalizeRuntimeRecoveries(rawRecoveries: unknown[]): RuntimeRecoverySu
     risks: readArray(raw, "risks"),
     created_at: readString(raw, "created_at", ""),
     updated_at: readString(raw, "updated_at", ""),
+  }));
+}
+
+function normalizeOperationRepairCandidates(rawCandidates: unknown[]): OperationRepairCandidateSummary[] {
+  return rawCandidates.map((raw, index) => ({
+    id: readString(raw, "id", `operation-repair-candidate-${index + 1}`),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    operation_type: readString(raw, "operation_type", ""),
+    operation_id: readString(raw, "operation_id", ""),
+    operation: readString(raw, "operation", ""),
+    operation_status: readString(raw, "operation_status", ""),
+    operation_decision: readString(raw, "operation_decision", ""),
+    failure_class: readString(raw, "failure_class", "unknown"),
+    signal_type: readString(raw, "signal_type", "runtime_error"),
+    signal_id: readString(raw, "signal_id", ""),
+    bug_candidate_id: readString(raw, "bug_candidate_id", ""),
+    repair_plan_id: readString(raw, "repair_plan_id", ""),
+    evidence_refs: readArray(raw, "evidence_refs"),
+    reasons: readArray(raw, "reasons"),
+    review_required: readBoolean(raw, "review_required"),
+    created_at: readString(raw, "created_at", ""),
   }));
 }
 

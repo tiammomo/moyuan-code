@@ -12,8 +12,10 @@ import (
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/memory"
+	"moyuan-code/internal/operations"
 	"moyuan-code/internal/quality"
 	"moyuan-code/internal/runtime"
+	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
 )
 
@@ -83,14 +85,42 @@ type Attempt struct {
 	MemoryRecordID  string          `json:"memory_record_id,omitempty"`
 }
 
+type OperationRepairCandidate struct {
+	ID                string     `json:"id"`
+	Status            string     `json:"status"`
+	Decision          string     `json:"decision"`
+	OperationType     string     `json:"operation_type"`
+	OperationID       string     `json:"operation_id"`
+	Operation         string     `json:"operation,omitempty"`
+	OperationStatus   string     `json:"operation_status,omitempty"`
+	OperationDecision string     `json:"operation_decision,omitempty"`
+	FailureClass      string     `json:"failure_class"`
+	SignalType        string     `json:"signal_type"`
+	SignalID          string     `json:"signal_id,omitempty"`
+	BugCandidateID    string     `json:"bug_candidate_id,omitempty"`
+	RepairPlanID      string     `json:"repair_plan_id,omitempty"`
+	EvidenceRefs      []string   `json:"evidence_refs"`
+	ArtifactRefs      []string   `json:"artifact_refs"`
+	Reasons           []string   `json:"reasons"`
+	ReviewRequired    bool       `json:"review_required"`
+	CreatedAt         string     `json:"created_at"`
+	Signal            *Signal    `json:"signal,omitempty"`
+	Candidate         *Candidate `json:"candidate,omitempty"`
+	Plan              *Plan      `json:"plan,omitempty"`
+}
+
 func CaptureSignal(rootDir string, signalType string, summary string, sourceID string) (Signal, error) {
+	return captureSignal(rootDir, signalType, summary, "run", sourceID, []string{})
+}
+
+func captureSignal(rootDir string, signalType string, summary string, sourceType string, sourceID string, evidenceRefs []string) (Signal, error) {
 	signal := Signal{
 		ID:           "signal-" + time.Now().UTC().Format("20060102150405.000000000"),
 		SignalType:   signalType,
-		SourceType:   "run",
+		SourceType:   sourceType,
 		SourceID:     sourceID,
 		Summary:      summary,
-		EvidenceRefs: []string{},
+		EvidenceRefs: append([]string{}, evidenceRefs...),
 		OccurredAt:   time.Now().UTC().Format(time.RFC3339Nano),
 		TraceID:      "trace-" + time.Now().UTC().Format("20060102150405"),
 	}
@@ -113,6 +143,12 @@ func Classify(rootDir string, signal Signal) (Candidate, error) {
 		status = "confirmed"
 		reproducible = true
 		riskLevel = "low"
+	}
+	if signal.SignalType == "smoke_failure" || signal.SignalType == "monitor_alert" {
+		classification = "NEEDS_EVIDENCE"
+		confidence = 0.55
+		status = "review_required"
+		riskLevel = "medium"
 	}
 	if signal.SignalType == "enhancement" {
 		classification = "ENHANCEMENT"
@@ -139,6 +175,14 @@ func Classify(rootDir string, signal Signal) (Candidate, error) {
 }
 
 func PlanRepair(rootDir string, candidate Candidate) (Plan, error) {
+	return planRepair(rootDir, candidate, false)
+}
+
+func planReviewOnlyRepair(rootDir string, candidate Candidate) (Plan, error) {
+	return planRepair(rootDir, candidate, true)
+}
+
+func planRepair(rootDir string, candidate Candidate, reviewOnly bool) (Plan, error) {
 	plan := Plan{
 		ID:                      "repair-plan-" + time.Now().UTC().Format("20060102150405.000000000"),
 		BugCandidateID:          candidate.ID,
@@ -159,11 +203,98 @@ func PlanRepair(rootDir string, candidate Candidate) (Plan, error) {
 		plan.RequiresApproval = true
 		plan.Status = "requires_approval"
 	}
+	if reviewOnly {
+		plan.Strategy = "review_repair_candidate"
+		plan.RequiresApproval = true
+		plan.Status = "candidate_review_required"
+	}
 	if err := fsutil.WriteJSON(planPath(rootDir, plan.ID), plan); err != nil {
 		return Plan{}, err
 	}
 	_ = logging.Log(rootDir, "run", "self_repair.repair.planned", map[string]any{"bug_candidate_id": candidate.ID, "repair_plan_id": plan.ID, "decision": plan.Strategy, "requires_approval": plan.RequiresApproval})
 	return plan, nil
+}
+
+func CandidateFromOperation(rootDir string, operationType string, operationID string) (OperationRepairCandidate, bool, error) {
+	detail, found, err := operations.Load(rootDir, operationType, operationID)
+	if err != nil || !found {
+		return OperationRepairCandidate{}, found, err
+	}
+	signalType, failureClass, repairable, reasons := classifyOperationDetail(detail)
+	result := OperationRepairCandidate{
+		ID:                "operation-repair-candidate-" + textutil.Slugify(detail.OperationType+"-"+detail.ID) + "-" + time.Now().UTC().Format("20060102150405.000000000"),
+		Status:            "ignored",
+		Decision:          "REPAIR_CANDIDATE_NOT_REQUIRED",
+		OperationType:     detail.OperationType,
+		OperationID:       detail.ID,
+		Operation:         detail.Operation,
+		OperationStatus:   detail.Status,
+		OperationDecision: detail.Decision,
+		FailureClass:      failureClass,
+		SignalType:        signalType,
+		EvidenceRefs:      operationEvidenceRefs(detail),
+		ArtifactRefs:      operationArtifactRefs(detail),
+		Reasons:           append([]string{}, reasons...),
+		ReviewRequired:    false,
+		CreatedAt:         time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if !repairable {
+		if err := saveOperationRepairCandidate(rootDir, result); err != nil {
+			return OperationRepairCandidate{}, true, err
+		}
+		_ = logging.Log(rootDir, "run", "self_repair.operation_candidate.skipped", map[string]any{"operation_type": result.OperationType, "operation_id": result.OperationID, "decision": result.Decision, "reason": strings.Join(result.Reasons, ",")})
+		return result, true, nil
+	}
+	signal, err := captureSignal(rootDir, signalType, operationSignalSummary(detail), "operation", detail.ID, result.EvidenceRefs)
+	if err != nil {
+		return OperationRepairCandidate{}, true, err
+	}
+	candidate, err := Classify(rootDir, signal)
+	if err != nil {
+		return OperationRepairCandidate{}, true, err
+	}
+	plan, err := planReviewOnlyRepair(rootDir, candidate)
+	if err != nil {
+		return OperationRepairCandidate{}, true, err
+	}
+	result.Status = "review_required"
+	result.Decision = "REPAIR_CANDIDATE_CREATED"
+	result.SignalID = signal.ID
+	result.BugCandidateID = candidate.ID
+	result.RepairPlanID = plan.ID
+	result.ReviewRequired = true
+	result.Signal = &signal
+	result.Candidate = &candidate
+	result.Plan = &plan
+	if err := saveOperationRepairCandidate(rootDir, result); err != nil {
+		return OperationRepairCandidate{}, true, err
+	}
+	_ = logging.Log(rootDir, "run", "self_repair.operation_candidate.created", map[string]any{"operation_type": result.OperationType, "operation_id": result.OperationID, "repair_plan_id": result.RepairPlanID, "failure_class": result.FailureClass})
+	return result, true, nil
+}
+
+func LoadOperationRepairCandidate(rootDir string, id string) (OperationRepairCandidate, bool, error) {
+	var candidate OperationRepairCandidate
+	found, err := fsutil.ReadJSON(operationRepairCandidatePath(rootDir, id), &candidate)
+	return candidate, found, err
+}
+
+func ListOperationRepairCandidates(rootDir string, limit int) ([]OperationRepairCandidate, error) {
+	lines, err := fsutil.TailLines(filepath.Join(workspace.ForRoot(rootDir).RepairDir, "operation-candidates.jsonl"), limit)
+	if err != nil {
+		return nil, err
+	}
+	candidates := []OperationRepairCandidate{}
+	for _, line := range lines {
+		var candidate OperationRepairCandidate
+		if err := json.Unmarshal([]byte(line), &candidate); err != nil {
+			return nil, err
+		}
+		if candidate.ID != "" {
+			candidates = append(candidates, candidate)
+		}
+	}
+	return candidates, nil
 }
 
 func RunAttempt(ctx context.Context, rootDir string, planID string, runtimeID string, prompt string) (Attempt, error) {
@@ -293,6 +424,66 @@ func finishAttempt(rootDir string, attempt Attempt) (Attempt, error) {
 	return attempt, nil
 }
 
+func saveOperationRepairCandidate(rootDir string, candidate OperationRepairCandidate) error {
+	if err := fsutil.WriteJSON(operationRepairCandidatePath(rootDir, candidate.ID), candidate); err != nil {
+		return err
+	}
+	return fsutil.AppendJSONL(filepath.Join(workspace.ForRoot(rootDir).RepairDir, "operation-candidates.jsonl"), candidate)
+}
+
+func classifyOperationDetail(detail operations.Detail) (string, string, bool, []string) {
+	reasons := append([]string{}, detail.Reasons...)
+	decision := strings.ToUpper(detail.Decision)
+	status := strings.ToLower(detail.Status)
+	switch {
+	case strings.Contains(decision, "SMOKE_FAILED") || strings.Contains(detail.Summary.SmokeDecision, "FAILED"):
+		return "smoke_failure", "smoke_failed", true, append(reasons, "operation_smoke_failed")
+	case strings.Contains(decision, "MONITOR_FAILED") || strings.Contains(detail.Summary.MonitorDecision, "FAILED"):
+		return "monitor_alert", "monitor_failed", true, append(reasons, "operation_monitor_failed")
+	case status == "failed" || strings.Contains(decision, "FAILED") || strings.Contains(decision, "REJECTED"):
+		return "runtime_error", "operation_failed", true, append(reasons, "operation_failed")
+	case status == "blocked" || strings.Contains(decision, "BLOCKED"):
+		return "operation_blocked", "operation_blocked", true, append(reasons, "operation_blocked")
+	default:
+		return "", "none", false, append(reasons, "operation_not_failed")
+	}
+}
+
+func operationSignalSummary(detail operations.Detail) string {
+	parts := []string{detail.OperationType, detail.Operation, detail.Decision}
+	for _, reason := range detail.Reasons {
+		if strings.TrimSpace(reason) != "" {
+			parts = append(parts, strings.TrimSpace(reason))
+			break
+		}
+	}
+	return strings.Join(parts, " / ")
+}
+
+func operationEvidenceRefs(detail operations.Detail) []string {
+	refs := []string{}
+	for _, record := range detail.Evidence {
+		if record.ID != "" {
+			refs = append(refs, record.ID)
+		}
+	}
+	return refs
+}
+
+func operationArtifactRefs(detail operations.Detail) []string {
+	refs := []string{}
+	for _, artifact := range detail.Artifacts {
+		if artifact.Path != "" {
+			refs = append(refs, artifact.Path)
+			continue
+		}
+		if artifact.ID != "" {
+			refs = append(refs, artifact.ID)
+		}
+	}
+	return refs
+}
+
 func nextAttemptNo(rootDir string, planID string) (int, error) {
 	lines, err := fsutil.TailLines(filepath.Join(workspace.ForRoot(rootDir).RepairDir, "attempts.jsonl"), 1000)
 	if err != nil {
@@ -322,4 +513,8 @@ func planPath(rootDir string, planID string) string {
 
 func attemptPath(rootDir string, attemptID string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).RepairDir, "attempts", attemptID+".json")
+}
+
+func operationRepairCandidatePath(rootDir string, id string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).RepairDir, "operation-candidates", id+".json")
 }

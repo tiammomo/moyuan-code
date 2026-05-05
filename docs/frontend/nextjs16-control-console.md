@@ -197,6 +197,7 @@ apps/console/
 - Live Workbench：运行中 issue 的状态、日志和下一步持续刷新。
 - Phase 2 Observability：把 runtime recoveries、subagent backlog、visual assets 和 visual render executions 放在同一屏，便于判断“失败如何恢复、任务为什么等待、架构图是否已规划、图片生成是否已进入受控执行”。
 - Runtime Evidence Preview：runtime recovery 可展开 stdout、stderr 和 diff summary 的受控预览；后端只读取 recovery 记录指向且位于 `.moyuan/` 下的归档文件。
+- Operation Repair Candidate Surface：Runtime Recoveries 面板展示从失败 operation 生成的 repair candidate、failure class、repair plan 和 evidence 数量；这些候选只进入人工 review，不自动运行修复。
 - Controlled Actions：低风险动作可从 Console 触发后端 dry-run 或 preview，例如 visual render dry-run、release provider preview；审批决定、API token、service account、PR/MR create、release provider publish、资源续期/退役等写操作必须调用后端受控 API，高风险动作仍进入 approval/authz。
 - Operation Detail：从 Operation History 选中 release provider 或 deployment execution 后，Console 优先读取 operation detail 聚合 API，展开 Evidence Chain，显示 evidence decision、reasons 和 artifact path；API 不可用时回退到 snapshot，刷新按钮触发 `router.refresh()` 重新拉取当前状态。
 - Schema-aware Forms：表单从 contract/schema 生成约束，错误能定位到字段；当前已先落地必填字段预检，后续再接入完整 schema metadata。

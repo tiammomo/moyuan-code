@@ -24,7 +24,7 @@ Phase 8 已完成并通过 release readiness：
 | P0 | `phase9-002` | `server-resource-lifecycle-alerts` | completed | 服务器资源生命周期提醒 | expiring/expired/maintenance_due 可查询并写入 audit |
 | P1 | `phase9-003` | `deployment-monitor-history` | completed | 部署后检查历史和失败分类 | smoke/monitor/rollback 可按 execution 查询历史 |
 | P1 | `phase9-004` | `provider-route-explanation-v2` | completed | Provider 路由解释增强 | selected/skipped provider signals 可解释 |
-| P2 | `phase9-005` | `self-repair-candidate-from-operations` | planned | 从失败 operation 生成修复候选 | repair candidate 可审查，不自动越权 |
+| P2 | `phase9-005` | `self-repair-candidate-from-operations` | completed | 从失败 operation 生成修复候选 | repair candidate 可审查，不自动越权 |
 
 ## 3. 执行规划：`phase9-001 operation-detail-aggregation-api`
 
@@ -126,7 +126,31 @@ Phase 8 已完成并通过 release readiness：
 - 路由候选理由覆盖 disabled、repo/runtime mismatch、memory API provider mismatch、health/quota/cost/data policy 阻断和低优先级跳过。
 - `candidate.signals` 追加 `selection` signal，便于 Console/日志解释本次路由为什么选或跳过。
 
-## 7. 验证要求
+## 7. 执行规划：`phase9-005 self-repair-candidate-from-operations`
+
+实现状态：completed。
+
+范围：
+
+- 从 operation detail 生成 review-only repair candidate，支持 `release_provider`、`deployment` 和 `evidence` operation。
+- 失败分类覆盖 `smoke_failed`、`monitor_failed`、`operation_failed`、`operation_blocked` 和 `none`。
+- 创建 operation-scoped signal、bug candidate 和 `candidate_review_required` repair plan，但不自动运行 repair attempt。
+- API 支持创建、列表和查看 operation repair candidate。
+- Console Runtime Recoveries 面板展示 operation repair candidate 摘要、failure class、repair plan 和 evidence 数量。
+
+非目标：
+
+- 不自动修复生产问题。
+- 不从 operation candidate 绕过 approval、quality gate、review 或 write scope。
+- 不记录完整 stdout/stderr、secret、token 或 provider 原始响应正文。
+
+落地结果：
+
+- 新增 `OperationRepairCandidate` 和 `CandidateFromOperation`。
+- 新增 API：`POST /v1/projects/:project_id/operations/:operation_type/:operation_id/repair-candidate`、`GET /v1/projects/:project_id/repair/operation-candidates`、`GET /v1/projects/:project_id/repair/operation-candidates/:candidate_id`。
+- 候选产物写入 `.moyuan/repair/operation-candidates/` 和 `.moyuan/repair/operation-candidates.jsonl`。
+
+## 8. 验证要求
 
 每完成一个 Phase 9 issue，至少运行：
 

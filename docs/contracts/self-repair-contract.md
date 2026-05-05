@@ -17,6 +17,7 @@ export type RuntimeSignalType =
   | "runtime_error"
   | "smoke_failure"
   | "monitor_alert"
+  | "operation_blocked"
   | "user_feedback"
   | "review_finding"
   | "repeated_pattern";
@@ -25,7 +26,7 @@ export interface RuntimeSignal {
   id: string;
   projectId: string;
   signalType: RuntimeSignalType;
-  sourceType: "run" | "issue" | "commit" | "release" | "deployment" | "user" | "monitor";
+  sourceType: "run" | "issue" | "commit" | "release" | "deployment" | "operation" | "user" | "monitor";
   sourceId?: string;
   summary: string;
   evidenceRefs: string[];
@@ -70,7 +71,7 @@ export interface RepairPlan {
   projectId: string;
   issueId?: string;
   writeScope: string[];
-  strategy: "minimal_fix" | "test_first_fix" | "rollback" | "issue_only";
+  strategy: "minimal_fix" | "test_first_fix" | "rollback" | "issue_only" | "review_repair_candidate";
   regressionTestRequired: boolean;
   commands: string[];
   requiresApproval: boolean;
@@ -105,6 +106,23 @@ export interface ImprovementRecord {
   confidence: number;
   status: "candidate" | "approved" | "applied" | "rejected" | "archived";
 }
+
+export interface OperationRepairCandidate {
+  id: string;
+  projectId: string;
+  operationType: "release_provider" | "deployment" | "evidence";
+  operationId: string;
+  operationDecision: string;
+  failureClass: "smoke_failed" | "monitor_failed" | "operation_failed" | "operation_blocked" | "none";
+  signalId?: string;
+  bugCandidateId?: string;
+  repairPlanId?: string;
+  evidenceRefs: string[];
+  artifactRefs: string[];
+  status: "review_required" | "ignored";
+  decision: "REPAIR_CANDIDATE_CREATED" | "REPAIR_CANDIDATE_NOT_REQUIRED";
+  reviewRequired: boolean;
+}
 ```
 
 ## 3. Engine 接口
@@ -114,6 +132,7 @@ export interface SelfRepairEngine {
   captureSignal(signal: RuntimeSignal): Promise<RuntimeSignal>;
   classify(candidateId: string): Promise<BugCandidate>;
   planRepair(candidateId: string): Promise<RepairPlan>;
+  createCandidateFromOperation(operationType: string, operationId: string): Promise<OperationRepairCandidate>;
   runRepair(planId: string): Promise<RepairAttemptResult>;
   recordImprovement(resultId: string): Promise<ImprovementRecord[]>;
 }

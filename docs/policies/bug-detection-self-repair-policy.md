@@ -16,8 +16,8 @@
 
 | 输入 | 说明 |
 | --- | --- |
-| `signal_type` | test_failure、runtime_error、smoke_failure、monitor_alert、user_feedback、review_finding |
-| `source` | run、issue、commit、release、deployment、user、monitor |
+| `signal_type` | test_failure、runtime_error、smoke_failure、monitor_alert、operation_blocked、user_feedback、review_finding |
+| `source` | run、issue、commit、release、deployment、operation、user、monitor |
 | `reproducible` | 是否稳定复现 |
 | `evidence_count` | 证据数量 |
 | `affected_scope` | 文件、模块、接口、环境 |
@@ -51,6 +51,10 @@ if signal is stable test/build/typecheck/lint failure:
 else if signal is smoke failure and reproduces in staging or test_dev:
   CONFIRMED_BUG
 
+else if signal comes from operation detail:
+  create review-only repair candidate
+  NEEDS_EVIDENCE until reviewed
+
 else if user_feedback conflicts with accepted requirement or contract:
   CONFIRMED_BUG
 
@@ -78,6 +82,9 @@ if auth_context invalid:
 
 if classification != CONFIRMED_BUG:
   do not auto repair
+
+if repair candidate is created from operation detail:
+  REQUIRE_APPROVAL
 
 if environment == production:
   REQUIRE_APPROVAL

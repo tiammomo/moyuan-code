@@ -299,6 +299,26 @@ export type RuntimeRecoverySummary = {
   updated_at?: string;
 };
 
+export type OperationRepairCandidateSummary = {
+  id: string;
+  status: string;
+  decision: string;
+  operation_type: string;
+  operation_id: string;
+  operation?: string;
+  operation_status?: string;
+  operation_decision?: string;
+  failure_class: string;
+  signal_type: string;
+  signal_id?: string;
+  bug_candidate_id?: string;
+  repair_plan_id?: string;
+  evidence_refs: string[];
+  reasons: string[];
+  review_required: boolean;
+  created_at?: string;
+};
+
 export type VisualAssetSummary = {
   id: string;
   diagram_spec_id: string;
@@ -558,6 +578,7 @@ export type ConsoleSnapshot = {
   runs: RunSummary[];
   subagents: SubagentSummary[];
   runtime_recoveries: RuntimeRecoverySummary[];
+  operation_repair_candidates: OperationRepairCandidateSummary[];
   visual_assets: VisualAssetSummary[];
   visual_render_executions: VisualRenderExecutionSummary[];
   quality_explanations: QualityExplanation[];
