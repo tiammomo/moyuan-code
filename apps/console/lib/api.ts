@@ -9,6 +9,7 @@ import type {
   AuthSessionSummary,
   BatchPlanSummary,
   BatchRunSummary,
+  ControlLoopQueueItemSummary,
   ControlLoopRunSummary,
   DecisionLedgerEntrySummary,
   DecisionLedgerReportSummary,
@@ -37,6 +38,8 @@ import type {
   ProviderWriteProofSummary,
   ProviderSummary,
   ProviderTelemetrySummary,
+  ProviderProofRequirementReportSummary,
+  ProviderProofRequirementSummary,
   QualityExplanation,
   QualitySignal,
   RehearsalSchedulerRunSummary,
@@ -52,6 +55,8 @@ import type {
   RunSummary,
   ResourceDeploymentRefSummary,
   ResourceSummary,
+  RemoteExecutionRehearsalReportSummary,
+  RemoteExecutionRehearsalSummary,
   ScheduleItem,
   ServiceAccountSummary,
   SubagentBacklogItem,
@@ -60,6 +65,8 @@ import type {
   VisualRenderExecutionSummary,
   WorktreeSummary,
   MergeQueueSummary,
+  WriteAdmissionReportSummary,
+  WriteAdmissionSummary,
 } from "./types";
 
 const apiBase = process.env.MOYUAN_API_BASE_URL ?? "http://127.0.0.1:8080/v1";
@@ -149,6 +156,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     operationsAuditExportResponse,
     decisionLedgerResponse,
     writeProofsResponse,
+    writeAdmissionsResponse,
+    providerProofRequirementsResponse,
+    remoteExecutionRehearsalsResponse,
+    controlLoopQueueResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
     apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: unknown[]; waiting_queue?: unknown[]; subagent_backlog?: unknown[] } }>>(
@@ -204,6 +215,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ operations_audit_export: unknown }>>(`/projects/${project.id}/operations/audit-export?limit=20`),
     apiGet<ApiEnvelope<{ decision_ledger: unknown }>>(`/projects/${project.id}/operations/decision-ledger?limit=20`),
     apiGet<ApiEnvelope<{ write_proofs: unknown }>>(`/projects/${project.id}/operations/write-proofs?limit=20`),
+    apiGet<ApiEnvelope<{ write_admissions: unknown }>>(`/projects/${project.id}/operations/write-admissions?limit=20`),
+    apiGet<ApiEnvelope<{ provider_proof_requirements: unknown }>>(`/projects/${project.id}/operations/provider-proof-requirements?limit=20`),
+    apiGet<ApiEnvelope<{ remote_execution_rehearsals: unknown }>>(`/projects/${project.id}/operations/remote-execution-rehearsals?limit=20`),
+    apiGet<ApiEnvelope<{ control_loop_queue: unknown[] }>>(`/projects/${project.id}/control-loop/queue?limit=20`),
   ]);
 
   const schedule = [
@@ -262,6 +277,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const operationsAuditExport = normalizeOperationsAuditExport(operationsAuditExportResponse?.operations_audit_export);
   const decisionLedger = normalizeDecisionLedgerReport(decisionLedgerResponse?.decision_ledger);
   const writeProofs = normalizeProviderWriteProofReport(writeProofsResponse?.write_proofs);
+  const writeAdmissions = normalizeWriteAdmissionReport(writeAdmissionsResponse?.write_admissions);
+  const providerProofRequirements = normalizeProviderProofRequirementReport(providerProofRequirementsResponse?.provider_proof_requirements);
+  const remoteExecutionRehearsals = normalizeRemoteExecutionRehearsalReport(remoteExecutionRehearsalsResponse?.remote_execution_rehearsals);
+  const controlLoopQueue = normalizeControlLoopQueue(controlLoopQueueResponse?.control_loop_queue ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
   const operationsTimeline = normalizeOperationsTimeline(operationsTimelineResponse?.operations_timeline ?? []);
@@ -347,6 +366,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     operations_audit_export: operationsAuditExport,
     decision_ledger: decisionLedger,
     write_proofs: writeProofs,
+    write_admissions: writeAdmissions,
+    provider_proof_requirements: providerProofRequirements,
+    remote_execution_rehearsals: remoteExecutionRehearsals,
+    control_loop_queue: controlLoopQueue,
     git_provider_plans: gitProviderPlans,
     auth_sessions: authSessions,
     api_tokens: apiTokens,
@@ -1313,6 +1336,163 @@ function normalizeProviderWriteProof(raw: unknown, index: number): ProviderWrite
     replay_guard: readString(raw, "replay_guard", ""),
     created_at: readString(raw, "created_at", ""),
   };
+}
+
+function normalizeWriteAdmissionReport(raw: unknown): WriteAdmissionReportSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const summary = readUnknown(raw, "summary");
+  return {
+    id: readString(raw, "id", "write-admission-report"),
+    generated_at: readString(raw, "generated_at", ""),
+    policy_id: readString(raw, "policy_id", "write-admission-default-v1"),
+    policy_version: readString(raw, "policy_version", ""),
+    target: readString(raw, "target", "real_write"),
+    entry_count: readNumber(summary, "entry_count"),
+    ready_count: readNumber(summary, "ready_count"),
+    blocked_count: readNumber(summary, "blocked_count"),
+    manual_required_count: readNumber(summary, "manual_required_count"),
+    rehearsal_only_count: readNumber(summary, "rehearsal_only_count"),
+    redaction_applied: readBoolean(summary, "redaction_applied"),
+    by_operation_type: readNumberMap(summary, "by_operation_type"),
+    by_provider: readNumberMap(summary, "by_provider"),
+    by_status: readNumberMap(summary, "by_status"),
+    by_decision: readNumberMap(summary, "by_decision"),
+    entries: readObjectArray(raw, "entries").map(normalizeWriteAdmission),
+  };
+}
+
+function normalizeWriteAdmission(raw: unknown, index: number): WriteAdmissionSummary {
+  return {
+    id: readString(raw, "id", `write-admission-${index + 1}`),
+    proof_id: readString(raw, "proof_id", ""),
+    proof_decision: readString(raw, "proof_decision", ""),
+    operation_type: readString(raw, "operation_type", "unknown"),
+    operation_id: readString(raw, "operation_id", ""),
+    provider: readString(raw, "provider", ""),
+    environment: readString(raw, "environment", ""),
+    mode: readString(raw, "mode", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    rule_refs: readArray(raw, "rule_refs"),
+    source_ref: readString(raw, "source_ref", ""),
+    dry_run: readBoolean(raw, "dry_run"),
+    write_enabled: readBoolean(raw, "write_enabled"),
+    rehearsal_allowed: readBoolean(raw, "rehearsal_allowed"),
+    approval_required: readBoolean(raw, "approval_required"),
+    approval_satisfied: readBoolean(raw, "approval_satisfied"),
+    secret_ref_status: readString(raw, "secret_ref_status", ""),
+    provider_evidence_refs: readArray(raw, "provider_evidence_refs"),
+    provider_requirement_id: readString(raw, "provider_requirement_id", ""),
+    provider_requirement_version: readString(raw, "provider_requirement_version", ""),
+    provider_requirement_refs: readArray(raw, "provider_requirement_refs"),
+    least_privilege: readString(raw, "least_privilege", ""),
+    replay_guard: readString(raw, "replay_guard", ""),
+    created_at: readString(raw, "created_at", ""),
+  };
+}
+
+function normalizeProviderProofRequirementReport(raw: unknown): ProviderProofRequirementReportSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const summary = readUnknown(raw, "summary");
+  return {
+    id: readString(raw, "id", "provider-proof-requirements"),
+    generated_at: readString(raw, "generated_at", ""),
+    policy_id: readString(raw, "policy_id", "provider-proof-requirements-v1"),
+    policy_version: readString(raw, "policy_version", ""),
+    requirement_count: readNumber(summary, "requirement_count"),
+    by_provider: readNumberMap(summary, "by_provider"),
+    by_operation_type: readNumberMap(summary, "by_operation_type"),
+    requirements: readObjectArray(raw, "requirements").map(normalizeProviderProofRequirement),
+  };
+}
+
+function normalizeProviderProofRequirement(raw: unknown, index: number): ProviderProofRequirementSummary {
+  return {
+    id: readString(raw, "id", `provider-proof-${index + 1}`),
+    provider: readString(raw, "provider", "provider"),
+    operation_type: readString(raw, "operation_type", "unknown"),
+    status: readString(raw, "status", "supported"),
+    decision: readString(raw, "decision", "PROVIDER_PROOF_REQUIREMENT_SUPPORTED"),
+    required_secret_ref_status: readString(raw, "required_secret_ref_status", ""),
+    require_evidence: readBoolean(raw, "require_evidence"),
+    require_approval: readBoolean(raw, "require_approval"),
+    require_write_switch: readBoolean(raw, "require_write_switch"),
+    production_review_required: readBoolean(raw, "production_review_required"),
+    least_privilege_scopes: readArray(raw, "least_privilege_scopes"),
+    replay_guard: readString(raw, "replay_guard", ""),
+    rule_refs: readArray(raw, "rule_refs"),
+  };
+}
+
+function normalizeRemoteExecutionRehearsalReport(raw: unknown): RemoteExecutionRehearsalReportSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const summary = readUnknown(raw, "summary");
+  return {
+    id: readString(raw, "id", "remote-execution-rehearsals"),
+    generated_at: readString(raw, "generated_at", ""),
+    rehearsal_count: readNumber(summary, "rehearsal_count"),
+    completed_count: readNumber(summary, "completed_count"),
+    blocked_count: readNumber(summary, "blocked_count"),
+    manual_count: readNumber(summary, "manual_count"),
+    by_provider: readNumberMap(summary, "by_provider"),
+    by_status: readNumberMap(summary, "by_status"),
+    by_decision: readNumberMap(summary, "by_decision"),
+    rehearsals: readObjectArray(raw, "rehearsals").map(normalizeRemoteExecutionRehearsal),
+  };
+}
+
+function normalizeRemoteExecutionRehearsal(raw: unknown, index: number): RemoteExecutionRehearsalSummary {
+  const rollback = readUnknown(raw, "rollback_check");
+  return {
+    id: readString(raw, "id", `remote-execution-rehearsal-${index + 1}`),
+    source_admission_id: readString(raw, "source_admission_id", ""),
+    source_proof_id: readString(raw, "source_proof_id", ""),
+    operation_type: readString(raw, "operation_type", "deployment_execution"),
+    operation_id: readString(raw, "operation_id", ""),
+    provider: readString(raw, "provider", ""),
+    environment: readString(raw, "environment", ""),
+    mode: readString(raw, "mode", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    rule_refs: readArray(raw, "rule_refs"),
+    evidence_refs: readArray(raw, "evidence_refs"),
+    provider_requirement_id: readString(raw, "provider_requirement_id", ""),
+    target_check_count: readObjectArray(raw, "target_checks").length,
+    command_check_count: readObjectArray(raw, "command_checks").length,
+    auth_ref_check_count: readObjectArray(raw, "auth_ref_checks").length,
+    rollback_required: readBoolean(rollback, "required"),
+    rollback_decision: readString(rollback, "decision", ""),
+    created_at: readString(raw, "created_at", ""),
+    finished_at: readString(raw, "finished_at", ""),
+  };
+}
+
+function normalizeControlLoopQueue(rawItems: unknown[]): ControlLoopQueueItemSummary[] {
+  return rawItems.map((raw, index) => ({
+    id: readString(raw, "id", `control-queue-${index + 1}`),
+    status: readString(raw, "status", "queued"),
+    decision: readString(raw, "decision", "CONTROL_QUEUE_QUEUED"),
+    trigger: readString(raw, "trigger", "queue"),
+    requested_by: readString(raw, "requested_by", ""),
+    retry_budget: readNumber(raw, "retry_budget"),
+    attempt_count: readNumber(raw, "attempt_count"),
+    steps: readArray(raw, "steps"),
+    environment: readString(raw, "environment", ""),
+    maintenance_window: readString(raw, "maintenance_window", ""),
+    due_at: readString(raw, "due_at", ""),
+    run_id: readString(raw, "run_id", ""),
+    reasons: readArray(raw, "reasons"),
+    created_at: readString(raw, "created_at", ""),
+    updated_at: readString(raw, "updated_at", ""),
+  }));
 }
 
 function normalizeGitProviderPlans(rawPlans: unknown[]): GitProviderPlanSummary[] {

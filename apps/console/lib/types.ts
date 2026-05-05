@@ -1120,6 +1120,136 @@ export type ProviderWriteProofReportSummary = {
   proofs: ProviderWriteProofSummary[];
 };
 
+export type WriteAdmissionSummary = {
+  id: string;
+  proof_id?: string;
+  proof_decision?: string;
+  operation_type: string;
+  operation_id: string;
+  provider?: string;
+  environment?: string;
+  mode?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  rule_refs: string[];
+  source_ref?: string;
+  dry_run: boolean;
+  write_enabled: boolean;
+  rehearsal_allowed: boolean;
+  approval_required: boolean;
+  approval_satisfied: boolean;
+  secret_ref_status?: string;
+  provider_evidence_refs: string[];
+  provider_requirement_id?: string;
+  provider_requirement_version?: string;
+  provider_requirement_refs: string[];
+  least_privilege?: string;
+  replay_guard?: string;
+  created_at?: string;
+};
+
+export type WriteAdmissionReportSummary = {
+  id: string;
+  generated_at?: string;
+  policy_id: string;
+  policy_version?: string;
+  target: string;
+  entry_count: number;
+  ready_count: number;
+  blocked_count: number;
+  manual_required_count: number;
+  rehearsal_only_count: number;
+  redaction_applied: boolean;
+  by_operation_type: Record<string, number>;
+  by_provider: Record<string, number>;
+  by_status: Record<string, number>;
+  by_decision: Record<string, number>;
+  entries: WriteAdmissionSummary[];
+};
+
+export type ProviderProofRequirementSummary = {
+  id: string;
+  provider: string;
+  operation_type: string;
+  status: string;
+  decision: string;
+  required_secret_ref_status?: string;
+  require_evidence: boolean;
+  require_approval: boolean;
+  require_write_switch: boolean;
+  production_review_required: boolean;
+  least_privilege_scopes: string[];
+  replay_guard?: string;
+  rule_refs: string[];
+};
+
+export type ProviderProofRequirementReportSummary = {
+  id: string;
+  generated_at?: string;
+  policy_id: string;
+  policy_version?: string;
+  requirement_count: number;
+  by_provider: Record<string, number>;
+  by_operation_type: Record<string, number>;
+  requirements: ProviderProofRequirementSummary[];
+};
+
+export type RemoteExecutionRehearsalSummary = {
+  id: string;
+  source_admission_id?: string;
+  source_proof_id?: string;
+  operation_type: string;
+  operation_id: string;
+  provider?: string;
+  environment?: string;
+  mode?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  rule_refs: string[];
+  evidence_refs: string[];
+  provider_requirement_id?: string;
+  target_check_count: number;
+  command_check_count: number;
+  auth_ref_check_count: number;
+  rollback_required: boolean;
+  rollback_decision?: string;
+  created_at?: string;
+  finished_at?: string;
+};
+
+export type RemoteExecutionRehearsalReportSummary = {
+  id: string;
+  generated_at?: string;
+  rehearsal_count: number;
+  completed_count: number;
+  blocked_count: number;
+  manual_count: number;
+  by_provider: Record<string, number>;
+  by_status: Record<string, number>;
+  by_decision: Record<string, number>;
+  rehearsals: RemoteExecutionRehearsalSummary[];
+};
+
+export type ControlLoopQueueItemSummary = {
+  id: string;
+  status: string;
+  decision: string;
+  trigger: string;
+  requested_by?: string;
+  retry_budget: number;
+  attempt_count: number;
+  steps: string[];
+  environment?: string;
+  maintenance_window?: string;
+  due_at?: string;
+  run_id?: string;
+  reasons: string[];
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type ApprovalRecordSummary = {
   id: string;
   target_type: string;
@@ -1262,6 +1392,10 @@ export type ConsoleSnapshot = {
   operations_audit_export?: OperationsAuditExportSummary;
   decision_ledger?: DecisionLedgerReportSummary;
   write_proofs?: ProviderWriteProofReportSummary;
+  write_admissions?: WriteAdmissionReportSummary;
+  provider_proof_requirements?: ProviderProofRequirementReportSummary;
+  remote_execution_rehearsals?: RemoteExecutionRehearsalReportSummary;
+  control_loop_queue?: ControlLoopQueueItemSummary[];
   git_provider_plans: GitProviderPlanSummary[];
   auth_sessions: AuthSessionSummary[];
   api_tokens: APITokenSummary[];

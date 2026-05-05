@@ -135,6 +135,13 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const decisionLedger = snapshot.decision_ledger;
   const writeProofReport = snapshot.write_proofs;
   const writeProofs = writeProofReport?.proofs ?? [];
+  const writeAdmissionReport = snapshot.write_admissions;
+  const writeAdmissions = writeAdmissionReport?.entries ?? [];
+  const providerProofRequirementReport = snapshot.provider_proof_requirements;
+  const providerProofRequirements = providerProofRequirementReport?.requirements ?? [];
+  const remoteRehearsalReport = snapshot.remote_execution_rehearsals;
+  const remoteRehearsals = remoteRehearsalReport?.rehearsals ?? [];
+  const controlLoopQueue = snapshot.control_loop_queue ?? [];
   const decisionEntries = decisionLedger?.entries ?? [];
   const latestControlLoopRun = snapshot.control_loop_runs[0];
   const activeSessions = snapshot.auth_sessions.filter((session) => session.status === "active");
@@ -1774,6 +1781,153 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
 
           <div className="panel">
+            <PanelTitle
+              icon={<ShieldCheck size={18} />}
+              title="Write Admission"
+              meta={writeAdmissionReport ? `${writeAdmissionReport.entry_count} entries` : "not generated"}
+            />
+            <div className="signalList">
+              {writeAdmissionReport ? (
+                <>
+                  <div className="signalItem">
+                    <div className="signalHeader">
+                      <strong>{writeAdmissionReport.policy_id}</strong>
+                      <StatusPill tone={writeAdmissionReport.blocked_count > 0 ? "blocked" : "ok"} label={writeAdmissionReport.target} />
+                    </div>
+                    <span>
+                      ready {writeAdmissionReport.ready_count} / rehearsal {writeAdmissionReport.rehearsal_only_count} / manual{" "}
+                      {writeAdmissionReport.manual_required_count}
+                    </span>
+                    <div className="signalMeta">
+                      <code>{writeAdmissionReport.redaction_applied ? "redaction applied" : "redaction clear"}</code>
+                      {Object.entries(writeAdmissionReport.by_status)
+                        .slice(0, 3)
+                        .map(([status, count]) => (
+                          <code key={status}>
+                            {status}:{count}
+                          </code>
+                        ))}
+                    </div>
+                  </div>
+                  {writeAdmissions.slice(0, 4).map((admission) => (
+                    <div className="signalItem" key={admission.id}>
+                      <div className="signalHeader">
+                        <strong>{admission.operation_type}</strong>
+                        <StatusPill tone={toneForStatus(admission.status)} label={admission.decision} />
+                      </div>
+                      <span>
+                        {admission.provider || "provider"} / {admission.mode || "mode"} / {compactID(admission.operation_id)}
+                      </span>
+                      <div className="signalMeta">
+                        <code>{admission.write_enabled ? "write enabled" : "write disabled"}</code>
+                        <code>{admission.rehearsal_allowed ? "rehearsal allowed" : "rehearsal blocked"}</code>
+                        {admission.provider_requirement_id ? <code>{compactID(admission.provider_requirement_id)}</code> : null}
+                        {admission.rule_refs.length ? <code>{admission.rule_refs.length} rules</code> : null}
+                        {admission.provider_evidence_refs.length ? <code>{admission.provider_evidence_refs.length} evidence</code> : null}
+                      </div>
+                      {admission.reasons[0] ? <small>{admission.reasons[0]}</small> : null}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="emptyState">No write admissions</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle
+              icon={<KeyRound size={18} />}
+              title="Provider Proof Pack"
+              meta={providerProofRequirementReport ? `${providerProofRequirementReport.requirement_count} requirements` : "not generated"}
+            />
+            <div className="signalList">
+              {providerProofRequirementReport ? (
+                <>
+                  <div className="signalItem">
+                    <div className="signalHeader">
+                      <strong>{providerProofRequirementReport.policy_id}</strong>
+                      <StatusPill tone="ok" label={providerProofRequirementReport.policy_version || "active"} />
+                    </div>
+                    <div className="signalMeta">
+                      {Object.entries(providerProofRequirementReport.by_provider)
+                        .slice(0, 5)
+                        .map(([provider, count]) => (
+                          <code key={provider}>
+                            {provider}:{count}
+                          </code>
+                        ))}
+                    </div>
+                  </div>
+                  {providerProofRequirements.slice(0, 5).map((requirement) => (
+                    <div className="signalItem" key={requirement.id}>
+                      <div className="signalHeader">
+                        <strong>{requirement.provider}</strong>
+                        <StatusPill tone={toneForStatus(requirement.status)} label={requirement.operation_type} />
+                      </div>
+                      <span>{requirement.decision}</span>
+                      <div className="signalMeta">
+                        <code>{requirement.require_write_switch ? "write switch" : "read-only"}</code>
+                        <code>{requirement.require_approval ? "approval" : "approval n/a"}</code>
+                        <code>{requirement.require_evidence ? "evidence" : "evidence n/a"}</code>
+                        {requirement.required_secret_ref_status ? <code>{requirement.required_secret_ref_status}</code> : null}
+                        {requirement.least_privilege_scopes.length ? <code>{requirement.least_privilege_scopes.length} scopes</code> : null}
+                      </div>
+                      {requirement.replay_guard ? <small>{requirement.replay_guard}</small> : null}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="emptyState">No provider proof requirements</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle
+              icon={<Server size={18} />}
+              title="Remote Rehearsal"
+              meta={remoteRehearsalReport ? `${remoteRehearsalReport.rehearsal_count} rehearsals` : "not generated"}
+            />
+            <div className="signalList">
+              {remoteRehearsalReport ? (
+                <>
+                  <div className="signalItem">
+                    <div className="signalHeader">
+                      <strong>{compactID(remoteRehearsalReport.id)}</strong>
+                      <StatusPill tone={remoteRehearsalReport.blocked_count > 0 ? "blocked" : "ok"} label={`${remoteRehearsalReport.completed_count} completed`} />
+                    </div>
+                    <span>
+                      blocked {remoteRehearsalReport.blocked_count} / manual {remoteRehearsalReport.manual_count}
+                    </span>
+                  </div>
+                  {remoteRehearsals.slice(0, 4).map((rehearsal) => (
+                    <div className="signalItem" key={rehearsal.id}>
+                      <div className="signalHeader">
+                        <strong>{rehearsal.provider || "provider"}</strong>
+                        <StatusPill tone={toneForStatus(rehearsal.status)} label={rehearsal.decision} />
+                      </div>
+                      <span>
+                        {rehearsal.mode || "mode"} / {compactID(rehearsal.operation_id)}
+                      </span>
+                      <div className="signalMeta">
+                        <code>{rehearsal.target_check_count} targets</code>
+                        <code>{rehearsal.auth_ref_check_count} auth</code>
+                        <code>{rehearsal.command_check_count} commands</code>
+                        <code>{rehearsal.rollback_required ? "rollback required" : "rollback n/a"}</code>
+                        {rehearsal.evidence_refs.length ? <code>{rehearsal.evidence_refs.length} evidence</code> : null}
+                      </div>
+                      {rehearsal.reasons[0] ? <small>{rehearsal.reasons[0]}</small> : null}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="emptyState">No remote rehearsals</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
             <PanelTitle icon={<RefreshCw size={18} />} title="Control Runner" meta={latestControlLoopRun ? compactID(latestControlLoopRun.id) : "no runs"} />
             <div className="signalList">
               {latestControlLoopRun ? (
@@ -1801,6 +1955,33 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 </div>
               ) : (
                 <div className="emptyState">No control loop runs</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<CircleDotDashed size={18} />} title="Control Queue" meta={`${controlLoopQueue.length} items`} />
+            <div className="signalList">
+              {controlLoopQueue.length > 0 ? (
+                controlLoopQueue.slice(0, 5).map((item) => (
+                  <div className="signalItem" key={item.id}>
+                    <div className="signalHeader">
+                      <strong>{compactID(item.id)}</strong>
+                      <StatusPill tone={toneForStatus(item.status)} label={item.decision} />
+                    </div>
+                    <span>
+                      {item.steps.length} steps / {item.environment || "all"} / attempt {item.attempt_count}
+                    </span>
+                    <div className="signalMeta">
+                      <code>{item.maintenance_window || "window open"}</code>
+                      {item.due_at ? <code>{shortTimestamp(item.due_at)}</code> : null}
+                      {item.run_id ? <code>{compactID(item.run_id)}</code> : null}
+                    </div>
+                    {item.reasons[0] ? <small>{item.reasons[0]}</small> : null}
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No queued control items</div>
               )}
             </div>
           </div>

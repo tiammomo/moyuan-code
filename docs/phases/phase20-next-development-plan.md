@@ -26,8 +26,8 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 | P0 | `phase20-002` | `provider-specific-proof-pack` | completed | provider 最小权限要求 | GitHub/Gitee/SSH/cloud 要求可配置 |
 | P1 | `phase20-003` | `remote-execution-rehearsal-runner` | completed | 远程执行演练 | rehearsal 不执行生产变更 |
 | P1 | `phase20-004` | `control-runner-queue-window` | completed | 长期任务队列与窗口 | 维护窗口、retry、handoff 可审计 |
-| P1 | `phase20-005` | `console-proof-admission-drilldown` | next | Console 单条钻取 | 展示 proof/admission/runner step |
-| P2 | `phase20-006` | `phase20-readiness` | planned | Phase 20 收口 | 全量门禁和生产边界完成 |
+| P1 | `phase20-005` | `console-proof-admission-drilldown` | completed | Console 单条钻取 | 展示 proof/admission/runner step |
+| P2 | `phase20-006` | `phase20-readiness` | next | Phase 20 收口 | 全量门禁和生产边界完成 |
 
 ## 3. 执行规划：`phase20-001 write-proof-admission-policy`
 
@@ -136,7 +136,7 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 
 ## 7. 执行规划：`phase20-005 console-proof-admission-drilldown`
 
-实现状态：next。
+实现状态：completed。
 
 范围：
 
@@ -150,7 +150,30 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 - drill-down 展示 reasons、rule refs、evidence refs、source refs、provider requirement refs 和 queue/run 关联。
 - `npm run typecheck` 和 `npm run build` 通过。
 
-## 8. 验证要求
+完成记录：
+
+- Console 数据层新增 `write_admissions`、`provider_proof_requirements`、`remote_execution_rehearsals` 和 `control_loop_queue` 拉取与规范化。
+- Operations 视图新增 Write Admission、Provider Proof Pack、Remote Rehearsal 和 Control Queue 面板。
+- 面板只展示后端返回的 status、decision、reasons、rule refs、evidence refs、provider requirement refs、queue/run 关联和 check count，不在前端重新计算准入结论。
+- TypeScript 类型覆盖新增 report/entry/requirement/rehearsal/queue item。
+
+## 8. 执行规划：`phase20-006 phase20-readiness`
+
+实现状态：next。
+
+范围：
+
+- 运行全量门禁并记录 Phase 20 完成范围。
+- 回写 README、docs 入口、issue graph、实施记录和 readiness 文档。
+- 明确 Phase 20 后仍然不默认开启生产真实写入，Phase 21 只能基于 readiness 入口继续。
+
+验收：
+
+- Go、Console typecheck/build 和 diff check 全部通过。
+- Phase 20 readiness 文档说明完成项、提交记录、保留边界和下一阶段入口。
+- 完成后停止，不进入 Phase 21。
+
+## 9. 验证要求
 
 每完成一个 Phase 20 issue，至少运行：
 
