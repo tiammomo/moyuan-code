@@ -47,6 +47,7 @@ const nav = [
   { label: "Memory", icon: Brain },
   { label: "Providers", icon: Sparkles },
   { label: "Deployments", icon: Rocket },
+  { label: "Operations", icon: Activity },
   { label: "Audit", icon: Lock },
 ] as const;
 
@@ -109,6 +110,8 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   );
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
   const latestDeployment = snapshot.deployments[0];
+  const latestVerification = snapshot.post_deployment_verifications[0];
+  const latestResourceDeploymentRef = snapshot.resource_deployment_refs[0];
   const latestRollbackCandidate = snapshot.executions.find((execution) => execution.rollback_required);
   const latestMonitorSummary = snapshot.monitor_summaries[0];
   const latestRehearsal = snapshot.deployment_rehearsals[0];
@@ -125,6 +128,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
       latestRiskHandoff ||
       latestRiskReviewQueueItem ||
       latestRiskReview ||
+      latestVerification ||
       snapshot.rollback_executions.length > 0,
   );
   const activeSessions = snapshot.auth_sessions.filter((session) => session.status === "active");
@@ -391,6 +395,34 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
       router.refresh();
     } catch (error) {
       setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Monitor summary failed." });
+    }
+  }
+
+  async function createPostDeploymentVerification() {
+    const execution = snapshot.executions[0];
+    if (!execution) {
+      setDeploymentActionState({ status: "error", message: "No execution available for verification." });
+      return;
+    }
+    setDeploymentActionState({ status: "running", message: "Creating post-deployment verification..." });
+    try {
+      const payload = await postJSON<PostDeploymentVerificationEnvelope>(`/api/projects/${snapshot.project.id}/post-deployment-verifications`, {
+        execution_id: execution.id,
+        environment: execution.environment,
+        monitor_limit: 10,
+      });
+      const verification = payload.post_deployment_verification;
+      if (!verification) {
+        throw new Error(payload.error ?? "Post-deployment verification returned no record.");
+      }
+      setDeploymentActionState({
+        status: verification.status === "completed" ? "completed" : "blocked",
+        id: verification.id,
+        message: `${verification.decision ?? verification.status}${verification.risk_handoff_recommended ? " / risk handoff recommended" : ""}`,
+      });
+      router.refresh();
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Post-deployment verification failed." });
     }
   }
 
@@ -1274,6 +1306,15 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <Activity size={13} />
                 <span>Monitor Summary</span>
               </button>
+              <button
+                className="inlineActionButton"
+                disabled={deploymentActionState.status === "running" || snapshot.executions.length === 0}
+                onClick={() => void createPostDeploymentVerification()}
+                type="button"
+              >
+                <ShieldCheck size={13} />
+                <span>Verify</span>
+              </button>
               <button className="inlineActionButton" disabled={deploymentActionState.status === "running"} onClick={() => void createDeploymentRehearsal()} type="button">
                 <CircleDotDashed size={13} />
                 <span>Rehearsal</span>
@@ -1347,6 +1388,20 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                     <span>{`${latestMonitorSummary.rollback_count} rollback / window ${latestMonitorSummary.window_size}`}</span>
                   </div>
                   <StatusPill tone={toneForStatus(latestMonitorSummary.status)} label={latestMonitorSummary.status} />
+                </div>
+              ) : null}
+              {latestVerification ? (
+                <div className="maintenanceItem">
+                  <div>
+                    <strong>{compactID(latestVerification.execution_id || latestVerification.id)}</strong>
+                    <span>{`${latestVerification.decision} / ${latestVerification.monitor_decision || "monitor pending"}`}</span>
+                    <span>
+                      {latestVerification.risk_handoff_recommended
+                        ? `${latestVerification.risk_source_type || "risk"} ${compactID(latestVerification.risk_source_id || "")}`
+                        : "risk handoff not required"}
+                    </span>
+                  </div>
+                  <StatusPill tone={toneForStatus(latestVerification.risk_handoff_recommended ? "warning" : latestVerification.status)} label={latestVerification.status} />
                 </div>
               ) : null}
               {latestRehearsal ? (
@@ -1444,7 +1499,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
         </section>
 
-        <section className="operationGrid" hidden={!viewVisible(activeView, ["Projects", "Deployments"])}>
+        <section className="operationGrid" hidden={!viewVisible(activeView, ["Projects", "Deployments", "Operations"])}>
           <div className="panel operationHistoryPanel">
             <PanelTitle icon={<ScrollText size={18} />} title="Operation History" meta={`${snapshot.operation_history.length} traced`} />
             <div className="operationList">
@@ -2839,6 +2894,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                         {resource.health ? ` / ${resource.health}` : ""}
                         {resource.expiration_state ? ` / ${resource.expiration_state}` : ""}
                       </span>
+                      {resource.last_deployment ? (
+                        <span>{`last ${resource.last_deployment.kind} / ${compactID(resource.last_deployment.execution_id || resource.last_deployment.deployment_id || resource.last_deployment.id)}`}</span>
+                      ) : null}
                     </div>
                     <StatusPill tone={toneForStatus(resource.expiration_state || (resource.environment === "production" ? "warning" : "ok"))} label={resource.environment} />
                     <div className="rowActions">
@@ -2867,6 +2925,27 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
               ) : (
                 <div className="emptyState">No resources registered</div>
               )}
+            </div>
+            <div className="maintenanceList">
+              {latestResourceDeploymentRef ? (
+                <div className="maintenanceItem">
+                  <div>
+                    <strong>{latestResourceDeploymentRef.resource_id}</strong>
+                    <span>{`${latestResourceDeploymentRef.kind} / ${latestResourceDeploymentRef.decision}`}</span>
+                    <span>{compactID(latestResourceDeploymentRef.execution_id || latestResourceDeploymentRef.deployment_id || latestResourceDeploymentRef.id)}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(latestResourceDeploymentRef.status)} label={latestResourceDeploymentRef.environment || latestResourceDeploymentRef.status} />
+                </div>
+              ) : null}
+              {snapshot.resource_deployment_refs.slice(1, 3).map((ref) => (
+                <div className="maintenanceItem" key={ref.id}>
+                  <div>
+                    <strong>{ref.resource_id}</strong>
+                    <span>{`${ref.kind} / ${ref.decision}`}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(ref.status)} label={ref.mode || ref.status} />
+                </div>
+              ))}
             </div>
             <div className="maintenanceList">
               {snapshot.lifecycle_alerts.length > 0 ? (
@@ -3135,6 +3214,16 @@ type MonitorSummaryEnvelope = {
     id?: string;
     status?: string;
     decision?: string;
+  };
+};
+
+type PostDeploymentVerificationEnvelope = {
+  error?: string;
+  post_deployment_verification?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+    risk_handoff_recommended?: boolean;
   };
 };
 

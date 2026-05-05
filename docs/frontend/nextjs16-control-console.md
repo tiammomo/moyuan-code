@@ -206,6 +206,7 @@ apps/console/
 - Provider Telemetry Surface：Provider 面板展示 health/quota/cost/quality 摘要和近期 telemetry 记录；Provider route preview 展示 selected/skipped/blocked candidates、score、runtime/model 和 provider 侧原因。
 - Resource Lifecycle Surface：Server Resources 面板展示 lifecycle alerts、expiration state、maintenance records 和资源续期/退役动作状态。
 - Deployment Monitor Surface：Deployment Executions 面板展示 post-deployment history 和 post-deployment verification，把 smoke/monitor 状态、失败分类、rollback runbook、risk handoff recommendation 和 evidence chain 作为后端事实源展示，不在前端自行推断高风险结论。
+- Operations Dashboard Surface：Console 优先读取后端 operations timeline，展示 post-deployment verification、resource deployment refs、resource lifecycle 和 risk review；前端只做筛选、展开和刷新，不重算 deployment readiness、release admission 或 maintenance policy。
 - Control Loop Surface：Console 展示 control loop run、step decision、summary、duration、evidence 数量；手动触发只运行 bounded control loop，不启动常驻 scheduler。
 - Batch Execution Surface：Console 展示后端 `batch_plans`、`batch_runs`、`worktrees` 和 `merge_queues`，用户可触发 batch dry-run 和 merge queue build；dependency、write scope、quality/review 和 merge readiness 只以后端事实源为准。
 - AI Assist Surface：保留“让 agent 解释当前状态 / 生成修复建议 / 生成发布说明”的入口，但不能绕过后端门禁。

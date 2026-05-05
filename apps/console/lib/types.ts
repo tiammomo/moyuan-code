@@ -100,6 +100,21 @@ export type ResourceSummary = {
   expiration_state?: string;
   maintenance_window?: string;
   health?: string;
+  last_deployment?: ResourceDeploymentRefSummary;
+};
+
+export type ResourceDeploymentRefSummary = {
+  id: string;
+  resource_id: string;
+  kind: string;
+  deployment_id?: string;
+  execution_id?: string;
+  release_id?: string;
+  environment?: string;
+  mode?: string;
+  status: string;
+  decision: string;
+  recorded_at?: string;
 };
 
 export type LifecycleAlertSummary = {
@@ -250,6 +265,28 @@ export type DeploymentMonitorSummary = {
   rollback_count: number;
   failure_classes: Record<string, number>;
   latest: DeploymentMonitorHistorySummary[];
+  evidence_ids: string[];
+  created_at?: string;
+};
+
+export type PostDeploymentVerificationSummary = {
+  id: string;
+  execution_id?: string;
+  deployment_id?: string;
+  release_id?: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  history_id?: string;
+  history_decision?: string;
+  monitor_summary_id?: string;
+  monitor_decision?: string;
+  smoke_decision?: string;
+  rollback_required: boolean;
+  risk_handoff_recommended: boolean;
+  risk_source_type?: string;
+  risk_source_id?: string;
   evidence_ids: string[];
   created_at?: string;
 };
@@ -920,7 +957,7 @@ export type TimelineEvent = {
 
 export type OperationHistoryItem = {
   id: string;
-  type: "release_provider" | "deployment" | "visual_render" | "evidence";
+  type: string;
   title: string;
   detail: string;
   status: string;
@@ -1102,9 +1139,11 @@ export type ConsoleSnapshot = {
   resources: ResourceSummary[];
   lifecycle_alerts: LifecycleAlertSummary[];
   maintenance_records: MaintenanceRecordSummary[];
+  resource_deployment_refs: ResourceDeploymentRefSummary[];
   deployments: DeploymentSummary[];
   executions: DeploymentExecutionSummary[];
   post_deployment_histories: PostDeploymentHistorySummary[];
+  post_deployment_verifications: PostDeploymentVerificationSummary[];
   rollback_executions: RollbackExecutionSummary[];
   monitor_summaries: DeploymentMonitorSummary[];
   deployment_rehearsals: DeploymentRehearsalSummary[];

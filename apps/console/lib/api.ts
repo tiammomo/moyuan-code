@@ -28,6 +28,7 @@ import type {
   OperationHistoryItem,
   OperationRepairCandidateSummary,
   PostDeploymentHistorySummary,
+  PostDeploymentVerificationSummary,
   ProjectSummary,
   ProviderSummary,
   ProviderTelemetrySummary,
@@ -44,6 +45,7 @@ import type {
   ReleaseCandidateSummary,
   RuntimeRecoverySummary,
   RunSummary,
+  ResourceDeploymentRefSummary,
   ResourceSummary,
   ScheduleItem,
   ServiceAccountSummary,
@@ -97,9 +99,11 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     resourcesResponse,
     lifecycleAlertsResponse,
     maintenanceResponse,
+    resourceDeploymentRefsResponse,
     deploymentsResponse,
     executionsResponse,
     postDeploymentHistoriesResponse,
+    postDeploymentVerificationsResponse,
     rollbackExecutionsResponse,
     monitorSummariesResponse,
     deploymentRehearsalsResponse,
@@ -136,6 +140,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     sessionsResponse,
     apiTokensResponse,
     serviceAccountsResponse,
+    operationsTimelineResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
     apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: unknown[]; waiting_queue?: unknown[]; subagent_backlog?: unknown[] } }>>(
@@ -146,9 +151,11 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ resources: unknown[] }>>(`/projects/${project.id}/resources`),
     apiGet<ApiEnvelope<{ lifecycle_alerts: unknown[] }>>(`/projects/${project.id}/resources/lifecycle-alerts?limit=5`),
     apiGet<ApiEnvelope<{ maintenance_records: unknown[] }>>(`/projects/${project.id}/resources/maintenance?limit=5`),
+    apiGet<ApiEnvelope<{ resource_deployment_refs: unknown[] }>>(`/projects/${project.id}/resources/deployment-refs?limit=8`),
     apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
     apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
     apiGet<ApiEnvelope<{ post_deployment_histories: unknown[] }>>(`/projects/${project.id}/deployment-monitor-history?limit=5`),
+    apiGet<ApiEnvelope<{ post_deployment_verifications: unknown[] }>>(`/projects/${project.id}/post-deployment-verifications?limit=5`),
     apiGet<ApiEnvelope<{ rollback_executions: unknown[] }>>(`/projects/${project.id}/deployment-rollback-executions?limit=5`),
     apiGet<ApiEnvelope<{ monitor_summaries: unknown[] }>>(`/projects/${project.id}/deployment-monitor-summaries?limit=5`),
     apiGet<ApiEnvelope<{ deployment_rehearsals: unknown[] }>>(`/projects/${project.id}/deployment-rehearsals?limit=5`),
@@ -185,6 +192,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ sessions: unknown[] }>>(`/projects/${project.id}/auth/sessions`),
     apiGet<ApiEnvelope<{ api_tokens: unknown[] }>>(`/projects/${project.id}/auth/api-tokens`),
     apiGet<ApiEnvelope<{ service_accounts: unknown[] }>>(`/projects/${project.id}/auth/service-accounts`),
+    apiGet<ApiEnvelope<{ operations_timeline: unknown[] }>>(`/projects/${project.id}/operations/timeline?limit=20`),
   ]);
 
   const schedule = [
@@ -197,9 +205,11 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const resources = normalizeResources(resourcesResponse?.resources ?? []);
   const lifecycleAlerts = normalizeLifecycleAlerts(lifecycleAlertsResponse?.lifecycle_alerts ?? []);
   const maintenanceRecords = normalizeMaintenanceRecords(maintenanceResponse?.maintenance_records ?? []);
+  const resourceDeploymentRefs = normalizeResourceDeploymentRefs(resourceDeploymentRefsResponse?.resource_deployment_refs ?? []);
   const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
   const executions = normalizeExecutions(executionsResponse?.executions ?? []);
   const postDeploymentHistories = normalizePostDeploymentHistories(postDeploymentHistoriesResponse?.post_deployment_histories ?? []);
+  const postDeploymentVerifications = normalizePostDeploymentVerifications(postDeploymentVerificationsResponse?.post_deployment_verifications ?? []);
   const rollbackExecutions = normalizeRollbackExecutions(rollbackExecutionsResponse?.rollback_executions ?? []);
   const monitorSummaries = normalizeMonitorSummaries(monitorSummariesResponse?.monitor_summaries ?? []);
   const deploymentRehearsals = normalizeDeploymentRehearsals(deploymentRehearsalsResponse?.deployment_rehearsals ?? []);
@@ -240,7 +250,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const serviceAccounts = normalizeServiceAccounts(serviceAccountsResponse?.service_accounts ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
-  const operationHistory = buildOperationHistory(releaseProviderExecutions, executions, visualRenderExecutions, evidence);
+  const operationsTimeline = normalizeOperationsTimeline(operationsTimelineResponse?.operations_timeline ?? []);
+  const operationHistory = operationsTimeline.length > 0 ? operationsTimeline : buildOperationHistory(releaseProviderExecutions, executions, visualRenderExecutions, evidence);
   const operationDetails = await fetchOperationDetails(project.id, operationHistory);
   const timeline = liveTimeline(runs, executions, deployments, releaseProviderExecutions);
   const qualitySignals = normalizeQualitySignals(qualityExplanations, qualityReports);
@@ -280,9 +291,11 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     resources,
     lifecycle_alerts: lifecycleAlerts,
     maintenance_records: maintenanceRecords,
+    resource_deployment_refs: resourceDeploymentRefs,
     deployments,
     executions,
     post_deployment_histories: postDeploymentHistories,
+    post_deployment_verifications: postDeploymentVerifications,
     rollback_executions: rollbackExecutions,
     monitor_summaries: monitorSummaries,
     deployment_rehearsals: deploymentRehearsals,
@@ -466,7 +479,33 @@ function normalizeResources(rawResources: unknown[]): ResourceSummary[] {
     expiration_state: readString(raw, "expiration_state", ""),
     maintenance_window: readString(raw, "maintenance_window", ""),
     health: readString(readUnknown(raw, "healthcheck"), "last_status", "unknown"),
+    last_deployment: normalizeOptionalResourceDeploymentRef(readUnknown(raw, "last_deployment")),
   }));
+}
+
+function normalizeResourceDeploymentRefs(rawRefs: unknown[]): ResourceDeploymentRefSummary[] {
+  return rawRefs.map((raw, index) => normalizeResourceDeploymentRef(raw, `deployment-ref-${index + 1}`));
+}
+
+function normalizeOptionalResourceDeploymentRef(raw: unknown): ResourceDeploymentRefSummary | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  return normalizeResourceDeploymentRef(raw, "deployment-ref");
+}
+
+function normalizeResourceDeploymentRef(raw: unknown, fallbackID: string): ResourceDeploymentRefSummary {
+  return {
+    id: readString(raw, "id", fallbackID),
+    resource_id: readString(raw, "resource_id", ""),
+    kind: readString(raw, "kind", "deployment_reference"),
+    deployment_id: readString(raw, "deployment_id", ""),
+    execution_id: readString(raw, "execution_id", ""),
+    release_id: readString(raw, "release_id", ""),
+    environment: readString(raw, "environment", ""),
+    mode: readString(raw, "mode", ""),
+    status: readString(raw, "status", "recorded"),
+    decision: readString(raw, "decision", "DEPLOYMENT_RESOURCE_REFERENCED"),
+    recorded_at: readString(raw, "recorded_at", ""),
+  };
 }
 
 function normalizeLifecycleAlerts(rawAlerts: unknown[]): LifecycleAlertSummary[] {
@@ -583,6 +622,30 @@ function normalizePostDeploymentHistories(rawHistories: unknown[]): PostDeployme
       created_at: readString(raw, "created_at", ""),
     };
   });
+}
+
+function normalizePostDeploymentVerifications(rawVerifications: unknown[]): PostDeploymentVerificationSummary[] {
+  return rawVerifications.map((raw, index) => ({
+    id: readString(raw, "id", `post-deployment-verification-${index + 1}`),
+    execution_id: readString(raw, "execution_id", ""),
+    deployment_id: readString(raw, "deployment_id", ""),
+    release_id: readString(raw, "release_id", ""),
+    environment: readString(raw, "environment", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    history_id: readString(raw, "history_id", ""),
+    history_decision: readString(raw, "history_decision", ""),
+    monitor_summary_id: readString(raw, "monitor_summary_id", ""),
+    monitor_decision: readString(raw, "monitor_decision", ""),
+    smoke_decision: readString(raw, "smoke_decision", ""),
+    rollback_required: readBoolean(raw, "rollback_required"),
+    risk_handoff_recommended: readBoolean(raw, "risk_handoff_recommended"),
+    risk_source_type: readString(raw, "risk_source_type", ""),
+    risk_source_id: readString(raw, "risk_source_id", ""),
+    evidence_ids: readArray(raw, "evidence_ids"),
+    created_at: readString(raw, "created_at", ""),
+  }));
 }
 
 function normalizeRollbackExecutions(rawExecutions: unknown[]): RollbackExecutionSummary[] {
@@ -1565,6 +1628,34 @@ function normalizeQualitySignals(explanations: QualityExplanation[], reports: Re
   }));
 }
 
+function normalizeOperationsTimeline(rawItems: unknown[]): OperationHistoryItem[] {
+  return rawItems.slice(0, 20).map((raw, index) => {
+    const type = readString(raw, "type", "operation");
+    const operation = readString(raw, "operation", type);
+    const status = readString(raw, "status", "unknown");
+    const decision = readString(raw, "decision", "unknown");
+    const primaryRef = readString(raw, "primary_ref", "");
+    const secondaryRef = readString(raw, "secondary_ref", "");
+    const timestamp = readString(raw, "timestamp", "");
+    return {
+      id: readString(raw, "id", `operation-${index + 1}`),
+      type,
+      title: operation,
+      detail: [decision, primaryRef ? compactRef(primaryRef) : "", secondaryRef ? compactRef(secondaryRef) : ""].filter(Boolean).join(" / "),
+      status,
+      decision,
+      tone: toneFromStatus(status),
+      time: shortTime(timestamp),
+      occurred_at: timestamp,
+      primary_ref: primaryRef,
+      secondary_ref: secondaryRef,
+      evidence_ids: readArray(raw, "evidence_refs"),
+      reasons: readArray(raw, "reasons"),
+      metadata: metadataToStrings(readUnknown(raw, "metadata")).slice(0, 6),
+    };
+  });
+}
+
 function buildOperationHistory(
   releaseProviderExecutions: ReleaseProviderExecutionSummary[],
   executions: DeploymentExecutionSummary[],
@@ -1657,6 +1748,23 @@ function buildOperationHistory(
   ];
 
   return items.sort((a, b) => timestampOf(b.occurred_at) - timestampOf(a.occurred_at)).slice(0, 12);
+}
+
+function metadataToStrings(value: unknown): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  return Object.entries(value as Record<string, unknown>)
+    .map(([key, item]) => {
+      if (item === "" || item === undefined || item === null) return "";
+      if (typeof item === "boolean") return `${key} ${item ? "true" : "false"}`;
+      if (typeof item === "number" || typeof item === "string") return `${key} ${item}`;
+      return "";
+    })
+    .filter(Boolean);
+}
+
+function compactRef(value: string) {
+  if (value.length <= 24) return value;
+  return `${value.slice(0, 10)}...${value.slice(-8)}`;
 }
 
 function liveTimeline(
