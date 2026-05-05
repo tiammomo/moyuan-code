@@ -277,6 +277,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/release-provider-executions?limit=5", http.StatusOK, `"release_provider_executions"`, releaseProviderExecution.ID)
 	assertGETContains(t, router, "/v1/projects/managed/release-provider-executions/"+releaseProviderExecution.ID, http.StatusOK, `"release_provider_execution"`, releaseProviderExecution.ID)
+	assertGETContains(t, router, "/v1/projects/managed/operations/release_provider/"+releaseProviderExecution.ID, http.StatusOK, `"operation_detail"`, `"release.provider.preview"`, `"artifact_count":1`)
 	assertPostContains(t, router, "/v1/projects/managed/resources", `{"id":"dev-api","environment":"test_dev","host":"10.0.0.11","provider":"local_vm","owner":"dev-owner","auth_ref":"env:DEV_SERVER_SSH_KEY","expires_at":"2099-01-01"}`, http.StatusCreated, `"resource"`, `"dev-api"`)
 	assertGETContains(t, router, "/v1/projects/managed/resources", http.StatusOK, `"resources"`, `"dev-api"`)
 	assertGETContains(t, router, "/v1/projects/managed/resources/dev-api", http.StatusOK, `"resource"`, `"test_dev"`)
@@ -298,6 +299,9 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 		t.Fatalf("expected deployment evidence record, records=%+v err=%v", evidenceRecords, err)
 	}
 	assertGETContains(t, router, "/v1/projects/managed/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"evidence"`, evidenceRecords[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/operations/deployment/"+evidenceRecords[0].ParentID, http.StatusOK, `"operation_detail"`, `"deployment.execute.dry_run"`, `"artifact_count":1`)
+	assertGETContains(t, router, "/v1/projects/managed/operations/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"operation_detail"`, `"evidence_count":1`)
+	assertGETContains(t, router, "/v1/projects/managed/operations/visual_render/missing", http.StatusNotFound, `"operation not found"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/missing-execution", http.StatusNotFound, `"deployment execution not found"`)
 	assertGETContains(t, router, "/v1/projects/managed/requirements/"+reqPlan.ID, http.StatusOK, `"requirement"`, `"clarification_decision"`)
 	assertPostContains(t, router, "/v1/projects/managed/requirements/plan", `{"text":"add backend API to inspect requirements with go test verification"}`, http.StatusCreated, `"requirement"`, `"backend-implementation"`)

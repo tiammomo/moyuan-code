@@ -81,10 +81,15 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [releaseProviderActionState, setReleaseProviderActionState] = useState<ActionState>({ status: "idle" });
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const selectedOperation = snapshot.operation_history.find((operation) => operation.id === selectedOperationID) ?? snapshot.operation_history[0];
+  const operationDetailByID = useMemo(() => new Map(snapshot.operation_details.map((detail) => [detail.id, detail])), [snapshot.operation_details]);
+  const selectedOperationDetail = selectedOperation ? operationDetailByID.get(selectedOperation.id) : undefined;
   const evidenceByID = useMemo(() => new Map(snapshot.evidence.map((record) => [record.id, record])), [snapshot.evidence]);
   const selectedEvidenceRecords = useMemo(
-    () => selectedOperation?.evidence_ids.map((id) => evidenceByID.get(id)).filter((record): record is EvidenceSummary => Boolean(record)) ?? [],
-    [evidenceByID, selectedOperation],
+    () =>
+      selectedOperationDetail?.evidence.length
+        ? selectedOperationDetail.evidence
+        : selectedOperation?.evidence_ids.map((id) => evidenceByID.get(id)).filter((record): record is EvidenceSummary => Boolean(record)) ?? [],
+    [evidenceByID, selectedOperation, selectedOperationDetail],
   );
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
   const latestDeployment = snapshot.deployments[0];
@@ -688,16 +693,16 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
 
           <div className="panel operationDetailPanel">
-            <PanelTitle icon={<Activity size={18} />} title="Execution Detail" meta={selectedOperation?.type ?? "operation"} />
+            <PanelTitle icon={<Activity size={18} />} title="Execution Detail" meta={selectedOperationDetail?.operation_type ?? selectedOperation?.type ?? "operation"} />
             {selectedOperation ? (
               <div className="operationDetail">
                 <div className="detailHeader">
                   <div>
                     <strong>{selectedOperation.title}</strong>
-                    <span>{selectedOperation.id}</span>
+                    <span>{selectedOperationDetail?.operation || selectedOperation.id}</span>
                   </div>
                   <div className="detailHeaderActions">
-                    <StatusPill tone={selectedOperation.tone} label={selectedOperation.status} />
+                    <StatusPill tone={toneForStatus(selectedOperationDetail?.status || selectedOperation.status)} label={selectedOperationDetail?.status || selectedOperation.status} />
                     <button aria-label="Refresh operation detail" className="iconActionButton" onClick={() => router.refresh()} type="button">
                       <RefreshCw size={14} />
                     </button>
@@ -706,30 +711,33 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <dl>
                   <div>
                     <dt>Decision</dt>
-                    <dd>{selectedOperation.decision}</dd>
+                    <dd>{selectedOperationDetail?.decision || selectedOperation.decision}</dd>
                   </div>
                   <div>
                     <dt>Primary Ref</dt>
-                    <dd>{selectedOperation.primary_ref || "none"}</dd>
+                    <dd>{selectedOperationDetail?.primary_ref || selectedOperation.primary_ref || "none"}</dd>
                   </div>
                   <div>
                     <dt>Secondary Ref</dt>
-                    <dd>{selectedOperation.secondary_ref || "none"}</dd>
+                    <dd>{selectedOperationDetail?.secondary_ref || selectedOperation.secondary_ref || "none"}</dd>
                   </div>
                   <div>
                     <dt>Evidence</dt>
-                    <dd>{selectedOperation.evidence_ids.length > 0 ? selectedOperation.evidence_ids.map(compactID).join(", ") : "none"}</dd>
+                    <dd>{selectedEvidenceRecords.length > 0 ? selectedEvidenceRecords.map((record) => compactID(record.id)).join(", ") : "none"}</dd>
                   </div>
                 </dl>
-                {selectedOperation.reasons.length > 0 ? (
+                {(selectedOperationDetail?.reasons.length ? selectedOperationDetail.reasons : selectedOperation.reasons).length > 0 ? (
                   <div className="detailChips">
-                    {selectedOperation.reasons.slice(0, 3).map((reason) => (
+                    {(selectedOperationDetail?.reasons.length ? selectedOperationDetail.reasons : selectedOperation.reasons).slice(0, 3).map((reason) => (
                       <code key={reason}>{reason}</code>
                     ))}
                   </div>
                 ) : null}
                 {selectedOperation.metadata.length > 0 ? (
                   <div className="detailChips subtle">
+                    {selectedOperationDetail ? <code>detail api</code> : null}
+                    {selectedOperationDetail?.summary.evidence_count ? <code>{selectedOperationDetail.summary.evidence_count} evidence</code> : null}
+                    {selectedOperationDetail?.summary.artifact_count ? <code>{selectedOperationDetail.summary.artifact_count} artifacts</code> : null}
                     {selectedOperation.metadata.map((item) => (
                       <code key={item}>{item}</code>
                     ))}

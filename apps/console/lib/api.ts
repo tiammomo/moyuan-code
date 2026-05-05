@@ -12,6 +12,7 @@ import type {
   GitProviderPlanSummary,
   IssueNode,
   MaintenanceRecordSummary,
+  OperationDetailSummary,
   OperationHistoryItem,
   ProjectSummary,
   ProviderSummary,
@@ -144,6 +145,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
   const operationHistory = buildOperationHistory(releaseProviderExecutions, executions, visualRenderExecutions, evidence);
+  const operationDetails = await fetchOperationDetails(project.id, operationHistory);
   const timeline = liveTimeline(runs, executions, deployments, releaseProviderExecutions);
   const qualitySignals = normalizeQualitySignals(qualityExplanations, qualityReports);
 
@@ -177,6 +179,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     release_provider_executions: releaseProviderExecutions,
     evidence,
     operation_history: operationHistory,
+    operation_details: operationDetails,
     runs,
     subagents,
     runtime_recoveries: recoveries,
@@ -423,6 +426,57 @@ function normalizeEvidence(rawRecords: unknown[]): EvidenceSummary[] {
   }));
 }
 
+function normalizeOperationDetails(rawDetails: unknown[]): OperationDetailSummary[] {
+  return rawDetails.map((raw) => ({
+    id: readString(raw, "id", ""),
+    operation_type: readString(raw, "operation_type", ""),
+    operation: readString(raw, "operation", ""),
+    status: readString(raw, "status", ""),
+    decision: readString(raw, "decision", ""),
+    reasons: readArray(raw, "reasons"),
+    primary_ref: readString(raw, "primary_ref", ""),
+    secondary_ref: readString(raw, "secondary_ref", ""),
+    started_at: readString(raw, "started_at", ""),
+    finished_at: readString(raw, "finished_at", ""),
+    created_at: readString(raw, "created_at", ""),
+    summary: normalizeOperationSummary(readUnknown(raw, "summary")),
+    evidence: normalizeEvidence(readObjectArray(raw, "evidence")),
+    artifacts: normalizeEvidenceArtifacts(readObjectArray(raw, "artifacts")),
+  }));
+}
+
+function normalizeOperationSummary(raw: unknown): OperationDetailSummary["summary"] {
+  return {
+    mode: readString(raw, "mode", ""),
+    release_id: readString(raw, "release_id", ""),
+    version: readString(raw, "version", ""),
+    provider: readString(raw, "provider", ""),
+    deployment_id: readString(raw, "deployment_id", ""),
+    environment: readString(raw, "environment", ""),
+    action_count: readNumber(raw, "action_count"),
+    step_count: readNumber(raw, "step_count"),
+    resource_count: readNumber(raw, "resource_count"),
+    evidence_count: readNumber(raw, "evidence_count"),
+    artifact_count: readNumber(raw, "artifact_count"),
+    remote_status: readString(raw, "remote_status", ""),
+    smoke_decision: readString(raw, "smoke_decision", ""),
+    monitor_decision: readString(raw, "monitor_decision", ""),
+    rollback_decision: readString(raw, "rollback_decision", ""),
+    approval_id: readString(raw, "approval_id", ""),
+    approval_consumed: readBoolean(raw, "approval_consumed"),
+    write_enabled: readBoolean(raw, "write_enabled"),
+    remote_exec_enabled: readBoolean(raw, "remote_exec_enabled"),
+  };
+}
+
+function normalizeEvidenceArtifacts(rawArtifacts: Record<string, unknown>[]): EvidenceSummary["artifacts"] {
+  return rawArtifacts.map((raw) => ({
+    kind: readString(raw, "kind", "artifact"),
+    id: readString(raw, "id", ""),
+    path: readString(raw, "path", ""),
+  }));
+}
+
 function normalizeRuns(rawRuns: unknown[]): RunSummary[] {
   return rawRuns.map((raw, index) => ({
     run_id: readString(raw, "run_id", `run-${index + 1}`),
@@ -655,6 +709,20 @@ async function fetchQualityExplanations(projectID: string, runs: RunSummary[], r
     .map((response) => response?.quality_explanation)
     .filter((value): value is unknown => Boolean(value))
     .map(normalizeQualityExplanation);
+}
+
+async function fetchOperationDetails(projectID: string, operations: OperationHistoryItem[]) {
+  const supported = operations
+    .filter((operation) => operation.type === "release_provider" || operation.type === "deployment" || operation.type === "evidence")
+    .slice(0, 8);
+  const responses = await Promise.all(
+    supported.map((operation) =>
+      apiGet<ApiEnvelope<{ operation_detail: unknown }>>(
+        `/projects/${projectID}/operations/${operation.type}/${encodeURIComponent(operation.id)}`,
+      ),
+    ),
+  );
+  return normalizeOperationDetails(responses.map((response) => response?.operation_detail).filter((value): value is unknown => Boolean(value)));
 }
 
 function normalizeQualityExplanation(raw: unknown): QualityExplanation {

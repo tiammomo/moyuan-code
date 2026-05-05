@@ -16,6 +16,7 @@ import (
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/memory"
+	"moyuan-code/internal/operations"
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/providers"
 	"moyuan-code/internal/quality"
@@ -1600,6 +1601,27 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"evidence": record})
+	})
+	router.GET("/v1/projects/:project_id/operations/:operation_type/:operation_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		detail, found, err := operations.Load(rootDir, c.Param("operation_type"), c.Param("operation_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "operation not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"operation_detail": detail})
 	})
 	router.POST("/v1/projects/:project_id/requirements/plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

@@ -20,7 +20,7 @@ Phase 8 已完成并通过 release readiness：
 
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase9-001` | `operation-detail-aggregation-api` | planned | Operation detail 后端聚合 | Console/API 可按 operation id 获取 execution/evidence/artifact detail |
+| P0 | `phase9-001` | `operation-detail-aggregation-api` | completed | Operation detail 后端聚合 | Console/API 可按 operation id 获取 execution/evidence/artifact detail |
 | P0 | `phase9-002` | `server-resource-lifecycle-alerts` | planned | 服务器资源生命周期提醒 | expiring/expired/maintenance_due 可查询并写入 audit |
 | P1 | `phase9-003` | `deployment-monitor-history` | planned | 部署后检查历史和失败分类 | smoke/monitor/rollback 可按 execution 查询历史 |
 | P1 | `phase9-004` | `provider-route-explanation-v2` | planned | Provider 路由解释增强 | selected/skipped provider signals 可解释 |
@@ -28,7 +28,7 @@ Phase 8 已完成并通过 release readiness：
 
 ## 3. 执行规划：`phase9-001 operation-detail-aggregation-api`
 
-实现状态：planned。
+实现状态：completed。
 
 范围：
 
@@ -50,6 +50,13 @@ Phase 8 已完成并通过 release readiness：
 - detail 中包含 operation、evidence、artifacts、status、decision 和 reason。
 - Console Operation Detail 能展示聚合 detail。
 - `go test ./internal/api ./internal/evidence ./internal/release ./internal/deployment`、`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
+
+落地结果：
+
+- 新增 `internal/operations` 聚合层，支持 `release_provider`、`deployment` 和 `evidence` operation detail。
+- 新增 API：`GET /v1/projects/:project_id/operations/:operation_type/:operation_id`。
+- 聚合结果返回 execution 摘要、evidence chain 和 artifact references，不返回完整 stdout/stderr、secret、SSH key 或 provider response body。
+- Console snapshot 会拉取近期 operation detail，详情区优先展示 detail API 的 evidence chain，API 不可用时回退到原 snapshot。
 
 ## 4. 验证要求
 

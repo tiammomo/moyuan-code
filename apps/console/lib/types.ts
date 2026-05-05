@@ -332,6 +332,43 @@ export type OperationHistoryItem = {
   metadata: string[];
 };
 
+export type OperationDetailSummary = {
+  id: string;
+  operation_type: string;
+  operation: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  primary_ref?: string;
+  secondary_ref?: string;
+  started_at?: string;
+  finished_at?: string;
+  created_at?: string;
+  summary: {
+    mode?: string;
+    release_id?: string;
+    version?: string;
+    provider?: string;
+    deployment_id?: string;
+    environment?: string;
+    action_count?: number;
+    step_count?: number;
+    resource_count?: number;
+    evidence_count?: number;
+    artifact_count?: number;
+    remote_status?: string;
+    smoke_decision?: string;
+    monitor_decision?: string;
+    rollback_decision?: string;
+    approval_id?: string;
+    approval_consumed?: boolean;
+    write_enabled?: boolean;
+    remote_exec_enabled?: boolean;
+  };
+  evidence: EvidenceSummary[];
+  artifacts: EvidenceArtifactSummary[];
+};
+
 export type QualitySignal = {
   id: string;
   title: string;
@@ -456,6 +493,7 @@ export type ConsoleSnapshot = {
   release_provider_executions: ReleaseProviderExecutionSummary[];
   evidence: EvidenceSummary[];
   operation_history: OperationHistoryItem[];
+  operation_details: OperationDetailSummary[];
   runs: RunSummary[];
   subagents: SubagentSummary[];
   runtime_recoveries: RuntimeRecoverySummary[];

@@ -18,7 +18,7 @@ Phase 9 的目标是把 Phase 8 的受控外部执行 Beta 推进到“生产运
 
 | ID | Issue | 状态 | 主要范围 | 依赖 | 建议角色 | 退出条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `phase9-001` | `operation-detail-aggregation-api` | planned | 聚合 operation、execution、evidence、artifact 和状态摘要 | Phase 8 readiness | `backend_owner` + `frontend_owner` | Console 可按 operation id 获取完整 detail，而不是只依赖 snapshot 拼装 |
+| `phase9-001` | `operation-detail-aggregation-api` | completed | 聚合 operation、execution、evidence、artifact 和状态摘要 | Phase 8 readiness | `backend_owner` + `frontend_owner` | Console 可按 operation id 获取完整 detail，而不是只依赖 snapshot 拼装 |
 | `phase9-002` | `server-resource-lifecycle-alerts` | planned | 服务器到期、维护窗口、环境分层、续期提醒和资源健康摘要 | `phase9-001` 可并行 | `devops_owner` | 资源列表可标记 expiring/expired/maintenance_due 并写入 audit |
 | `phase9-003` | `deployment-monitor-history` | planned | smoke/monitor 历史、失败分类、rollback runbook 状态追踪 | `phase8-003`,`phase8-004` | `qa_owner` + `devops_owner` | 部署后检查可按 execution 查询历史与失败原因 |
 | `phase9-004` | `provider-route-explanation-v2` | planned | provider budget/quota/cost/quality feedback 的路由解释增强 | `phase8-006` | `provider_owner` | route decision 给出候选 provider 的 skipped/selected signals |
