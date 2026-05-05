@@ -71,6 +71,10 @@ func TestCreatePlanFromCandidateUsesReleaseCandidateAndResources(t *testing.T) {
 	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(root).ReleasesDir, "candidates", candidate.ID+".json"), candidate); err != nil {
 		t.Fatal(err)
 	}
+	okServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer okServer.Close()
 	if _, err := serverresources.Add(root, serverresources.Resource{
 		ID:          "candidate-host",
 		Environment: "test_dev",
@@ -79,7 +83,7 @@ func TestCreatePlanFromCandidateUsesReleaseCandidateAndResources(t *testing.T) {
 		Owner:       "devops",
 		AuthRef:     "env:DEV_SERVER_SSH_KEY",
 		Status:      "active",
-		Healthcheck: serverresources.Healthcheck{Type: "http", Target: "http://127.0.0.1/healthz"},
+		Healthcheck: serverresources.Healthcheck{Type: "http", Target: okServer.URL},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -100,6 +104,27 @@ func TestCreatePlanFromCandidateUsesReleaseCandidateAndResources(t *testing.T) {
 	}
 	if execution.Decision != "DEPLOY_EXECUTION_DRY_RUN" || execution.DeploymentID != plan.ID || execution.ReleaseID != candidate.ID {
 		t.Fatalf("expected dry-run execution from candidate deployment plan, got %+v", execution)
+	}
+	completed, err := ExecuteFromCandidate(context.Background(), root, CandidateExecuteOptions{
+		CandidateID:  candidate.ID,
+		Environment:  "test_dev",
+		Mode:         "local_shell",
+		Approved:     true,
+		Commands:     []string{"printf candidate-deploy-ok"},
+		DeploymentID: plan.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	feedback, found, err := FeedbackForCandidate(root, candidate.ID, 5)
+	if err != nil || !found {
+		t.Fatalf("expected candidate deployment feedback, found=%v err=%v", found, err)
+	}
+	if feedback.Decision != "CANDIDATE_DEPLOYMENT_HEALTHY" || feedback.LatestExecutionID != completed.ID || feedback.RollbackRequired {
+		t.Fatalf("expected healthy candidate deployment feedback, got %+v", feedback)
+	}
+	if feedback.HistoryCount < 2 || len(feedback.EvidenceIDs) == 0 {
+		t.Fatalf("expected candidate feedback to aggregate histories and evidence, got %+v", feedback)
 	}
 }
 

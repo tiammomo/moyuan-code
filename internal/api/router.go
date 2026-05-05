@@ -1045,6 +1045,27 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(status, gin.H{"execution": execution})
 	})
+	router.GET("/v1/projects/:project_id/release-candidates/:candidate_id/deployment-feedback", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		feedback, found, err := deployment.FeedbackForCandidate(rootDir, c.Param("candidate_id"), queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "release candidate not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"deployment_feedback": feedback})
+	})
 	router.GET("/v1/projects/:project_id/worktrees", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
