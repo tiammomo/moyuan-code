@@ -19,7 +19,7 @@ Phase 8 的目标是从“受控真实外部执行准备”进入“受控外部
 | ID | Issue | 状态 | 主要范围 | 依赖 | 建议角色 | 退出条件 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `phase8-001` | `release-provider-real-adapter-beta` | completed | GitHub/Gitee release provider adapter 最小真实写入 | Phase 7 readiness | `release_manager` + `security_owner` | 写开关、approval、secret resolver 和 replay guard 全部满足后才执行远程写入 |
-| `phase8-002` | `ssh-runner-controlled-execution` | planned | SSH runner 真实连接、命令执行、timeout、脱敏和 evidence | `phase8-001` 可并行准备 | `devops_owner` + `security_owner` | allowlist 命令能执行，非 allowlist 阻断，stdout/stderr 不泄密 |
+| `phase8-002` | `ssh-runner-controlled-execution` | completed | SSH runner 真实连接、命令执行、timeout、脱敏和 evidence | `phase8-001` 可并行准备 | `devops_owner` + `security_owner` | allowlist 命令能执行，非 allowlist 阻断，stdout/stderr 不泄密 |
 | `phase8-003` | `post-deploy-smoke-monitor-evidence` | planned | smoke、monitor、health check 和结果 evidence | `phase8-002` | `qa_owner` + `devops_owner` | 部署后能生成 smoke/monitor evidence，失败能阻断发布完成 |
 | `phase8-004` | `rollback-suggestion-and-runbook` | planned | rollback suggestion、runbook、手动确认和回滚 evidence | `phase8-003` | `release_manager` + `devops_owner` | 失败部署能生成可审查回滚建议，不默认自动回滚生产 |
 | `phase8-005` | `console-operation-drilldown` | planned | Console operation detail 独立 API、evidence drill-down 和刷新 | `phase7-005` | `frontend_owner` | 用户能从 operation history 打开完整 execution/evidence detail |
@@ -28,7 +28,7 @@ Phase 8 的目标是从“受控真实外部执行准备”进入“受控外部
 ## 3. 建议执行顺序
 
 1. `phase8-001` 已完成，release provider adapter 的 create release 真实写入边界已最小可验证。
-2. `phase8-002` 与 `phase8-001` 可部分并行，但真实 SSH 必须等待 secret resolver、allowlist 和 evidence 约束完整。
+2. `phase8-002` 已完成，真实 SSH runner 已接入 secret resolver、allowlist、timeout、脱敏和 smoke/monitor/rollback evidence。
 3. `phase8-003` 在 SSH runner 可控后推进，形成部署后的自动验证。
 4. `phase8-004` 在 smoke/monitor 有结果后推进，不提前自动回滚。
 5. `phase8-005` 在 operation 数据模型稳定后增强 Console drill-down。

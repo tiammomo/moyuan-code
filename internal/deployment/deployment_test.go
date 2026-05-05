@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -141,14 +143,20 @@ func TestExecuteBlocksRealSSHExecution(t *testing.T) {
 	}
 }
 
-func TestExecuteSSHGuardedRunnerValidatesAllowlist(t *testing.T) {
+func TestExecuteSSHRunnerExecutesAllowedCommands(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("MOYUAN_ALLOW_SSH_EXECUTE", "1")
+	t.Setenv("DEV_SERVER_SSH_KEY", "ssh-key-path-secret")
+	prependFakeSSH(t, 0, "remote deploy ok ssh-key-path-secret", "")
 	if _, err := workspace.Ensure(root); err != nil {
 		t.Fatal(err)
 	}
 
-	plan := createDeploymentPlanWithHealthTarget(t, root, "ssh-guarded-safe", "http://127.0.0.1/healthz")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+	plan := createDeploymentPlanWithHealthTarget(t, root, "ssh-runner-safe", server.URL)
 	execution, err := Execute(context.Background(), root, ExecuteOptions{
 		DeploymentID: plan.ID,
 		Mode:         "ssh_execute",
@@ -158,25 +166,59 @@ func TestExecuteSSHGuardedRunnerValidatesAllowlist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if execution.Status != "blocked" || execution.Decision != "DEPLOY_SSH_EXECUTION_GUARDED_READY" || !execution.RemoteExecEnabled {
-		t.Fatalf("expected guarded SSH execution boundary, got %+v", execution)
+	if execution.Status != "completed" || execution.Decision != "DEPLOY_EXECUTION_COMPLETED" || !execution.RemoteExecEnabled {
+		t.Fatalf("expected completed SSH execution, got %+v", execution)
 	}
-	if execution.RemotePlan == nil || execution.RemotePlan.Decision != "SSH_EXECUTION_GUARDED_READY" {
-		t.Fatalf("expected guarded remote plan, got %+v", execution.RemotePlan)
+	if execution.RemotePlan == nil || execution.RemotePlan.Decision != "SSH_EXECUTION_READY" {
+		t.Fatalf("expected SSH execution plan, got %+v", execution.RemotePlan)
 	}
-	if !hasStep(execution.Steps, "ssh_execute", "planned") {
-		t.Fatalf("expected planned SSH execute step, got %+v", execution.Steps)
+	if !hasStep(execution.Steps, "ssh_execute", "completed") {
+		t.Fatalf("expected completed SSH execute step, got %+v", execution.Steps)
 	}
-	if !containsReason(execution.Reasons, "remote_ssh_command_runner_not_enabled") {
-		t.Fatalf("expected runner boundary reason, got %+v", execution.Reasons)
+	if !containsReason(execution.Reasons, "allowed_ssh_commands_completed") {
+		t.Fatalf("expected completed SSH command reason, got %+v", execution.Reasons)
 	}
 	releaseLog, found, err := fsutil.ReadText(filepath.Join(workspace.ForRoot(root).LogsDir, "release.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !found || !strings.Contains(releaseLog, "deployment.ssh.execution.guarded") {
-		t.Fatalf("expected guarded ssh execution log, found=%v log=%s", found, releaseLog)
+	if !found || !strings.Contains(releaseLog, "deployment.ssh.commands.completed") {
+		t.Fatalf("expected completed ssh execution log, found=%v log=%s", found, releaseLog)
 	}
+	assertDeploymentFileDoesNotContain(t, executionPath(root, execution.ID), "ssh-key-path-secret")
+	assertDeploymentFileDoesNotContain(t, filepath.Join(workspace.ForRoot(root).DeploymentsDir, "executions.jsonl"), "ssh-key-path-secret")
+	assertDeploymentFileDoesNotContain(t, filepath.Join(workspace.ForRoot(root).LogsDir, "audit.jsonl"), "ssh-key-path-secret")
+}
+
+func TestExecuteSSHRunnerFailsAndSuggestsRollback(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("MOYUAN_ALLOW_SSH_EXECUTE", "1")
+	t.Setenv("DEV_SERVER_SSH_KEY", "ssh-key-path-secret")
+	prependFakeSSH(t, 7, "", "remote failed ssh-key-path-secret")
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	plan := createDeploymentPlanWithHealthTarget(t, root, "ssh-runner-fail", "http://127.0.0.1/healthz")
+	execution, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "ssh_execute",
+		Approved:     true,
+		Commands:     []string{"printf deploy-ok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if execution.Status != "failed" || execution.Decision != "DEPLOY_SSH_EXECUTION_FAILED" {
+		t.Fatalf("expected failed SSH execution, got %+v", execution)
+	}
+	if !execution.RollbackSuggestion.Required || execution.RollbackSuggestion.Reason != "ssh_command_failed" {
+		t.Fatalf("expected rollback suggestion for SSH command failure, got %+v", execution.RollbackSuggestion)
+	}
+	if !hasStep(execution.Steps, "ssh_execute", "failed") {
+		t.Fatalf("expected failed SSH execute step, got %+v", execution.Steps)
+	}
+	assertDeploymentFileDoesNotContain(t, executionPath(root, execution.ID), "ssh-key-path-secret")
 }
 
 func TestExecuteSSHGuardedRunnerBlocksUnsafeCommand(t *testing.T) {
@@ -264,4 +306,33 @@ func containsReason(reasons []string, expected string) bool {
 		}
 	}
 	return false
+}
+
+func prependFakeSSH(t *testing.T, exitCode int, stdout string, stderr string) {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ssh")
+	script := "#!/bin/sh\n"
+	if stdout != "" {
+		script += "printf '%s\\n' '" + stdout + "'\n"
+	}
+	if stderr != "" {
+		script += "printf '%s\\n' '" + stderr + "' >&2\n"
+	}
+	script += "exit " + strconv.Itoa(exitCode) + "\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func assertDeploymentFileDoesNotContain(t *testing.T, path string, value string) {
+	t.Helper()
+	text, _, err := fsutil.ReadText(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(text, value) {
+		t.Fatalf("expected %s not to contain secret value", path)
+	}
 }

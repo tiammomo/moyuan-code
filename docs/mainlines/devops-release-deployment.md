@@ -17,7 +17,7 @@ Release note、发版批次、覆盖率门禁、禁止发版条件和回退后 f
 - 输出位置：`.moyuan/lifecycle/releases/` 和 `.moyuan/lifecycle/deployments/`。
 - 当前生成 release suggestion、release branch plan、tag suggestion、release notes draft、provider release/tag/workflow action preview、deploy/smoke/monitor/rollback plan，并在受控 `local_shell` 执行后自动记录 smoke/monitor 结果；`ssh_preview` 可生成远程目标执行预览，`ssh_execute` 仍默认阻断，不真实连接 SSH 或生产部署。
 - Release provider publish 已具备受控真实写入 Beta：默认返回 preview-only 且不消费 approval；设置 `MOYUAN_ALLOW_RELEASE_PROVIDER_WRITE=1` 后，仍必须通过 approval、secret resolver 和 release plan ready 检查。secret 缺失时阻断且不消费 approval；secret 通过后消费 approval 并调用 GitHub/Gitee create release API。branch push、tag push 和 workflow dispatch 暂时显式 `skipped`，同一 approval 不能重复使用。
-- SSH execute 已具备 guarded runner 边界：默认返回 blocked；设置 `MOYUAN_ALLOW_SSH_EXECUTE=1` 后只校验 server resource、`auth_ref` 和命令 allowlist，生成 guarded remote plan，不真实连接 SSH。
+- SSH execute 已具备受控真实执行 Beta：默认返回 blocked；设置 `MOYUAN_ALLOW_SSH_EXECUTE=1` 后校验 server resource、`auth_ref`、命令 allowlist 和超时，再通过本机 `ssh` 二进制执行。stdout/stderr 写入 execution 前脱敏，成功后自动进入 smoke/monitor，失败后生成 rollback suggestion；production real execution 仍继续阻断。
 - Release provider execution 和 deployment execution 会自动写入 `.moyuan/lifecycle/evidence/`，作为发布、部署、烟测、监控和回滚证据链的统一索引。
 - 已接入门禁：dirty worktree、remote 缺失、无 accepted issue、存在 unresolved issue 时阻断。
 - production deployment plan 缺少 approval 时阻断；test_dev 可生成演练计划。

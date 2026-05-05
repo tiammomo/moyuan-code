@@ -18,6 +18,7 @@ import (
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/process"
 	"moyuan-code/internal/release"
+	secretresolver "moyuan-code/internal/secrets"
 	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
@@ -397,14 +398,32 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 		case !execution.RemoteExecEnabled:
 			execution.Decision = "DEPLOY_EXECUTION_BLOCKED"
 		case ok:
-			execution.Decision = "DEPLOY_SSH_EXECUTION_GUARDED_READY"
-			_ = logging.Log(rootDir, "release", "deployment.ssh.execution.guarded", map[string]any{
-				"deployment_id": execution.DeploymentID,
-				"release_id":    execution.ReleaseID,
-				"environment":   execution.Environment,
-				"targets":       len(remotePlan.Targets),
-				"decision":      execution.Decision,
-			})
+			runSteps, runOK, runReasons := runSSHCommands(ctx, rootDir, plan, remotePlan, options.Commands)
+			execution.Steps = append(execution.Steps, runSteps...)
+			execution.Reasons = append(execution.Reasons, runReasons...)
+			if runOK {
+				smoke, monitor, rollback, postSteps, postOK, postReasons := runPostDeploymentChecks(ctx, rootDir, plan)
+				execution.SmokeReport = smoke
+				execution.MonitorReport = monitor
+				execution.RollbackSuggestion = rollback
+				execution.Steps = append(execution.Steps, postSteps...)
+				execution.Reasons = append(execution.Reasons, postReasons...)
+				switch {
+				case !postOK && smoke.Status == "failed":
+					execution.Status = "failed"
+					execution.Decision = "DEPLOY_SMOKE_FAILED"
+				case !postOK && monitor.Status == "failed":
+					execution.Status = "failed"
+					execution.Decision = "DEPLOY_MONITOR_FAILED"
+				default:
+					execution.Status = "completed"
+					execution.Decision = "DEPLOY_EXECUTION_COMPLETED"
+				}
+			} else {
+				execution.Status = "failed"
+				execution.Decision = "DEPLOY_SSH_EXECUTION_FAILED"
+				execution.RollbackSuggestion = rollbackFor(plan, "ssh_command_failed")
+			}
 		default:
 			execution.Decision = "DEPLOY_SSH_EXECUTION_BLOCKED"
 		}
@@ -702,7 +721,7 @@ func buildSSHExecutionPlan(rootDir string, plan Plan, commands []string, enabled
 			if enabled {
 				target.Status, target.Reason = validateRemoteTarget(plan, resource)
 				if target.Status == "planned" {
-					target.Reason = "ssh_guarded_execution_ready"
+					target.Reason = "ssh_execution_ready"
 				}
 			}
 			if enabled && len(commands) == 0 {
@@ -740,14 +759,123 @@ func buildSSHExecutionPlan(rootDir string, plan Plan, commands []string, enabled
 	}
 	if ok {
 		remotePlan.Status = "planned"
-		remotePlan.Decision = "SSH_EXECUTION_GUARDED_READY"
-		reasons = append(reasons, "ssh_guarded_execution_ready", "remote_ssh_command_runner_not_enabled")
+		remotePlan.Decision = "SSH_EXECUTION_READY"
+		reasons = append(reasons, "ssh_execution_ready")
 		return remotePlan, steps, true, reasons
 	}
 	if enabled {
 		remotePlan.Decision = "SSH_EXECUTION_BLOCKED"
 	}
 	return remotePlan, steps, false, reasons
+}
+
+func runSSHCommands(ctx context.Context, rootDir string, plan Plan, remotePlan RemotePlan, commands []string) ([]ExecutionStep, bool, []string) {
+	steps := []ExecutionStep{}
+	reasons := []string{}
+	ok := true
+	for _, target := range remotePlan.Targets {
+		if target.Status != "planned" {
+			continue
+		}
+		resource, found, err := serverresources.Show(rootDir, target.ResourceID)
+		if err != nil || !found {
+			reasons = append(reasons, "server_resource_not_found:"+target.ResourceID)
+			steps = append(steps, blockedSSHStep(target, "", "server_resource_not_found"))
+			ok = false
+			continue
+		}
+		resolution, err := secretresolver.Resolve(rootDir, resource.AuthRef, secretresolver.ResolveOptions{Purpose: "server.ssh.execute", AdapterID: resource.ID, Required: true})
+		if err != nil {
+			reasons = append(reasons, "ssh_auth_resolve_failed:"+resource.ID)
+			steps = append(steps, blockedSSHStep(target, "", "ssh_auth_resolve_failed"))
+			ok = false
+			continue
+		}
+		if resolution.Status != "ok" {
+			reasons = append(reasons, "ssh_auth_"+resolution.Status+":"+resource.ID+":"+resolution.Reason)
+			steps = append(steps, blockedSSHStep(target, "", "ssh_auth_"+resolution.Status))
+			ok = false
+			continue
+		}
+		authValue := resolution.Value()
+		for _, command := range commands {
+			step := ExecutionStep{
+				Name:      "ssh_execute",
+				Status:    "running",
+				Command:   command,
+				Allowlist: safeSSHPrefixes(),
+				StartedAt: time.Now().UTC().Format(time.RFC3339Nano),
+			}
+			commandCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			result := process.RunCommand(commandCtx, rootDir, "ssh", sshArgs(resource, authValue, command)...)
+			cancel()
+			step.Output = redactSSHOutput(result.Stdout, authValue)
+			step.Error = redactSSHOutput(result.Stderr, authValue)
+			if result.Code == 0 {
+				step.Status = "completed"
+			} else {
+				step.Status = "failed"
+				reasons = append(reasons, "ssh_command_failed:"+resource.ID)
+				ok = false
+			}
+			step.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
+			steps = append(steps, step)
+		}
+	}
+	if ok {
+		reasons = append(reasons, "allowed_ssh_commands_completed")
+		_ = logging.Log(rootDir, "release", "deployment.ssh.commands.completed", map[string]any{
+			"deployment_id": plan.ID,
+			"release_id":    plan.ReleaseID,
+			"environment":   plan.Environment,
+			"targets":       len(remotePlan.Targets),
+			"commands":      len(commands),
+			"decision":      "SSH_COMMANDS_COMPLETED",
+		})
+	}
+	return steps, ok, reasons
+}
+
+func blockedSSHStep(target RemoteTarget, command string, reason string) ExecutionStep {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	return ExecutionStep{
+		Name:       "ssh_execute",
+		Status:     "blocked",
+		Command:    command,
+		Output:     target.ResourceID + ":" + target.Host + ":" + reason,
+		Error:      reason,
+		Allowlist:  safeSSHPrefixes(),
+		StartedAt:  now,
+		FinishedAt: now,
+	}
+}
+
+func sshArgs(resource serverresources.Resource, identityFile string, command string) []string {
+	args := []string{
+		"-i", identityFile,
+		"-o", "BatchMode=yes",
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "ConnectTimeout=10",
+		resource.Host,
+		"--",
+		command,
+	}
+	return args
+}
+
+func redactSSHOutput(value string, sensitiveValues ...string) string {
+	value = secretresolver.Redact(value)
+	for _, sensitive := range sensitiveValues {
+		sensitive = strings.TrimSpace(sensitive)
+		if sensitive != "" {
+			value = strings.ReplaceAll(value, sensitive, "[REDACTED]")
+		}
+	}
+	value = strings.TrimSpace(value)
+	if len(value) > 4000 {
+		value = value[:4000] + "...[truncated]"
+	}
+	return value
 }
 
 func commandSummary(commands []string) string {
