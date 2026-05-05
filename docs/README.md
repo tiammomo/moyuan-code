@@ -63,8 +63,11 @@
 
 ## 当前实施入口
 
-Phase 1 本地 CLI MVP、Beta 第一批控制面能力、Phase 2、Phase 3、Phase 4、Phase 5 和 Phase 6 第一批能力已完成主要闭环。当前验收和状态入口：
+Phase 1 本地 CLI MVP、Beta 第一批控制面能力、Phase 2、Phase 3、Phase 4、Phase 5、Phase 6 和 Phase 7 第一批能力已完成主要闭环。当前验收和状态入口：
 
+- [Phase 8 实现 Issue Graph](./phases/phase8-issue-graph.md)：Phase 8 受控外部执行 Beta 的依赖图。
+- [Phase 8 实施记录](./phases/phase8-next-development-plan.md)：Phase 8 当前任务范围、验收标准和执行入口。
+- [Phase 7 Release Readiness](./phases/phase7-release-readiness.md)：Phase 7 受控真实外部执行准备的收口验证。
 - [Phase 7 实现 Issue Graph](./phases/phase7-issue-graph.md)：Phase 7 受控真实外部执行准备的依赖图。
 - [Phase 7 实施记录](./phases/phase7-next-development-plan.md)：Phase 7 当前任务范围、验收标准和执行入口。
 - [Phase 6 Release Readiness](./phases/phase6-release-readiness.md)：Phase 6 approval、adapter、telemetry 和 Console schema forms 的收口验证。
