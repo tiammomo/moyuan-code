@@ -67,6 +67,9 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	if failedExecution.Decision != "DEPLOY_SMOKE_FAILED" || failedExecution.SmokeReport.Status != "failed" || !failedExecution.RollbackSuggestion.Required {
 		t.Fatalf("expected smoke failure rollback suggestion, got %+v", failedExecution)
 	}
+	if failedExecution.RollbackSuggestion.Runbook == nil || failedExecution.RollbackSuggestion.Runbook.Decision != "ROLLBACK_RUNBOOK_READY" || len(failedExecution.RollbackSuggestion.Runbook.Steps) < 3 {
+		t.Fatalf("expected structured rollback runbook, got %+v", failedExecution.RollbackSuggestion.Runbook)
+	}
 	if !hasStep(failedExecution.Steps, "rollback", "suggested") {
 		t.Fatalf("expected rollback suggestion step: %+v", failedExecution.Steps)
 	}
@@ -78,6 +81,10 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 		!hasEvidenceOperation(failedEvidenceRecords, "deployment.rollback.suggested", "ROLLBACK_RECOMMENDED") {
 		t.Fatalf("expected smoke failure and rollback evidence, got %+v", failedEvidenceRecords)
 	}
+	if !hasEvidenceArtifact(failedEvidenceRecords, "deployment.rollback.suggested", "rollback_runbook") {
+		t.Fatalf("expected rollback runbook artifact evidence, got %+v", failedEvidenceRecords)
+	}
+	assertDeploymentFileExists(t, filepath.Join(workspace.ForRoot(root).DeploymentsDir, "rollback-runbooks", failedExecution.ID+".json"))
 	releaseLog, found, err := fsutil.ReadText(filepath.Join(workspace.ForRoot(root).LogsDir, "release.jsonl"))
 	if err != nil {
 		t.Fatal(err)
@@ -229,6 +236,9 @@ func TestExecuteSSHRunnerFailsAndSuggestsRollback(t *testing.T) {
 	if !execution.RollbackSuggestion.Required || execution.RollbackSuggestion.Reason != "ssh_command_failed" {
 		t.Fatalf("expected rollback suggestion for SSH command failure, got %+v", execution.RollbackSuggestion)
 	}
+	if execution.RollbackSuggestion.Runbook == nil || execution.RollbackSuggestion.Runbook.Decision != "ROLLBACK_RUNBOOK_READY" {
+		t.Fatalf("expected rollback runbook for SSH command failure, got %+v", execution.RollbackSuggestion.Runbook)
+	}
 	if !hasStep(execution.Steps, "ssh_execute", "failed") {
 		t.Fatalf("expected failed SSH execute step, got %+v", execution.Steps)
 	}
@@ -322,6 +332,20 @@ func hasEvidenceOperation(records []evidence.Record, operation string, decision 
 	return false
 }
 
+func hasEvidenceArtifact(records []evidence.Record, operation string, kind string) bool {
+	for _, record := range records {
+		if record.Operation != operation {
+			continue
+		}
+		for _, artifact := range record.Artifacts {
+			if artifact.Kind == kind {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func containsReason(reasons []string, expected string) bool {
 	for _, reason := range reasons {
 		if reason == expected {
@@ -347,6 +371,13 @@ func prependFakeSSH(t *testing.T, exitCode int, stdout string, stderr string) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func assertDeploymentFileExists(t *testing.T, path string) {
+	t.Helper()
+	if !fsutil.Exists(path) {
+		t.Fatalf("expected file to exist: %s", path)
+	}
 }
 
 func assertDeploymentFileDoesNotContain(t *testing.T, path string, value string) {

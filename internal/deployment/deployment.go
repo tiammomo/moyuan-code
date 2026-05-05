@@ -134,10 +134,27 @@ type CheckResult struct {
 }
 
 type RollbackSuggestion struct {
-	Required bool     `json:"required,omitempty"`
-	Decision string   `json:"decision,omitempty"`
-	Reason   string   `json:"reason,omitempty"`
-	Actions  []string `json:"actions,omitempty"`
+	Required bool             `json:"required,omitempty"`
+	Decision string           `json:"decision,omitempty"`
+	Reason   string           `json:"reason,omitempty"`
+	Actions  []string         `json:"actions,omitempty"`
+	Runbook  *RollbackRunbook `json:"runbook,omitempty"`
+}
+
+type RollbackRunbook struct {
+	Status      string                `json:"status"`
+	Decision    string                `json:"decision"`
+	Reason      string                `json:"reason"`
+	Steps       []RollbackRunbookStep `json:"steps"`
+	GeneratedAt string                `json:"generated_at"`
+}
+
+type RollbackRunbookStep struct {
+	Order        int    `json:"order"`
+	Name         string `json:"name"`
+	Action       string `json:"action"`
+	Verification string `json:"verification"`
+	Manual       bool   `json:"manual"`
 }
 
 func CreatePlan(rootDir string, options PlanOptions) (Plan, error) {
@@ -570,9 +587,25 @@ func addPostDeploymentEvidence(rootDir string, execution Execution) error {
 	if execution.RollbackSuggestion.Decision != "" {
 		operation := "deployment.rollback.not_required"
 		status := "not_required"
+		artifacts := []evidence.ArtifactRef{{
+			Kind: "rollback_suggestion",
+			ID:   execution.ID,
+			Path: artifactPath,
+		}}
 		if execution.RollbackSuggestion.Required {
 			operation = "deployment.rollback.suggested"
 			status = "suggested"
+			runbookRelPath, err := writeRollbackRunbook(rootDir, execution)
+			if err != nil {
+				return err
+			}
+			if runbookRelPath != "" {
+				artifacts = append(artifacts, evidence.ArtifactRef{
+					Kind: "rollback_runbook",
+					ID:   execution.ID,
+					Path: runbookRelPath,
+				})
+			}
 		}
 		if _, err := evidence.Add(rootDir, evidence.AddOptions{
 			ParentType:  "deployment_execution",
@@ -584,16 +617,25 @@ func addPostDeploymentEvidence(rootDir string, execution Execution) error {
 			Decision:    execution.RollbackSuggestion.Decision,
 			Reasons:     rollbackReasons(execution.RollbackSuggestion),
 			Source:      "deployment",
-			Artifacts: []evidence.ArtifactRef{{
-				Kind: "rollback_suggestion",
-				ID:   execution.ID,
-				Path: artifactPath,
-			}},
+			Artifacts:   artifacts,
 		}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func writeRollbackRunbook(rootDir string, execution Execution) (string, error) {
+	if execution.RollbackSuggestion.Runbook == nil {
+		return "", nil
+	}
+	dir := filepath.Join(workspace.ForRoot(rootDir).DeploymentsDir, "rollback-runbooks")
+	if err := fsutil.EnsureDir(dir); err != nil {
+		return "", err
+	}
+	rel := filepath.ToSlash(filepath.Join(".moyuan", "lifecycle", "deployments", "rollback-runbooks", execution.ID+".json"))
+	path := filepath.Join(dir, execution.ID+".json")
+	return rel, fsutil.WriteJSON(path, execution.RollbackSuggestion.Runbook)
 }
 
 func checkReportReasons(report CheckReport) []string {
@@ -1180,7 +1222,40 @@ func rollbackFor(plan Plan, reason string) RollbackSuggestion {
 	if len(actions) == 0 {
 		actions = []string{"restore previous release", "rerun smoke checks", "keep incident record open"}
 	}
-	return RollbackSuggestion{Required: true, Decision: "ROLLBACK_RECOMMENDED", Reason: reason, Actions: actions}
+	runbook := rollbackRunbookFor(plan, reason, actions)
+	return RollbackSuggestion{Required: true, Decision: "ROLLBACK_RECOMMENDED", Reason: reason, Actions: actions, Runbook: &runbook}
+}
+
+func rollbackRunbookFor(plan Plan, reason string, actions []string) RollbackRunbook {
+	steps := []RollbackRunbookStep{
+		{Order: 1, Name: "freeze_release", Action: "pause deployment promotion and notify release owner", Verification: "release owner acknowledges rollback review", Manual: true},
+	}
+	order := 2
+	for _, action := range actions {
+		action = strings.TrimSpace(action)
+		if action == "" {
+			continue
+		}
+		steps = append(steps, RollbackRunbookStep{
+			Order:        order,
+			Name:         "apply_rollback_action",
+			Action:       action,
+			Verification: "action completed or explicitly skipped by release owner",
+			Manual:       true,
+		})
+		order++
+	}
+	steps = append(steps,
+		RollbackRunbookStep{Order: order, Name: "rerun_smoke", Action: "rerun smoke checks for release " + plan.ReleaseID, Verification: "smoke check evidence is passed or manual_required", Manual: true},
+		RollbackRunbookStep{Order: order + 1, Name: "record_outcome", Action: "record rollback decision, evidence, and follow-up issue", Verification: "rollback evidence and follow-up issue are linked", Manual: true},
+	)
+	return RollbackRunbook{
+		Status:      "manual_review_required",
+		Decision:    "ROLLBACK_RUNBOOK_READY",
+		Reason:      reason,
+		Steps:       steps,
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
+	}
 }
 
 func allManualOrSkipped(results []CheckResult) bool {
