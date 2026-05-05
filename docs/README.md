@@ -65,6 +65,8 @@
 
 Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 12 已完成主要闭环。当前验收和状态入口：
 
+- [Phase 13 实现 Issue Graph](./phases/phase13-issue-graph.md)：Release Candidate 远程发布与部署交接的依赖图。
+- [Phase 13 实施记录](./phases/phase13-next-development-plan.md)：Phase 13 当前任务、验收标准和执行入口。
 - [Phase 12 Release Readiness](./phases/phase12-release-readiness.md)：真实并发执行与集成合入准备的收口验证。
 - [Phase 12 实现 Issue Graph](./phases/phase12-issue-graph.md)：真实并发执行与集成合入准备的依赖图。
 - [Phase 12 实施记录](./phases/phase12-next-development-plan.md)：Phase 12 完成任务、验收标准和执行入口。
