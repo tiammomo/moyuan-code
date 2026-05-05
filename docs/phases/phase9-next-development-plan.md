@@ -23,7 +23,7 @@ Phase 8 已完成并通过 release readiness：
 | P0 | `phase9-001` | `operation-detail-aggregation-api` | completed | Operation detail 后端聚合 | Console/API 可按 operation id 获取 execution/evidence/artifact detail |
 | P0 | `phase9-002` | `server-resource-lifecycle-alerts` | completed | 服务器资源生命周期提醒 | expiring/expired/maintenance_due 可查询并写入 audit |
 | P1 | `phase9-003` | `deployment-monitor-history` | completed | 部署后检查历史和失败分类 | smoke/monitor/rollback 可按 execution 查询历史 |
-| P1 | `phase9-004` | `provider-route-explanation-v2` | planned | Provider 路由解释增强 | selected/skipped provider signals 可解释 |
+| P1 | `phase9-004` | `provider-route-explanation-v2` | completed | Provider 路由解释增强 | selected/skipped provider signals 可解释 |
 | P2 | `phase9-005` | `self-repair-candidate-from-operations` | planned | 从失败 operation 生成修复候选 | repair candidate 可审查，不自动越权 |
 
 ## 3. 执行规划：`phase9-001 operation-detail-aggregation-api`
@@ -103,7 +103,30 @@ Phase 8 已完成并通过 release readiness：
 - 新增 API：`GET /v1/projects/:project_id/deployment-monitor-history` 和 `GET /v1/projects/:project_id/deployment-executions/:execution_id/post-deployment-history`。
 - 失败分类包括 `smoke_failed`、`monitor_failed`、`execution_failed`、`execution_blocked`、`manual_check_required` 和 `none`。
 
-## 6. 验证要求
+## 6. 执行规划：`phase9-004 provider-route-explanation-v2`
+
+实现状态：completed。
+
+范围：
+
+- `provider-route` 保持原有 `route.decision/provider_id/runtime_id/signals`，新增 `route.explanation` 和 `route.candidates`。
+- 候选 provider 按 `selected`、`skipped`、`blocked` 分类，给出 reason、score 和 health/quota/cost/quality/selection signals。
+- explanation 汇总 selected reason、strategy、candidate count、selected/skipped/blocked count。
+- API 测试覆盖 route explanation 字段；provider 单测覆盖 selected、skipped 和 blocked candidate。
+
+非目标：
+
+- 不改变 route policy 的安全边界。
+- 不让前端自行重算 provider 决策。
+- 不记录 prompt、模型响应、secret、token 或 provider 原始响应正文。
+
+落地结果：
+
+- 新增 `RouteExplanation` 和 `RouteCandidate`。
+- 路由候选理由覆盖 disabled、repo/runtime mismatch、memory API provider mismatch、health/quota/cost/data policy 阻断和低优先级跳过。
+- `candidate.signals` 追加 `selection` signal，便于 Console/日志解释本次路由为什么选或跳过。
+
+## 7. 验证要求
 
 每完成一个 Phase 9 issue，至少运行：
 

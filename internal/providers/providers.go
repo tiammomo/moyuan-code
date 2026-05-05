@@ -213,14 +213,16 @@ type RouteRequest struct {
 }
 
 type RouteDecision struct {
-	Decision   string        `json:"decision"`
-	Blocked    bool          `json:"blocked"`
-	Strategy   string        `json:"strategy,omitempty"`
-	ProviderID string        `json:"provider_id,omitempty"`
-	RuntimeID  string        `json:"runtime_id,omitempty"`
-	ModelID    string        `json:"model_id,omitempty"`
-	Reason     string        `json:"reason"`
-	Signals    []RouteSignal `json:"signals,omitempty"`
+	Decision    string            `json:"decision"`
+	Blocked     bool              `json:"blocked"`
+	Strategy    string            `json:"strategy,omitempty"`
+	ProviderID  string            `json:"provider_id,omitempty"`
+	RuntimeID   string            `json:"runtime_id,omitempty"`
+	ModelID     string            `json:"model_id,omitempty"`
+	Reason      string            `json:"reason"`
+	Signals     []RouteSignal     `json:"signals,omitempty"`
+	Explanation *RouteExplanation `json:"explanation,omitempty"`
+	Candidates  []RouteCandidate  `json:"candidates,omitempty"`
 }
 
 type RouteSignal struct {
@@ -228,6 +230,29 @@ type RouteSignal struct {
 	Type       string `json:"type"`
 	Status     string `json:"status"`
 	Reason     string `json:"reason,omitempty"`
+}
+
+type RouteExplanation struct {
+	Summary            string `json:"summary"`
+	SelectedProviderID string `json:"selected_provider_id,omitempty"`
+	SelectedReason     string `json:"selected_reason,omitempty"`
+	Strategy           string `json:"strategy,omitempty"`
+	CandidateCount     int    `json:"candidate_count"`
+	SelectedCount      int    `json:"selected_count"`
+	SkippedCount       int    `json:"skipped_count"`
+	BlockedCount       int    `json:"blocked_count"`
+}
+
+type RouteCandidate struct {
+	ProviderID string        `json:"provider_id"`
+	RuntimeID  string        `json:"runtime_id,omitempty"`
+	Vendor     string        `json:"vendor,omitempty"`
+	APIType    string        `json:"api_type,omitempty"`
+	ModelID    string        `json:"model_id,omitempty"`
+	Status     string        `json:"status"`
+	Reason     string        `json:"reason"`
+	Score      int           `json:"score"`
+	Signals    []RouteSignal `json:"signals,omitempty"`
 }
 
 func Load(rootDir string) (Registry, error) {
@@ -572,11 +597,20 @@ func Route(rootDir string, request RouteRequest) (RouteDecision, error) {
 }
 
 func Decide(registry Registry, request RouteRequest) RouteDecision {
+	request = prepareRouteRequest(request)
+	decision := decidePrepared(registry, request)
+	return explainRouteDecision(registry, request, decision)
+}
+
+func prepareRouteRequest(request RouteRequest) RouteRequest {
 	request.Role = normalizeToken(request.Role)
 	request.ModelStrategy = normalizeToken(request.ModelStrategy)
 	request.TaskType = normalizeToken(request.TaskType)
 	request.OutputType = normalizeToken(request.OutputType)
-	request = applyModelStrategy(request)
+	return applyModelStrategy(request)
+}
+
+func decidePrepared(registry Registry, request RouteRequest) RouteDecision {
 	if request.IncludesSecrets {
 		return withStrategy(blocked("contains_secret_context"), request.ModelStrategy)
 	}
@@ -1461,6 +1495,168 @@ func runtimeMatches(provider Provider, runtimeID string) bool {
 		return true
 	}
 	return normalizeToken(provider.ID) == runtimeID && provider.RuntimeID == ""
+}
+
+func explainRouteDecision(registry Registry, request RouteRequest, decision RouteDecision) RouteDecision {
+	candidates := routeCandidates(registry, request, decision)
+	decision.Candidates = candidates
+	decision.Explanation = routeExplanation(decision, candidates)
+	return decision
+}
+
+func routeCandidates(registry Registry, request RouteRequest, decision RouteDecision) []RouteCandidate {
+	candidates := []RouteCandidate{}
+	for _, provider := range registry.Providers {
+		candidate := routeCandidate(provider, request, decision)
+		candidates = append(candidates, candidate)
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return candidateOrder(candidates[i].Status) < candidateOrder(candidates[j].Status)
+	})
+	return candidates
+}
+
+func routeCandidate(provider Provider, request RouteRequest, decision RouteDecision) RouteCandidate {
+	status, reason, score := routeCandidateStatus(provider, request)
+	if decision.ProviderID == provider.ID {
+		if decision.Blocked {
+			status = "blocked"
+		} else {
+			status = "selected"
+			score = 100
+		}
+		reason = decision.Reason
+	}
+	candidate := RouteCandidate{
+		ProviderID: provider.ID,
+		RuntimeID:  provider.RuntimeID,
+		Vendor:     provider.Vendor,
+		APIType:    provider.APIType,
+		Status:     status,
+		Reason:     reason,
+		Score:      score,
+		Signals:    routeCandidateSignals(provider, status, reason),
+	}
+	if len(provider.Models) > 0 {
+		candidate.ModelID = provider.Models[0].ID
+	}
+	return candidate
+}
+
+func routeCandidateStatus(provider Provider, request RouteRequest) (string, string, int) {
+	if request.IncludesSecrets {
+		return "blocked", "contains_secret_context", 0
+	}
+	if !provider.Enabled {
+		return "blocked", "provider_disabled", 0
+	}
+	if violation := dataPolicyViolation(provider, request); violation != "" {
+		return "blocked", violation, 0
+	}
+	if violation := availabilityViolation(provider); violation != "" {
+		return "blocked", violation, 0
+	}
+	if reason := routeIntentMismatch(provider, request); reason != "" {
+		return "skipped", reason, 30
+	}
+	return "skipped", "lower_priority_candidate", 70
+}
+
+func routeIntentMismatch(provider Provider, request RouteRequest) string {
+	if request.OutputType == "architecture_diagram" || request.OutputType == "image" || request.TaskType == "image_generation" {
+		if provider.ID == "gpt_image_2" || provider.APIType == "image" || matchesUseCase(provider.AllowedUseCases, request) {
+			return ""
+		}
+		return "image_output_mismatch"
+	}
+	if request.RequiresRepoEdit {
+		runtimeID := defaultRuntimeForRole(request.Role)
+		if runtimeMatches(provider, runtimeID) {
+			return ""
+		}
+		if provider.NativeRuntime && matchesUseCase(provider.AllowedUseCases, request) {
+			return ""
+		}
+		return "repo_edit_runtime_mismatch:" + runtimeID
+	}
+	if request.TaskType == "memory_extraction" || request.TaskType == "memory_compaction" {
+		if provider.NativeRuntime {
+			return "memory_requires_api_provider"
+		}
+		if !vendorAllowed(provider.Vendor, []string{"glm", "minimax", "dashscope", "deepseek", "zhipu"}) {
+			return "memory_vendor_mismatch"
+		}
+		if len(provider.AllowedUseCases) > 0 && !contains(provider.AllowedUseCases, request.TaskType) {
+			return "memory_use_case_mismatch"
+		}
+		return ""
+	}
+	if request.TaskType == "architecture_planning" || request.TaskType == "requirement_planning" {
+		if provider.ID == "claude_cli" {
+			return ""
+		}
+		if provider.NativeRuntime {
+			return "planning_runtime_mismatch"
+		}
+		if vendorAllowed(provider.Vendor, []string{"anthropic", "openai", "third_party"}) {
+			return ""
+		}
+		return "planning_vendor_mismatch"
+	}
+	runtimeID := defaultRuntimeForRole(request.Role)
+	if runtimeMatches(provider, runtimeID) || matchesUseCase(provider.AllowedUseCases, request) {
+		return ""
+	}
+	return "default_runtime_mismatch:" + runtimeID
+}
+
+func routeCandidateSignals(provider Provider, status string, reason string) []RouteSignal {
+	signals := append([]RouteSignal{}, routeSignals(provider)...)
+	signals = append(signals, RouteSignal{ProviderID: provider.ID, Type: "selection", Status: status, Reason: reason})
+	return signals
+}
+
+func routeExplanation(decision RouteDecision, candidates []RouteCandidate) *RouteExplanation {
+	explanation := &RouteExplanation{
+		Summary:            decision.Decision + ":" + decision.Reason,
+		SelectedProviderID: decision.ProviderID,
+		SelectedReason:     decision.Reason,
+		Strategy:           decision.Strategy,
+		CandidateCount:     len(candidates),
+	}
+	for _, candidate := range candidates {
+		switch candidate.Status {
+		case "selected":
+			explanation.SelectedCount++
+		case "blocked":
+			explanation.BlockedCount++
+		default:
+			explanation.SkippedCount++
+		}
+	}
+	return explanation
+}
+
+func candidateOrder(status string) int {
+	switch status {
+	case "selected":
+		return 0
+	case "blocked":
+		return 1
+	case "skipped":
+		return 2
+	default:
+		return 3
+	}
+}
+
+func vendorAllowed(vendor string, allowed []string) bool {
+	for _, value := range allowed {
+		if vendor == value {
+			return true
+		}
+	}
+	return false
 }
 
 func isThirdParty(provider Provider) bool {

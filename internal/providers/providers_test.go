@@ -270,6 +270,47 @@ func TestProviderExecutionAndQualityFeedbackUpdateTelemetry(t *testing.T) {
 	}
 }
 
+func TestProviderRouteExplainsSelectedAndSkippedCandidates(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Upsert(root, Provider{
+		ID:      "glm-memory",
+		Name:    "GLM Memory",
+		Vendor:  "glm",
+		APIType: "openai-compatible",
+		AuthRef: "env:GLM_API_KEY",
+		Enabled: true,
+		DataPolicy: DataPolicy{
+			AllowProjectMemory: true,
+		},
+		Models:          []Model{{ID: "glm-4"}},
+		AllowedUseCases: []string{"memory_extraction"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	route, err := Route(root, RouteRequest{Role: "memory_curator", TaskType: "memory_extraction", IncludesProjectMemory: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if route.Decision != DecisionAllowed || route.ProviderID != "glm-memory" || route.Explanation == nil {
+		t.Fatalf("unexpected route explanation: %+v", route)
+	}
+	if route.Explanation.CandidateCount < 4 || route.Explanation.SelectedCount != 1 || route.Explanation.SkippedCount == 0 || route.Explanation.BlockedCount == 0 {
+		t.Fatalf("expected selected/skipped/blocked candidate counts, got %+v candidates=%+v", route.Explanation, route.Candidates)
+	}
+	if !hasRouteCandidate(route.Candidates, "glm-memory", "selected", "memory_low_cost_provider") ||
+		!hasRouteCandidate(route.Candidates, "codex_cli", "skipped", "memory_requires_api_provider") ||
+		!hasRouteCandidate(route.Candidates, "gpt_image_2", "blocked", "provider_disabled") {
+		t.Fatalf("expected selected and skipped candidate reasons, got %+v", route.Candidates)
+	}
+	if !hasCandidateSignal(route.Candidates, "glm-memory", "selection", "selected") {
+		t.Fatalf("expected selected candidate signal, got %+v", route.Candidates)
+	}
+}
+
 func TestProviderFeedbackAccruesUsageQuotaCostAndQualitySignals(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {
@@ -581,6 +622,24 @@ func writeProviderSecretPolicy(t *testing.T, root string, text string) {
 func hasRouteSignal(signals []RouteSignal, signalType string, status string) bool {
 	for _, signal := range signals {
 		if signal.Type == signalType && signal.Status == status {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRouteCandidate(candidates []RouteCandidate, providerID string, status string, reason string) bool {
+	for _, candidate := range candidates {
+		if candidate.ProviderID == providerID && candidate.Status == status && candidate.Reason == reason {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCandidateSignal(candidates []RouteCandidate, providerID string, signalType string, status string) bool {
+	for _, candidate := range candidates {
+		if candidate.ProviderID == providerID && hasRouteSignal(candidate.Signals, signalType, status) {
 			return true
 		}
 	}

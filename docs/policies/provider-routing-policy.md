@@ -128,6 +128,14 @@ Phase 6 当前实现：
 - Runtime execution feedback 会累计本地 token 估算；配置 token 单价后会同步更新成本估算，配置 token limit 后会同步扣减额度。
 - Telemetry 只记录状态、数值型 token 估算、成本估算和 reason，不记录 prompt、模型响应或 secret。
 
+Phase 9 route explanation v2 当前实现：
+
+- `route.explanation`：包含 summary、selected provider、selected reason、strategy、candidate count、selected/skipped/blocked count。
+- `route.candidates[]`：每个 provider 输出 `provider_id/runtime_id/vendor/api_type/model_id/status/reason/score/signals`。
+- `candidate.status`：`selected` 表示本次路由命中；`skipped` 表示能力或优先级不匹配；`blocked` 表示 disabled、secret/data policy、health、quota 或 cost 阻断。
+- `candidate.signals`：继承 provider 的 health/quota/cost/quality signals，并追加 `selection` signal。该字段只解释路由，不授权绕过门禁。
+- 不记录 prompt、模型响应、token 值、API key、SSH key 或完整 stdout/stderr。
+
 模型策略当前实现：
 
 - `frontend-first`：将任务按前端代码路径路由，默认进入 `claude_cli` 或其 provider profile。
