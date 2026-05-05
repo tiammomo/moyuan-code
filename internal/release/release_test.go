@@ -1,10 +1,12 @@
 package release
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,6 +17,86 @@ import (
 	"moyuan-code/internal/review"
 	"moyuan-code/internal/workspace"
 )
+
+func TestPlanCandidateFromSuggestedReleaseBatch(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	initReleaseGitRepo(t, root)
+	runReleaseGit(t, root, "remote", "add", "origin", "git@github.com:owner/repo.git")
+	batch, err := finishBatchPlan(root, BatchPlan{
+		ID:                   "release-batch-v0.2.0",
+		IntegrationApplyID:   "integration-apply-release",
+		IntegrationPreviewID: "integration-preview-release",
+		MergeQueueID:         "merge-queue-release",
+		BatchID:              "batch-release",
+		EpicID:               "epic-release",
+		Status:               "suggested",
+		Decision:             "RELEASE_BATCH_SUGGESTED",
+		Version:              "v0.2.0",
+		ReleaseBranch:        "release/v0.2.0",
+		SourceBranch:         "moyuan/integration/release",
+		ReadyItemCount:       3,
+		MinItems:             3,
+		Reasons:              []string{"ready_item_threshold_met"},
+		Commands:             []string{"git checkout -b release/v0.2.0 moyuan/integration/release"},
+		CreatedAt:            "2026-05-05T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	candidate, err := PlanCandidate(context.Background(), root, CandidateOptions{ReleaseBatchID: batch.ID, DeploymentTargets: []string{"test_dev", "production"}, RequestedBy: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate.Decision != "RELEASE_CANDIDATE_READY" || candidate.Provider != "github" || candidate.RemoteName != "origin" {
+		t.Fatalf("expected ready github candidate, got %+v", candidate)
+	}
+	if candidate.ReleaseBranch != "release/v0.2.0" || candidate.SourceBranch != "moyuan/integration/release" || candidate.ReadyItemCount != 3 {
+		t.Fatalf("expected candidate to inherit release batch facts, got %+v", candidate)
+	}
+	if len(candidate.DeploymentTargets) != 2 || candidate.DeploymentTargets[1] != "production" {
+		t.Fatalf("expected deployment targets, got %+v", candidate.DeploymentTargets)
+	}
+	loaded, found, err := LoadCandidate(root, candidate.ID)
+	if err != nil || !found || loaded.ID != candidate.ID {
+		t.Fatalf("expected persisted candidate, found=%v loaded=%+v err=%v", found, loaded, err)
+	}
+	candidates, err := ListCandidates(root, batch.ID, 10)
+	if err != nil || len(candidates) != 1 || candidates[0].ID != candidate.ID {
+		t.Fatalf("expected listed candidate, candidates=%+v err=%v", candidates, err)
+	}
+}
+
+func TestPlanCandidateBlocksWhenReleaseBatchNotSuggested(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	batch, err := finishBatchPlan(root, BatchPlan{
+		ID:            "release-batch-small",
+		Status:        "not_ready",
+		Decision:      "RELEASE_BATCH_NOT_READY",
+		Version:       "v0.2.1",
+		ReleaseBranch: "release/v0.2.1",
+		MinItems:      3,
+		Reasons:       []string{"ready_item_count_below_threshold:3"},
+		CreatedAt:     "2026-05-05T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	candidate, err := PlanCandidate(context.Background(), root, CandidateOptions{ReleaseBatchID: batch.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate.Decision != "RELEASE_CANDIDATE_BLOCKED" || !containsReleaseReason(candidate.Reasons, "release_batch_not_suggested:RELEASE_BATCH_NOT_READY") {
+		t.Fatalf("expected candidate blocked by release batch, got %+v", candidate)
+	}
+}
 
 func TestPlanBatchSuggestsReleaseWhenIntegrationApplyThresholdMet(t *testing.T) {
 	root := t.TempDir()
@@ -476,6 +558,23 @@ repository:
 `)+"\n")
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func initReleaseGitRepo(t *testing.T, root string) {
+	t.Helper()
+	runReleaseGit(t, root, "init")
+	runReleaseGit(t, root, "config", "user.email", "test@example.com")
+	runReleaseGit(t, root, "config", "user.name", "Test User")
+}
+
+func runReleaseGit(t *testing.T, root string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, string(output))
 	}
 }
 

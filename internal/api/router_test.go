@@ -265,6 +265,13 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/release-batches?integration_apply_id="+integrationApplies[0].ID, http.StatusOK, `"release_batches"`, releaseBatches[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/release-batches/"+releaseBatches[0].ID, http.StatusOK, `"release_batch"`, `"RELEASE_BATCH_BLOCKED"`)
+	assertPostContains(t, router, "/v1/projects/managed/release-batches/"+releaseBatches[0].ID+"/candidate", `{"deployment_targets":["test_dev"],"requested_by":"api-test"}`, http.StatusAccepted, `"release_candidate"`, `"RELEASE_CANDIDATE_BLOCKED"`, "release_batch_not_suggested:")
+	releaseCandidates, err := release.ListCandidates(root, releaseBatches[0].ID, 1)
+	if err != nil || len(releaseCandidates) != 1 {
+		t.Fatalf("expected API release candidate, candidates=%+v err=%v", releaseCandidates, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/release-candidates?release_batch_id="+releaseBatches[0].ID, http.StatusOK, `"release_candidates"`, releaseCandidates[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/release-candidates/"+releaseCandidates[0].ID, http.StatusOK, `"release_candidate"`, `"RELEASE_CANDIDATE_BLOCKED"`)
 	assertGETContains(t, router, "/v1/projects/managed/worktrees?issue_id=api-worktree", http.StatusOK, `"worktrees"`, worktreeRecord.ID, `"WORKTREE_READY"`)
 	assertGETContains(t, router, "/v1/projects/managed/worktrees/"+worktreeRecord.ID, http.StatusOK, `"worktree"`, `"api-worktree"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)

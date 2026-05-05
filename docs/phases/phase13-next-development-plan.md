@@ -21,7 +21,7 @@ Phase 12 已完成并通过 readiness：
 
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase13-001` | `release-candidate-plan-from-batch` | planned | Release Candidate 事实源 | suggested release batch 可生成 release candidate plan |
+| P0 | `phase13-001` | `release-candidate-plan-from-batch` | completed | Release Candidate 事实源 | suggested release batch 可生成 release candidate plan |
 | P0 | `phase13-002` | `guarded-local-release-branch-apply` | planned | 本地 release branch 受控 apply | 审批和开关满足后可更新本地 release branch |
 | P1 | `phase13-003` | `release-candidate-provider-preview` | planned | 远程发布预览 | Candidate 可生成 PR/MR、tag、release 和 workflow guarded preview |
 | P1 | `phase13-004` | `deployment-handoff-from-release-candidate` | planned | 部署交接 | Candidate 可生成 deployment dry-run plan |
@@ -29,7 +29,7 @@ Phase 12 已完成并通过 readiness：
 
 ## 3. 执行规划：`phase13-001 release-candidate-plan-from-batch`
 
-实现状态：planned。
+实现状态：completed。
 
 范围：
 
@@ -51,6 +51,13 @@ Phase 12 已完成并通过 readiness：
 - not_ready/blocked release batch 会生成 blocked candidate，并保留 batch reason。
 - 非 Git 仓库或远程缺失时 candidate blocked。
 - 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- 新增 `release.PlanCandidate`、`LoadCandidate`、`ListCandidates`。
+- Release candidate 写入 `.moyuan/lifecycle/releases/candidates/` 和 `release-candidates.jsonl`。
+- API 新增 `POST /v1/projects/:project_id/release-batches/:batch_id/candidate`、`GET /v1/projects/:project_id/release-candidates`、`GET /v1/projects/:project_id/release-candidates/:candidate_id`。
+- Candidate 仍是计划事实源，不创建 release branch、不执行远程写入、不创建 deployment execution。
 
 ## 4. 后续执行占位
 
