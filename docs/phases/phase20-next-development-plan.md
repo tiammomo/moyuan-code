@@ -22,8 +22,8 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 
 | 优先级 | Issue | 名称 | 状态 | 目标 | 验收 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase20-001` | `write-proof-admission-policy` | next | 写入准入报告 | proof -> admission 可解释且不执行写入 |
-| P0 | `phase20-002` | `provider-specific-proof-pack` | planned | provider 最小权限要求 | GitHub/Gitee/SSH/cloud 要求可配置 |
+| P0 | `phase20-001` | `write-proof-admission-policy` | completed | 写入准入报告 | proof -> admission 可解释且不执行写入 |
+| P0 | `phase20-002` | `provider-specific-proof-pack` | next | provider 最小权限要求 | GitHub/Gitee/SSH/cloud 要求可配置 |
 | P1 | `phase20-003` | `remote-execution-rehearsal-runner` | planned | 远程执行演练 | rehearsal 不执行生产变更 |
 | P1 | `phase20-004` | `control-runner-queue-window` | planned | 长期任务队列与窗口 | 维护窗口、retry、handoff 可审计 |
 | P1 | `phase20-005` | `console-proof-admission-drilldown` | planned | Console 单条钻取 | 展示 proof/admission/runner step |
@@ -31,7 +31,7 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 
 ## 3. 执行规划：`phase20-001 write-proof-admission-policy`
 
-实现状态：next。
+实现状态：completed。
 
 范围：
 
@@ -52,7 +52,31 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 - write disabled、approval missing、secret missing、production blocked、evidence missing 都有明确 decision。
 - API、CLI 和单测覆盖过滤、空结果和生产边界。
 
-## 4. 验证要求
+完成记录：
+
+- `internal/operations` 新增 write admission report，读取 write proof 后输出 `ready`、`blocked`、`manual_required` 或 `rehearsal_only`。
+- 每条 admission 保留 proof id、operation、provider、environment、write flag、approval、secret/auth ref、evidence、rule refs、least privilege 和 replay guard。
+- API 增加 `GET /v1/projects/:project_id/operations/write-admissions`。
+- CLI 增加 `moyuan operations write-admissions ...`。
+- 单测覆盖 release provider、deployment dry-run、resource maintenance、过滤、API 和 CLI。
+
+## 4. 执行规划：`phase20-002 provider-specific-proof-pack`
+
+实现状态：next。
+
+范围：
+
+- 新增 provider-specific proof requirements，覆盖 `github`、`gitee`、`ssh`、`cloud` 和 `local_registry` 的默认要求。
+- 每个 provider requirement 需要声明 allowed operation types、required secret ref status、required evidence、required approval、least privilege scopes 和 replay guard。
+- write admission 后续可引用 provider requirement 的 rule refs，但本任务不执行真实写入。
+
+验收：
+
+- 可按 provider 和 operation type 查询 provider proof requirements。
+- GitHub/Gitee/SSH/cloud/local_registry 默认规则可测试。
+- API、CLI 和单测覆盖未知 provider、provider 不支持 operation、缺 required evidence/secret/approval 的解释。
+
+## 5. 验证要求
 
 每完成一个 Phase 20 issue，至少运行：
 

@@ -221,6 +221,11 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	assertContains(t, writeProofs.stdout, `"write_proofs"`)
 	assertContains(t, writeProofs.stdout, `"operation_type": "deployment_execution"`)
 	assertContains(t, writeProofs.stdout, `"WRITE_PROOF_WRITE_DISABLED"`)
+
+	writeAdmissions := runCLI(t, root, "operations", "write-admissions", "--operation-type", "deployment_execution", "--limit", "5")
+	assertContains(t, writeAdmissions.stdout, `"write_admissions"`)
+	assertContains(t, writeAdmissions.stdout, `"operation_type": "deployment_execution"`)
+	assertContains(t, writeAdmissions.stdout, `"WRITE_ADMISSION_WRITE_DISABLED"`)
 }
 
 func TestControlLoopCLIRunsDurableIdempotentSteps(t *testing.T) {

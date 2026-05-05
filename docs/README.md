@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 19 已完成 readiness 收口，operations audit export、decision ledger、durable control runner、provider write proof contract 和 Console observability drill-down 已完成；后续暂不启动 Phase 20 实现。
+当前阶段：Phase 20 已启动，write admission policy 已完成，后续聚焦 provider-specific proof pack；Phase 19 已完成 readiness 收口。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
@@ -63,8 +63,10 @@
 
 ## 当前实施入口
 
-Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 19 已完成主要闭环。当前验收和状态入口：
+Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 19 已完成主要闭环，Phase 20 正在推进受控生产写入演练与远程运维执行增强。当前验收和状态入口：
 
+- [Phase 20 实现 Issue Graph](./phases/phase20-issue-graph.md)：受控生产写入演练与远程运维执行增强的依赖图。
+- [Phase 20 实施记录](./phases/phase20-next-development-plan.md)：Phase 20 当前任务、验收标准和执行入口。
 - [Phase 19 实现 Issue Graph](./phases/phase19-issue-graph.md)：受控自动化执行增强与生产可观测性深化的依赖图。
 - [Phase 19 实施记录](./phases/phase19-next-development-plan.md)：Phase 19 当前任务、验收标准和执行入口。
 - [Phase 19 Release Readiness](./phases/phase19-release-readiness.md)：Phase 19 完成范围、门禁结论、保留边界和 Phase 20 入口建议。

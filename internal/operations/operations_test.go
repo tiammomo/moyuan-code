@@ -467,6 +467,70 @@ func TestBuildWriteProofsAggregatesProviderDeploymentAndResourceControls(t *test
 	}
 }
 
+func TestBuildWriteAdmissionsEvaluatesWriteProofGates(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := release.Suggest(context.Background(), root, release.SuggestOptions{Version: "v0.5.0", MinIssues: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseExecution, found, err := release.ProviderPreview(root, plan.ID)
+	if err != nil || !found {
+		t.Fatalf("expected release provider preview, found=%v err=%v", found, err)
+	}
+	deploymentExecution, err := deployment.Execute(context.Background(), root, deployment.ExecuteOptions{DeploymentID: "missing-deployment", Mode: "dry_run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "dev-admission",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2099-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, renewal, found, err := serverresources.Renew(root, serverresources.RenewalOptions{ResourceID: "dev-admission", ExpiresAt: "2099-02-01", ActorID: "ops", Reason: "admission test"})
+	if err != nil || !found {
+		t.Fatalf("expected resource renewal, found=%v err=%v", found, err)
+	}
+
+	report, err := BuildWriteAdmissions(root, WriteAdmissionOptions{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.PolicyID != defaultWriteAdmissionPolicyID || report.Target != "real_write" {
+		t.Fatalf("unexpected admission policy metadata: %+v", report)
+	}
+	if report.Summary.EntryCount != len(report.Entries) || report.Summary.RehearsalOnlyCount == 0 || report.Summary.ReadyCount == 0 {
+		t.Fatalf("unexpected write admission summary: %+v", report.Summary)
+	}
+	releaseAdmission := writeAdmissionForOperation(report.Entries, "release_provider_execution", releaseExecution.ID)
+	if releaseAdmission.OperationID == "" || releaseAdmission.Status != "rehearsal_only" || releaseAdmission.Decision != "WRITE_ADMISSION_WRITE_DISABLED" || len(releaseAdmission.ProviderEvidenceRefs) == 0 {
+		t.Fatalf("expected release provider admission to require write enablement, got %+v", releaseAdmission)
+	}
+	deploymentAdmission := writeAdmissionForOperation(report.Entries, "deployment_execution", deploymentExecution.ID)
+	if deploymentAdmission.OperationID == "" || deploymentAdmission.Status != "rehearsal_only" || deploymentAdmission.Decision != "WRITE_ADMISSION_WRITE_DISABLED" || !deploymentAdmission.RehearsalAllowed {
+		t.Fatalf("expected dry-run deployment admission to be rehearsal-only, got %+v", deploymentAdmission)
+	}
+	resourceAdmission := writeAdmissionForOperation(report.Entries, "resource_maintenance", renewal.ID)
+	if resourceAdmission.OperationID == "" || resourceAdmission.Status != "ready" || resourceAdmission.Decision != "WRITE_ADMISSION_READY" {
+		t.Fatalf("expected test_dev resource maintenance admission to be ready, got %+v", resourceAdmission)
+	}
+	readyOnly, err := BuildWriteAdmissions(root, WriteAdmissionOptions{Status: "ready", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(readyOnly.Entries) != 1 || readyOnly.Entries[0].OperationID != renewal.ID {
+		t.Fatalf("expected ready filter to return resource admission, got %+v", readyOnly.Entries)
+	}
+}
+
 func timelineContainsType(items []TimelineItem, typ string) bool {
 	for _, item := range items {
 		if item.Type == typ {
@@ -510,4 +574,13 @@ func writeProofForOperation(proofs []WriteProof, operationType string, operation
 		}
 	}
 	return WriteProof{}
+}
+
+func writeAdmissionForOperation(entries []WriteAdmissionEntry, operationType string, operationID string) WriteAdmissionEntry {
+	for _, entry := range entries {
+		if entry.OperationType == operationType && entry.OperationID == operationID {
+			return entry
+		}
+	}
+	return WriteAdmissionEntry{}
 }
