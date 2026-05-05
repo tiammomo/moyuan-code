@@ -576,6 +576,92 @@ func TestExecuteDoesNotConsumeApprovalForUnsafeLocalShellCommand(t *testing.T) {
 	}
 }
 
+func TestExecuteRollbackPreviewsRequestsApprovalAndConsumesBeforeLocalShell(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	failedExecution := createRollbackRequiredExecution(t, root, "rollback-controller")
+
+	preview, err := ExecuteRollback(context.Background(), root, RollbackExecuteOptions{ExecutionID: failedExecution.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Status != "completed" || preview.Decision != "ROLLBACK_PREVIEW_READY" || preview.Runbook == nil || len(preview.Steps) == 0 {
+		t.Fatalf("expected rollback preview from runbook, got %+v", preview)
+	}
+	assertDeploymentFileExists(t, rollbackExecutionPath(root, preview.ID))
+	approvalRequired, err := ExecuteRollback(context.Background(), root, RollbackExecuteOptions{
+		ExecutionID: failedExecution.ID,
+		Mode:        "local_shell",
+		Commands:    []string{"printf rollback-ok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approvalRequired.Decision != "ROLLBACK_EXECUTION_APPROVAL_REQUIRED" || approvalRequired.ApprovalID == "" || !containsReason(approvalRequired.Reasons, "approval_required_before_rollback_execution") {
+		t.Fatalf("expected rollback approval request, got %+v", approvalRequired)
+	}
+	if _, _, err := approvals.Decide(root, approvalRequired.ApprovalID, approvals.DecisionOptions{Decision: "approved", DecidedBy: "ops", Reason: "rollback approved"}); err != nil {
+		t.Fatal(err)
+	}
+	previewOnly, err := ExecuteRollback(context.Background(), root, RollbackExecuteOptions{
+		ExecutionID: failedExecution.ID,
+		Mode:        "local_shell",
+		Approved:    true,
+		ApprovalID:  approvalRequired.ApprovalID,
+		Commands:    []string{"printf rollback-ok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if previewOnly.Decision != "ROLLBACK_EXECUTION_PREVIEW_ONLY" || previewOnly.ApprovalConsumed || !containsReason(previewOnly.Reasons, "rollback_execution_not_enabled") {
+		t.Fatalf("expected rollback execution disabled without consuming approval, got %+v", previewOnly)
+	}
+	stillApproved, found, err := approvals.Load(root, approvalRequired.ApprovalID)
+	if err != nil || !found {
+		t.Fatalf("expected rollback approval record, found=%v err=%v", found, err)
+	}
+	if stillApproved.Status != "approved" {
+		t.Fatalf("expected disabled rollback execution not to consume approval, got %+v", stillApproved)
+	}
+
+	t.Setenv("MOYUAN_ALLOW_ROLLBACK_EXECUTE", "1")
+	completed, err := ExecuteRollback(context.Background(), root, RollbackExecuteOptions{
+		ExecutionID: failedExecution.ID,
+		Mode:        "local_shell",
+		Approved:    true,
+		ApprovalID:  approvalRequired.ApprovalID,
+		Commands:    []string{"printf rollback-ok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Decision != "ROLLBACK_EXECUTION_COMPLETED" || !completed.ApprovalConsumed || !containsReason(completed.Reasons, "approval_consumed_before_rollback_execution") {
+		t.Fatalf("expected rollback approval consumption and execution, got %+v", completed)
+	}
+	consumed, found, err := approvals.Load(root, approvalRequired.ApprovalID)
+	if err != nil || !found {
+		t.Fatalf("expected consumed rollback approval, found=%v err=%v", found, err)
+	}
+	if consumed.Status != "consumed" || consumed.ConsumedBy != "rollback-executor" {
+		t.Fatalf("expected consumed rollback approval, got %+v", consumed)
+	}
+	replay, err := ExecuteRollback(context.Background(), root, RollbackExecuteOptions{
+		ExecutionID: failedExecution.ID,
+		Mode:        "local_shell",
+		Approved:    true,
+		ApprovalID:  approvalRequired.ApprovalID,
+		Commands:    []string{"printf rollback-ok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay.Decision != "ROLLBACK_EXECUTION_APPROVAL_REQUIRED" || !containsReason(replay.Reasons, "approval_not_approved") {
+		t.Fatalf("expected consumed rollback approval replay blocked, got %+v", replay)
+	}
+}
+
 func createDeploymentPlanWithHealthTarget(t *testing.T, root string, id string, target string) Plan {
 	t.Helper()
 	resource, err := serverresources.Add(root, serverresources.Resource{
@@ -612,6 +698,29 @@ func createDeploymentPlanWithHealthTarget(t *testing.T, root string, id string, 
 		t.Fatal(err)
 	}
 	return plan
+}
+
+func createRollbackRequiredExecution(t *testing.T, root string, id string) Execution {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "fail", http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+	plan := createDeploymentPlanWithHealthTarget(t, root, id, server.URL)
+	execution, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "local_shell",
+		Approved:     true,
+		ApprovalID:   approveDeploymentExecution(t, root, plan.ID, "local_shell"),
+		Commands:     []string{"printf deploy-fail"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !execution.RollbackSuggestion.Required || execution.RollbackSuggestion.Runbook == nil {
+		t.Fatalf("expected rollback required execution fixture, got %+v", execution)
+	}
+	return execution
 }
 
 func approveDeploymentExecution(t *testing.T, root string, deploymentID string, mode string) string {

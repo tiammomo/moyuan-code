@@ -606,6 +606,11 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	assertContains(t, deployDryRun.stdout, `"no_remote_or_local_commands_executed"`)
 	dryRunExecutionID := decodeStringField(t, deployDryRun.stdout, "id")
 	assertFileExists(t, root, ".moyuan/lifecycle/deployments/executions/"+dryRunExecutionID+".json")
+	missingRollback := runCLIAllowFailure(t, root, "deploy", "rollback", "missing-execution")
+	if missingRollback.code == 0 {
+		t.Fatalf("expected missing rollback execution to fail: %s", missingRollback.stdout)
+	}
+	assertContains(t, missingRollback.stdout, `"deployment_execution_not_found"`)
 
 	deployApprovalRequired := runCLIAllowFailure(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--command", "printf deployment-ok")
 	if deployApprovalRequired.code == 0 {

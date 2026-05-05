@@ -223,8 +223,10 @@ func usage() string {
 		"moyuan resources health scan [--environment test_dev] [--resource <resource-id>] [--approved]",
 		"moyuan deploy plan <release-id> --environment test_dev [--resource <resource-id>]",
 		"moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell] [--approved] [--approval-id <approval-id>] [--command <safe-command>]",
+		"moyuan deploy rollback <execution-id> [--mode preview|local_shell] [--approved] [--approval-id <approval-id>] [--command <safe-command>]",
 		"moyuan deploy show <deployment-id>",
 		"moyuan deploy execution <execution-id>",
+		"moyuan deploy rollback-execution <rollback-execution-id>",
 		"moyuan evidence list [--parent-type <type>] [--parent-id <id>] [--limit 20]",
 		"moyuan evidence show <evidence-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
@@ -1543,6 +1545,34 @@ func handleDeploy(ctx context.Context, args []string, cwd string) (string, any, 
 			return "", map[string]any{}, 1, nil
 		}
 		return "", execution, 0, nil
+	case "rollback":
+		if len(args) < 2 {
+			return "missing execution id\n", nil, 1, nil
+		}
+		rollback, err := deployment.ExecuteRollback(ctx, rootDir, deployment.RollbackExecuteOptions{
+			ExecutionID: args[1],
+			Mode:        flagValue(args, "--mode", "preview"),
+			Approved:    hasFlag(args, "--approved"),
+			ApprovalID:  flagValue(args, "--approval-id", ""),
+			Commands:    flagValues(args, "--command"),
+		})
+		code := 0
+		if rollback.Status == "blocked" || rollback.Status == "failed" {
+			code = 1
+		}
+		return "", rollback, code, err
+	case "rollback-execution":
+		if len(args) < 2 {
+			return "missing rollback execution id\n", nil, 1, nil
+		}
+		rollback, ok, err := deployment.LoadRollbackExecution(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", rollback, 0, nil
 	}
 	return "unknown deploy command\n", nil, 1, nil
 }

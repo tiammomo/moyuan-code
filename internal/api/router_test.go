@@ -374,6 +374,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/deployments", http.StatusOK, `"deployments"`, `"release_not_found"`)
 	assertPostContains(t, router, "/v1/projects/managed/deployments/missing-deployment/execute", `{}`, http.StatusAccepted, `"execution"`, `"deployment_not_found"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions", http.StatusOK, `"executions"`, `"deployment_not_found"`)
+	assertPostContains(t, router, "/v1/projects/managed/deployment-executions/missing-execution/rollback", `{}`, http.StatusAccepted, `"rollback_execution"`, `"deployment_execution_not_found"`)
+	assertGETContains(t, router, "/v1/projects/managed/deployment-rollback-executions", http.StatusOK, `"rollback_executions"`, `"deployment_execution_not_found"`)
 	assertGETContains(t, router, "/v1/projects/managed/evidence?parent_type=deployment_execution&limit=5", http.StatusOK, `"evidence"`, `"deployment.execute.dry_run"`, `"deployment_not_found"`)
 	evidenceRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "deployment_execution", Limit: 1})
 	if err != nil || len(evidenceRecords) != 1 {
@@ -394,6 +396,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/operations/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"operation_detail"`, `"evidence_count":1`)
 	assertGETContains(t, router, "/v1/projects/managed/operations/visual_render/missing", http.StatusNotFound, `"operation not found"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/missing-execution", http.StatusNotFound, `"deployment execution not found"`)
+	assertGETContains(t, router, "/v1/projects/managed/deployment-rollback-executions/missing-rollback", http.StatusNotFound, `"deployment rollback execution not found"`)
 	assertGETContains(t, router, "/v1/projects/managed/requirements/"+reqPlan.ID, http.StatusOK, `"requirement"`, `"clarification_decision"`)
 	assertPostContains(t, router, "/v1/projects/managed/requirements/plan", `{"text":"add backend API to inspect requirements with go test verification"}`, http.StatusCreated, `"requirement"`, `"backend-implementation"`)
 	assertPostContains(t, router, "/v1/projects/managed/requirements/plan", `{"text":"tune"}`, http.StatusAccepted, `"needs_user_input"`)

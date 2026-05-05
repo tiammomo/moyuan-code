@@ -134,6 +134,13 @@ type deploymentExecuteRequest struct {
 	Commands     []string `json:"commands"`
 }
 
+type rollbackExecuteRequest struct {
+	Mode       string   `json:"mode"`
+	Approved   bool     `json:"approved"`
+	ApprovalID string   `json:"approval_id"`
+	Commands   []string `json:"commands"`
+}
+
 type resourceHealthScanRequest struct {
 	Environment string   `json:"environment"`
 	ResourceIDs []string `json:"resource_ids"`
@@ -2485,6 +2492,76 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"execution": execution})
 	})
+	router.POST("/v1/projects/:project_id/deployment-executions/:execution_id/rollback", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req rollbackExecuteRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		rollback, err := deployment.ExecuteRollback(c.Request.Context(), rootDir, deployment.RollbackExecuteOptions{
+			ExecutionID: c.Param("execution_id"),
+			Mode:        req.Mode,
+			Approved:    req.Approved,
+			ApprovalID:  req.ApprovalID,
+			Commands:    req.Commands,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if rollback.Status == "blocked" || rollback.Status == "failed" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"rollback_execution": rollback})
+	})
+	router.GET("/v1/projects/:project_id/deployment-rollback-executions", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		executions, err := deployment.ListRollbackExecutions(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"rollback_executions": executions})
+	})
+	router.GET("/v1/projects/:project_id/deployment-rollback-executions/:rollback_execution_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		rollback, found, err := deployment.LoadRollbackExecution(rootDir, c.Param("rollback_execution_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "deployment rollback execution not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"rollback_execution": rollback})
+	})
 	router.GET("/v1/projects/:project_id/evidence", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3355,6 +3432,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "auth.token.revoke", Risk: "high", Scopes: []string{"auth:write"}}, true
 	case "/v1/projects/:project_id/deployments/:deployment_id/execute":
 		return authzRule{Action: "deployment.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
+	case "/v1/projects/:project_id/deployment-executions/:execution_id/rollback":
+		return authzRule{Action: "deployment.rollback.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case "/v1/projects/:project_id/visuals/assets/:asset_id/render":
 		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
 	case "/v1/projects/:project_id/resources/:resource_id/renew":
@@ -3423,6 +3502,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "auth.token.revoke", Risk: "high", Scopes: []string{"auth:write"}}, true
 	case strings.Contains(rawPath, "/deployments/") && strings.HasSuffix(rawPath, "/execute"):
 		return authzRule{Action: "deployment.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
+	case strings.Contains(rawPath, "/deployment-executions/") && strings.HasSuffix(rawPath, "/rollback"):
+		return authzRule{Action: "deployment.rollback.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case strings.Contains(rawPath, "/visuals/assets/") && strings.HasSuffix(rawPath, "/render"):
 		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
 	case strings.Contains(rawPath, "/resources/") && strings.HasSuffix(rawPath, "/renew"):
