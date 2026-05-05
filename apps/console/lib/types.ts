@@ -524,6 +524,55 @@ export type ReleaseBatchSummary = {
   created_at?: string;
 };
 
+export type ReleaseCandidateSummary = {
+  id: string;
+  release_batch_id: string;
+  integration_apply_id?: string;
+  status: string;
+  decision: string;
+  version: string;
+  release_branch: string;
+  source_branch?: string;
+  provider?: string;
+  remote_name?: string;
+  ready_item_count: number;
+  deployment_targets: string[];
+  reasons: string[];
+  created_at?: string;
+};
+
+export type ReleaseCandidateApplySummary = {
+  id: string;
+  candidate_id: string;
+  release_batch_id?: string;
+  mode: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  release_branch?: string;
+  source_branch?: string;
+  write_enabled: boolean;
+  action_count: number;
+  started_at?: string;
+  finished_at?: string;
+};
+
+export type ReleaseCandidateProviderPreviewSummary = {
+  id: string;
+  candidate_id: string;
+  release_batch_id?: string;
+  version?: string;
+  provider?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  remote_action_count: number;
+  pr_mr_type?: string;
+  pr_mr_decision?: string;
+  pr_mr_head_branch?: string;
+  created_at?: string;
+};
+
 export type VisualAssetSummary = {
   id: string;
   diagram_spec_id: string;
@@ -772,6 +821,7 @@ export type ConsoleSnapshot = {
     integration_previews: number;
     integration_applies: number;
     release_batches: number;
+    release_candidates: number;
   };
   issues: IssueNode[];
   schedule: ScheduleItem[];
@@ -800,6 +850,9 @@ export type ConsoleSnapshot = {
   integration_previews: IntegrationPreviewSummary[];
   integration_applies: IntegrationApplySummary[];
   release_batches: ReleaseBatchSummary[];
+  release_candidates: ReleaseCandidateSummary[];
+  release_candidate_applies: ReleaseCandidateApplySummary[];
+  release_candidate_provider_previews: ReleaseCandidateProviderPreviewSummary[];
   visual_assets: VisualAssetSummary[];
   visual_render_executions: VisualRenderExecutionSummary[];
   quality_explanations: QualityExplanation[];

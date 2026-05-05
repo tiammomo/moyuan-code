@@ -789,6 +789,118 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
     }
   }
 
+  async function planReleaseCandidate(releaseBatchID: string) {
+    const actionKey = `${releaseBatchID}:candidate`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Planning release candidate..." },
+    }));
+    try {
+      const payload = await postJSON<ReleaseCandidateEnvelope>(`/api/projects/${snapshot.project.id}/release-batches/${encodeURIComponent(releaseBatchID)}/candidate`, {
+        deployment_targets: ["test_dev"],
+        requested_by: "console",
+      });
+      const candidate = payload.release_candidate;
+      if (!candidate) {
+        throw new Error(payload.error ?? "Release candidate returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: candidate.status === "ready" ? "completed" : "blocked", id: candidate.id, message: candidate.decision ?? candidate.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Release candidate plan failed." },
+      }));
+    }
+  }
+
+  async function dryRunReleaseCandidateApply(candidateID: string) {
+    const actionKey = `${candidateID}:release-branch-apply`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Planning release branch apply..." },
+    }));
+    try {
+      const payload = await postJSON<ReleaseCandidateApplyEnvelope>(`/api/projects/${snapshot.project.id}/release-candidates/${encodeURIComponent(candidateID)}/apply`, {
+        mode: "dry_run",
+        requested_by: "console",
+      });
+      const apply = payload.release_candidate_apply;
+      if (!apply) {
+        throw new Error(payload.error ?? "Release branch apply returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: apply.status === "planned" || apply.status === "applied" ? "completed" : "blocked", id: apply.id, message: apply.decision ?? apply.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Release branch apply failed." },
+      }));
+    }
+  }
+
+  async function previewReleaseCandidateProvider(candidateID: string) {
+    const actionKey = `${candidateID}:provider-preview`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Creating provider preview..." },
+    }));
+    try {
+      const payload = await postJSON<ReleaseCandidateProviderPreviewEnvelope>(
+        `/api/projects/${snapshot.project.id}/release-candidates/${encodeURIComponent(candidateID)}/provider-preview`,
+        {},
+      );
+      const preview = payload.release_candidate_provider_preview;
+      if (!preview) {
+        throw new Error(payload.error ?? "Release candidate provider preview returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: preview.status === "completed" ? "completed" : "blocked", id: preview.id, message: preview.decision ?? preview.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Provider preview failed." },
+      }));
+    }
+  }
+
+  async function createCandidateDeploymentPlan(candidateID: string) {
+    const actionKey = `${candidateID}:deployment-plan`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Creating deployment handoff..." },
+    }));
+    try {
+      const payload = await postJSON<DeploymentPlanEnvelope>(`/api/projects/${snapshot.project.id}/release-candidates/${encodeURIComponent(candidateID)}/deployment-plan`, {
+        environment: "test_dev",
+        approved: true,
+      });
+      const deployment = payload.deployment;
+      if (!deployment) {
+        throw new Error(payload.error ?? "Deployment handoff returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: deployment.status === "planned" ? "completed" : "blocked", id: deployment.id, message: deployment.decision ?? deployment.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Deployment handoff failed." },
+      }));
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -1508,21 +1620,121 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   </div>
                 );
               })}
-              {snapshot.release_batches.slice(0, 2).map((releaseBatch) => (
-                <div className="signalItem" key={releaseBatch.id}>
+              {snapshot.release_batches.slice(0, 2).map((releaseBatch) => {
+                const candidateState = batchActionState[`${releaseBatch.id}:candidate`];
+                return (
+                  <div className="signalItem" key={releaseBatch.id}>
+                    <div className="signalHeader">
+                      <strong>{compactID(releaseBatch.version || releaseBatch.id)}</strong>
+                      <StatusPill tone={toneForStatus(releaseBatch.status)} label={releaseBatch.decision} />
+                    </div>
+                    <span>
+                      ready {releaseBatch.ready_item_count}/{releaseBatch.min_items} / {releaseBatch.release_branch || "release branch pending"}
+                    </span>
+                    <div className="signalMeta">
+                      {releaseBatch.integration_apply_id ? <code>{compactID(releaseBatch.integration_apply_id)}</code> : null}
+                      {releaseBatch.source_branch ? <code>{compactID(releaseBatch.source_branch)}</code> : null}
+                      {releaseBatch.reasons[0] ? <code>{releaseBatch.reasons[0]}</code> : null}
+                    </div>
+                    <div className="signalActions">
+                      <button
+                        className="inlineActionButton"
+                        disabled={candidateState?.status === "running"}
+                        onClick={() => void planReleaseCandidate(releaseBatch.id)}
+                        type="button"
+                      >
+                        <Rocket size={13} />
+                        <span>{candidateState?.status === "running" ? "Planning" : "Candidate"}</span>
+                      </button>
+                    </div>
+                    <ActionFeedback state={candidateState} />
+                    {releaseBatch.commands[0] ? <small>{releaseBatch.commands[0]}</small> : null}
+                  </div>
+                );
+              })}
+              {snapshot.release_candidates.slice(0, 2).map((candidate) => {
+                const applyState = batchActionState[`${candidate.id}:release-branch-apply`];
+                const providerState = batchActionState[`${candidate.id}:provider-preview`];
+                const deployState = batchActionState[`${candidate.id}:deployment-plan`];
+                return (
+                  <div className="signalItem" key={candidate.id}>
+                    <div className="signalHeader">
+                      <strong>{compactID(candidate.version || candidate.id)}</strong>
+                      <StatusPill tone={toneForStatus(candidate.status)} label={candidate.decision} />
+                    </div>
+                    <span>
+                      {candidate.provider || "provider pending"} / {candidate.release_branch || "release branch pending"}
+                    </span>
+                    <div className="signalMeta">
+                      {candidate.release_batch_id ? <code>{compactID(candidate.release_batch_id)}</code> : null}
+                      {candidate.source_branch ? <code>{compactID(candidate.source_branch)}</code> : null}
+                      {candidate.deployment_targets.length > 0 ? <code>{candidate.deployment_targets.join(",")}</code> : null}
+                    </div>
+                    <div className="signalActions">
+                      <button
+                        className="inlineActionButton"
+                        disabled={applyState?.status === "running"}
+                        onClick={() => void dryRunReleaseCandidateApply(candidate.id)}
+                        type="button"
+                      >
+                        <GitBranch size={13} />
+                        <span>{applyState?.status === "running" ? "Planning" : "Branch Dry Run"}</span>
+                      </button>
+                      <button
+                        className="inlineActionButton"
+                        disabled={providerState?.status === "running"}
+                        onClick={() => void previewReleaseCandidateProvider(candidate.id)}
+                        type="button"
+                      >
+                        <ShieldCheck size={13} />
+                        <span>{providerState?.status === "running" ? "Previewing" : "Provider Preview"}</span>
+                      </button>
+                      <button
+                        className="inlineActionButton"
+                        disabled={deployState?.status === "running"}
+                        onClick={() => void createCandidateDeploymentPlan(candidate.id)}
+                        type="button"
+                      >
+                        <Server size={13} />
+                        <span>{deployState?.status === "running" ? "Planning" : "Deploy Plan"}</span>
+                      </button>
+                    </div>
+                    <ActionFeedback state={applyState} />
+                    <ActionFeedback state={providerState} />
+                    <ActionFeedback state={deployState} />
+                  </div>
+                );
+              })}
+              {snapshot.release_candidate_applies.slice(0, 2).map((apply) => (
+                <div className="signalItem" key={apply.id}>
                   <div className="signalHeader">
-                    <strong>{compactID(releaseBatch.version || releaseBatch.id)}</strong>
-                    <StatusPill tone={toneForStatus(releaseBatch.status)} label={releaseBatch.decision} />
+                    <strong>{compactID(apply.candidate_id || apply.id)}</strong>
+                    <StatusPill tone={toneForStatus(apply.status)} label={apply.decision} />
                   </div>
                   <span>
-                    ready {releaseBatch.ready_item_count}/{releaseBatch.min_items} / {releaseBatch.release_branch || "release branch pending"}
+                    {apply.mode} / {apply.write_enabled ? "write enabled" : "guarded"} / {apply.action_count} actions
                   </span>
                   <div className="signalMeta">
-                    {releaseBatch.integration_apply_id ? <code>{compactID(releaseBatch.integration_apply_id)}</code> : null}
-                    {releaseBatch.source_branch ? <code>{compactID(releaseBatch.source_branch)}</code> : null}
-                    {releaseBatch.reasons[0] ? <code>{releaseBatch.reasons[0]}</code> : null}
+                    {apply.release_branch ? <code>{compactID(apply.release_branch)}</code> : null}
+                    {apply.source_branch ? <code>{compactID(apply.source_branch)}</code> : null}
+                    {apply.reasons[0] ? <code>{apply.reasons[0]}</code> : null}
                   </div>
-                  {releaseBatch.commands[0] ? <small>{releaseBatch.commands[0]}</small> : null}
+                </div>
+              ))}
+              {snapshot.release_candidate_provider_previews.slice(0, 2).map((preview) => (
+                <div className="signalItem" key={preview.id}>
+                  <div className="signalHeader">
+                    <strong>{compactID(preview.candidate_id || preview.id)}</strong>
+                    <StatusPill tone={toneForStatus(preview.status)} label={preview.decision} />
+                  </div>
+                  <span>
+                    {preview.provider || "provider"} / {preview.remote_action_count} actions / {preview.pr_mr_type || "pr/mr"}
+                  </span>
+                  <div className="signalMeta">
+                    {preview.pr_mr_decision ? <code>{preview.pr_mr_decision}</code> : null}
+                    {preview.pr_mr_head_branch ? <code>{compactID(preview.pr_mr_head_branch)}</code> : null}
+                    {preview.reasons[0] ? <code>{preview.reasons[0]}</code> : null}
+                  </div>
                 </div>
               ))}
             </div>
@@ -2666,6 +2878,42 @@ type ReleaseBatchEnvelope = {
     status?: string;
     decision?: string;
     ready_item_count?: number;
+  };
+};
+
+type ReleaseCandidateEnvelope = {
+  error?: string;
+  release_candidate?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type ReleaseCandidateApplyEnvelope = {
+  error?: string;
+  release_candidate_apply?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type ReleaseCandidateProviderPreviewEnvelope = {
+  error?: string;
+  release_candidate_provider_preview?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type DeploymentPlanEnvelope = {
+  error?: string;
+  deployment?: {
+    id?: string;
+    status?: string;
+    decision?: string;
   };
 };
 

@@ -1,6 +1,6 @@
 # Phase 13 实施记录
 
-状态：in_progress
+状态：completed
 责任角色：release_owner + git_owner + devops_owner + backend_owner + frontend_owner + security_owner + qa_owner
 最后更新：2026-05-05
 
@@ -25,7 +25,7 @@ Phase 12 已完成并通过 readiness：
 | P0 | `phase13-002` | `guarded-local-release-branch-apply` | completed | 本地 release branch 受控 apply | 审批和开关满足后可更新本地 release branch |
 | P1 | `phase13-003` | `release-candidate-provider-preview` | completed | 远程发布预览 | Candidate 可生成 PR/MR、tag、release 和 workflow guarded preview |
 | P1 | `phase13-004` | `deployment-handoff-from-release-candidate` | completed | 部署交接 | Candidate 可生成 deployment dry-run plan |
-| P2 | `phase13-005` | `console-release-candidate-surface` | planned | Console 发布候选面 | Console 可见 candidate 到 provider/deploy 的完整链路 |
+| P2 | `phase13-005` | `console-release-candidate-surface` | completed | Console 发布候选面 | Console 可见 candidate 到 provider/deploy 的完整链路 |
 
 ## 3. 执行规划：`phase13-001 release-candidate-plan-from-batch`
 
@@ -154,11 +154,40 @@ Phase 12 已完成并通过 readiness：
 - API 新增 `POST /v1/projects/:project_id/release-candidates/:candidate_id/deployment-plan`。
 - Release candidate 到 deployment plan 的交接只生成部署计划，不执行部署。
 
-## 7. 后续执行占位
+## 7. 执行规划：`phase13-005 console-release-candidate-surface`
 
-`phase13-005` 之后的实际落地结果在对应 issue 完成后补充，稳定设计会回写到 release、git provider、deployment 和 Console 相关主线文档。
+实现状态：completed。
 
-## 8. 验证要求
+范围：
+
+- Console snapshot 接入 release candidate、candidate apply 和 candidate provider preview。
+- `Integration & Release` 面板展示 release batch、release candidate、branch apply、provider preview 和 deployment handoff。
+- Console 可触发 release candidate plan、branch apply dry-run、provider preview 和 deployment plan。
+- 所有状态以后端 API 返回为准，前端不自行计算 release/provider/deploy readiness。
+
+非目标：
+
+- 不在前端执行真实 Git 或远程发布命令。
+- 不在前端开启 release branch apply 写开关。
+- 不在前端执行 deployment execution。
+
+验收：
+
+- Console live snapshot 能读取并展示 release candidate 链路。
+- 无后端时 demo snapshot 能展示完整 release candidate 示例。
+- 新增按钮只调用后端受控 API，成功后刷新 server snapshot。
+- 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- `ConsoleSnapshot` 增加 `release_candidates`、`release_candidate_applies` 和 `release_candidate_provider_previews`。
+- Console 可见 Phase 13 从 release batch 到 candidate、branch、provider 和 deployment handoff 的链路。
+
+## 8. 后续执行占位
+
+Phase 13 第一批任务完成后，应进入 release readiness 收口，确认远程写入仍默认关闭、Console 不计算权威结论，并规划后续真实 PR/MR 或 deployment execution 的审批边界。
+
+## 9. 验证要求
 
 每完成一个 Phase 13 issue，至少运行：
 

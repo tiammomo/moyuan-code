@@ -29,6 +29,9 @@ import type {
   QualitySignal,
   ReleaseProviderExecutionSummary,
   ReleaseBatchSummary,
+  ReleaseCandidateApplySummary,
+  ReleaseCandidateProviderPreviewSummary,
+  ReleaseCandidateSummary,
   RuntimeRecoverySummary,
   RunSummary,
   ResourceSummary,
@@ -108,6 +111,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     integrationPreviewsResponse,
     integrationAppliesResponse,
     releaseBatchesResponse,
+    releaseCandidatesResponse,
+    releaseCandidateAppliesResponse,
+    releaseCandidateProviderPreviewsResponse,
     sessionsResponse,
     apiTokensResponse,
     serviceAccountsResponse,
@@ -145,6 +151,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ integration_previews: unknown[] }>>(`/projects/${project.id}/integration-previews?limit=5`),
     apiGet<ApiEnvelope<{ integration_applies: unknown[] }>>(`/projects/${project.id}/integration-applies?limit=5`),
     apiGet<ApiEnvelope<{ release_batches: unknown[] }>>(`/projects/${project.id}/release-batches?limit=5`),
+    apiGet<ApiEnvelope<{ release_candidates: unknown[] }>>(`/projects/${project.id}/release-candidates?limit=5`),
+    apiGet<ApiEnvelope<{ release_candidate_applies: unknown[] }>>(`/projects/${project.id}/release-candidate-applies?limit=5`),
+    apiGet<ApiEnvelope<{ release_candidate_provider_previews: unknown[] }>>(`/projects/${project.id}/release-candidate-provider-previews?limit=5`),
     apiGet<ApiEnvelope<{ sessions: unknown[] }>>(`/projects/${project.id}/auth/sessions`),
     apiGet<ApiEnvelope<{ api_tokens: unknown[] }>>(`/projects/${project.id}/auth/api-tokens`),
     apiGet<ApiEnvelope<{ service_accounts: unknown[] }>>(`/projects/${project.id}/auth/service-accounts`),
@@ -183,6 +192,11 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const integrationPreviews = normalizeIntegrationPreviews(integrationPreviewsResponse?.integration_previews ?? []);
   const integrationApplies = normalizeIntegrationApplies(integrationAppliesResponse?.integration_applies ?? []);
   const releaseBatches = normalizeReleaseBatches(releaseBatchesResponse?.release_batches ?? []);
+  const releaseCandidates = normalizeReleaseCandidates(releaseCandidatesResponse?.release_candidates ?? []);
+  const releaseCandidateApplies = normalizeReleaseCandidateApplies(releaseCandidateAppliesResponse?.release_candidate_applies ?? []);
+  const releaseCandidateProviderPreviews = normalizeReleaseCandidateProviderPreviews(
+    releaseCandidateProviderPreviewsResponse?.release_candidate_provider_previews ?? [],
+  );
   const authSessions = normalizeAuthSessions(sessionsResponse?.sessions ?? []);
   const apiTokens = normalizeAPITokens(apiTokensResponse?.api_tokens ?? []);
   const serviceAccounts = normalizeServiceAccounts(serviceAccountsResponse?.service_accounts ?? []);
@@ -218,6 +232,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       integration_previews: integrationPreviews.length,
       integration_applies: integrationApplies.length,
       release_batches: releaseBatches.length,
+      release_candidates: releaseCandidates.length,
     },
     issues: issues.length > 0 ? issues : demoSnapshot.issues,
     schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
@@ -246,6 +261,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     integration_previews: integrationPreviews,
     integration_applies: integrationApplies,
     release_batches: releaseBatches,
+    release_candidates: releaseCandidates,
+    release_candidate_applies: releaseCandidateApplies,
+    release_candidate_provider_previews: releaseCandidateProviderPreviews,
     visual_assets: visualAssets,
     visual_render_executions: visualRenderExecutions,
     quality_explanations: qualityExplanations,
@@ -1033,6 +1051,65 @@ function normalizeReleaseBatches(rawBatches: unknown[]): ReleaseBatchSummary[] {
     requested_by: readString(raw, "requested_by", ""),
     created_at: readString(raw, "created_at", ""),
   }));
+}
+
+function normalizeReleaseCandidates(rawCandidates: unknown[]): ReleaseCandidateSummary[] {
+  return rawCandidates.map((raw, index) => ({
+    id: readString(raw, "id", `release-candidate-${index + 1}`),
+    release_batch_id: readString(raw, "release_batch_id", ""),
+    integration_apply_id: readString(raw, "integration_apply_id", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    version: readString(raw, "version", ""),
+    release_branch: readString(raw, "release_branch", ""),
+    source_branch: readString(raw, "source_branch", ""),
+    provider: readString(raw, "provider", ""),
+    remote_name: readString(raw, "remote_name", ""),
+    ready_item_count: readNumber(raw, "ready_item_count"),
+    deployment_targets: readArray(raw, "deployment_targets"),
+    reasons: readArray(raw, "reasons"),
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeReleaseCandidateApplies(rawApplies: unknown[]): ReleaseCandidateApplySummary[] {
+  return rawApplies.map((raw, index) => ({
+    id: readString(raw, "id", `release-candidate-apply-${index + 1}`),
+    candidate_id: readString(raw, "candidate_id", ""),
+    release_batch_id: readString(raw, "release_batch_id", ""),
+    mode: readString(raw, "mode", "dry_run"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    release_branch: readString(raw, "release_branch", ""),
+    source_branch: readString(raw, "source_branch", ""),
+    write_enabled: readBoolean(raw, "write_enabled"),
+    action_count: readNumber(raw, "action_count"),
+    started_at: readString(raw, "started_at", ""),
+    finished_at: readString(raw, "finished_at", ""),
+  }));
+}
+
+function normalizeReleaseCandidateProviderPreviews(rawPreviews: unknown[]): ReleaseCandidateProviderPreviewSummary[] {
+  return rawPreviews.map((raw, index) => {
+    const remotePlan = readUnknown(raw, "remote_plan");
+    const prmr = readUnknown(raw, "pr_mr");
+    return {
+      id: readString(raw, "id", `release-candidate-provider-preview-${index + 1}`),
+      candidate_id: readString(raw, "candidate_id", ""),
+      release_batch_id: readString(raw, "release_batch_id", ""),
+      version: readString(raw, "version", ""),
+      provider: readString(raw, "provider", ""),
+      status: readString(raw, "status", "unknown"),
+      decision: readString(raw, "decision", "unknown"),
+      reasons: readArray(raw, "reasons"),
+      remote_action_count: readObjectArray(remotePlan, "actions").length,
+      pr_mr_type: readString(prmr, "type", ""),
+      pr_mr_decision: readString(prmr, "preview_decision", ""),
+      pr_mr_head_branch: readString(prmr, "head_branch", ""),
+      created_at: readString(raw, "created_at", ""),
+    };
+  });
 }
 
 function normalizeAuthSessions(rawSessions: unknown[]): AuthSessionSummary[] {
