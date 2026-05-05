@@ -146,6 +146,7 @@ export type DeploymentSummary = {
 export type DeploymentExecutionSummary = {
   id: string;
   deployment_id: string;
+  release_id?: string;
   environment: string;
   mode: string;
   status: string;
@@ -204,6 +205,7 @@ export type RollbackHistorySummary = {
 export type ReleaseProviderExecutionSummary = {
   id: string;
   release_id: string;
+  candidate_id?: string;
   version?: string;
   provider?: string;
   mode: string;
@@ -573,6 +575,23 @@ export type ReleaseCandidateProviderPreviewSummary = {
   created_at?: string;
 };
 
+export type CandidateDeploymentFeedbackSummary = {
+  id: string;
+  candidate_id: string;
+  status: string;
+  decision: string;
+  failure_class?: string;
+  severity?: string;
+  latest_execution_id?: string;
+  latest_deployment_id?: string;
+  environment?: string;
+  history_count: number;
+  rollback_required: boolean;
+  evidence_count: number;
+  reasons: string[];
+  created_at?: string;
+};
+
 export type VisualAssetSummary = {
   id: string;
   diagram_spec_id: string;
@@ -751,6 +770,7 @@ export type ApprovalRecordSummary = {
 export type GitProviderPlanSummary = {
   id: string;
   issue_id: string;
+  candidate_id?: string;
   status: string;
   decision: string;
   provider: string;
@@ -853,6 +873,7 @@ export type ConsoleSnapshot = {
   release_candidates: ReleaseCandidateSummary[];
   release_candidate_applies: ReleaseCandidateApplySummary[];
   release_candidate_provider_previews: ReleaseCandidateProviderPreviewSummary[];
+  deployment_feedback: CandidateDeploymentFeedbackSummary[];
   visual_assets: VisualAssetSummary[];
   visual_render_executions: VisualRenderExecutionSummary[];
   quality_explanations: QualityExplanation[];

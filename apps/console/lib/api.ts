@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { demoSnapshot } from "./demo-data";
 import type {
   ConsoleSnapshot,
+  CandidateDeploymentFeedbackSummary,
   AuditEventSummary,
   APITokenSummary,
   ApprovalRecordSummary,
@@ -193,6 +194,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const integrationApplies = normalizeIntegrationApplies(integrationAppliesResponse?.integration_applies ?? []);
   const releaseBatches = normalizeReleaseBatches(releaseBatchesResponse?.release_batches ?? []);
   const releaseCandidates = normalizeReleaseCandidates(releaseCandidatesResponse?.release_candidates ?? []);
+  const deploymentFeedback = await fetchCandidateDeploymentFeedback(project.id, releaseCandidates);
   const releaseCandidateApplies = normalizeReleaseCandidateApplies(releaseCandidateAppliesResponse?.release_candidate_applies ?? []);
   const releaseCandidateProviderPreviews = normalizeReleaseCandidateProviderPreviews(
     releaseCandidateProviderPreviewsResponse?.release_candidate_provider_previews ?? [],
@@ -264,6 +266,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     release_candidates: releaseCandidates,
     release_candidate_applies: releaseCandidateApplies,
     release_candidate_provider_previews: releaseCandidateProviderPreviews,
+    deployment_feedback: deploymentFeedback,
     visual_assets: visualAssets,
     visual_render_executions: visualRenderExecutions,
     quality_explanations: qualityExplanations,
@@ -476,6 +479,7 @@ function normalizeExecutions(rawExecutions: unknown[]): DeploymentExecutionSumma
     return {
       id: readString(raw, "id", `execution-${index + 1}`),
       deployment_id: readString(raw, "deployment_id", ""),
+      release_id: readString(raw, "release_id", ""),
       environment: readString(raw, "environment", "test_dev"),
       mode: readString(raw, "mode", "dry_run"),
       status: readString(raw, "status", "unknown"),
@@ -540,6 +544,7 @@ function normalizeReleaseProviderExecutions(rawExecutions: unknown[]): ReleasePr
     return {
       id: readString(raw, "id", `release-provider-execution-${index + 1}`),
       release_id: readString(raw, "release_id", ""),
+      candidate_id: readString(raw, "candidate_id", ""),
       version: readString(raw, "version", ""),
       provider: readString(raw, "provider", ""),
       mode: readString(raw, "mode", "preview"),
@@ -824,6 +829,7 @@ function normalizeGitProviderPlans(rawPlans: unknown[]): GitProviderPlanSummary[
     return {
       id: readString(raw, "id", `git-plan-${index + 1}`),
       issue_id: readString(raw, "issue_id", ""),
+      candidate_id: readString(raw, "candidate_id", ""),
       status: readString(raw, "status", "unknown"),
       decision: readString(raw, "decision", "unknown"),
       provider: readString(raw, "provider", "generic_git"),
@@ -1110,6 +1116,39 @@ function normalizeReleaseCandidateProviderPreviews(rawPreviews: unknown[]): Rele
       created_at: readString(raw, "created_at", ""),
     };
   });
+}
+
+async function fetchCandidateDeploymentFeedback(projectID: string, candidates: ReleaseCandidateSummary[]): Promise<CandidateDeploymentFeedbackSummary[]> {
+  const responses = await Promise.all(
+    candidates.slice(0, 5).map((candidate) =>
+      apiGet<ApiEnvelope<{ deployment_feedback: unknown }>>(`/projects/${projectID}/release-candidates/${candidate.id}/deployment-feedback`),
+    ),
+  );
+  return responses.flatMap((response) => {
+    if (!response?.deployment_feedback) {
+      return [];
+    }
+    return [normalizeCandidateDeploymentFeedback(response.deployment_feedback)];
+  });
+}
+
+function normalizeCandidateDeploymentFeedback(raw: unknown): CandidateDeploymentFeedbackSummary {
+  return {
+    id: readString(raw, "id", "candidate-deployment-feedback"),
+    candidate_id: readString(raw, "candidate_id", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    failure_class: readString(raw, "failure_class", ""),
+    severity: readString(raw, "severity", ""),
+    latest_execution_id: readString(raw, "latest_execution_id", ""),
+    latest_deployment_id: readString(raw, "latest_deployment_id", ""),
+    environment: readString(raw, "environment", ""),
+    history_count: readNumber(raw, "history_count"),
+    rollback_required: readBoolean(raw, "rollback_required"),
+    evidence_count: readArray(raw, "evidence_ids").length,
+    reasons: readArray(raw, "reasons"),
+    created_at: readString(raw, "created_at", ""),
+  };
 }
 
 function normalizeAuthSessions(rawSessions: unknown[]): AuthSessionSummary[] {

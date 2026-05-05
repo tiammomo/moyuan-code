@@ -901,6 +901,87 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
     }
   }
 
+  async function publishReleaseCandidateProvider(candidateID: string) {
+    const actionKey = `${candidateID}:provider-publish`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Checking publish gate..." },
+    }));
+    try {
+      const payload = await postJSON<ReleaseProviderExecutionEnvelope>(
+        `/api/projects/${snapshot.project.id}/release-candidates/${encodeURIComponent(candidateID)}/provider-publish`,
+        {},
+      );
+      const execution = payload.release_provider_execution;
+      if (!execution) {
+        throw new Error(payload.error ?? "Candidate publish returned no execution.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: execution.status === "completed" ? "completed" : "blocked", id: execution.id, message: execution.decision ?? execution.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Candidate publish failed." },
+      }));
+    }
+  }
+
+  async function planCandidatePRMR(candidateID: string) {
+    const actionKey = `${candidateID}:pr-mr-plan`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Planning PR/MR..." },
+    }));
+    try {
+      const payload = await postJSON<GitProviderActionEnvelope>(`/api/projects/${snapshot.project.id}/release-candidates/${encodeURIComponent(candidateID)}/pr-mr-plan`, {});
+      const plan = payload.git_provider_plan;
+      if (!plan) {
+        throw new Error(payload.error ?? "Candidate PR/MR plan returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: plan.status === "pr_mr_plan_ready" ? "completed" : "blocked", id: plan.id, message: plan.decision ?? plan.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Candidate PR/MR plan failed." },
+      }));
+    }
+  }
+
+  async function runCandidateDeploymentDryRun(candidateID: string) {
+    const actionKey = `${candidateID}:deployment-execution`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Running deploy dry-run..." },
+    }));
+    try {
+      const payload = await postJSON<DeploymentExecutionEnvelope>(
+        `/api/projects/${snapshot.project.id}/release-candidates/${encodeURIComponent(candidateID)}/deployment-execution`,
+        { mode: "dry_run", environment: "test_dev" },
+      );
+      const execution = payload.execution;
+      if (!execution) {
+        throw new Error(payload.error ?? "Candidate deployment execution returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: execution.status === "completed" ? "completed" : "blocked", id: execution.id, message: execution.decision ?? execution.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Candidate deployment dry-run failed." },
+      }));
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -1656,6 +1737,10 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 const applyState = batchActionState[`${candidate.id}:release-branch-apply`];
                 const providerState = batchActionState[`${candidate.id}:provider-preview`];
                 const deployState = batchActionState[`${candidate.id}:deployment-plan`];
+                const publishState = batchActionState[`${candidate.id}:provider-publish`];
+                const prmrState = batchActionState[`${candidate.id}:pr-mr-plan`];
+                const executionState = batchActionState[`${candidate.id}:deployment-execution`];
+                const feedback = snapshot.deployment_feedback.find((item) => item.candidate_id === candidate.id);
                 return (
                   <div className="signalItem" key={candidate.id}>
                     <div className="signalHeader">
@@ -1698,10 +1783,47 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                         <Server size={13} />
                         <span>{deployState?.status === "running" ? "Planning" : "Deploy Plan"}</span>
                       </button>
+                      <button
+                        className="inlineActionButton"
+                        disabled={publishState?.status === "running"}
+                        onClick={() => void publishReleaseCandidateProvider(candidate.id)}
+                        type="button"
+                      >
+                        <Rocket size={13} />
+                        <span>{publishState?.status === "running" ? "Checking" : "Publish Gate"}</span>
+                      </button>
+                      <button
+                        className="inlineActionButton"
+                        disabled={prmrState?.status === "running"}
+                        onClick={() => void planCandidatePRMR(candidate.id)}
+                        type="button"
+                      >
+                        <GitBranch size={13} />
+                        <span>{prmrState?.status === "running" ? "Planning" : "PR/MR Plan"}</span>
+                      </button>
+                      <button
+                        className="inlineActionButton"
+                        disabled={executionState?.status === "running"}
+                        onClick={() => void runCandidateDeploymentDryRun(candidate.id)}
+                        type="button"
+                      >
+                        <Play size={13} />
+                        <span>{executionState?.status === "running" ? "Running" : "Deploy Dry Run"}</span>
+                      </button>
                     </div>
                     <ActionFeedback state={applyState} />
                     <ActionFeedback state={providerState} />
                     <ActionFeedback state={deployState} />
+                    <ActionFeedback state={publishState} />
+                    <ActionFeedback state={prmrState} />
+                    <ActionFeedback state={executionState} />
+                    {feedback ? (
+                      <div className="signalMeta">
+                        <code>{feedback.decision}</code>
+                        {feedback.environment ? <code>{feedback.environment}</code> : null}
+                        {feedback.rollback_required ? <code>rollback suggested</code> : null}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}

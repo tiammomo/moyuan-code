@@ -873,6 +873,24 @@ export const demoSnapshot: ConsoleSnapshot = {
       created_at: "2026-05-05T01:18:00.000Z",
     },
   ],
+  deployment_feedback: [
+    {
+      id: "candidate-deployment-feedback-release-candidate-v0-2-0-20260505011600",
+      candidate_id: "release-candidate-v0-2-0-20260505011600",
+      status: "passed",
+      decision: "CANDIDATE_DEPLOYMENT_HEALTHY",
+      failure_class: "none",
+      severity: "",
+      latest_execution_id: "deploy-exec-candidate-v0-2-0",
+      latest_deployment_id: "deployment-release-candidate-v0-2-0-test-dev",
+      environment: "test_dev",
+      history_count: 2,
+      rollback_required: false,
+      evidence_count: 4,
+      reasons: ["smoke_and_monitor_not_failed"],
+      created_at: "2026-05-05T01:24:00.000Z",
+    },
+  ],
   visual_assets: [
     {
       id: "visual-diagram-multi-agent-20260505003000",
@@ -1011,6 +1029,7 @@ export const demoSnapshot: ConsoleSnapshot = {
     {
       id: "git-provider-plan-frontend-console-20260505004300",
       issue_id: "frontend-console",
+      candidate_id: "",
       status: "pr_mr_plan_ready",
       decision: "PR_MR_ALLOWED",
       provider: "github",
