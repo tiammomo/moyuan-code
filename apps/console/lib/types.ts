@@ -357,6 +357,99 @@ export type ControlLoopRunSummary = {
   finished_at?: string;
 };
 
+export type BatchPlanSummary = {
+  id: string;
+  epic_id: string;
+  mode: string;
+  status: string;
+  decision: string;
+  max_parallel: number;
+  dispatch_count: number;
+  waiting_count: number;
+  blocked_count: number;
+  write_scope_conflict_count: number;
+  runtime_slots: number;
+  reasons: string[];
+  item_count: number;
+  created_at?: string;
+};
+
+export type BatchRunItemSummary = {
+  issue_id: string;
+  status: string;
+  decision: string;
+  reason?: string;
+  runtime_id?: string;
+  provider_id?: string;
+  model_id?: string;
+  worktree_id?: string;
+  worktree_path?: string;
+  branch?: string;
+  run_id?: string;
+  subagent_id?: string;
+  quality_report_id?: string;
+};
+
+export type BatchRunSummary = {
+  id: string;
+  batch_id: string;
+  epic_id?: string;
+  mode: string;
+  status: string;
+  decision: string;
+  requested_by?: string;
+  max_issues: number;
+  item_count: number;
+  accepted_count: number;
+  blocked_count: number;
+  needs_rework_count: number;
+  reasons: string[];
+  items: BatchRunItemSummary[];
+  started_at?: string;
+  finished_at?: string;
+};
+
+export type WorktreeSummary = {
+  id: string;
+  epic_id?: string;
+  batch_id?: string;
+  issue_id: string;
+  status: string;
+  decision: string;
+  worktree_path?: string;
+  branch?: string;
+  base_ref?: string;
+  reasons: string[];
+  created_at?: string;
+  removed_at?: string;
+};
+
+export type MergeQueueItemSummary = {
+  issue_id: string;
+  status: string;
+  decision: string;
+  reason?: string;
+  run_id?: string;
+  quality_report_id?: string;
+  worktree_id?: string;
+  branch?: string;
+};
+
+export type MergeQueueSummary = {
+  id: string;
+  batch_id: string;
+  epic_id?: string;
+  batch_run_id?: string;
+  status: string;
+  decision: string;
+  ready_count: number;
+  needs_rework_count: number;
+  blocked_count: number;
+  reasons: string[];
+  items: MergeQueueItemSummary[];
+  created_at?: string;
+};
+
 export type VisualAssetSummary = {
   id: string;
   diagram_spec_id: string;
@@ -598,6 +691,10 @@ export type ConsoleSnapshot = {
     visual_assets: number;
     visual_render_executions: number;
     control_loop_runs: number;
+    batch_plans: number;
+    batch_runs: number;
+    worktrees: number;
+    merge_queues: number;
   };
   issues: IssueNode[];
   schedule: ScheduleItem[];
@@ -619,6 +716,10 @@ export type ConsoleSnapshot = {
   runtime_recoveries: RuntimeRecoverySummary[];
   operation_repair_candidates: OperationRepairCandidateSummary[];
   control_loop_runs: ControlLoopRunSummary[];
+  batch_plans: BatchPlanSummary[];
+  batch_runs: BatchRunSummary[];
+  worktrees: WorktreeSummary[];
+  merge_queues: MergeQueueSummary[];
   visual_assets: VisualAssetSummary[];
   visual_render_executions: VisualRenderExecutionSummary[];
   quality_explanations: QualityExplanation[];

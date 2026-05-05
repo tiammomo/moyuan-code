@@ -1,6 +1,6 @@
 # Phase 11 实施记录
 
-状态：in_progress
+状态：completed
 责任角色：orchestrator_owner + backend_owner + frontend_owner + qa_owner
 最后更新：2026-05-05
 
@@ -24,7 +24,7 @@ Phase 10 已完成并通过 readiness：
 | P0 | `phase11-002` | `bounded-issue-batch-run` | completed | 受控批量执行 | 审批/安全模式下可执行一批 issue，并记录每个 issue 结果 |
 | P1 | `phase11-003` | `parallel-worktree-isolation` | completed | 并发隔离 | 并发 issue 使用独立 worktree/branch，不共享写入目录 |
 | P1 | `phase11-004` | `quality-review-merge-queue` | completed | 质量复核合入队列 | issue 通过 quality + review 后进入 merge ready |
-| P2 | `phase11-005` | `console-batch-execution-surface` | planned | Console 批量执行面 | Console 可查看 batch plan/run 和 merge readiness |
+| P2 | `phase11-005` | `console-batch-execution-surface` | completed | Console 批量执行面 | Console 可查看 batch plan/run 和 merge readiness |
 
 ## 3. 执行规划：`phase11-001 issue-batch-dispatch-preview`
 
@@ -160,7 +160,40 @@ Phase 10 已完成并通过 readiness：
 - API 新增 `POST /v1/projects/:project_id/batches/:batch_id/merge-queue`、`GET /v1/projects/:project_id/merge-queues`、`GET /v1/projects/:project_id/merge-queues/:queue_id`。
 - 后续 `phase11-005` Console 可直接展示 merge readiness，不需要前端自行计算。
 
-## 7. 验证要求
+## 7. 执行规划：`phase11-005 console-batch-execution-surface`
+
+实现状态：completed。
+
+范围：
+
+- Console snapshot 接入 `batch_plans`、`batch_runs`、`worktrees` 和 `merge_queues`。
+- 后端补充 project-level `GET /v1/projects/:project_id/batches`，便于 Console 不依赖单个 epic 读取最近 batch plan。
+- Console sidebar 增加 `Batches` 视图。
+- Console 增加 `Batch Plans`、`Batch Runs`、`Worktrees & Merge` 三组面板。
+- `Batch Plans` 支持触发受控 `dry_run` batch run 和 merge queue build。
+- 所有结论以后端事实源为准，前端只展示数量、状态、reason、worktree、quality report 和 merge readiness。
+
+非目标：
+
+- 不在前端计算 dependency、write scope 或 merge 结论。
+- 不在前端执行真实 `git merge`、PR/MR create 或 release publish。
+- 不在本阶段启动后台常驻 scheduler。
+
+验收：
+
+- Console live snapshot 可读取并展示最近 batch plan/run/worktree/merge queue。
+- batch dry-run 和 merge queue 按钮只调用后端受控 API。
+- demo snapshot 在无后端时仍能展示 Batch 视图结构。
+- API router 测试覆盖 project-level batch list。
+- 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- `ConsoleSnapshot` 增加 `batch_plans`、`batch_runs`、`worktrees` 和 `merge_queues`。
+- `apps/console` 接入 batch execution surface，并保留 dry-run 优先的安全交互。
+- Phase 11 从后端 batch execution 事实源到 Console 操作面形成闭环。
+
+## 8. 验证要求
 
 每完成一个 Phase 11 issue，至少运行：
 

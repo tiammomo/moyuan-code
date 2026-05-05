@@ -225,6 +225,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/epics/phase1-epic/schedule", http.StatusOK, `"schedule"`, `"ready_queue"`, `"blocked_reason"`, `"dispatch_queue"`)
 	assertPostContains(t, router, "/v1/projects/managed/epics/"+reqPlan.EpicID+"/batches/plan", `{"max_parallel":2,"requested_by":"api-test"}`, http.StatusCreated, `"batch_plan"`, `"BATCH_PLAN_READY"`, `"route_decision"`)
 	assertGETContains(t, router, "/v1/projects/managed/epics/"+reqPlan.EpicID+"/batches?limit=3", http.StatusOK, `"batch_plans"`, `"BATCH_PLAN_READY"`)
+	assertGETContains(t, router, "/v1/projects/managed/batches?limit=3", http.StatusOK, `"batch_plans"`, `"BATCH_PLAN_READY"`)
 	batchPlans, err := batch.List(root, reqPlan.EpicID, 1)
 	if err != nil || len(batchPlans) != 1 {
 		t.Fatalf("expected API batch plan, plans=%+v err=%v", batchPlans, err)

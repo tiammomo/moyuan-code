@@ -6,6 +6,8 @@ import type {
   APITokenSummary,
   ApprovalRecordSummary,
   AuthSessionSummary,
+  BatchPlanSummary,
+  BatchRunSummary,
   ControlLoopRunSummary,
   DeploymentExecutionSummary,
   DeploymentSummary,
@@ -33,6 +35,8 @@ import type {
   SubagentSummary,
   VisualAssetSummary,
   VisualRenderExecutionSummary,
+  WorktreeSummary,
+  MergeQueueSummary,
 } from "./types";
 
 const apiBase = process.env.MOYUAN_API_BASE_URL ?? "http://127.0.0.1:8080/v1";
@@ -94,6 +98,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     approvalsResponse,
     gitProviderPlansResponse,
     controlLoopRunsResponse,
+    batchPlansResponse,
+    batchRunsResponse,
+    worktreesResponse,
+    mergeQueuesResponse,
     sessionsResponse,
     apiTokensResponse,
     serviceAccountsResponse,
@@ -124,6 +132,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ approvals: unknown[] }>>(`/projects/${project.id}/approvals?limit=6`),
     apiGet<ApiEnvelope<{ git_provider_plans: unknown[] }>>(`/projects/${project.id}/git-provider-plans?limit=5`),
     apiGet<ApiEnvelope<{ control_loop_runs: unknown[] }>>(`/projects/${project.id}/control-loop/runs?limit=5`),
+    apiGet<ApiEnvelope<{ batch_plans: unknown[] }>>(`/projects/${project.id}/batches?limit=5`),
+    apiGet<ApiEnvelope<{ batch_runs: unknown[] }>>(`/projects/${project.id}/batch-runs?limit=5`),
+    apiGet<ApiEnvelope<{ worktrees: unknown[] }>>(`/projects/${project.id}/worktrees?limit=5`),
+    apiGet<ApiEnvelope<{ merge_queues: unknown[] }>>(`/projects/${project.id}/merge-queues?limit=5`),
     apiGet<ApiEnvelope<{ sessions: unknown[] }>>(`/projects/${project.id}/auth/sessions`),
     apiGet<ApiEnvelope<{ api_tokens: unknown[] }>>(`/projects/${project.id}/auth/api-tokens`),
     apiGet<ApiEnvelope<{ service_accounts: unknown[] }>>(`/projects/${project.id}/auth/service-accounts`),
@@ -155,6 +167,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const approvals = normalizeApprovals(approvalsResponse?.approvals ?? []);
   const gitProviderPlans = normalizeGitProviderPlans(gitProviderPlansResponse?.git_provider_plans ?? []);
   const controlLoopRuns = normalizeControlLoopRuns(controlLoopRunsResponse?.control_loop_runs ?? []);
+  const batchPlans = normalizeBatchPlans(batchPlansResponse?.batch_plans ?? []);
+  const batchRuns = normalizeBatchRuns(batchRunsResponse?.batch_runs ?? []);
+  const worktrees = normalizeWorktrees(worktreesResponse?.worktrees ?? []);
+  const mergeQueues = normalizeMergeQueues(mergeQueuesResponse?.merge_queues ?? []);
   const authSessions = normalizeAuthSessions(sessionsResponse?.sessions ?? []);
   const apiTokens = normalizeAPITokens(apiTokensResponse?.api_tokens ?? []);
   const serviceAccounts = normalizeServiceAccounts(serviceAccountsResponse?.service_accounts ?? []);
@@ -183,6 +199,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       visual_assets: visualAssets.length,
       visual_render_executions: visualRenderExecutions.length,
       control_loop_runs: controlLoopRuns.length,
+      batch_plans: batchPlans.length,
+      batch_runs: batchRuns.length,
+      worktrees: worktrees.length,
+      merge_queues: mergeQueues.length,
     },
     issues: issues.length > 0 ? issues : demoSnapshot.issues,
     schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
@@ -204,6 +224,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     runtime_recoveries: recoveries,
     operation_repair_candidates: operationRepairCandidates,
     control_loop_runs: controlLoopRuns,
+    batch_plans: batchPlans,
+    batch_runs: batchRuns,
+    worktrees,
+    merge_queues: mergeQueues,
     visual_assets: visualAssets,
     visual_render_executions: visualRenderExecutions,
     quality_explanations: qualityExplanations,
@@ -809,6 +833,106 @@ function normalizeControlLoopRuns(rawRuns: unknown[]): ControlLoopRunSummary[] {
     reasons: readArray(raw, "reasons"),
     started_at: readString(raw, "started_at", ""),
     finished_at: readString(raw, "finished_at", ""),
+  }));
+}
+
+function normalizeBatchPlans(rawPlans: unknown[]): BatchPlanSummary[] {
+  return rawPlans.map((raw, index) => ({
+    id: readString(raw, "id", `batch-plan-${index + 1}`),
+    epic_id: readString(raw, "epic_id", ""),
+    mode: readString(raw, "mode", "dry_run"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    max_parallel: readNumber(raw, "max_parallel"),
+    dispatch_count: readNumber(raw, "dispatch_count"),
+    waiting_count: readNumber(raw, "waiting_count"),
+    blocked_count: readNumber(raw, "blocked_count"),
+    write_scope_conflict_count: readNumber(raw, "write_scope_conflict_count"),
+    runtime_slots: readNumber(raw, "runtime_slots"),
+    reasons: readArray(raw, "reasons"),
+    item_count: readObjectArray(raw, "items").length,
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeBatchRuns(rawRuns: unknown[]): BatchRunSummary[] {
+  return rawRuns.map((raw, index) => {
+    const items = readObjectArray(raw, "items").map((item) => ({
+      issue_id: readString(item, "issue_id", ""),
+      status: readString(item, "status", "unknown"),
+      decision: readString(item, "decision", "unknown"),
+      reason: readString(item, "reason", ""),
+      runtime_id: readString(item, "runtime_id", ""),
+      provider_id: readString(item, "provider_id", ""),
+      model_id: readString(item, "model_id", ""),
+      worktree_id: readString(item, "worktree_id", ""),
+      worktree_path: readString(item, "worktree_path", ""),
+      branch: readString(item, "branch", ""),
+      run_id: readString(item, "run_id", ""),
+      subagent_id: readString(item, "subagent_id", ""),
+      quality_report_id: readString(item, "quality_report_id", ""),
+    }));
+    return {
+      id: readString(raw, "id", `batch-run-${index + 1}`),
+      batch_id: readString(raw, "batch_id", ""),
+      epic_id: readString(raw, "epic_id", ""),
+      mode: readString(raw, "mode", "dry_run"),
+      status: readString(raw, "status", "unknown"),
+      decision: readString(raw, "decision", "unknown"),
+      requested_by: readString(raw, "requested_by", ""),
+      max_issues: readNumber(raw, "max_issues"),
+      item_count: items.length,
+      accepted_count: items.filter((item) => item.decision === "BATCH_ITEM_ACCEPTED").length,
+      blocked_count: items.filter((item) => item.status === "blocked" || item.decision.includes("BLOCKED")).length,
+      needs_rework_count: items.filter((item) => item.status === "failed" || item.decision.includes("REWORK")).length,
+      reasons: readArray(raw, "reasons"),
+      items,
+      started_at: readString(raw, "started_at", ""),
+      finished_at: readString(raw, "finished_at", ""),
+    };
+  });
+}
+
+function normalizeWorktrees(rawRecords: unknown[]): WorktreeSummary[] {
+  return rawRecords.map((raw, index) => ({
+    id: readString(raw, "id", `worktree-${index + 1}`),
+    epic_id: readString(raw, "epic_id", ""),
+    batch_id: readString(raw, "batch_id", ""),
+    issue_id: readString(raw, "issue_id", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    worktree_path: readString(raw, "worktree_path", ""),
+    branch: readString(raw, "branch", ""),
+    base_ref: readString(raw, "base_ref", ""),
+    reasons: readArray(raw, "reasons"),
+    created_at: readString(raw, "created_at", ""),
+    removed_at: readString(raw, "removed_at", ""),
+  }));
+}
+
+function normalizeMergeQueues(rawQueues: unknown[]): MergeQueueSummary[] {
+  return rawQueues.map((raw, index) => ({
+    id: readString(raw, "id", `merge-queue-${index + 1}`),
+    batch_id: readString(raw, "batch_id", ""),
+    epic_id: readString(raw, "epic_id", ""),
+    batch_run_id: readString(raw, "batch_run_id", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    ready_count: readNumber(raw, "ready_count"),
+    needs_rework_count: readNumber(raw, "needs_rework_count"),
+    blocked_count: readNumber(raw, "blocked_count"),
+    reasons: readArray(raw, "reasons"),
+    items: readObjectArray(raw, "items").map((item) => ({
+      issue_id: readString(item, "issue_id", ""),
+      status: readString(item, "status", "unknown"),
+      decision: readString(item, "decision", "unknown"),
+      reason: readString(item, "reason", ""),
+      run_id: readString(item, "run_id", ""),
+      quality_report_id: readString(item, "quality_report_id", ""),
+      worktree_id: readString(item, "worktree_id", ""),
+      branch: readString(item, "branch", ""),
+    })),
+    created_at: readString(raw, "created_at", ""),
   }));
 }
 

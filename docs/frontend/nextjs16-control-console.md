@@ -151,6 +151,7 @@ apps/console/
 | Project Overview | 项目画像、模块地图、命令、Memory 摘要、下一步建议 |
 | Requirement Planning | 输入需求、查看澄清判断、完善后的需求和 Issue Graph |
 | Issue Graph | 图形化展示依赖、并发度、waiting reason 和执行计划 |
+| Batch Execution | 查看 batch plan、batch run、issue worktree、merge queue，并触发受控 dry-run / merge queue build |
 | Runs | 查看 Runtime 调用、Subagent 输出、diff、stdout/stderr 和风险 |
 | Quality Review | 查看 quality report、review finding、测试缺口和返工建议 |
 | Memory | 查看 record、candidate、compact、命中证据和维护事件 |
@@ -206,6 +207,7 @@ apps/console/
 - Resource Lifecycle Surface：Server Resources 面板展示 lifecycle alerts、expiration state、maintenance records 和资源续期/退役动作状态。
 - Deployment Monitor Surface：Deployment Executions 面板展示 post-deployment history，把 smoke/monitor 状态、失败分类、rollback runbook 状态和 evidence chain 作为后端事实源展示，不在前端自行推断高风险结论。
 - Control Loop Surface：Console 展示 control loop run、step decision、summary、duration、evidence 数量；手动触发只运行 bounded control loop，不启动常驻 scheduler。
+- Batch Execution Surface：Console 展示后端 `batch_plans`、`batch_runs`、`worktrees` 和 `merge_queues`，用户可触发 batch dry-run 和 merge queue build；dependency、write scope、quality/review 和 merge readiness 只以后端事实源为准。
 - AI Assist Surface：保留“让 agent 解释当前状态 / 生成修复建议 / 生成发布说明”的入口，但不能绕过后端门禁。
 
 ## 8. 设计语言

@@ -41,6 +41,7 @@ const laneLabels: Record<IssueNode["lane"], string> = {
 const nav = [
   { label: "Projects", icon: Boxes },
   { label: "Issue Graph", icon: Network },
+  { label: "Batches", icon: Layers3 },
   { label: "Runs", icon: TerminalSquare },
   { label: "Quality", icon: ShieldCheck },
   { label: "Memory", icon: Brain },
@@ -87,6 +88,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [controlLoopActionState, setControlLoopActionState] = useState<ActionState>({ status: "idle" });
   const [repairReviewForm, setRepairReviewForm] = useState({ reviewerID: "qa-owner", reason: "reviewed in console" });
   const [repairActionState, setRepairActionState] = useState<Record<string, ActionState>>({});
+  const [batchActionState, setBatchActionState] = useState<Record<string, ActionState>>({});
   const [releaseProviderForm, setReleaseProviderForm] = useState({
     releaseID: snapshot.deployments[0]?.release_id ?? "",
     approved: false,
@@ -635,6 +637,62 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
     }
   }
 
+  async function runBatchDryRun(batchID: string) {
+    setBatchActionState((current) => ({
+      ...current,
+      [batchID]: { status: "running", message: "Creating batch dry run..." },
+    }));
+    try {
+      const payload = await postJSON<BatchRunEnvelope>(`/api/projects/${snapshot.project.id}/batches/${encodeURIComponent(batchID)}/run`, {
+        mode: "dry_run",
+        requested_by: "console",
+      });
+      const run = payload.batch_run;
+      if (!run) {
+        throw new Error(payload.error ?? "Batch dry run returned no run.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [batchID]: { status: run.status === "completed" ? "completed" : "blocked", id: run.id, message: run.decision ?? run.status },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [batchID]: { status: "error", message: error instanceof Error ? error.message : "Batch dry run failed." },
+      }));
+    }
+  }
+
+  async function buildMergeQueue(batchID: string) {
+    const actionKey = `${batchID}:merge`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Building merge queue..." },
+    }));
+    try {
+      const payload = await postJSON<MergeQueueEnvelope>(`/api/projects/${snapshot.project.id}/batches/${encodeURIComponent(batchID)}/merge-queue`, {});
+      const queue = payload.merge_queue;
+      if (!queue) {
+        throw new Error(payload.error ?? "Merge queue returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: {
+          status: queue.status === "ready_to_merge" ? "completed" : queue.status === "needs_rework" ? "blocked" : "blocked",
+          id: queue.id,
+          message: queue.decision ?? queue.status,
+        },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Merge queue failed." },
+      }));
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -1108,6 +1166,144 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   <span>{record.kind}</span>
                   <strong>{record.summary}</strong>
                   <meter value={record.score} min="0" max="1" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="lowerGrid" hidden={!viewVisible(activeView, ["Projects", "Batches", "Runs", "Quality"])}>
+          <div className="panel">
+            <PanelTitle icon={<Layers3 size={18} />} title="Batch Plans" meta={`${snapshot.batch_plans.length} plans`} />
+            <div className="signalList">
+              {snapshot.batch_plans.length > 0 ? (
+                snapshot.batch_plans.map((plan) => {
+                  const dryRunState = batchActionState[plan.id];
+                  const mergeState = batchActionState[`${plan.id}:merge`];
+                  return (
+                    <div className="signalItem" key={plan.id}>
+                      <div className="signalHeader">
+                        <strong>{compactID(plan.epic_id || plan.id)}</strong>
+                        <StatusPill tone={toneForStatus(plan.status)} label={plan.decision} />
+                      </div>
+                      <span>
+                        dispatch {plan.dispatch_count} / waiting {plan.waiting_count} / blocked {plan.blocked_count}
+                      </span>
+                      <div className="signalMeta">
+                        <code>{plan.mode}</code>
+                        <code>{plan.max_parallel} parallel</code>
+                        <code>{plan.runtime_slots} slots</code>
+                        {plan.write_scope_conflict_count ? <code>{plan.write_scope_conflict_count} conflicts</code> : null}
+                      </div>
+                      {plan.reasons[0] ? <small>{plan.reasons[0]}</small> : null}
+                      <div className="signalActions">
+                        <button className="inlineActionButton" disabled={dryRunState?.status === "running"} onClick={() => void runBatchDryRun(plan.id)} type="button">
+                          <Play size={13} />
+                          <span>{dryRunState?.status === "running" ? "Running" : "Dry Run"}</span>
+                        </button>
+                        <button className="inlineActionButton" disabled={mergeState?.status === "running"} onClick={() => void buildMergeQueue(plan.id)} type="button">
+                          <ShieldCheck size={13} />
+                          <span>{mergeState?.status === "running" ? "Building" : "Merge Queue"}</span>
+                        </button>
+                      </div>
+                      <ActionFeedback state={dryRunState} />
+                      <ActionFeedback state={mergeState} />
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="emptyState">No batch plans</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<TerminalSquare size={18} />} title="Batch Runs" meta={`${snapshot.batch_runs.length} runs`} />
+            <div className="signalList">
+              {snapshot.batch_runs.length > 0 ? (
+                snapshot.batch_runs.map((run) => (
+                  <div className="signalItem" key={run.id}>
+                    <div className="signalHeader">
+                      <strong>{compactID(run.id)}</strong>
+                      <StatusPill tone={toneForStatus(run.status)} label={run.decision} />
+                    </div>
+                    <span>
+                      {run.mode} / {run.item_count} items / accepted {run.accepted_count}
+                    </span>
+                    <div className="signalMeta">
+                      <code>{compactID(run.batch_id)}</code>
+                      <code>rework {run.needs_rework_count}</code>
+                      <code>blocked {run.blocked_count}</code>
+                      {run.requested_by ? <code>{run.requested_by}</code> : null}
+                    </div>
+                    <div className="routeCandidateGrid compact">
+                      {run.items.slice(0, 3).map((item) => (
+                        <div className="routeCandidate" key={`${run.id}-${item.issue_id}`}>
+                          <strong>{compactID(item.issue_id)}</strong>
+                          <span>{item.decision}</span>
+                          <div className="signalMeta">
+                            {item.runtime_id ? <code>{item.runtime_id}</code> : null}
+                            {item.worktree_id ? <code>{compactID(item.worktree_id)}</code> : null}
+                            {item.quality_report_id ? <code>{compactID(item.quality_report_id)}</code> : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {run.reasons[0] ? <small>{run.reasons[0]}</small> : null}
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No batch runs</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<GitBranch size={18} />} title="Worktrees & Merge" meta={`${snapshot.worktrees.length} worktrees / ${snapshot.merge_queues.length} queues`} />
+            <div className="signalList">
+              {snapshot.merge_queues.length > 0 ? (
+                snapshot.merge_queues.map((queue) => (
+                  <div className="signalItem" key={queue.id}>
+                    <div className="signalHeader">
+                      <strong>{compactID(queue.id)}</strong>
+                      <StatusPill tone={toneForStatus(queue.status)} label={queue.decision} />
+                    </div>
+                    <span>
+                      ready {queue.ready_count} / rework {queue.needs_rework_count} / blocked {queue.blocked_count}
+                    </span>
+                    <div className="signalMeta">
+                      <code>{compactID(queue.batch_id)}</code>
+                      {queue.batch_run_id ? <code>{compactID(queue.batch_run_id)}</code> : null}
+                      {queue.reasons[0] ? <code>{queue.reasons[0]}</code> : null}
+                    </div>
+                    <div className="routeCandidateGrid compact">
+                      {queue.items.slice(0, 3).map((item) => (
+                        <div className="routeCandidate" key={`${queue.id}-${item.issue_id}`}>
+                          <strong>{compactID(item.issue_id)}</strong>
+                          <span>{item.reason || item.decision}</span>
+                          <div className="signalMeta">
+                            <code>{item.status}</code>
+                            {item.worktree_id ? <code>{compactID(item.worktree_id)}</code> : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState compact">No merge queues</div>
+              )}
+              {snapshot.worktrees.slice(0, 3).map((record) => (
+                <div className="signalItem" key={record.id}>
+                  <div className="signalHeader">
+                    <strong>{compactID(record.issue_id || record.id)}</strong>
+                    <StatusPill tone={toneForStatus(record.status)} label={record.decision} />
+                  </div>
+                  <span>{record.branch || record.base_ref || "branch pending"}</span>
+                  <div className="signalMeta">
+                    {record.batch_id ? <code>{compactID(record.batch_id)}</code> : null}
+                    {record.worktree_path ? <code>{shortPath(record.worktree_path)}</code> : null}
+                  </div>
                 </div>
               ))}
             </div>
@@ -2208,6 +2404,24 @@ type ControlLoopRunEnvelope = {
   };
 };
 
+type BatchRunEnvelope = {
+  error?: string;
+  batch_run?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type MergeQueueEnvelope = {
+  error?: string;
+  merge_queue?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
 type OperationRepairReviewEnvelope = {
   error?: string;
   operation_repair_review?: {
@@ -2343,6 +2557,7 @@ function toneForStatus(status: string): StatusTone {
     status === "selected" ||
     status === "passed" ||
     status === "ready" ||
+    status === "ready_to_merge" ||
     status === "completed" ||
     status === "planned" ||
     status === "ok" ||
@@ -2369,6 +2584,8 @@ function toneForStatus(status: string): StatusTone {
   )
     return "blocked";
   if (
+    status === "needs_rework" ||
+    status === "dry_run" ||
     status === "waiting" ||
     status === "pending" ||
     status === "archived" ||

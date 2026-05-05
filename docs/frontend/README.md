@@ -58,7 +58,7 @@ npm audit --omit=dev
 - Deployment plans 和 Deployment executions。
 - Requirement Intake 表单通过 `/api/projects/:project_id/requirements/plan` 调用后端低风险规划入口。
 - Provider telemetry、审批队列、身份对象、PR/MR plan、release provider execution、evidence 和 operation history/detail。
-- Console 已支持多视图切换和受控表单必填字段预检；所有成功/失败状态仍以后端 API 返回为准。
+- Console 已支持多视图切换、受控表单必填字段预检、Batch Execution 操作面、provider route preview、control loop run、repair review 和 operation detail drill-down；所有成功/失败状态仍以后端 API 返回为准。
 
 ## 3. 设计原则
 
