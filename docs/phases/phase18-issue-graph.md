@@ -19,7 +19,7 @@ Phase 18 的目标是把 Phase 17 的 policy、scheduler、review queue 和 depl
 | Issue | 名称 | 状态 | 范围 | 前置 | 责任角色 | 验收重点 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `phase18-001` | `operations-timeline` | completed | 聚合 release/deployment/admission/scheduler/risk/resource 事实为 timeline | Phase 17 readiness | `backend_owner` + `devops_owner` | 统一查询、排序、过滤、可追溯 evidence |
-| `phase18-002` | `maintenance-policy-pack` | planned | 维护窗口、冻结期、环境级动作许可和人工复核策略 | `phase18-001` | `security_owner` + `release_owner` | policy 不降低已有门禁，可解释 |
+| `phase18-002` | `maintenance-policy-pack` | completed | 维护窗口、冻结期、环境级动作许可和人工复核策略 | `phase18-001` | `security_owner` + `release_owner` | policy 不降低已有门禁，可解释 |
 | `phase18-003` | `post-deployment-smoke-monitor-loop` | planned | 发布后 smoke、monitor、rollback suggestion 和 risk review 形成闭环 | `phase18-001` | `qa_owner` + `devops_owner` | 线上验证可审计，失败不自动生产修复 |
 | `phase18-004` | `server-resource-lifecycle-control` | planned | 服务器资源到期、续费、退役、健康扫描和部署关系长期维护 | `phase18-001` | `devops_owner` | 测试开发机/生产机区分清晰 |
 | `phase18-005` | `console-operations-dashboard` | planned | Console 展示 operations timeline、维护策略、资源风险和受控动作 | `phase18-001`,`phase18-004` | `frontend_owner` | 前端只展示事实源，不重新决策 |

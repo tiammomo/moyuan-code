@@ -231,6 +231,7 @@ func usage() string {
 		"moyuan resources disable <resource-id>",
 		"moyuan resources expiration scan",
 		"moyuan resources maintenance scan|list",
+		"moyuan resources maintenance policy [--environment <env>] [--action <action>] [--requested-at <time>]",
 		"moyuan resources renew <resource-id> --expires-at YYYY-MM-DD",
 		"moyuan resources retire <resource-id>",
 		"moyuan resources health scan [--environment test_dev] [--resource <resource-id>] [--approved]",
@@ -1570,6 +1571,22 @@ func handleResources(ctx context.Context, args []string, cwd string) (string, an
 			return "", resources, 0, err
 		}
 	case "maintenance":
+		if len(args) >= 2 && args[1] == "policy" {
+			pack, err := serverresources.LoadMaintenancePolicyPack(rootDir, flagValue(args, "--environment", ""))
+			if err != nil {
+				return "", nil, 1, err
+			}
+			payload := map[string]any{"maintenance_policy_pack": pack}
+			if flagValue(args, "--action", "") != "" {
+				payload["maintenance_policy_decision"] = serverresources.EvaluateMaintenancePolicy(pack, serverresources.MaintenancePolicyContext{
+					Environment: flagValue(args, "--environment", ""),
+					Action:      flagValue(args, "--action", ""),
+					ResourceID:  flagValue(args, "--resource", ""),
+					RequestedAt: flagValue(args, "--requested-at", ""),
+				})
+			}
+			return "", payload, 0, nil
+		}
 		if len(args) >= 2 && args[1] == "scan" {
 			records, err := serverresources.MaintenanceScan(rootDir)
 			return "", map[string]any{"maintenance_records": records}, 0, err

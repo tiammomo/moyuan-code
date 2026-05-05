@@ -2258,6 +2258,32 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(status, gin.H{"health_scan": report})
 	})
+	router.GET("/v1/projects/:project_id/resources/maintenance-policy", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		pack, err := serverresources.LoadMaintenancePolicyPack(rootDir, c.Query("environment"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		payload := gin.H{"maintenance_policy_pack": pack}
+		if c.Query("action") != "" {
+			payload["maintenance_policy_decision"] = serverresources.EvaluateMaintenancePolicy(pack, serverresources.MaintenancePolicyContext{
+				Environment: c.Query("environment"),
+				Action:      c.Query("action"),
+				ResourceID:  c.Query("resource_id"),
+				RequestedAt: c.Query("requested_at"),
+			})
+		}
+		c.JSON(http.StatusOK, payload)
+	})
 	router.GET("/v1/projects/:project_id/resources/:resource_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

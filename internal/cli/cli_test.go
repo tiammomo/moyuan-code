@@ -204,6 +204,17 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	assertContains(t, timeline.stdout, `"evidence_refs"`)
 }
 
+func TestMaintenancePolicyCLIExplainsProductionGate(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	policy := runCLI(t, root, "resources", "maintenance", "policy", "--environment", "production", "--action", "deploy", "--requested-at", "2026-05-05")
+	assertContains(t, policy.stdout, `"maintenance_policy_pack"`)
+	assertContains(t, policy.stdout, `"maintenance_policy_decision"`)
+	assertContains(t, policy.stdout, `"decision": "MAINTENANCE_POLICY_MANUAL_REVIEW_REQUIRED"`)
+	assertContains(t, policy.stdout, `"maintenance_window_missing"`)
+}
+
 func TestSkillsCLIRegistersListsAndDisablesSkillDefinitions(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)

@@ -191,7 +191,7 @@
 | `policies/comprehension.yaml` | 项目理解触发策略 | [项目接入与阅读理解策略](./policies/project-comprehension-policy.md) |
 | `policies/memory.yaml` | Record Gate、抽取、暂存、检索、维护策略 | [Agent Memory 系统方案](./agent-memory-system.md) |
 | `policies/logging.yaml` | 核心日志、审计日志、脱敏、保留和导出策略 | [配置方案](./configuration-guide.md) |
-| `policies/server-resources.yaml` | 测试开发机、生产机、云资产、到期时间、资源组、连接、权限和健康检查 | [服务器资源管理主线](./mainlines/server-resource-management.md) |
+| `policies/server-resources.yaml` | 测试开发机、生产机、云资产、到期时间、资源组、连接、权限、健康检查和 maintenance policy pack | [服务器资源管理主线](./mainlines/server-resource-management.md) |
 | `policies/release.yaml` | 版本分支、tag、PR/MR、投产和回滚策略 | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
 | `policies/environments.yaml` | 服务器、环境、部署方式、健康检查、监控配置引用 | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
 | `reports/` | 人类可读报告 | [总体规划与生命周期路线图](./lifecycle-roadmap.md) |
