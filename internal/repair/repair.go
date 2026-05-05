@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"moyuan-code/internal/fsutil"
+	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/memory"
 	"moyuan-code/internal/operations"
@@ -103,10 +105,54 @@ type OperationRepairCandidate struct {
 	ArtifactRefs      []string   `json:"artifact_refs"`
 	Reasons           []string   `json:"reasons"`
 	ReviewRequired    bool       `json:"review_required"`
+	ReviewedAt        string     `json:"reviewed_at,omitempty"`
+	ReviewedBy        string     `json:"reviewed_by,omitempty"`
+	ReviewDecision    string     `json:"review_decision,omitempty"`
+	ReviewReason      string     `json:"review_reason,omitempty"`
+	IssueID           string     `json:"issue_id,omitempty"`
+	RepairAttemptID   string     `json:"repair_attempt_id,omitempty"`
 	CreatedAt         string     `json:"created_at"`
 	Signal            *Signal    `json:"signal,omitempty"`
 	Candidate         *Candidate `json:"candidate,omitempty"`
 	Plan              *Plan      `json:"plan,omitempty"`
+}
+
+type OperationRepairReviewOptions struct {
+	Decision   string `json:"decision"`
+	ReviewerID string `json:"reviewer_id,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+	NextStep   string `json:"next_step,omitempty"`
+	RuntimeID  string `json:"runtime_id,omitempty"`
+}
+
+type OperationRepairReview struct {
+	ID              string `json:"id"`
+	CandidateID     string `json:"candidate_id"`
+	Decision        string `json:"decision"`
+	ReviewerID      string `json:"reviewer_id,omitempty"`
+	Reason          string `json:"reason,omitempty"`
+	NextStep        string `json:"next_step,omitempty"`
+	Status          string `json:"status"`
+	IssueID         string `json:"issue_id,omitempty"`
+	RepairAttemptID string `json:"repair_attempt_id,omitempty"`
+	CreatedAt       string `json:"created_at"`
+}
+
+type RepairIssue struct {
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	Status          string   `json:"status"`
+	SourceType      string   `json:"source_type"`
+	SourceID        string   `json:"source_id"`
+	OperationType   string   `json:"operation_type,omitempty"`
+	OperationID     string   `json:"operation_id,omitempty"`
+	BugCandidateID  string   `json:"bug_candidate_id,omitempty"`
+	RepairPlanID    string   `json:"repair_plan_id,omitempty"`
+	EvidenceRefs    []string `json:"evidence_refs,omitempty"`
+	FailureClass    string   `json:"failure_class,omitempty"`
+	Acceptance      []string `json:"acceptance,omitempty"`
+	RecommendedRole string   `json:"recommended_role,omitempty"`
+	CreatedAt       string   `json:"created_at"`
 }
 
 func CaptureSignal(rootDir string, signalType string, summary string, sourceID string) (Signal, error) {
@@ -274,6 +320,10 @@ func CandidateFromOperation(rootDir string, operationType string, operationID st
 }
 
 func LoadOperationRepairCandidate(rootDir string, id string) (OperationRepairCandidate, bool, error) {
+	id, ok := cleanRepairID(id)
+	if !ok {
+		return OperationRepairCandidate{}, false, nil
+	}
 	var candidate OperationRepairCandidate
 	found, err := fsutil.ReadJSON(operationRepairCandidatePath(rootDir, id), &candidate)
 	return candidate, found, err
@@ -284,17 +334,145 @@ func ListOperationRepairCandidates(rootDir string, limit int) ([]OperationRepair
 	if err != nil {
 		return nil, err
 	}
-	candidates := []OperationRepairCandidate{}
+	latest := map[string]OperationRepairCandidate{}
 	for _, line := range lines {
 		var candidate OperationRepairCandidate
 		if err := json.Unmarshal([]byte(line), &candidate); err != nil {
 			return nil, err
 		}
 		if candidate.ID != "" {
-			candidates = append(candidates, candidate)
+			latest[candidate.ID] = candidate
 		}
 	}
+	candidates := []OperationRepairCandidate{}
+	for _, candidate := range latest {
+		candidates = append(candidates, candidate)
+	}
+	sortOperationRepairCandidates(candidates)
+	if limit > 0 && len(candidates) > limit {
+		return candidates[:limit], nil
+	}
 	return candidates, nil
+}
+
+func ReviewOperationRepairCandidate(ctx context.Context, rootDir string, candidateID string, options OperationRepairReviewOptions) (OperationRepairReview, OperationRepairCandidate, *Attempt, bool, error) {
+	_ = ctx
+	options.Decision = normalizeReviewDecision(options.Decision)
+	options.NextStep = normalizeReviewNextStep(options.NextStep, options.Decision)
+	options.ReviewerID = strings.TrimSpace(options.ReviewerID)
+	options.Reason = strings.TrimSpace(options.Reason)
+	if options.Decision == "" {
+		return OperationRepairReview{}, OperationRepairCandidate{}, nil, false, errors.New("review_decision_required")
+	}
+	candidate, found, err := LoadOperationRepairCandidate(rootDir, candidateID)
+	if err != nil || !found {
+		return OperationRepairReview{}, OperationRepairCandidate{}, nil, found, err
+	}
+	if candidate.Status != "review_required" && candidate.Status != "approved" {
+		return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, errors.New("operation_repair_candidate_not_reviewable")
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	review := OperationRepairReview{
+		ID:          "operation-repair-review-" + textutil.Slugify(candidate.ID) + "-" + time.Now().UTC().Format("20060102150405.000000000"),
+		CandidateID: candidate.ID,
+		Decision:    options.Decision,
+		ReviewerID:  options.ReviewerID,
+		Reason:      options.Reason,
+		NextStep:    options.NextStep,
+		Status:      "completed",
+		CreatedAt:   now,
+	}
+	candidate.ReviewRequired = false
+	candidate.ReviewedAt = now
+	candidate.ReviewedBy = options.ReviewerID
+	candidate.ReviewDecision = options.Decision
+	candidate.ReviewReason = options.Reason
+	if options.Decision == "rejected" {
+		candidate.Status = "rejected"
+		candidate.Decision = "REPAIR_CANDIDATE_REJECTED"
+		candidate.Reasons = append(candidate.Reasons, "review_rejected:"+options.Reason)
+		if err := saveOperationRepairCandidate(rootDir, candidate); err != nil {
+			return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, err
+		}
+		if err := saveOperationRepairReview(rootDir, review); err != nil {
+			return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, err
+		}
+		_ = logging.Log(rootDir, "run", "self_repair.operation_candidate.rejected", map[string]any{"candidate_id": candidate.ID, "reviewer_id": options.ReviewerID})
+		return review, candidate, nil, true, nil
+	}
+	candidate.Status = "approved"
+	candidate.Decision = "REPAIR_CANDIDATE_APPROVED"
+	var attempt *Attempt
+	if options.NextStep == "issue" || options.NextStep == "repair_attempt" {
+		repairIssue, err := createRepairIssue(rootDir, candidate)
+		if err != nil {
+			return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, err
+		}
+		candidate.IssueID = repairIssue.ID
+		review.IssueID = repairIssue.ID
+		if candidate.RepairPlanID != "" {
+			plan, err := LoadPlan(rootDir, candidate.RepairPlanID)
+			if err != nil {
+				return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, err
+			}
+			plan.IssueID = repairIssue.ID
+			plan.Status = "review_approved"
+			if err := savePlan(rootDir, plan); err != nil {
+				return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, err
+			}
+			candidate.Plan = &plan
+		}
+	}
+	if options.NextStep == "repair_attempt" {
+		if candidate.RepairPlanID == "" {
+			return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, errors.New("repair_plan_required")
+		}
+		created, err := CreateReviewOnlyAttempt(rootDir, candidate.RepairPlanID, options.RuntimeID)
+		if err != nil {
+			return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, err
+		}
+		attempt = &created
+		candidate.RepairAttemptID = created.ID
+		review.RepairAttemptID = created.ID
+	}
+	if err := saveOperationRepairCandidate(rootDir, candidate); err != nil {
+		return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, err
+	}
+	if err := saveOperationRepairReview(rootDir, review); err != nil {
+		return OperationRepairReview{}, OperationRepairCandidate{}, nil, true, err
+	}
+	_ = logging.Log(rootDir, "run", "self_repair.operation_candidate.approved", map[string]any{"candidate_id": candidate.ID, "reviewer_id": options.ReviewerID, "next_step": options.NextStep})
+	return review, candidate, attempt, true, nil
+}
+
+func CreateReviewOnlyAttempt(rootDir string, planID string, runtimeID string) (Attempt, error) {
+	plan, err := LoadPlan(rootDir, planID)
+	if err != nil {
+		return Attempt{}, err
+	}
+	if runtimeID == "" {
+		runtimeID = "review_only"
+	}
+	attemptNo, err := nextAttemptNo(rootDir, plan.ID)
+	if err != nil {
+		return Attempt{}, err
+	}
+	attempt := Attempt{
+		ID:             "repair-attempt-" + time.Now().UTC().Format("20060102150405.000000000"),
+		PlanID:         plan.ID,
+		BugCandidateID: plan.BugCandidateID,
+		IssueID:        plan.IssueID,
+		Status:         "review_ready",
+		AttemptNo:      attemptNo,
+		MaxAttempts:    plan.MaxAttempts,
+		RuntimeID:      runtimeID,
+		FailureReason:  "manual_review_required_before_runtime_execution",
+		StartedAt:      time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if attempt.MaxAttempts <= 0 {
+		attempt.MaxAttempts = defaultMaxAttempts
+	}
+	return finishAttempt(rootDir, attempt)
 }
 
 func RunAttempt(ctx context.Context, rootDir string, planID string, runtimeID string, prompt string) (Attempt, error) {
@@ -420,8 +598,15 @@ func finishAttempt(rootDir string, attempt Attempt) (Attempt, error) {
 	if attempt.Status != "repaired" {
 		event = "self_repair.repair.failed"
 	}
+	if attempt.Status == "review_ready" {
+		event = "self_repair.repair.review_ready"
+	}
 	_ = logging.Log(rootDir, "run", event, map[string]any{"repair_attempt_id": attempt.ID, "repair_plan_id": attempt.PlanID, "status": attempt.Status, "reason": attempt.FailureReason})
 	return attempt, nil
+}
+
+func savePlan(rootDir string, plan Plan) error {
+	return fsutil.WriteJSON(planPath(rootDir, plan.ID), plan)
 }
 
 func saveOperationRepairCandidate(rootDir string, candidate OperationRepairCandidate) error {
@@ -429,6 +614,143 @@ func saveOperationRepairCandidate(rootDir string, candidate OperationRepairCandi
 		return err
 	}
 	return fsutil.AppendJSONL(filepath.Join(workspace.ForRoot(rootDir).RepairDir, "operation-candidates.jsonl"), candidate)
+}
+
+func saveOperationRepairReview(rootDir string, review OperationRepairReview) error {
+	if err := fsutil.WriteJSON(operationRepairReviewPath(rootDir, review.ID), review); err != nil {
+		return err
+	}
+	return fsutil.AppendJSONL(filepath.Join(workspace.ForRoot(rootDir).RepairDir, "operation-candidate-reviews.jsonl"), review)
+}
+
+func createRepairIssue(rootDir string, candidate OperationRepairCandidate) (RepairIssue, error) {
+	issueID := "repair-" + textutil.Slugify(candidate.FailureClass+"-"+candidate.OperationType+"-"+candidate.OperationID)
+	if issueID == "repair" {
+		issueID = "repair-" + textutil.Slugify(candidate.ID)
+	}
+	issue := RepairIssue{
+		ID:              issueID,
+		Title:           repairIssueTitle(candidate),
+		Status:          "ready",
+		SourceType:      "operation_repair_candidate",
+		SourceID:        candidate.ID,
+		OperationType:   candidate.OperationType,
+		OperationID:     candidate.OperationID,
+		BugCandidateID:  candidate.BugCandidateID,
+		RepairPlanID:    candidate.RepairPlanID,
+		EvidenceRefs:    append([]string{}, candidate.EvidenceRefs...),
+		FailureClass:    candidate.FailureClass,
+		RecommendedRole: "repair_agent",
+		Acceptance: []string{
+			"reproduce or explain the failure evidence before code changes",
+			"apply minimal fix within approved write scope",
+			"add or update regression coverage",
+			"pass quality gate and independent review before merge",
+		},
+		CreatedAt: time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if err := fsutil.WriteJSON(repairIssuePath(rootDir, issue.ID), issue); err != nil {
+		return RepairIssue{}, err
+	}
+	if err := fsutil.AppendJSONL(filepath.Join(workspace.ForRoot(rootDir).RepairDir, "repair-issues.jsonl"), issue); err != nil {
+		return RepairIssue{}, err
+	}
+	if err := upsertRepairIssueGraph(rootDir, issue); err != nil {
+		return RepairIssue{}, err
+	}
+	_ = logging.Log(rootDir, "run", "self_repair.issue.created", map[string]any{"issue_id": issue.ID, "candidate_id": candidate.ID})
+	return issue, nil
+}
+
+func upsertRepairIssueGraph(rootDir string, repairIssue RepairIssue) error {
+	graph, found, err := issues.LoadGraph(rootDir, "repair-epic")
+	if err != nil {
+		return err
+	}
+	if !found {
+		graph = issues.Graph{
+			Epic:  issues.Epic{ID: "repair-epic", Title: "operation-repair", Status: "active"},
+			Nodes: []issues.Node{},
+		}
+	}
+	exists := false
+	for idx := range graph.Nodes {
+		if graph.Nodes[idx].ID == repairIssue.ID {
+			graph.Nodes[idx].Title = repairIssue.Title
+			graph.Nodes[idx].Status = repairIssue.Status
+			exists = true
+			break
+		}
+	}
+	if !exists {
+		graph.Nodes = append(graph.Nodes, issues.Node{ID: repairIssue.ID, Title: repairIssue.Title, Status: repairIssue.Status, DependsOn: []string{}})
+	}
+	if err := issues.SaveGraph(rootDir, graph); err != nil {
+		return err
+	}
+	return issues.SaveSchedule(rootDir, issues.Summarize(graph))
+}
+
+func normalizeReviewDecision(value string) string {
+	value = strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "-", "_")
+	switch value {
+	case "approve", "approved":
+		return "approved"
+	case "reject", "rejected":
+		return "rejected"
+	default:
+		return ""
+	}
+}
+
+func normalizeReviewNextStep(value string, decision string) string {
+	value = strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "-", "_")
+	if decision == "rejected" {
+		return "none"
+	}
+	switch value {
+	case "", "issue":
+		return "issue"
+	case "repair_attempt", "attempt":
+		return "repair_attempt"
+	case "none":
+		return "none"
+	default:
+		return "issue"
+	}
+}
+
+func sortOperationRepairCandidates(candidates []OperationRepairCandidate) {
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return operationCandidateSortTime(candidates[i]) > operationCandidateSortTime(candidates[j])
+	})
+}
+
+func operationCandidateSortTime(candidate OperationRepairCandidate) string {
+	if candidate.ReviewedAt != "" {
+		return candidate.ReviewedAt
+	}
+	return candidate.CreatedAt
+}
+
+func repairIssueTitle(candidate OperationRepairCandidate) string {
+	parts := []string{"repair", candidate.FailureClass, candidate.OperationType, candidate.OperationID}
+	filtered := []string{}
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			filtered = append(filtered, part)
+		}
+	}
+	return strings.Join(filtered, " / ")
+}
+
+func cleanRepairID(id string) (string, bool) {
+	id = strings.TrimSpace(id)
+	if id == "" || strings.Contains(id, "/") || strings.Contains(id, "\\") || strings.Contains(id, "..") {
+		return "", false
+	}
+	return id, true
 }
 
 func classifyOperationDetail(detail operations.Detail) (string, string, bool, []string) {
@@ -517,4 +839,12 @@ func attemptPath(rootDir string, attemptID string) string {
 
 func operationRepairCandidatePath(rootDir string, id string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).RepairDir, "operation-candidates", id+".json")
+}
+
+func operationRepairReviewPath(rootDir string, id string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).RepairDir, "operation-candidate-reviews", id+".json")
+}
+
+func repairIssuePath(rootDir string, id string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).RepairDir, "issues", id+".json")
 }

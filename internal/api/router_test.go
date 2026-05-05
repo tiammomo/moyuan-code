@@ -308,6 +308,12 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/operations/deployment/"+evidenceRecords[0].ParentID, http.StatusOK, `"operation_detail"`, `"deployment.execute.dry_run"`, `"artifact_count":1`)
 	assertPostContains(t, router, "/v1/projects/managed/operations/deployment/"+evidenceRecords[0].ParentID+"/repair-candidate", `{}`, http.StatusCreated, `"operation_repair_candidate"`, `"REPAIR_CANDIDATE_CREATED"`, `"candidate_review_required"`)
 	assertGETContains(t, router, "/v1/projects/managed/repair/operation-candidates?limit=5", http.StatusOK, `"operation_repair_candidates"`, `"operation_blocked"`)
+	operationCandidates, err := repair.ListOperationRepairCandidates(root, 1)
+	if err != nil || len(operationCandidates) != 1 {
+		t.Fatalf("expected operation repair candidate for review, candidates=%+v err=%v", operationCandidates, err)
+	}
+	assertPostContains(t, router, "/v1/projects/managed/repair/operation-candidates/"+operationCandidates[0].ID+"/review", `{"decision":"approved","reviewer_id":"qa","reason":"open controlled repair task","next_step":"repair_attempt"}`, http.StatusOK, `"operation_repair_review"`, `"REPAIR_CANDIDATE_APPROVED"`, `"review_ready"`)
+	assertGETContains(t, router, "/v1/projects/managed/repair/operation-candidates?limit=5", http.StatusOK, `"operation_repair_candidates"`, `"approved"`)
 	assertGETContains(t, router, "/v1/projects/managed/operations/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"operation_detail"`, `"evidence_count":1`)
 	assertGETContains(t, router, "/v1/projects/managed/operations/visual_render/missing", http.StatusNotFound, `"operation not found"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/missing-execution", http.StatusNotFound, `"deployment execution not found"`)

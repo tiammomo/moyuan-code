@@ -78,6 +78,14 @@ type controlLoopRunRequest struct {
 	ComprehensionSince string   `json:"comprehension_since"`
 }
 
+type operationRepairReviewRequest struct {
+	Decision   string `json:"decision"`
+	ReviewerID string `json:"reviewer_id"`
+	Reason     string `json:"reason"`
+	NextStep   string `json:"next_step"`
+	RuntimeID  string `json:"runtime_id"`
+}
+
 type gitProviderCreateRequest struct {
 	Approved   bool   `json:"approved"`
 	ApprovalID string `json:"approval_id"`
@@ -2293,6 +2301,46 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"operation_repair_candidate": candidate})
 	})
+	router.POST("/v1/projects/:project_id/repair/operation-candidates/:candidate_id/review", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req operationRepairReviewRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		review, candidate, attempt, found, err := repair.ReviewOperationRepairCandidate(c.Request.Context(), rootDir, c.Param("candidate_id"), repair.OperationRepairReviewOptions{
+			Decision:   req.Decision,
+			ReviewerID: req.ReviewerID,
+			Reason:     req.Reason,
+			NextStep:   req.NextStep,
+			RuntimeID:  req.RuntimeID,
+		})
+		if err != nil {
+			status := http.StatusInternalServerError
+			if err.Error() == "review_decision_required" || err.Error() == "operation_repair_candidate_not_reviewable" || err.Error() == "repair_plan_required" {
+				status = http.StatusBadRequest
+			}
+			writeError(c, status, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "operation repair candidate not found")
+			return
+		}
+		payload := gin.H{"operation_repair_review": review, "operation_repair_candidate": candidate}
+		if attempt != nil {
+			payload["repair_attempt"] = attempt
+		}
+		c.JSON(http.StatusOK, payload)
+	})
 	router.GET("/v1/projects/:project_id/repair/attempts/:attempt_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -2437,6 +2485,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case "/v1/projects/:project_id/control-loop/run":
 		return authzRule{Action: "control_loop.run", Risk: "high", Scopes: []string{"control:write"}}, true
+	case "/v1/projects/:project_id/repair/operation-candidates/:candidate_id/review":
+		return authzRule{Action: "repair.candidate.review", Risk: "high", Scopes: []string{"repair:write"}}, true
 	case "/v1/projects/:project_id/approvals/:approval_id/decide":
 		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
 	case "/v1/projects/:project_id/auth/sessions":
@@ -2477,6 +2527,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case strings.Contains(rawPath, "/control-loop/run"):
 		return authzRule{Action: "control_loop.run", Risk: "high", Scopes: []string{"control:write"}}, true
+	case strings.Contains(rawPath, "/repair/operation-candidates/") && strings.HasSuffix(rawPath, "/review"):
+		return authzRule{Action: "repair.candidate.review", Risk: "high", Scopes: []string{"repair:write"}}, true
 	case strings.Contains(rawPath, "/approvals/") && strings.HasSuffix(rawPath, "/decide"):
 		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
 	case strings.HasSuffix(rawPath, "/auth/sessions"):

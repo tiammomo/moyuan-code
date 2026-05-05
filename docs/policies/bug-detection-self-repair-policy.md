@@ -85,6 +85,9 @@ if classification != CONFIRMED_BUG:
 
 if repair candidate is created from operation detail:
   REQUIRE_APPROVAL
+  allow approve/reject review only
+  approved candidate may create repair issue or review_ready repair attempt
+  do not execute runtime until issue/run gates are satisfied
 
 if environment == production:
   REQUIRE_APPROVAL

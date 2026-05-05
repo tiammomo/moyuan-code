@@ -13,7 +13,7 @@
 - 将 bug signature、root cause、fix pattern、回归测试和成功修复经验写入 Memory。
 - 让项目越使用，项目理解、测试策略、质量规则、Agent 分工和 skills 推荐越准确。
 
-当前 Phase 9 已落地 operation repair candidate：失败的 operation detail 可以生成 review-only self-repair candidate，系统会创建 runtime signal、bug candidate 和 repair plan，但 repair plan 默认 `candidate_review_required`，不会自动运行修复或越过审批。
+当前 Phase 10 已落地 operation repair candidate review flow：失败的 operation detail 可以生成 review-only self-repair candidate；候选必须经过 approve/reject 复核。approve 后默认创建 repair issue，也可以创建 `review_ready` repair attempt，但不会自动运行修复 runtime 或越过审批。
 
 ## 2. 边界
 
@@ -75,6 +75,9 @@ operation detail failed/blocked
   -> classify bug candidate
   -> create review-only repair plan
   -> list under /repair/operation-candidates
+  -> POST /repair/operation-candidates/:candidate_id/review
+  -> approve/reject
+  -> create repair issue or review_ready repair attempt
 ```
 
 ## 5. Bug 判断标准
@@ -145,6 +148,8 @@ operation detail failed/blocked
 | bug candidate | `.moyuan/lifecycle/bug-candidates/` | 疑似 bug 及证据 |
 | repair attempt | `.moyuan/lifecycle/repair-attempts/` | 自动修复计划、执行和结果 |
 | operation repair candidate | `.moyuan/repair/operation-candidates/` | 从失败 operation 生成的可审查修复候选 |
+| operation repair review | `.moyuan/repair/operation-candidate-reviews/` | 候选 approve/reject 复核记录 |
+| repair issue | `.moyuan/repair/issues/` | approve 后生成的受控修复 issue |
 | improvement record | `.moyuan/lifecycle/improvements/` | 能力增强建议和应用结果 |
 | quality report | `.moyuan/lifecycle/quality/` | 修复后的质量门禁结果 |
 | memory candidate | `.moyuan/memory/candidates/` | bug 模式、修复经验和回归测试经验 |

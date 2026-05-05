@@ -82,7 +82,7 @@ export interface RepairAttemptResult {
   id: string;
   repairPlanId: string;
   runId: string;
-  status: "passed" | "failed" | "needs_rework" | "blocked" | "escalated";
+  status: "passed" | "failed" | "needs_rework" | "blocked" | "review_ready" | "escalated";
   changedFiles: string[];
   regressionTests: string[];
   qualityReportId?: string;
@@ -119,9 +119,32 @@ export interface OperationRepairCandidate {
   repairPlanId?: string;
   evidenceRefs: string[];
   artifactRefs: string[];
-  status: "review_required" | "ignored";
-  decision: "REPAIR_CANDIDATE_CREATED" | "REPAIR_CANDIDATE_NOT_REQUIRED";
+  status: "review_required" | "approved" | "rejected" | "ignored";
+  decision:
+    | "REPAIR_CANDIDATE_CREATED"
+    | "REPAIR_CANDIDATE_APPROVED"
+    | "REPAIR_CANDIDATE_REJECTED"
+    | "REPAIR_CANDIDATE_NOT_REQUIRED";
   reviewRequired: boolean;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewDecision?: "approved" | "rejected";
+  reviewReason?: string;
+  issueId?: string;
+  repairAttemptId?: string;
+}
+
+export interface OperationRepairReview {
+  id: string;
+  candidateId: string;
+  decision: "approved" | "rejected";
+  reviewerId?: string;
+  reason?: string;
+  nextStep?: "issue" | "repair_attempt" | "none";
+  status: "completed";
+  issueId?: string;
+  repairAttemptId?: string;
+  createdAt: string;
 }
 ```
 
@@ -133,6 +156,7 @@ export interface SelfRepairEngine {
   classify(candidateId: string): Promise<BugCandidate>;
   planRepair(candidateId: string): Promise<RepairPlan>;
   createCandidateFromOperation(operationType: string, operationId: string): Promise<OperationRepairCandidate>;
+  reviewOperationRepairCandidate(candidateId: string, review: OperationRepairReview): Promise<OperationRepairCandidate>;
   runRepair(planId: string): Promise<RepairAttemptResult>;
   recordImprovement(resultId: string): Promise<ImprovementRecord[]>;
 }
@@ -144,6 +168,7 @@ export interface SelfRepairEngine {
 - `classify` 必须输出 confidence 和 evidence refs。
 - `planRepair` 必须遵守 write scope、auth context 和审批策略。
 - `runRepair` 必须经过 Runtime Adapter、质量门禁和 review。
+- `reviewOperationRepairCandidate` 只能 approve/reject 候选；approve 后可以创建 repair issue 或 `review_ready` repair attempt，但不能直接执行 runtime。
 - `recordImprovement` 只能生成 Memory candidate，不能绕过 Memory Record Gate。
 
 ## 4. 错误类型
@@ -168,6 +193,7 @@ export interface SelfRepairEngine {
 - `self_repair.bug.classified`
 - `self_repair.repair.planned`
 - `self_repair.repair.started`
+- `self_repair.repair.review_ready`
 - `self_repair.repair.completed`
 - `self_repair.repair.failed`
 - `self_repair.improvement.candidate_created`

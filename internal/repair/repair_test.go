@@ -1,6 +1,7 @@
 package repair
 
 import (
+	"context"
 	"testing"
 
 	"moyuan-code/internal/evidence"
@@ -55,5 +56,31 @@ func TestCandidateFromFailedOperationCreatesReviewOnlyPlan(t *testing.T) {
 	list, err := ListOperationRepairCandidates(root, 10)
 	if err != nil || len(list) != 1 {
 		t.Fatalf("expected operation repair candidate list, list=%+v err=%v", list, err)
+	}
+	review, reviewedCandidate, attempt, found, err := ReviewOperationRepairCandidate(context.Background(), root, operationCandidate.ID, OperationRepairReviewOptions{
+		Decision:   "approved",
+		ReviewerID: "qa-owner",
+		Reason:     "evidence chain is enough to open a controlled repair task",
+		NextStep:   "repair_attempt",
+	})
+	if err != nil || !found {
+		t.Fatalf("expected operation repair review, found=%v review=%+v err=%v", found, review, err)
+	}
+	if review.Decision != "approved" || review.IssueID == "" || review.RepairAttemptID == "" {
+		t.Fatalf("unexpected review result: %+v", review)
+	}
+	if reviewedCandidate.Status != "approved" || reviewedCandidate.Decision != "REPAIR_CANDIDATE_APPROVED" || reviewedCandidate.IssueID == "" {
+		t.Fatalf("unexpected reviewed candidate: %+v", reviewedCandidate)
+	}
+	if attempt == nil || attempt.Status != "review_ready" || attempt.RuntimeID != "review_only" {
+		t.Fatalf("expected review-only repair attempt, got %+v", attempt)
+	}
+	plan, err := LoadPlan(root, operationCandidate.RepairPlanID)
+	if err != nil || plan.IssueID != review.IssueID || plan.Status != "review_approved" {
+		t.Fatalf("expected review to bind repair plan to issue, plan=%+v err=%v", plan, err)
+	}
+	list, err = ListOperationRepairCandidates(root, 10)
+	if err != nil || len(list) != 1 || list[0].Status != "approved" {
+		t.Fatalf("expected deduped approved candidate list, list=%+v err=%v", list, err)
 	}
 }

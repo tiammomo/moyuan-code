@@ -21,7 +21,7 @@ Phase 9 已完成并通过 release readiness：
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase10-001` | `background-control-loop-scheduler` | completed | 控制循环调度底座 | 一次 run 可触发多个受控 step，并写入状态、日志和审计 |
-| P0 | `phase10-002` | `operation-repair-candidate-review-flow` | planned | 修复候选复核流转 | approve/reject 后可生成 issue 或受控 repair attempt |
+| P0 | `phase10-002` | `operation-repair-candidate-review-flow` | completed | 修复候选复核流转 | approve/reject 后可生成 issue 或受控 repair attempt |
 | P1 | `phase10-003` | `release-provider-branch-tag-workflow-preview` | planned | release provider 扩展预览 | branch/tag/workflow 有 preview plan 和 guardrail |
 | P1 | `phase10-004` | `deployment-check-template-policy` | planned | 部署检查模板策略 | smoke/monitor 失败分级可配置、可追踪 |
 | P2 | `phase10-005` | `console-route-repair-operator-surfaces` | planned | Console 操作面增强 | route candidates、repair review、control loop history 可见 |
@@ -61,7 +61,32 @@ Phase 9 已完成并通过 release readiness：
 - `provider_ops_refresh` 默认不 probe 外部服务；如果启用 probe 且未审批，会沿用 provider approval guard。
 - 第一批只提供手动 bounded run，不启动后台常驻定时器，不新增生产真实写入。
 
-## 4. 验证要求
+## 4. 执行规划：`phase10-002 operation-repair-candidate-review-flow`
+
+实现状态：completed。
+
+范围：
+
+- Operation repair candidate 支持 approve/reject 复核。
+- approve 后默认创建 repair issue，并写入 `repair-epic` issue graph。
+- approve 且 `next_step=repair_attempt` 时，只创建 `review_ready` repair attempt，不执行 runtime。
+- reject 会关闭候选，并记录 reviewer、reason 和审计日志。
+- API 支持候选 review，列表接口返回去重后的最新候选状态。
+
+非目标：
+
+- 不自动运行修复 runtime。
+- 不绕过 repair plan、issue graph、quality gate、review 和 approval。
+- 不把 operation candidate 直接合入开发分支。
+
+落地结果：
+
+- 新增 API：`POST /v1/projects/:project_id/repair/operation-candidates/:candidate_id/review`。
+- 新增产物：`.moyuan/repair/operation-candidate-reviews/`、`.moyuan/repair/issues/`、`.moyuan/repair/repair-issues.jsonl`。
+- `repair_attempt.status=review_ready` 表示进入人工复核后的受控准备态，仍不代表代码已修改。
+- `operation-candidates` 列表按 candidate id 去重，展示最新 review 状态。
+
+## 5. 验证要求
 
 每完成一个 Phase 10 issue，至少运行：
 
