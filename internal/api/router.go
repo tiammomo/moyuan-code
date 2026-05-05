@@ -444,6 +444,65 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"batch_run": run})
 	})
+	router.POST("/v1/projects/:project_id/batches/:batch_id/merge-queue", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		queue, err := review.BuildMergeQueue(rootDir, c.Param("batch_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusAccepted
+		if queue.Status == "ready_to_merge" {
+			status = http.StatusOK
+		}
+		c.JSON(status, gin.H{"merge_queue": queue})
+	})
+	router.GET("/v1/projects/:project_id/merge-queues", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		queues, err := review.ListMergeQueues(rootDir, c.Query("batch_id"), queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"merge_queues": queues})
+	})
+	router.GET("/v1/projects/:project_id/merge-queues/:queue_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		queue, found, err := review.LoadMergeQueue(rootDir, c.Param("queue_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "merge queue not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"merge_queue": queue})
+	})
 	router.GET("/v1/projects/:project_id/worktrees", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -2688,6 +2747,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "batch.plan", Risk: "normal", Scopes: []string{"project:read"}}, true
 	case "/v1/projects/:project_id/batches/:batch_id/run":
 		return authzRule{Action: "batch.run", Risk: "high", Scopes: []string{"run:write"}}, true
+	case "/v1/projects/:project_id/batches/:batch_id/merge-queue":
+		return authzRule{Action: "merge.queue", Risk: "normal", Scopes: []string{"review:write"}}, true
 	case "/v1/projects/:project_id/providers/ops/refresh":
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case "/v1/projects/:project_id/control-loop/run":
@@ -2734,6 +2795,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "batch.plan", Risk: "normal", Scopes: []string{"project:read"}}, true
 	case strings.Contains(rawPath, "/batches/") && strings.HasSuffix(rawPath, "/run"):
 		return authzRule{Action: "batch.run", Risk: "high", Scopes: []string{"run:write"}}, true
+	case strings.Contains(rawPath, "/batches/") && strings.HasSuffix(rawPath, "/merge-queue"):
+		return authzRule{Action: "merge.queue", Risk: "normal", Scopes: []string{"review:write"}}, true
 	case strings.Contains(rawPath, "/providers/ops/refresh"):
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case strings.Contains(rawPath, "/control-loop/run"):

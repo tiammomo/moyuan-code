@@ -23,7 +23,7 @@ Phase 10 已完成并通过 readiness：
 | P0 | `phase11-001` | `issue-batch-dispatch-preview` | completed | 批量执行预览 | 可生成 batch plan，解释 dispatch/wait/block、并发槽和 write scope 冲突 |
 | P0 | `phase11-002` | `bounded-issue-batch-run` | completed | 受控批量执行 | 审批/安全模式下可执行一批 issue，并记录每个 issue 结果 |
 | P1 | `phase11-003` | `parallel-worktree-isolation` | completed | 并发隔离 | 并发 issue 使用独立 worktree/branch，不共享写入目录 |
-| P1 | `phase11-004` | `quality-review-merge-queue` | planned | 质量复核合入队列 | issue 通过 quality + review 后进入 merge ready |
+| P1 | `phase11-004` | `quality-review-merge-queue` | completed | 质量复核合入队列 | issue 通过 quality + review 后进入 merge ready |
 | P2 | `phase11-005` | `console-batch-execution-surface` | planned | Console 批量执行面 | Console 可查看 batch plan/run 和 merge readiness |
 
 ## 3. 执行规划：`phase11-001 issue-batch-dispatch-preview`
@@ -128,7 +128,39 @@ Phase 10 已完成并通过 readiness：
 - API 新增 `GET /v1/projects/:project_id/worktrees`、`GET /v1/projects/:project_id/worktrees/:worktree_id`。
 - `batch.Run(local_shell)` 不再共享主工作区执行 issue。
 
-## 6. 验证要求
+## 6. 执行规划：`phase11-004 quality-review-merge-queue`
+
+实现状态：completed。
+
+范围：
+
+- 新增 batch merge queue，读取 batch run 结果并聚合每个 issue 的质量复核和合入状态。
+- 对 accepted batch item 调用现有 `review.DecideMerge`，复用单 issue merge gate。
+- 每个 queue item 输出 issue、run、subagent、quality report、worktree、branch 和 merge decision。
+- queue 聚合为 `ready_to_merge`、`needs_rework`、`blocked` 三类，并统计对应数量。
+- merge queue 写入 `.moyuan/lifecycle/merge-reports/queues/` 和 `.moyuan/lifecycle/merge-reports/merge-queues.jsonl`。
+- API 支持生成、列表和详情查询 merge queue。
+
+非目标：
+
+- 不执行真实 `git merge`。
+- 不创建 PR/MR。
+- 不推进 release suggestion。
+
+验收：
+
+- dry-run batch item 不允许进入 ready merge queue。
+- accepted issue + passed quality + accepted review 可进入 ready merge queue。
+- failed/rejected item 进入 needs rework。
+- 缺少 batch run 或缺少 merge facts 时 queue blocked。
+
+落地结果：
+
+- `review.BuildMergeQueue`、`LoadMergeQueue`、`ListMergeQueues` 已实现。
+- API 新增 `POST /v1/projects/:project_id/batches/:batch_id/merge-queue`、`GET /v1/projects/:project_id/merge-queues`、`GET /v1/projects/:project_id/merge-queues/:queue_id`。
+- 后续 `phase11-005` Console 可直接展示 merge readiness，不需要前端自行计算。
+
+## 7. 验证要求
 
 每完成一个 Phase 11 issue，至少运行：
 

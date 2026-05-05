@@ -25,6 +25,7 @@ import (
 	"moyuan-code/internal/release"
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
+	"moyuan-code/internal/review"
 	runtimemgr "moyuan-code/internal/runtime"
 	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/store"
@@ -235,6 +236,13 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/batch-runs?limit=3", http.StatusOK, `"batch_runs"`, `"BATCH_RUN_DRY_RUN"`)
 	assertGETContains(t, router, "/v1/projects/managed/batch-runs/"+batchRuns[0].ID, http.StatusOK, `"batch_run"`, batchPlans[0].ID)
+	assertPostContains(t, router, "/v1/projects/managed/batches/"+batchPlans[0].ID+"/merge-queue", `{}`, http.StatusAccepted, `"merge_queue"`, `"MERGE_QUEUE_BLOCKED"`, `"batch_item_dry_run"`)
+	mergeQueues, err := review.ListMergeQueues(root, batchPlans[0].ID, 1)
+	if err != nil || len(mergeQueues) != 1 {
+		t.Fatalf("expected API merge queue, queues=%+v err=%v", mergeQueues, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/merge-queues?batch_id="+batchPlans[0].ID, http.StatusOK, `"merge_queues"`, mergeQueues[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/merge-queues/"+mergeQueues[0].ID, http.StatusOK, `"merge_queue"`, `"MERGE_QUEUE_BLOCKED"`)
 	assertGETContains(t, router, "/v1/projects/managed/worktrees?issue_id=api-worktree", http.StatusOK, `"worktrees"`, worktreeRecord.ID, `"WORKTREE_READY"`)
 	assertGETContains(t, router, "/v1/projects/managed/worktrees/"+worktreeRecord.ID, http.StatusOK, `"worktree"`, `"api-worktree"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)

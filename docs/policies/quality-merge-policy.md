@@ -130,6 +130,12 @@ else:
 - `.moyuan/lifecycle/reviews/`
 - `.moyuan/lifecycle/merge-reports/`
 
+当前实现：
+
+- 单 issue merge decision 写入 `.moyuan/lifecycle/reviews/merge-decisions/` 和 `.moyuan/lifecycle/reviews/merge-decisions.jsonl`。
+- batch merge queue 写入 `.moyuan/lifecycle/merge-reports/queues/` 和 `.moyuan/lifecycle/merge-reports/merge-queues.jsonl`。
+- merge queue 只生成 `ready_to_merge`、`needs_rework`、`blocked` 决策事实源，不执行真实 Git merge。
+
 日志：
 
 - `quality`
