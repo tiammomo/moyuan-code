@@ -48,6 +48,7 @@ type Provider struct {
 	Quota                Quota      `json:"quota,omitempty"`
 	Usage                Usage      `json:"usage,omitempty"`
 	Cost                 Cost       `json:"cost,omitempty"`
+	Feedback             Feedback   `json:"feedback,omitempty"`
 	UpstreamVendor       string     `json:"upstream_vendor,omitempty"`
 	RequireProviderLabel bool       `json:"require_provider_label,omitempty"`
 	AllowedUseCases      []string   `json:"allowed_use_cases,omitempty"`
@@ -91,10 +92,27 @@ type Usage struct {
 }
 
 type Cost struct {
-	Currency        string  `json:"currency,omitempty"`
-	EstimatedAmount float64 `json:"estimated_amount,omitempty"`
-	BudgetAmount    float64 `json:"budget_amount,omitempty"`
-	Status          string  `json:"status,omitempty"`
+	Currency             string  `json:"currency,omitempty"`
+	EstimatedAmount      float64 `json:"estimated_amount,omitempty"`
+	BudgetAmount         float64 `json:"budget_amount,omitempty"`
+	InputTokenCostPer1K  float64 `json:"input_token_cost_per_1k,omitempty"`
+	OutputTokenCostPer1K float64 `json:"output_token_cost_per_1k,omitempty"`
+	Status               string  `json:"status,omitempty"`
+}
+
+type Feedback struct {
+	Window             string  `json:"window,omitempty"`
+	RuntimeExecutions  int64   `json:"runtime_executions,omitempty"`
+	RuntimeFailures    int64   `json:"runtime_failures,omitempty"`
+	RuntimeFailureRate float64 `json:"runtime_failure_rate,omitempty"`
+	QualityChecks      int64   `json:"quality_checks,omitempty"`
+	QualityFailures    int64   `json:"quality_failures,omitempty"`
+	QualityFailureRate float64 `json:"quality_failure_rate,omitempty"`
+	QualityStatus      string  `json:"quality_status,omitempty"`
+	LastRuntimeStatus  string  `json:"last_runtime_status,omitempty"`
+	LastQualityStatus  string  `json:"last_quality_status,omitempty"`
+	LastReason         string  `json:"last_reason,omitempty"`
+	UpdatedAt          string  `json:"updated_at,omitempty"`
 }
 
 type OpsSnapshot struct {
@@ -148,30 +166,39 @@ type TelemetryRecord struct {
 	HealthStatus    string  `json:"health_status,omitempty"`
 	HealthReason    string  `json:"health_reason,omitempty"`
 	QuotaStatus     string  `json:"quota_status,omitempty"`
+	InputTokens     int64   `json:"input_tokens,omitempty"`
+	OutputTokens    int64   `json:"output_tokens,omitempty"`
+	TotalTokens     int64   `json:"total_tokens,omitempty"`
 	UsedTokens      int64   `json:"used_tokens,omitempty"`
 	RemainingTokens int64   `json:"remaining_tokens,omitempty"`
 	UsageTokens     int64   `json:"usage_tokens,omitempty"`
 	CostStatus      string  `json:"cost_status,omitempty"`
+	IncrementalCost float64 `json:"incremental_cost,omitempty"`
 	EstimatedCost   float64 `json:"estimated_cost,omitempty"`
 	BudgetAmount    float64 `json:"budget_amount,omitempty"`
+	FeedbackStatus  string  `json:"feedback_status,omitempty"`
 	Decision        string  `json:"decision"`
 	Reason          string  `json:"reason,omitempty"`
 	CreatedAt       string  `json:"created_at"`
 }
 
 type FeedbackOptions struct {
-	ProviderID        string `json:"provider_id,omitempty"`
-	RuntimeID         string `json:"runtime_id,omitempty"`
-	ModelID           string `json:"model_id,omitempty"`
-	RunID             string `json:"run_id,omitempty"`
-	IssueID           string `json:"issue_id,omitempty"`
-	QualityReportID   string `json:"quality_report_id,omitempty"`
-	Source            string `json:"source,omitempty"`
-	RuntimeStatus     string `json:"runtime_status,omitempty"`
-	QualityStatus     string `json:"quality_status,omitempty"`
-	RouteDecision     string `json:"route_decision,omitempty"`
-	Reason            string `json:"reason,omitempty"`
-	IncrementRequests bool   `json:"increment_requests,omitempty"`
+	ProviderID        string  `json:"provider_id,omitempty"`
+	RuntimeID         string  `json:"runtime_id,omitempty"`
+	ModelID           string  `json:"model_id,omitempty"`
+	RunID             string  `json:"run_id,omitempty"`
+	IssueID           string  `json:"issue_id,omitempty"`
+	QualityReportID   string  `json:"quality_report_id,omitempty"`
+	Source            string  `json:"source,omitempty"`
+	RuntimeStatus     string  `json:"runtime_status,omitempty"`
+	QualityStatus     string  `json:"quality_status,omitempty"`
+	RouteDecision     string  `json:"route_decision,omitempty"`
+	Reason            string  `json:"reason,omitempty"`
+	InputTokens       int64   `json:"input_tokens,omitempty"`
+	OutputTokens      int64   `json:"output_tokens,omitempty"`
+	TotalTokens       int64   `json:"total_tokens,omitempty"`
+	IncrementalCost   float64 `json:"incremental_cost,omitempty"`
+	IncrementRequests bool    `json:"increment_requests,omitempty"`
 }
 
 type RouteRequest struct {
@@ -659,6 +686,8 @@ func recordTelemetryWithFeedback(rootDir string, provider Provider, source strin
 	if strings.TrimSpace(source) == "" {
 		source = "unknown"
 	}
+	inputTokens, outputTokens, totalTokens := feedbackTokenUsage(feedback)
+	incrementalCost := feedbackIncrementalCost(provider.Cost, inputTokens, outputTokens, feedback.IncrementalCost)
 	decision, reason := telemetryDecision(provider)
 	record := TelemetryRecord{
 		ID:              "provider-telemetry-" + provider.ID + "-" + strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", ""),
@@ -675,12 +704,17 @@ func recordTelemetryWithFeedback(rootDir string, provider Provider, source strin
 		HealthStatus:    provider.Health.Status,
 		HealthReason:    provider.Health.Reason,
 		QuotaStatus:     provider.Quota.Status,
+		InputTokens:     inputTokens,
+		OutputTokens:    outputTokens,
+		TotalTokens:     totalTokens,
 		UsedTokens:      provider.Quota.UsedTokens,
 		RemainingTokens: provider.Quota.RemainingTokens,
 		UsageTokens:     provider.Usage.TotalTokens,
 		CostStatus:      provider.Cost.Status,
+		IncrementalCost: incrementalCost,
 		EstimatedCost:   provider.Cost.EstimatedAmount,
 		BudgetAmount:    provider.Cost.BudgetAmount,
+		FeedbackStatus:  provider.Feedback.QualityStatus,
 		Decision:        decision,
 		Reason:          reason,
 		CreatedAt:       now(),
@@ -721,6 +755,9 @@ func recordFeedback(rootDir string, options FeedbackOptions) (TelemetryRecord, b
 	options.ProviderID = normalizeID(options.ProviderID)
 	if options.ProviderID == "" {
 		return TelemetryRecord{}, false, nil
+	}
+	if err := validateFeedbackOptions(options); err != nil {
+		return TelemetryRecord{}, false, err
 	}
 	registry, err := Load(rootDir)
 	if err != nil {
@@ -770,6 +807,7 @@ func applyFeedback(provider Provider, options FeedbackOptions) Provider {
 	runtimeStatus := normalizeToken(options.RuntimeStatus)
 	qualityStatus := normalizeToken(options.QualityStatus)
 	reason := sanitizeFeedbackReason(options.Reason)
+	inputTokens, outputTokens, totalTokens := feedbackTokenUsage(options)
 	if options.IncrementRequests {
 		if provider.Usage.Window == "" {
 			provider.Usage.Window = "lifecycle"
@@ -777,13 +815,114 @@ func applyFeedback(provider Provider, options FeedbackOptions) Provider {
 		provider.Usage.Requests++
 		provider.Usage.UpdatedAt = now
 	}
+	if totalTokens > 0 {
+		if provider.Usage.Window == "" {
+			provider.Usage.Window = "lifecycle"
+		}
+		provider.Usage.InputTokens += inputTokens
+		provider.Usage.OutputTokens += outputTokens
+		provider.Usage.TotalTokens += totalTokens
+		provider.Usage.UpdatedAt = now
+		if provider.Quota.LimitTokens > 0 {
+			provider.Quota.UsedTokens += totalTokens
+			provider.Quota = refreshQuota(provider.Quota)
+		}
+	}
+	if incrementalCost := feedbackIncrementalCost(provider.Cost, inputTokens, outputTokens, options.IncrementalCost); incrementalCost > 0 {
+		provider.Cost.EstimatedAmount += incrementalCost
+		provider.Cost = refreshCost(provider.Cost)
+	}
 	health, healthReason := feedbackHealth(runtimeStatus, qualityStatus, reason)
 	if health != "" {
 		provider.Health.Status = health
 		provider.Health.Reason = healthReason
 		provider.Health.LastCheckedAt = now
 	}
+	provider.Feedback = applyFeedbackSummary(provider.Feedback, options, runtimeStatus, qualityStatus, reason, now)
 	return provider
+}
+
+func validateFeedbackOptions(options FeedbackOptions) error {
+	if options.InputTokens < 0 || options.OutputTokens < 0 || options.TotalTokens < 0 || options.IncrementalCost < 0 {
+		return errors.New("provider_feedback_values_must_not_be_negative")
+	}
+	return nil
+}
+
+func feedbackTokenUsage(options FeedbackOptions) (int64, int64, int64) {
+	inputTokens := options.InputTokens
+	outputTokens := options.OutputTokens
+	totalTokens := options.TotalTokens
+	if totalTokens == 0 {
+		totalTokens = inputTokens + outputTokens
+	}
+	if totalTokens < inputTokens+outputTokens {
+		totalTokens = inputTokens + outputTokens
+	}
+	return inputTokens, outputTokens, totalTokens
+}
+
+func feedbackIncrementalCost(cost Cost, inputTokens int64, outputTokens int64, explicit float64) float64 {
+	if explicit > 0 {
+		return explicit
+	}
+	return (float64(inputTokens)/1000)*cost.InputTokenCostPer1K + (float64(outputTokens)/1000)*cost.OutputTokenCostPer1K
+}
+
+func applyFeedbackSummary(existing Feedback, options FeedbackOptions, runtimeStatus string, qualityStatus string, reason string, updatedAt string) Feedback {
+	source := normalizeToken(options.Source)
+	if existing.Window == "" {
+		existing.Window = "lifecycle"
+	}
+	if source == "runtime_execution" && runtimeStatus != "" {
+		existing.RuntimeExecutions++
+		existing.LastRuntimeStatus = runtimeStatus
+		if isRuntimeFailure(runtimeStatus) {
+			existing.RuntimeFailures++
+		}
+	}
+	if qualityStatus != "" {
+		existing.QualityChecks++
+		existing.LastQualityStatus = qualityStatus
+		if isQualityFailure(qualityStatus) {
+			existing.QualityFailures++
+		}
+	}
+	if existing.RuntimeExecutions > 0 {
+		existing.RuntimeFailureRate = float64(existing.RuntimeFailures) / float64(existing.RuntimeExecutions)
+	}
+	if existing.QualityChecks > 0 {
+		existing.QualityFailureRate = float64(existing.QualityFailures) / float64(existing.QualityChecks)
+	}
+	if qualityStatus != "" {
+		existing.QualityStatus = qualityFeedbackStatus(existing, qualityStatus)
+	}
+	if reason != "" {
+		existing.LastReason = reason
+	}
+	existing.UpdatedAt = updatedAt
+	return existing
+}
+
+func isRuntimeFailure(status string) bool {
+	return status == "failed" || status == "blocked"
+}
+
+func isQualityFailure(status string) bool {
+	return status == "failed" || status == "rejected"
+}
+
+func qualityFeedbackStatus(feedback Feedback, latest string) string {
+	if isQualityFailure(latest) {
+		return "degraded"
+	}
+	if latest == "passed" || latest == "accepted" || latest == "accepted_with_findings" {
+		if feedback.QualityFailures > 0 && feedback.QualityFailureRate >= 0.25 {
+			return "warning"
+		}
+		return "ok"
+	}
+	return "unknown"
 }
 
 func feedbackHealth(runtimeStatus string, qualityStatus string, reason string) (string, string) {
@@ -1372,6 +1511,9 @@ func routeSignals(provider Provider) []RouteSignal {
 	if provider.Cost.Status != "" {
 		signals = append(signals, RouteSignal{ProviderID: provider.ID, Type: "cost", Status: provider.Cost.Status})
 	}
+	if provider.Feedback.QualityStatus != "" {
+		signals = append(signals, RouteSignal{ProviderID: provider.ID, Type: "quality", Status: provider.Feedback.QualityStatus, Reason: provider.Feedback.LastReason})
+	}
 	return signals
 }
 
@@ -1437,7 +1579,8 @@ func normalizeOpsSnapshot(snapshot *OpsSnapshot) error {
 	}
 	if snapshot.Quota.LimitTokens < 0 || snapshot.Quota.UsedTokens < 0 || snapshot.Quota.RemainingTokens < 0 ||
 		snapshot.Usage.Requests < 0 || snapshot.Usage.InputTokens < 0 || snapshot.Usage.OutputTokens < 0 || snapshot.Usage.TotalTokens < 0 ||
-		snapshot.Cost.EstimatedAmount < 0 || snapshot.Cost.BudgetAmount < 0 {
+		snapshot.Cost.EstimatedAmount < 0 || snapshot.Cost.BudgetAmount < 0 ||
+		snapshot.Cost.InputTokenCostPer1K < 0 || snapshot.Cost.OutputTokenCostPer1K < 0 {
 		return errors.New("provider_ops_values_must_not_be_negative")
 	}
 	if snapshot.Quota.RemainingTokens == 0 && snapshot.Quota.LimitTokens > 0 && snapshot.Quota.UsedTokens > 0 && snapshot.Quota.LimitTokens >= snapshot.Quota.UsedTokens {
@@ -1518,6 +1661,12 @@ func mergeCost(existing Cost, incoming Cost) Cost {
 	}
 	if incoming.BudgetAmount != 0 {
 		existing.BudgetAmount = incoming.BudgetAmount
+	}
+	if incoming.InputTokenCostPer1K != 0 {
+		existing.InputTokenCostPer1K = incoming.InputTokenCostPer1K
+	}
+	if incoming.OutputTokenCostPer1K != 0 {
+		existing.OutputTokenCostPer1K = incoming.OutputTokenCostPer1K
 	}
 	if incoming.Status != "" {
 		existing.Status = incoming.Status

@@ -187,7 +187,7 @@ func usage() string {
 		"moyuan model provider add --id <id> --vendor <vendor> --api-type <type> [--auth-ref env:KEY]",
 		"moyuan model provider list",
 		"moyuan model provider show <provider>",
-		"moyuan model provider ops <provider> [--health ok] [--quota-status ok] [--used-tokens 1000]",
+		"moyuan model provider ops <provider> [--health ok] [--quota-status ok] [--used-tokens 1000] [--input-token-cost-per-1k 0.01]",
 		"moyuan model provider refresh [--provider <provider>] [--include-disabled] [--probe] [--approved] [--probe-timeout-ms 3000]",
 		"moyuan model provider telemetry [--provider <provider>] [--limit 20]",
 		"moyuan model provider disable <provider>",
@@ -1075,10 +1075,12 @@ func handleModelProvider(args []string, rootDir string) (string, any, int, error
 				UpdatedAt:    flagValue(args, "--usage-updated-at", ""),
 			},
 			Cost: providers.Cost{
-				Currency:        flagValue(args, "--currency", ""),
-				EstimatedAmount: flagFloat(args, "--estimated-cost", 0),
-				BudgetAmount:    flagFloat(args, "--budget", 0),
-				Status:          flagValue(args, "--cost-status", ""),
+				Currency:             flagValue(args, "--currency", ""),
+				EstimatedAmount:      flagFloat(args, "--estimated-cost", 0),
+				BudgetAmount:         flagFloat(args, "--budget", 0),
+				InputTokenCostPer1K:  flagFloat(args, "--input-token-cost-per-1k", 0),
+				OutputTokenCostPer1K: flagFloat(args, "--output-token-cost-per-1k", 0),
+				Status:               flagValue(args, "--cost-status", ""),
 			},
 		})
 		if err != nil {

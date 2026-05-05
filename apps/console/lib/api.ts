@@ -310,8 +310,15 @@ function normalizeProviderTelemetry(rawRecords: unknown[]): ProviderTelemetrySum
     health_status: readString(raw, "health_status", ""),
     quota_status: readString(raw, "quota_status", ""),
     cost_status: readString(raw, "cost_status", ""),
+    runtime_status: readString(raw, "runtime_status", ""),
+    quality_status: readString(raw, "quality_status", ""),
+    input_tokens: readNumber(raw, "input_tokens"),
+    output_tokens: readNumber(raw, "output_tokens"),
+    total_tokens: readNumber(raw, "total_tokens"),
     usage_tokens: readNumber(raw, "usage_tokens"),
+    incremental_cost: readNumber(raw, "incremental_cost"),
     estimated_cost: readNumber(raw, "estimated_cost"),
+    feedback_status: readString(raw, "feedback_status", ""),
     created_at: readString(raw, "created_at", ""),
   }));
 }

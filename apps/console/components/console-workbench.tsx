@@ -1410,10 +1410,13 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   <div className="telemetryItem" key={record.id}>
                     <div>
                       <strong>{record.provider_id}</strong>
-                      <span>{record.source}</span>
+                      <span>
+                        {record.source}
+                        {record.total_tokens ? ` / ${record.total_tokens} tokens` : ""}
+                      </span>
                     </div>
-                    <StatusPill tone={toneForStatus(record.health_status || record.decision)} label={record.health_status || record.decision} />
-                    <code>{record.quota_status || record.cost_status || "ops"}</code>
+                    <StatusPill tone={toneForStatus(record.quality_status || record.health_status || record.decision)} label={record.quality_status || record.health_status || record.decision} />
+                    <code>{record.cost_status || record.quota_status || record.runtime_status || "ops"}</code>
                   </div>
                 ))
               ) : (

@@ -25,7 +25,7 @@ Phase 7 已完成并通过 release readiness：
 | P1 | `phase8-003` | `post-deploy-smoke-monitor-evidence` | completed | 部署后 smoke/monitor evidence | 失败能阻断发布完成并生成 evidence |
 | P1 | `phase8-004` | `rollback-suggestion-and-runbook` | completed | 回滚建议和 runbook | 失败部署能生成可审查回滚建议 |
 | P2 | `phase8-005` | `console-operation-drilldown` | completed | Console operation detail 独立 drill-down | 用户能刷新并查看单个 operation/evidence detail |
-| P2 | `phase8-006` | `provider-real-quota-cost-feedback` | planned | Provider quota/cost/quality feedback 更真实 | route decision 读取可信 signals |
+| P2 | `phase8-006` | `provider-real-quota-cost-feedback` | completed | Provider quota/cost/quality feedback 更真实 | route decision 读取可信 signals |
 
 ## 3. 执行规划：`phase8-001 release-provider-real-adapter-beta`
 
@@ -135,7 +135,26 @@ Phase 7 已完成并通过 release readiness：
 - rollback runbook artifact path 会在 evidence card 内可见。
 - Demo snapshot 补齐 artifacts，保证无后端时也能看到 drill-down 结构。
 
-## 8. 验证要求
+## 8. 执行规划：`phase8-006 provider-real-quota-cost-feedback`
+
+实现状态：completed。
+
+范围：
+
+- Runtime execution feedback 会写入本地 token 估算，只保存数值，不保存 prompt、stdout、stderr 或模型响应正文。
+- Provider 配置 `cost.input_token_cost_per_1k` 和 `cost.output_token_cost_per_1k` 后，系统按执行反馈累计 `usage`、估算 `cost.estimated_amount`。
+- Provider 配置 `quota.limit_tokens` 后，执行反馈会累计 `quota.used_tokens` 并刷新 `remaining_tokens/status`。
+- Quality gate 反馈进入 `provider.feedback`，route decision 增加 `quality` signal。
+- Console provider telemetry 显示 quality/runtime 状态和本次 total tokens。
+
+落地结果：
+
+- `RecordExecutionFeedback` 支持 `input_tokens`、`output_tokens`、`total_tokens` 和 `incremental_cost`，并能驱动 quota/cost 更新。
+- `RecordQualityFeedback` 更新 provider feedback summary，但不会重复计算 runtime execution 次数。
+- `provider-route` 的 `signals` 现在可包含 `health`、`quota`、`cost` 和 `quality`。
+- CLI `model provider ops` 支持配置 `--input-token-cost-per-1k` 和 `--output-token-cost-per-1k`。
+
+## 9. 验证要求
 
 每完成一个 Phase 8 issue，至少运行：
 

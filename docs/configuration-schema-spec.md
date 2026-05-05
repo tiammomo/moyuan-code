@@ -169,6 +169,10 @@ Account 字段：
 | `runtime_id` | optional, nullable | 绑定 Native Runtime 时填写，例如 `claude_cli` |
 | `allowed_use_cases` | optional | 可为空；代码 provider 建议声明 `frontend`、`backend`、`review` 等 |
 | `models` | optional | 绑定 API 或兼容 API 的 CLI profile 时可填写模型 id |
+| `quota.limit_tokens` | optional, nullable | 为空表示不按 token 额度扣减；非空时 runtime feedback 会累计 `used_tokens/remaining_tokens` |
+| `cost.budget_amount` | optional, nullable | 为空表示不按 provider 单独预算阻断 |
+| `cost.input_token_cost_per_1k` | optional, nullable | 为空表示不估算输入 token 成本 |
+| `cost.output_token_cost_per_1k` | optional, nullable | 为空表示不估算输出 token 成本 |
 
 必须为空：
 

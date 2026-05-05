@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"moyuan-code/internal/fsutil"
 	gitadapter "moyuan-code/internal/git"
@@ -245,6 +246,8 @@ func Invoke(ctx context.Context, rootDir string, invocation Invocation) (Result,
 			IssueID:       invocation.IssueID,
 			RuntimeStatus: result.Status,
 			Reason:        feedbackReason(result.Risks, "runtime_status:"+result.Status),
+			InputTokens:   estimateTextTokens(invocation.Prompt),
+			OutputTokens:  estimateTextTokens(result.Summary),
 		})
 	}
 	_ = logging.Log(rootDir, "run", "runtime.completed", map[string]any{"run_id": invocation.RunID, "runtime_id": invocation.RuntimeID, "status": result.Status, "changed_files": result.ChangedFiles, "diff_summary_path": result.DiffSummaryPath})
@@ -256,6 +259,23 @@ func feedbackReason(risks []string, fallback string) string {
 		return fallback
 	}
 	return strings.Join(risks, ",")
+}
+
+func estimateTextTokens(text string) int64 {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return 0
+	}
+	words := len(strings.Fields(text))
+	runes := utf8.RuneCountInString(text)
+	runeEstimate := (runes + 2) / 3
+	if runeEstimate < 1 {
+		runeEstimate = 1
+	}
+	if words > runeEstimate {
+		return int64(words)
+	}
+	return int64(runeEstimate)
 }
 
 func appendRisk(risks []string, risk string) []string {

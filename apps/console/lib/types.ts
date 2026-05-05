@@ -78,8 +78,15 @@ export type ProviderTelemetrySummary = {
   health_status?: string;
   quota_status?: string;
   cost_status?: string;
+  runtime_status?: string;
+  quality_status?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
   usage_tokens?: number;
+  incremental_cost?: number;
   estimated_cost?: number;
+  feedback_status?: string;
   created_at?: string;
 };
 

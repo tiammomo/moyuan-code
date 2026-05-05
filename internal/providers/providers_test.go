@@ -270,6 +270,97 @@ func TestProviderExecutionAndQualityFeedbackUpdateTelemetry(t *testing.T) {
 	}
 }
 
+func TestProviderFeedbackAccruesUsageQuotaCostAndQualitySignals(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	_, ok, err := UpdateOps(root, "codex_cli", OpsSnapshot{
+		Quota: Quota{Status: "ok", LimitTokens: 1000, UsedTokens: 100},
+		Usage: Usage{Window: "daily"},
+		Cost: Cost{
+			Currency:             "usd",
+			BudgetAmount:         1,
+			InputTokenCostPer1K:  0.01,
+			OutputTokenCostPer1K: 0.02,
+			Status:               "ok",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected codex_cli provider")
+	}
+
+	record, ok, err := RecordExecutionFeedback(root, FeedbackOptions{
+		ProviderID:    "codex_cli",
+		RuntimeID:     "codex_cli",
+		RunID:         "run-metered",
+		IssueID:       "issue-metered",
+		RuntimeStatus: "completed",
+		InputTokens:   120,
+		OutputTokens:  80,
+		Reason:        "runtime_status:completed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || record.TotalTokens != 200 || !floatNear(record.IncrementalCost, 0.0028) {
+		t.Fatalf("unexpected metered telemetry: ok=%v record=%+v", ok, record)
+	}
+	provider, ok, err := Show(root, "codex_cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("missing codex_cli provider")
+	}
+	if provider.Usage.InputTokens != 120 || provider.Usage.OutputTokens != 80 || provider.Usage.TotalTokens != 200 {
+		t.Fatalf("expected feedback usage tokens to accrue, got %+v", provider.Usage)
+	}
+	if provider.Quota.UsedTokens != 300 || provider.Quota.RemainingTokens != 700 || provider.Quota.Status != "ok" {
+		t.Fatalf("expected quota to be deducted from token feedback, got %+v", provider.Quota)
+	}
+	if !floatNear(provider.Cost.EstimatedAmount, 0.0028) || provider.Cost.Status != "ok" {
+		t.Fatalf("expected estimated cost to accrue, got %+v", provider.Cost)
+	}
+	if provider.Feedback.RuntimeExecutions != 1 || provider.Feedback.RuntimeFailures != 0 {
+		t.Fatalf("expected runtime feedback summary, got %+v", provider.Feedback)
+	}
+
+	_, ok, err = RecordQualityFeedback(root, FeedbackOptions{
+		ProviderID:      "codex_cli",
+		RuntimeID:       "codex_cli",
+		RunID:           "run-metered",
+		IssueID:         "issue-metered",
+		QualityReportID: "quality-metered",
+		RuntimeStatus:   "completed",
+		QualityStatus:   "failed",
+		Reason:          "quality_status:failed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected quality feedback to be recorded")
+	}
+	provider, ok, err = Show(root, "codex_cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || provider.Feedback.RuntimeExecutions != 1 || provider.Feedback.QualityStatus != "degraded" || provider.Feedback.QualityFailures != 1 {
+		t.Fatalf("expected quality feedback summary without double-counted runtime execution: ok=%v provider=%+v", ok, provider)
+	}
+	route, err := Route(root, RouteRequest{Role: "backend", RequiresRepoEdit: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if route.Decision != DecisionAllowed || !hasRouteSignal(route.Signals, "quality", "degraded") {
+		t.Fatalf("expected quality route signal, got %+v", route)
+	}
+}
+
 func TestProviderOpsRefreshUpdatesLocalSignals(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {
@@ -503,4 +594,12 @@ func hasTelemetrySource(records []TelemetryRecord, source string) bool {
 		}
 	}
 	return false
+}
+
+func floatNear(got float64, want float64) bool {
+	delta := got - want
+	if delta < 0 {
+		delta = -delta
+	}
+	return delta < 0.000001
 }

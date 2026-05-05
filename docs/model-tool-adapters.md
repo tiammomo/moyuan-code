@@ -32,7 +32,9 @@ Adapter 统一解决：
 - 已实现约束：`auth_ref` 只能是 `env:` 或 `secret:` 引用；不会保存明文 API key。
 - 已实现默认路由：前端和架构类代码任务路由到 `claude_cli`，后端、调优、测试、review 和修复类任务路由到 `codex_cli`，启用后的 API provider 可承担 memory 抽取、规划或图像类任务。
 - 已实现 provider env profile：绑定到 `claude_cli` 或 `codex_cli` 的 provider 可通过 Secret Resolver 注入 `base_url`、模型名和 `auth_ref` 对应的环境变量；runtime metadata 只记录 `env_keys`，不记录 token 值。
-- 已实现 ops snapshot 和 telemetry：provider 可记录 `health`、`quota`、`usage` 和 `cost`，每次 ops update/refresh 会追加 telemetry 记录，路由会因 `unhealthy/down`、`quota.exhausted`、`cost.exceeded` 给出明确阻断原因，并在 route decision 中返回 `signals`。
+- 已实现 ops snapshot 和 telemetry：provider 可记录 `health`、`quota`、`usage`、`cost` 和 `feedback`，每次 ops update/refresh 会追加 telemetry 记录，路由会因 `unhealthy/down`、`quota.exhausted`、`cost.exceeded` 给出明确阻断原因，并在 route decision 中返回 `signals`。
+- 已实现 feedback metering：runtime execution 会写入本地 token 估算；如果 provider 配置了 `cost.input_token_cost_per_1k` 和 `cost.output_token_cost_per_1k`，系统会按执行反馈累计 `usage`、扣减 `quota.used_tokens/remaining_tokens`、估算 `cost.estimated_amount`，并在 telemetry 中记录本次 `input_tokens/output_tokens/total_tokens/incremental_cost`。
+- 已实现 quality feedback signal：quality gate 结果会进入 `provider.feedback`，route decision 会返回 `quality` signal，便于调度看到某 provider 最近是否产生质量退化。
 - Console 已接入 provider telemetry 摘要，用于在路由、开发和发布操作前看到 provider 健康、额度和成本风险。
 - 已实现 ops refresh：自动检查 native runtime 是否可发现、API provider 的 `auth_ref/base_url` 配置完整性，并按 quota/cost 阈值刷新状态；默认不外呼云厂商账单或模型 API。传入 `probe=true` 或 CLI `--probe --approved` 时，才通过轻量 HTTP probe 检查 API provider 可达性和鉴权状态，探测过程不落盘 token；未带 approval 时会生成 approval record 并返回 `provider_probe_approval_required`。
 - 已实现 task model strategy：`model route --strategy <strategy>` 和 `provider-route` API 可指定 `frontend-first`、`backend-safe`、`low-cost-memory`、`image-diagram`、`planning` 策略。
@@ -64,7 +66,8 @@ Phase 2 当前运行期 ops 字段：
 - `health.status`：`ok`、`healthy`、`degraded`、`unhealthy`、`down`、`unknown`。
 - `quota.status`：`ok`、`warning`、`exhausted`、`unknown`。
 - `usage`：请求数、输入/输出/总 token、统计窗口和更新时间。
-- `cost`：币种、预估成本、预算和 `ok`、`warning`、`exceeded` 状态。
+- `cost`：币种、预估成本、预算、可选输入/输出 token 单价和 `ok`、`warning`、`exceeded` 状态。
+- `feedback`：runtime execution 数、失败率、quality check 数、质量失败率、最近质量状态和更新时间。
 
 Phase 2 当前模型策略：
 

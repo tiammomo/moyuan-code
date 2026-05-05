@@ -200,7 +200,7 @@ apps/console/
 - Controlled Actions：低风险动作可从 Console 触发后端 dry-run 或 preview，例如 visual render dry-run、release provider preview；审批决定、API token、service account、PR/MR create、release provider publish、资源续期/退役等写操作必须调用后端受控 API，高风险动作仍进入 approval/authz。
 - Operation Detail：从 Operation History 选中 release provider 或 deployment execution 后，Console 展开 Evidence Chain，显示 evidence decision、reasons 和 artifact path；刷新按钮触发 `router.refresh()` 重新拉取当前状态。
 - Schema-aware Forms：表单从 contract/schema 生成约束，错误能定位到字段；当前已先落地必填字段预检，后续再接入完整 schema metadata。
-- Provider Telemetry Surface：Provider 面板展示 health/quota/cost 摘要和近期 telemetry 记录，路由异常需要能看到 provider 侧原因。
+- Provider Telemetry Surface：Provider 面板展示 health/quota/cost/quality 摘要和近期 telemetry 记录，路由异常需要能看到 provider 侧原因；runtime feedback 有 token 估算时展示本次 total tokens。
 - AI Assist Surface：保留“让 agent 解释当前状态 / 生成修复建议 / 生成发布说明”的入口，但不能绕过后端门禁。
 
 ## 8. 设计语言

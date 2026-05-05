@@ -23,7 +23,7 @@ Phase 8 的目标是从“受控真实外部执行准备”进入“受控外部
 | `phase8-003` | `post-deploy-smoke-monitor-evidence` | completed | smoke、monitor、health check 和结果 evidence | `phase8-002` | `qa_owner` + `devops_owner` | 部署后能生成 smoke/monitor evidence，失败能阻断发布完成 |
 | `phase8-004` | `rollback-suggestion-and-runbook` | completed | rollback suggestion、runbook、手动确认和回滚 evidence | `phase8-003` | `release_manager` + `devops_owner` | 失败部署能生成可审查回滚建议，不默认自动回滚生产 |
 | `phase8-005` | `console-operation-drilldown` | completed | Console operation detail、evidence drill-down 和刷新 | `phase7-005` | `frontend_owner` | 用户能从 operation history 打开完整 execution/evidence detail |
-| `phase8-006` | `provider-real-quota-cost-feedback` | planned | Provider quota/cost/quality feedback 接入真实或半真实来源 | `phase7-004` | `provider_owner` | route decision 能读取更可信的 quota/cost/quality signals |
+| `phase8-006` | `provider-real-quota-cost-feedback` | completed | Provider quota/cost/quality feedback 接入真实或半真实来源 | `phase7-004` | `provider_owner` | route decision 能读取更可信的 quota/cost/quality signals |
 
 ## 3. 建议执行顺序
 
@@ -32,7 +32,7 @@ Phase 8 的目标是从“受控真实外部执行准备”进入“受控外部
 3. `phase8-003` 已完成，deployment execution 会拆出 smoke、monitor 和 rollback evidence。
 4. `phase8-004` 已完成，失败部署会生成人工审查 rollback runbook，不提前自动回滚。
 5. `phase8-005` 已完成，Operation Detail 可展开 evidence chain、artifact path 并刷新当前状态。
-6. `phase8-006` 可穿插推进，但不能阻塞核心 release/deploy Beta。
+6. `phase8-006` 已完成，runtime/quality feedback 可驱动 provider usage、quota、cost 和 quality signals。
 
 ## 4. 收口规则
 

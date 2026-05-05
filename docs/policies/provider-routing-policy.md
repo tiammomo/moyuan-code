@@ -123,9 +123,10 @@ Phase 2 当前实现：
 Phase 6 当前实现：
 
 - Provider ops update/refresh 会追加 `.moyuan/models/provider-telemetry.jsonl`。
-- `model provider telemetry` 和 `GET /providers/telemetry` 可查询 provider health/quota/usage/cost 历史。
-- `provider-route` 返回 `signals`，包含参与决策的 health、quota 和 cost 状态。
-- Telemetry 只记录状态、用量、成本和 reason，不记录 token、prompt 或模型响应。
+- `model provider telemetry` 和 `GET /providers/telemetry` 可查询 provider health/quota/usage/cost/feedback 历史。
+- `provider-route` 返回 `signals`，包含参与决策的 health、quota、cost 和 quality 状态。
+- Runtime execution feedback 会累计本地 token 估算；配置 token 单价后会同步更新成本估算，配置 token limit 后会同步扣减额度。
+- Telemetry 只记录状态、数值型 token 估算、成本估算和 reason，不记录 prompt、模型响应或 secret。
 
 模型策略当前实现：
 
