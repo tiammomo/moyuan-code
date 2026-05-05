@@ -11,6 +11,7 @@ import type {
   EvidenceSummary,
   GitProviderPlanSummary,
   IssueNode,
+  LifecycleAlertSummary,
   MaintenanceRecordSummary,
   OperationDetailSummary,
   OperationHistoryItem,
@@ -71,6 +72,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     providersResponse,
     providerTelemetryResponse,
     resourcesResponse,
+    lifecycleAlertsResponse,
     maintenanceResponse,
     deploymentsResponse,
     executionsResponse,
@@ -97,6 +99,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ providers: unknown[] }>>(`/projects/${project.id}/providers`),
     apiGet<ApiEnvelope<{ provider_telemetry: unknown[] }>>(`/projects/${project.id}/providers/telemetry?limit=6`),
     apiGet<ApiEnvelope<{ resources: unknown[] }>>(`/projects/${project.id}/resources`),
+    apiGet<ApiEnvelope<{ lifecycle_alerts: unknown[] }>>(`/projects/${project.id}/resources/lifecycle-alerts?limit=5`),
     apiGet<ApiEnvelope<{ maintenance_records: unknown[] }>>(`/projects/${project.id}/resources/maintenance?limit=5`),
     apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
     apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
@@ -125,6 +128,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const providers = normalizeProviders(providersResponse?.providers ?? []);
   const providerTelemetry = normalizeProviderTelemetry(providerTelemetryResponse?.provider_telemetry ?? []);
   const resources = normalizeResources(resourcesResponse?.resources ?? []);
+  const lifecycleAlerts = normalizeLifecycleAlerts(lifecycleAlertsResponse?.lifecycle_alerts ?? []);
   const maintenanceRecords = normalizeMaintenanceRecords(maintenanceResponse?.maintenance_records ?? []);
   const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
   const executions = normalizeExecutions(executionsResponse?.executions ?? []);
@@ -173,6 +177,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     providers: providers.length > 0 ? providers : demoSnapshot.providers,
     provider_telemetry: providerTelemetry,
     resources,
+    lifecycle_alerts: lifecycleAlerts,
     maintenance_records: maintenanceRecords,
     deployments,
     executions,
@@ -334,7 +339,27 @@ function normalizeResources(rawResources: unknown[]): ResourceSummary[] {
     provider: readString(raw, "provider", ""),
     owner: readString(raw, "owner", ""),
     expires_at: readString(raw, "expires_at", ""),
+    expiration_state: readString(raw, "expiration_state", ""),
+    maintenance_window: readString(raw, "maintenance_window", ""),
     health: readString(readUnknown(raw, "healthcheck"), "last_status", "unknown"),
+  }));
+}
+
+function normalizeLifecycleAlerts(rawAlerts: unknown[]): LifecycleAlertSummary[] {
+  return rawAlerts.map((raw, index) => ({
+    id: readString(raw, "id", `lifecycle-alert-${index + 1}`),
+    resource_id: readString(raw, "resource_id", ""),
+    environment: readString(raw, "environment", "test_dev"),
+    type: readString(raw, "type", "lifecycle"),
+    severity: readString(raw, "severity", "warning"),
+    status: readString(raw, "status", "open"),
+    decision: readString(raw, "decision", "RESOURCE_LIFECYCLE_ATTENTION_REQUIRED"),
+    reason: readString(raw, "reason", ""),
+    expiration_state: readString(raw, "expiration_state", ""),
+    expires_at: readString(raw, "expires_at", ""),
+    maintenance_window: readString(raw, "maintenance_window", ""),
+    health_status: readString(raw, "health_status", ""),
+    created_at: readString(raw, "created_at", ""),
   }));
 }
 

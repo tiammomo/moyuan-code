@@ -3,9 +3,9 @@
 当前 Beta 实现已落地服务器资源 registry 最小闭环：
 
 - CLI：`moyuan resources add/list/show/disable`、`moyuan resources expiration scan`、`moyuan resources maintenance scan|list`、`moyuan resources renew`、`moyuan resources retire`。
-- API：`GET/POST /v1/projects/:project_id/resources`、`GET /v1/projects/:project_id/resources/:resource_id`、`POST /v1/projects/:project_id/resources/:resource_id/disable`、`GET /v1/projects/:project_id/resources/expiration-scan`、`GET /resources/maintenance`、`POST /resources/maintenance/scan`、`POST /resources/:id/renew`、`POST /resources/:id/retire`。
-- 输出位置：`.moyuan/resources/inventory.json`、`.moyuan/resources/events.jsonl`、`.moyuan/resources/maintenance/` 和 `.moyuan/resources/maintenance.jsonl`。
-- 当前只做登记、查询、禁用、到期扫描、维护记录、续费记录和退役记录，不连接 SSH、不部署、不修改云资源。
+- API：`GET/POST /v1/projects/:project_id/resources`、`GET /v1/projects/:project_id/resources/:resource_id`、`POST /v1/projects/:project_id/resources/:resource_id/disable`、`GET /v1/projects/:project_id/resources/expiration-scan`、`GET /resources/lifecycle-alerts`、`POST /resources/lifecycle/scan`、`GET /resources/maintenance`、`POST /resources/maintenance/scan`、`POST /resources/:id/renew`、`POST /resources/:id/retire`。
+- 输出位置：`.moyuan/resources/inventory.json`、`.moyuan/resources/events.jsonl`、`.moyuan/resources/lifecycle-alerts.jsonl`、`.moyuan/resources/lifecycle-scans/`、`.moyuan/resources/maintenance/` 和 `.moyuan/resources/maintenance.jsonl`。
+- 当前只做登记、查询、禁用、到期扫描、生命周期提醒、维护记录、续费记录和退役记录，不连接 SSH、不部署、不修改云资源。
 - Phase 4 已支持维护记录、续费记录和退役记录；真实云厂商续费和远程操作仍留给后续受控 adapter。
 - 生产机必须显式声明 `environment=production`，并填写 owner、auth_ref 和 expires_at。
 
@@ -76,6 +76,7 @@ scheduled maintenance
   -> service health check
   -> backup status check
   -> cloud expiration scan
+  -> lifecycle alert scan
   -> cost snapshot
   -> create maintenance issue when needed
 ```

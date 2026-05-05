@@ -97,7 +97,25 @@ export type ResourceSummary = {
   provider?: string;
   owner?: string;
   expires_at?: string;
+  expiration_state?: string;
+  maintenance_window?: string;
   health?: string;
+};
+
+export type LifecycleAlertSummary = {
+  id: string;
+  resource_id: string;
+  environment: string;
+  type: string;
+  severity: string;
+  status: string;
+  decision: string;
+  reason?: string;
+  expiration_state?: string;
+  expires_at?: string;
+  maintenance_window?: string;
+  health_status?: string;
+  created_at?: string;
 };
 
 export type MaintenanceRecordSummary = {
@@ -487,6 +505,7 @@ export type ConsoleSnapshot = {
   providers: ProviderSummary[];
   provider_telemetry: ProviderTelemetrySummary[];
   resources: ResourceSummary[];
+  lifecycle_alerts: LifecycleAlertSummary[];
   maintenance_records: MaintenanceRecordSummary[];
   deployments: DeploymentSummary[];
   executions: DeploymentExecutionSummary[];

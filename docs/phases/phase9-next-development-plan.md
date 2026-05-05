@@ -21,7 +21,7 @@ Phase 8 已完成并通过 release readiness：
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase9-001` | `operation-detail-aggregation-api` | completed | Operation detail 后端聚合 | Console/API 可按 operation id 获取 execution/evidence/artifact detail |
-| P0 | `phase9-002` | `server-resource-lifecycle-alerts` | planned | 服务器资源生命周期提醒 | expiring/expired/maintenance_due 可查询并写入 audit |
+| P0 | `phase9-002` | `server-resource-lifecycle-alerts` | completed | 服务器资源生命周期提醒 | expiring/expired/maintenance_due 可查询并写入 audit |
 | P1 | `phase9-003` | `deployment-monitor-history` | planned | 部署后检查历史和失败分类 | smoke/monitor/rollback 可按 execution 查询历史 |
 | P1 | `phase9-004` | `provider-route-explanation-v2` | planned | Provider 路由解释增强 | selected/skipped provider signals 可解释 |
 | P2 | `phase9-005` | `self-repair-candidate-from-operations` | planned | 从失败 operation 生成修复候选 | repair candidate 可审查，不自动越权 |
@@ -58,7 +58,29 @@ Phase 8 已完成并通过 release readiness：
 - 聚合结果返回 execution 摘要、evidence chain 和 artifact references，不返回完整 stdout/stderr、secret、SSH key 或 provider response body。
 - Console snapshot 会拉取近期 operation detail，详情区优先展示 detail API 的 evidence chain，API 不可用时回退到原 snapshot。
 
-## 4. 验证要求
+## 4. 执行规划：`phase9-002 server-resource-lifecycle-alerts`
+
+实现状态：completed。
+
+范围：
+
+- 增加资源生命周期 scan，统一识别 `RESOURCE_EXPIRING`、`RESOURCE_EXPIRED`、`RESOURCE_MAINTENANCE_DUE` 和 `RESOURCE_HEALTH_ATTENTION`。
+- 生命周期 scan 会更新资源 `expiration_state`，写入 lifecycle alert JSONL、scan report、maintenance record 和 audit log。
+- API 支持 `POST /v1/projects/:project_id/resources/lifecycle/scan` 和 `GET /v1/projects/:project_id/resources/lifecycle-alerts`。
+- Console Server Resources 面板展示 lifecycle alerts、expiration state 和维护记录。
+
+非目标：
+
+- 不连接云厂商 API，不自动续费，不修改云资源。
+- 不执行 SSH 或生产部署。
+
+落地结果：
+
+- 新增 `LifecycleScan`、`ListLifecycleAlerts`、`LifecycleScanReport` 和 `LifecycleAlert`。
+- `maintenance_window` 支持 `due:YYYY-MM-DD` 或 `YYYY-MM-DD` 形式的 due 判断；其他自然语言窗口只保留为信息，不强行判断。
+- 生命周期提醒会沉淀到 `.moyuan/resources/lifecycle-alerts.jsonl` 和 `.moyuan/resources/lifecycle-scans/`。
+
+## 5. 验证要求
 
 每完成一个 Phase 9 issue，至少运行：
 

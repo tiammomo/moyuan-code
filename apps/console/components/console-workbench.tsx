@@ -1434,7 +1434,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
 
           <div className="panel">
-            <PanelTitle icon={<Server size={18} />} title="Server Resources" meta={`${snapshot.maintenance_records.length} maintenance`} />
+            <PanelTitle icon={<Server size={18} />} title="Server Resources" meta={`${snapshot.lifecycle_alerts.length} alerts / ${snapshot.maintenance_records.length} maintenance`} />
             <div className="controlForm compact">
               <label>
                 <span>Actor</span>
@@ -1463,9 +1463,10 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       <span>
                         {resource.host}
                         {resource.health ? ` / ${resource.health}` : ""}
+                        {resource.expiration_state ? ` / ${resource.expiration_state}` : ""}
                       </span>
                     </div>
-                    <StatusPill tone={resource.environment === "production" ? "warning" : "ok"} label={resource.environment} />
+                    <StatusPill tone={toneForStatus(resource.expiration_state || (resource.environment === "production" ? "warning" : "ok"))} label={resource.environment} />
                     <div className="rowActions">
                       <button
                         className="inlineActionButton"
@@ -1491,6 +1492,21 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 ))
               ) : (
                 <div className="emptyState">No resources registered</div>
+              )}
+            </div>
+            <div className="maintenanceList">
+              {snapshot.lifecycle_alerts.length > 0 ? (
+                snapshot.lifecycle_alerts.slice(0, 3).map((alert) => (
+                  <div className="maintenanceItem" key={alert.id}>
+                    <div>
+                      <strong>{alert.resource_id || compactID(alert.id)}</strong>
+                      <span>{alert.reason || alert.type}</span>
+                    </div>
+                    <StatusPill tone={toneForStatus(alert.severity || alert.status)} label={alert.expiration_state || alert.health_status || alert.type} />
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState compact">No lifecycle alerts</div>
               )}
             </div>
             <div className="maintenanceList">
@@ -1928,9 +1944,26 @@ function toneForStatus(status: string): StatusTone {
   if (status === "accepted" || status === "passed" || status === "ready" || status === "completed" || status === "planned" || status === "ok" || status === "healthy")
     return "ok";
   if (status === "running" || status === "dispatch" || status === "retrying") return "running";
-  if (status === "blocked" || status === "rejected" || status === "failed" || status === "route_blocked" || status === "unhealthy" || status === "down")
+  if (
+    status === "blocked" ||
+    status === "rejected" ||
+    status === "failed" ||
+    status === "route_blocked" ||
+    status === "unhealthy" ||
+    status === "down" ||
+    status === "expired" ||
+    status === "critical"
+  )
     return "blocked";
-  if (status === "waiting" || status === "pending" || status === "archived" || status === "open" || status === "warning" || status === "degraded")
+  if (
+    status === "waiting" ||
+    status === "pending" ||
+    status === "archived" ||
+    status === "open" ||
+    status === "warning" ||
+    status === "degraded" ||
+    status === "attention_required"
+  )
     return "warning";
   return "neutral";
 }

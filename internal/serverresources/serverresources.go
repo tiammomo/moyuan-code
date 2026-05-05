@@ -2,6 +2,7 @@ package serverresources
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -99,6 +100,31 @@ type MaintenanceRecord struct {
 	ActorID         string `json:"actor_id,omitempty"`
 	Reason          string `json:"reason,omitempty"`
 	CreatedAt       string `json:"created_at"`
+}
+
+type LifecycleScanReport struct {
+	ID        string           `json:"id"`
+	Status    string           `json:"status"`
+	Decision  string           `json:"decision"`
+	Alerts    []LifecycleAlert `json:"alerts"`
+	Reasons   []string         `json:"reasons"`
+	CreatedAt string           `json:"created_at"`
+}
+
+type LifecycleAlert struct {
+	ID                string `json:"id"`
+	ResourceID        string `json:"resource_id"`
+	Environment       string `json:"environment"`
+	Type              string `json:"type"`
+	Severity          string `json:"severity"`
+	Status            string `json:"status"`
+	Decision          string `json:"decision"`
+	Reason            string `json:"reason,omitempty"`
+	ExpirationState   string `json:"expiration_state,omitempty"`
+	ExpiresAt         string `json:"expires_at,omitempty"`
+	MaintenanceWindow string `json:"maintenance_window,omitempty"`
+	HealthStatus      string `json:"health_status,omitempty"`
+	CreatedAt         string `json:"created_at"`
 }
 
 type RenewalOptions struct {
@@ -341,6 +367,85 @@ func MaintenanceScan(rootDir string) ([]MaintenanceRecord, error) {
 	return records, nil
 }
 
+func LifecycleScan(rootDir string) (LifecycleScanReport, error) {
+	registry, err := Load(rootDir)
+	if err != nil {
+		return LifecycleScanReport{}, err
+	}
+	nowTime := time.Now()
+	report := LifecycleScanReport{
+		ID:        "resource-lifecycle-scan-" + timeID(nowTime.UTC()),
+		Status:    "ok",
+		Decision:  "RESOURCE_LIFECYCLE_OK",
+		Alerts:    []LifecycleAlert{},
+		Reasons:   []string{},
+		CreatedAt: now(),
+	}
+	changed := false
+	for idx, resource := range registry.Resources {
+		if resource.Status == "retired" {
+			continue
+		}
+		state := expirationState(resource.ExpiresAt, nowTime)
+		if registry.Resources[idx].ExpirationState != state {
+			registry.Resources[idx].ExpirationState = state
+			registry.Resources[idx].UpdatedAt = now()
+			resource.ExpirationState = state
+			changed = true
+		}
+		alerts := lifecycleAlertsFor(resource, nowTime)
+		report.Alerts = append(report.Alerts, alerts...)
+	}
+	if len(report.Alerts) > 0 {
+		report.Status = "attention_required"
+		report.Decision = "RESOURCE_LIFECYCLE_ATTENTION_REQUIRED"
+		for _, alert := range report.Alerts {
+			report.Reasons = append(report.Reasons, alert.Reason)
+			if err := saveLifecycleAlert(rootDir, alert); err != nil {
+				return LifecycleScanReport{}, err
+			}
+			if err := saveMaintenanceRecord(rootDir, maintenanceRecordFromLifecycleAlert(alert)); err != nil {
+				return LifecycleScanReport{}, err
+			}
+		}
+	}
+	if changed {
+		if err := save(rootDir, registry); err != nil {
+			return LifecycleScanReport{}, err
+		}
+	}
+	if err := fsutil.WriteJSON(lifecycleScanPath(rootDir, report.ID), report); err != nil {
+		return LifecycleScanReport{}, err
+	}
+	if err := fsutil.AppendJSONL(filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "lifecycle-scans.jsonl"), report); err != nil {
+		return LifecycleScanReport{}, err
+	}
+	_ = fsutil.AppendJSONL(eventsPath(rootDir), map[string]any{"event": "resource.lifecycle_scan", "alerts": len(report.Alerts), "decision": report.Decision, "ts": now()})
+	_ = logging.Log(rootDir, "audit", "server_resource.lifecycle_scan", map[string]any{"scan_id": report.ID, "alerts": len(report.Alerts), "decision": report.Decision, "status": report.Status})
+	return report, nil
+}
+
+func ListLifecycleAlerts(rootDir string, limit int) ([]LifecycleAlert, error) {
+	lines, err := fsutil.TailLines(lifecycleAlertsPath(rootDir), limit)
+	if err != nil {
+		return nil, err
+	}
+	alerts := []LifecycleAlert{}
+	for _, line := range lines {
+		var alert LifecycleAlert
+		if err := json.Unmarshal([]byte(line), &alert); err != nil {
+			return nil, err
+		}
+		if alert.ID != "" {
+			alerts = append(alerts, alert)
+		}
+	}
+	sort.SliceStable(alerts, func(i, j int) bool {
+		return alerts[i].CreatedAt > alerts[j].CreatedAt
+	})
+	return alerts, nil
+}
+
 func ListMaintenance(rootDir string, limit int) ([]MaintenanceRecord, error) {
 	if err := fsutil.EnsureDir(maintenanceDir(rootDir)); err != nil {
 		return nil, err
@@ -524,6 +629,14 @@ func healthScanPath(rootDir string, id string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "checks", id+".json")
 }
 
+func lifecycleScanPath(rootDir string, id string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "lifecycle-scans", id+".json")
+}
+
+func lifecycleAlertsPath(rootDir string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "lifecycle-alerts.jsonl")
+}
+
 func maintenanceDir(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "maintenance")
 }
@@ -537,6 +650,10 @@ func saveMaintenanceRecord(rootDir string, record MaintenanceRecord) error {
 		return err
 	}
 	return fsutil.AppendJSONL(filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "maintenance.jsonl"), record)
+}
+
+func saveLifecycleAlert(rootDir string, alert LifecycleAlert) error {
+	return fsutil.AppendJSONL(lifecycleAlertsPath(rootDir), alert)
 }
 
 func newMaintenanceRecord(resource Resource, recordType string, status string, decision string, reason string) MaintenanceRecord {
@@ -576,6 +693,77 @@ func scanResource(ctx context.Context, resource Resource, approved bool) HealthS
 		result.Reason = "healthcheck_type_not_allowed:" + resource.Healthcheck.Type
 	}
 	return result
+}
+
+func lifecycleAlertsFor(resource Resource, nowTime time.Time) []LifecycleAlert {
+	alerts := []LifecycleAlert{}
+	state := expirationState(resource.ExpiresAt, nowTime)
+	switch state {
+	case "expired":
+		alerts = append(alerts, newLifecycleAlert(resource, "expiration", "critical", "RESOURCE_EXPIRED", "expiration_expired"))
+	case "critical", "warning":
+		alerts = append(alerts, newLifecycleAlert(resource, "expiration", "warning", "RESOURCE_EXPIRING", "expiration_"+state))
+	}
+	if maintenanceDue(resource.MaintenanceWindow, nowTime) {
+		alerts = append(alerts, newLifecycleAlert(resource, "maintenance_due", "warning", "RESOURCE_MAINTENANCE_DUE", "maintenance_window_due"))
+	}
+	if resource.Healthcheck.LastStatus == "failed" || resource.Healthcheck.LastStatus == "blocked" {
+		alerts = append(alerts, newLifecycleAlert(resource, "health_attention", "warning", "RESOURCE_HEALTH_ATTENTION", "health_"+resource.Healthcheck.LastStatus))
+	}
+	return alerts
+}
+
+func newLifecycleAlert(resource Resource, alertType string, severity string, decision string, reason string) LifecycleAlert {
+	createdAt := now()
+	return LifecycleAlert{
+		ID:                "lifecycle-alert-" + normalizeID(resource.ID) + "-" + normalizeToken(alertType) + "-" + timeID(time.Now().UTC()),
+		ResourceID:        resource.ID,
+		Environment:       resource.Environment,
+		Type:              normalizeToken(alertType),
+		Severity:          normalizeToken(severity),
+		Status:            "open",
+		Decision:          decision,
+		Reason:            reason,
+		ExpirationState:   resource.ExpirationState,
+		ExpiresAt:         resource.ExpiresAt,
+		MaintenanceWindow: resource.MaintenanceWindow,
+		HealthStatus:      resource.Healthcheck.LastStatus,
+		CreatedAt:         createdAt,
+	}
+}
+
+func maintenanceRecordFromLifecycleAlert(alert LifecycleAlert) MaintenanceRecord {
+	return MaintenanceRecord{
+		ID:              "maintenance-" + normalizeID(alert.ResourceID) + "-" + normalizeToken(alert.Type) + "-" + timeID(time.Now().UTC()),
+		ResourceID:      alert.ResourceID,
+		Environment:     alert.Environment,
+		Type:            alert.Type,
+		Status:          alert.Status,
+		Decision:        alert.Decision,
+		ExpirationState: alert.ExpirationState,
+		ExpiresAt:       alert.ExpiresAt,
+		HealthStatus:    alert.HealthStatus,
+		Reason:          alert.Reason,
+		CreatedAt:       alert.CreatedAt,
+	}
+}
+
+func maintenanceDue(window string, nowTime time.Time) bool {
+	value := strings.TrimSpace(window)
+	if value == "" {
+		return false
+	}
+	value = strings.TrimPrefix(value, "due:")
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return false
+	}
+	value = fields[0]
+	dueAt, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return false
+	}
+	return !nowTime.Before(dueAt)
 }
 
 func scanHTTP(ctx context.Context, resource Resource, result HealthScanResult) HealthScanResult {

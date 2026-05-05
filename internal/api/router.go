@@ -1270,6 +1270,23 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"maintenance_records": records})
 	})
+	router.GET("/v1/projects/:project_id/resources/lifecycle-alerts", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		alerts, err := serverresources.ListLifecycleAlerts(rootDir, queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"lifecycle_alerts": alerts})
+	})
 	router.POST("/v1/projects/:project_id/resources/maintenance/scan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -1286,6 +1303,27 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"maintenance_records": records})
+	})
+	router.POST("/v1/projects/:project_id/resources/lifecycle/scan", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		report, err := serverresources.LifecycleScan(rootDir)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if report.Status == "attention_required" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"lifecycle_scan": report})
 	})
 	router.POST("/v1/projects/:project_id/resources/health-scan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

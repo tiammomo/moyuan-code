@@ -201,6 +201,7 @@ apps/console/
 - Operation Detail：从 Operation History 选中 release provider 或 deployment execution 后，Console 优先读取 operation detail 聚合 API，展开 Evidence Chain，显示 evidence decision、reasons 和 artifact path；API 不可用时回退到 snapshot，刷新按钮触发 `router.refresh()` 重新拉取当前状态。
 - Schema-aware Forms：表单从 contract/schema 生成约束，错误能定位到字段；当前已先落地必填字段预检，后续再接入完整 schema metadata。
 - Provider Telemetry Surface：Provider 面板展示 health/quota/cost/quality 摘要和近期 telemetry 记录，路由异常需要能看到 provider 侧原因；runtime feedback 有 token 估算时展示本次 total tokens。
+- Resource Lifecycle Surface：Server Resources 面板展示 lifecycle alerts、expiration state、maintenance records 和资源续期/退役动作状态。
 - AI Assist Surface：保留“让 agent 解释当前状态 / 生成修复建议 / 生成发布说明”的入口，但不能绕过后端门禁。
 
 ## 8. 设计语言
