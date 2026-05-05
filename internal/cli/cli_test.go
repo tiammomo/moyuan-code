@@ -635,6 +635,13 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	admissions := runCLI(t, root, "release", "admissions")
 	assertContains(t, admissions.stdout, `"release_admissions"`)
 	assertContains(t, admissions.stdout, admissionID)
+	riskHandoff := runCLI(t, root, "repair", "deployment-risk", "create", "--admission-id", admissionID)
+	assertContains(t, riskHandoff.stdout, `"decision": "DEPLOYMENT_RISK_HANDOFF_NOT_REQUIRED"`)
+	riskHandoffID := decodeStringField(t, riskHandoff.stdout, "id")
+	riskHandoffShown := runCLI(t, root, "repair", "deployment-risk", riskHandoffID)
+	assertContains(t, riskHandoffShown.stdout, riskHandoffID)
+	riskHandoffs := runCLI(t, root, "repair", "deployment-risks")
+	assertContains(t, riskHandoffs.stdout, `"deployment_risk_handoffs"`)
 
 	deployApprovalRequired := runCLIAllowFailure(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--command", "printf deployment-ok")
 	if deployApprovalRequired.code == 0 {

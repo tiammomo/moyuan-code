@@ -103,6 +103,11 @@ type operationRepairReviewRequest struct {
 	RuntimeID  string `json:"runtime_id"`
 }
 
+type deploymentRiskHandoffRequest struct {
+	AdmissionID      string `json:"admission_id"`
+	MonitorSummaryID string `json:"monitor_summary_id"`
+}
+
 type gitProviderCreateRequest struct {
 	Approved   bool   `json:"approved"`
 	ApprovalID string `json:"approval_id"`
@@ -3391,6 +3396,73 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"operation_repair_candidates": candidates})
 	})
+	router.POST("/v1/projects/:project_id/repair/deployment-risk-handoffs", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req deploymentRiskHandoffRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		handoff, err := repair.CreateDeploymentRiskHandoff(rootDir, repair.DeploymentRiskHandoffOptions{
+			AdmissionID:      req.AdmissionID,
+			MonitorSummaryID: req.MonitorSummaryID,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusCreated
+		if handoff.Status == "blocked" || handoff.Status == "review_required" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"deployment_risk_handoff": handoff})
+	})
+	router.GET("/v1/projects/:project_id/repair/deployment-risk-handoffs", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		handoffs, err := repair.ListDeploymentRiskHandoffs(rootDir, queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"deployment_risk_handoffs": handoffs})
+	})
+	router.GET("/v1/projects/:project_id/repair/deployment-risk-handoffs/:handoff_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		handoff, found, err := repair.LoadDeploymentRiskHandoff(rootDir, c.Param("handoff_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "deployment risk handoff not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"deployment_risk_handoff": handoff})
+	})
 	router.GET("/v1/projects/:project_id/repair/operation-candidates/:candidate_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3624,6 +3696,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "control_loop.run", Risk: "high", Scopes: []string{"control:write"}}, true
 	case "/v1/projects/:project_id/repair/operation-candidates/:candidate_id/review":
 		return authzRule{Action: "repair.candidate.review", Risk: "high", Scopes: []string{"repair:write"}}, true
+	case "/v1/projects/:project_id/repair/deployment-risk-handoffs":
+		return authzRule{Action: "repair.deployment_risk_handoff", Risk: "normal", Scopes: []string{"repair:write"}}, true
 	case "/v1/projects/:project_id/approvals/:approval_id/decide":
 		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
 	case "/v1/projects/:project_id/auth/sessions":
@@ -3700,6 +3774,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "control_loop.run", Risk: "high", Scopes: []string{"control:write"}}, true
 	case strings.Contains(rawPath, "/repair/operation-candidates/") && strings.HasSuffix(rawPath, "/review"):
 		return authzRule{Action: "repair.candidate.review", Risk: "high", Scopes: []string{"repair:write"}}, true
+	case strings.HasSuffix(rawPath, "/repair/deployment-risk-handoffs"):
+		return authzRule{Action: "repair.deployment_risk_handoff", Risk: "normal", Scopes: []string{"repair:write"}}, true
 	case strings.Contains(rawPath, "/approvals/") && strings.HasSuffix(rawPath, "/decide"):
 		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
 	case strings.HasSuffix(rawPath, "/auth/sessions"):

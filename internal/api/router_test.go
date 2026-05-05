@@ -399,6 +399,13 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/release-admissions?limit=5", http.StatusOK, `"release_admissions"`, admissions[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/release-admissions/"+admissions[0].ID, http.StatusOK, `"release_admission"`, `"deployment_rehearsal"`)
+	assertPostContains(t, router, "/v1/projects/managed/repair/deployment-risk-handoffs", `{"admission_id":"`+admissions[0].ID+`"}`, http.StatusAccepted, `"deployment_risk_handoff"`, `"DEPLOYMENT_RISK_HANDOFF_REVIEW_REQUIRED"`)
+	riskHandoffs, err := repair.ListDeploymentRiskHandoffs(root, 1)
+	if err != nil || len(riskHandoffs) != 1 {
+		t.Fatalf("expected deployment risk handoff, handoffs=%+v err=%v", riskHandoffs, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/repair/deployment-risk-handoffs?limit=5", http.StatusOK, `"deployment_risk_handoffs"`, riskHandoffs[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/repair/deployment-risk-handoffs/"+riskHandoffs[0].ID, http.StatusOK, `"deployment_risk_handoff"`, `"release_admission_blocked"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/"+evidenceRecords[0].ParentID+"/post-deployment-history", http.StatusOK, `"post_deployment_history"`, `"execution_blocked"`)
 	assertGETContains(t, router, "/v1/projects/managed/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"evidence"`, evidenceRecords[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/operations/deployment/"+evidenceRecords[0].ParentID, http.StatusOK, `"operation_detail"`, `"deployment.execute.dry_run"`, `"artifact_count":1`)

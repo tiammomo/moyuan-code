@@ -181,6 +181,9 @@ func usage() string {
 		"moyuan memory candidates",
 		"moyuan memory compact",
 		"moyuan repair signal --type <type> --summary <text>",
+		"moyuan repair deployment-risk create [--admission-id <id>] [--monitor-summary-id <id>]",
+		"moyuan repair deployment-risk <handoff-id>",
+		"moyuan repair deployment-risks",
 		"moyuan repair run <plan-id> [--runtime local_shell] [--prompt <command>]",
 		"moyuan repair status <attempt-id>",
 		"moyuan review merge-decision <issue-id>",
@@ -908,6 +911,33 @@ func handleRepair(args []string, cwd string) (string, any, int, error) {
 			return "", nil, 1, err
 		}
 		return "", map[string]any{"signal": signal, "candidate": candidate, "repair_plan": plan}, 0, nil
+	case "deployment-risk":
+		if len(args) < 2 {
+			return "missing deployment risk command\n", nil, 1, nil
+		}
+		if args[1] == "create" {
+			handoff, err := repair.CreateDeploymentRiskHandoff(rootDir, repair.DeploymentRiskHandoffOptions{
+				AdmissionID:      flagValue(args, "--admission-id", ""),
+				MonitorSummaryID: flagValue(args, "--monitor-summary-id", ""),
+			})
+			code := 0
+			if handoff.Status == "blocked" {
+				code = 1
+			}
+			return "", handoff, code, err
+		}
+		handoff, ok, err := repair.LoadDeploymentRiskHandoff(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", handoff, 0, nil
+	case "deployment-risks":
+		limit, _ := strconv.Atoi(flagValue(args, "--limit", "20"))
+		handoffs, err := repair.ListDeploymentRiskHandoffs(rootDir, limit)
+		return "", map[string]any{"deployment_risk_handoffs": handoffs}, 0, err
 	case "run":
 		if len(args) < 2 {
 			return "missing repair plan id\n", nil, 1, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/workspace"
 )
@@ -82,5 +83,41 @@ func TestCandidateFromFailedOperationCreatesReviewOnlyPlan(t *testing.T) {
 	list, err = ListOperationRepairCandidates(root, 10)
 	if err != nil || len(list) != 1 || list[0].Status != "approved" {
 		t.Fatalf("expected deduped approved candidate list, list=%+v err=%v", list, err)
+	}
+}
+
+func TestDeploymentRiskHandoffCreatesReviewRepairPlan(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	admission, err := deployment.BuildReleaseAdmission(context.Background(), root, deployment.ReleaseAdmissionOptions{RehearsalID: "missing-rehearsal"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if admission.Status != "blocked" {
+		t.Fatalf("expected blocked admission fixture, got %+v", admission)
+	}
+	handoff, err := CreateDeploymentRiskHandoff(root, DeploymentRiskHandoffOptions{AdmissionID: admission.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if handoff.Status != "review_required" || handoff.Decision != "DEPLOYMENT_RISK_HANDOFF_REVIEW_REQUIRED" || !handoff.ReviewRequired {
+		t.Fatalf("expected review-required handoff, got %+v", handoff)
+	}
+	if handoff.SignalID == "" || handoff.BugCandidateID == "" || handoff.RepairPlanID == "" {
+		t.Fatalf("expected repair artifacts, got %+v", handoff)
+	}
+	loaded, found, err := LoadDeploymentRiskHandoff(root, handoff.ID)
+	if err != nil || !found || loaded.ID != handoff.ID {
+		t.Fatalf("expected handoff to load, found=%v loaded=%+v err=%v", found, loaded, err)
+	}
+	list, err := ListDeploymentRiskHandoffs(root, 10)
+	if err != nil || len(list) != 1 || list[0].ID != handoff.ID {
+		t.Fatalf("expected handoff list, list=%+v err=%v", list, err)
+	}
+	plan, err := LoadPlan(root, handoff.RepairPlanID)
+	if err != nil || !plan.RequiresApproval || plan.Status != "requires_approval" {
+		t.Fatalf("expected approval-gated repair plan, plan=%+v err=%v", plan, err)
 	}
 }
