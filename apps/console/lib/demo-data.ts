@@ -272,6 +272,7 @@ export const demoSnapshot: ConsoleSnapshot = {
       status: "completed",
       decision: "DEPLOY_EXECUTION_DRY_RUN",
       reasons: ["no_remote_or_local_commands_executed"],
+      artifacts: [{ kind: "deployment_execution", id: "deploy-exec-dry-run", path: ".moyuan/lifecycle/deployments/executions/deploy-exec-dry-run.json" }],
       artifact_count: 1,
       created_at: "2026-05-05T00:12:02.000Z",
     },
@@ -285,6 +286,13 @@ export const demoSnapshot: ConsoleSnapshot = {
       status: "completed",
       decision: "RELEASE_PROVIDER_PREVIEW_READY",
       reasons: ["no_remote_release_actions_executed"],
+      artifacts: [
+        {
+          kind: "provider_execution",
+          id: "release-provider-preview-v0-1-0",
+          path: ".moyuan/lifecycle/releases/provider-executions/release-provider-preview-v0-1-0.json",
+        },
+      ],
       artifact_count: 1,
       created_at: "2026-05-05T00:10:02.000Z",
     },

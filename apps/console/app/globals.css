@@ -747,6 +747,25 @@ dd {
   gap: 12px;
 }
 
+.detailHeaderActions {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+}
+
+.iconActionButton {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #bfd0eb;
+  border-radius: 7px;
+  background: #fff;
+  color: #173b73;
+  cursor: pointer;
+}
+
 .detailHeader div {
   min-width: 0;
 }
@@ -810,6 +829,60 @@ dd {
   border-color: #e6ebf2;
   background: #fff;
   color: var(--muted);
+}
+
+.evidenceDrilldown {
+  display: grid;
+  gap: 10px;
+}
+
+.detailSectionTitle,
+.evidenceCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.detailSectionTitle span,
+.evidenceCardHeader span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.evidenceCard {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.evidenceCard dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.evidenceCard dl div {
+  background: #fff;
+}
+
+.artifactList {
+  display: grid;
+  gap: 6px;
+}
+
+.artifactList code {
+  padding: 5px 6px;
+  border: 1px solid #e6ebf2;
+  border-radius: 6px;
+  background: #fff;
+  color: #37506e;
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 
 .lowerGrid,

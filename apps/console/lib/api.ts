@@ -100,7 +100,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
     apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
     apiGet<ApiEnvelope<{ release_provider_executions: unknown[] }>>(`/projects/${project.id}/release-provider-executions?limit=6`),
-    apiGet<ApiEnvelope<{ evidence: unknown[] }>>(`/projects/${project.id}/evidence?limit=10`),
+    apiGet<ApiEnvelope<{ evidence: unknown[] }>>(`/projects/${project.id}/evidence?limit=30`),
     apiGet<ApiEnvelope<{ runs: unknown[] }>>(`/projects/${project.id}/runs?limit=12`),
     apiGet<ApiEnvelope<{ subagents: unknown[] }>>(`/projects/${project.id}/subagents?limit=12`),
     apiGet<ApiEnvelope<{ runtime_recoveries: unknown[] }>>(`/projects/${project.id}/runtime-recoveries?limit=6`),
@@ -406,6 +406,11 @@ function normalizeEvidence(rawRecords: unknown[]): EvidenceSummary[] {
     status: readString(raw, "status", "unknown"),
     decision: readString(raw, "decision", "unknown"),
     reasons: readArray(raw, "reasons"),
+    artifacts: readObjectArray(raw, "artifacts").map((artifact) => ({
+      kind: readString(artifact, "kind", "artifact"),
+      id: readString(artifact, "id", ""),
+      path: readString(artifact, "path", ""),
+    })),
     artifact_count: readObjectArray(raw, "artifacts").length,
     created_at: readString(raw, "created_at", ""),
   }));

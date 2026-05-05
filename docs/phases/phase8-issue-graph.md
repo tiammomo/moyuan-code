@@ -22,7 +22,7 @@ Phase 8 的目标是从“受控真实外部执行准备”进入“受控外部
 | `phase8-002` | `ssh-runner-controlled-execution` | completed | SSH runner 真实连接、命令执行、timeout、脱敏和 evidence | `phase8-001` 可并行准备 | `devops_owner` + `security_owner` | allowlist 命令能执行，非 allowlist 阻断，stdout/stderr 不泄密 |
 | `phase8-003` | `post-deploy-smoke-monitor-evidence` | completed | smoke、monitor、health check 和结果 evidence | `phase8-002` | `qa_owner` + `devops_owner` | 部署后能生成 smoke/monitor evidence，失败能阻断发布完成 |
 | `phase8-004` | `rollback-suggestion-and-runbook` | completed | rollback suggestion、runbook、手动确认和回滚 evidence | `phase8-003` | `release_manager` + `devops_owner` | 失败部署能生成可审查回滚建议，不默认自动回滚生产 |
-| `phase8-005` | `console-operation-drilldown` | planned | Console operation detail 独立 API、evidence drill-down 和刷新 | `phase7-005` | `frontend_owner` | 用户能从 operation history 打开完整 execution/evidence detail |
+| `phase8-005` | `console-operation-drilldown` | completed | Console operation detail、evidence drill-down 和刷新 | `phase7-005` | `frontend_owner` | 用户能从 operation history 打开完整 execution/evidence detail |
 | `phase8-006` | `provider-real-quota-cost-feedback` | planned | Provider quota/cost/quality feedback 接入真实或半真实来源 | `phase7-004` | `provider_owner` | route decision 能读取更可信的 quota/cost/quality signals |
 
 ## 3. 建议执行顺序
@@ -31,7 +31,7 @@ Phase 8 的目标是从“受控真实外部执行准备”进入“受控外部
 2. `phase8-002` 已完成，真实 SSH runner 已接入 secret resolver、allowlist、timeout、脱敏和 smoke/monitor/rollback evidence。
 3. `phase8-003` 已完成，deployment execution 会拆出 smoke、monitor 和 rollback evidence。
 4. `phase8-004` 已完成，失败部署会生成人工审查 rollback runbook，不提前自动回滚。
-5. `phase8-005` 在 operation 数据模型稳定后增强 Console drill-down。
+5. `phase8-005` 已完成，Operation Detail 可展开 evidence chain、artifact path 并刷新当前状态。
 6. `phase8-006` 可穿插推进，但不能阻塞核心 release/deploy Beta。
 
 ## 4. 收口规则

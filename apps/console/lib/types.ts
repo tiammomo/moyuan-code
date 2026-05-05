@@ -159,8 +159,15 @@ export type EvidenceSummary = {
   status: string;
   decision: string;
   reasons: string[];
+  artifacts: EvidenceArtifactSummary[];
   artifact_count: number;
   created_at?: string;
+};
+
+export type EvidenceArtifactSummary = {
+  kind: string;
+  id?: string;
+  path?: string;
 };
 
 export type RunSummary = {

@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
-import type { ConsoleSnapshot, IssueNode, StatusTone } from "@/lib/types";
+import type { ConsoleSnapshot, EvidenceSummary, IssueNode, StatusTone } from "@/lib/types";
 
 const laneLabels: Record<IssueNode["lane"], string> = {
   plan: "Planning",
@@ -81,6 +81,11 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [releaseProviderActionState, setReleaseProviderActionState] = useState<ActionState>({ status: "idle" });
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
   const selectedOperation = snapshot.operation_history.find((operation) => operation.id === selectedOperationID) ?? snapshot.operation_history[0];
+  const evidenceByID = useMemo(() => new Map(snapshot.evidence.map((record) => [record.id, record])), [snapshot.evidence]);
+  const selectedEvidenceRecords = useMemo(
+    () => selectedOperation?.evidence_ids.map((id) => evidenceByID.get(id)).filter((record): record is EvidenceSummary => Boolean(record)) ?? [],
+    [evidenceByID, selectedOperation],
+  );
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
   const latestDeployment = snapshot.deployments[0];
   const activeSessions = snapshot.auth_sessions.filter((session) => session.status === "active");
@@ -691,7 +696,12 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                     <strong>{selectedOperation.title}</strong>
                     <span>{selectedOperation.id}</span>
                   </div>
-                  <StatusPill tone={selectedOperation.tone} label={selectedOperation.status} />
+                  <div className="detailHeaderActions">
+                    <StatusPill tone={selectedOperation.tone} label={selectedOperation.status} />
+                    <button aria-label="Refresh operation detail" className="iconActionButton" onClick={() => router.refresh()} type="button">
+                      <RefreshCw size={14} />
+                    </button>
+                  </div>
                 </div>
                 <dl>
                   <div>
@@ -725,6 +735,54 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                     ))}
                   </div>
                 ) : null}
+                <div className="evidenceDrilldown">
+                  <div className="detailSectionTitle">
+                    <strong>Evidence Chain</strong>
+                    <span>{selectedEvidenceRecords.length} records</span>
+                  </div>
+                  {selectedEvidenceRecords.length > 0 ? (
+                    selectedEvidenceRecords.map((record) => (
+                      <div className="evidenceCard" key={record.id}>
+                        <div className="evidenceCardHeader">
+                          <div>
+                            <strong>{record.operation}</strong>
+                            <span>{record.id}</span>
+                          </div>
+                          <StatusPill tone={toneForStatus(record.status)} label={record.status} />
+                        </div>
+                        <dl>
+                          <div>
+                            <dt>Decision</dt>
+                            <dd>{record.decision}</dd>
+                          </div>
+                          <div>
+                            <dt>Artifacts</dt>
+                            <dd>{record.artifact_count}</dd>
+                          </div>
+                        </dl>
+                        {record.reasons.length > 0 ? (
+                          <div className="detailChips">
+                            {record.reasons.slice(0, 3).map((reason) => (
+                              <code key={`${record.id}-${reason}`}>{reason}</code>
+                            ))}
+                          </div>
+                        ) : null}
+                        {record.artifacts.length > 0 ? (
+                          <div className="artifactList">
+                            {record.artifacts.map((artifact, index) => (
+                              <code key={`${record.id}-${artifact.kind}-${index}`}>
+                                {artifact.kind}
+                                {artifact.path ? ` / ${artifact.path}` : ""}
+                              </code>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="emptyState compact">No linked evidence records</div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="emptyState">Select an operation</div>

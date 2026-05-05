@@ -24,7 +24,7 @@ Phase 7 已完成并通过 release readiness：
 | P0 | `phase8-002` | `ssh-runner-controlled-execution` | completed | SSH runner 真实受控执行 | allowlist 命令可执行，非 allowlist 阻断，输出脱敏 |
 | P1 | `phase8-003` | `post-deploy-smoke-monitor-evidence` | completed | 部署后 smoke/monitor evidence | 失败能阻断发布完成并生成 evidence |
 | P1 | `phase8-004` | `rollback-suggestion-and-runbook` | completed | 回滚建议和 runbook | 失败部署能生成可审查回滚建议 |
-| P2 | `phase8-005` | `console-operation-drilldown` | planned | Console operation detail 独立 drill-down | 用户能刷新并查看单个 operation/evidence detail |
+| P2 | `phase8-005` | `console-operation-drilldown` | completed | Console operation detail 独立 drill-down | 用户能刷新并查看单个 operation/evidence detail |
 | P2 | `phase8-006` | `provider-real-quota-cost-feedback` | planned | Provider quota/cost/quality feedback 更真实 | route decision 读取可信 signals |
 
 ## 3. 执行规划：`phase8-001 release-provider-real-adapter-beta`
@@ -118,7 +118,24 @@ Phase 7 已完成并通过 release readiness：
 - runbook 文件与 deployment execution JSON 分离，便于 Console、API 和人工审查直接引用。
 - 测试覆盖 smoke failure 和 SSH command failure 两条 rollback runbook 路径。
 
-## 7. 验证要求
+## 7. 执行规划：`phase8-005 console-operation-drilldown`
+
+实现状态：completed。
+
+范围：
+
+- Console Operation Detail 增加 Evidence Chain drill-down。
+- evidence snapshot 拉取上限提升到 30，覆盖 deployment execution 拆出的 smoke、monitor、rollback evidence。
+- `EvidenceSummary` 增加 artifacts，前端展示 artifact kind 和 path。
+- Operation Detail 增加刷新按钮，触发 `router.refresh()` 重新拉取当前 operation/evidence 状态。
+
+落地结果：
+
+- 用户从 Operation History 选中 deployment 或 release provider execution 后，可直接看到关联 evidence records。
+- rollback runbook artifact path 会在 evidence card 内可见。
+- Demo snapshot 补齐 artifacts，保证无后端时也能看到 drill-down 结构。
+
+## 8. 验证要求
 
 每完成一个 Phase 8 issue，至少运行：
 
