@@ -4,6 +4,9 @@
 
 ## 当前阶段
 
+- [Phase 27 实现 Issue Graph](./phase27-issue-graph.md)：Phase 27 Adapter Recovery Control Queue Binding 的依赖图。
+- [Phase 27 实施记录](./phase27-next-development-plan.md)：Phase 27 当前任务、执行范围和验收记录。
+- [Phase 27 Release Readiness](./phase27-release-readiness.md)：Phase 27 Adapter Recovery Control Queue Binding 的收口验证。
 - [Phase 26 实现 Issue Graph](./phase26-issue-graph.md)：Phase 26 Write Adapter Failure Recovery Record 的依赖图。
 - [Phase 26 实施记录](./phase26-next-development-plan.md)：Phase 26 当前任务、执行范围和验收记录。
 - [Phase 26 Release Readiness](./phase26-release-readiness.md)：Phase 26 Write Adapter Failure Recovery Record 的收口验证。

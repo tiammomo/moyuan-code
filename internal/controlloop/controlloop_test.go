@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"moyuan-code/internal/evidence"
+	"moyuan-code/internal/operations"
 	"moyuan-code/internal/providers"
 	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/workspace"
@@ -259,6 +260,43 @@ func TestQueueRequiresBoundReviewPacketBeforeExecution(t *testing.T) {
 	}
 }
 
+func TestQueueAdapterRecoveryRequiresReviewBeforeExecution(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	adapterReport, err := operations.CreateWriteAdapterExecutions(root, operations.WriteAdapterExecutionOptions{ExecutionPlanID: "missing-execution-plan", Mode: "preview", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	recoveryReport, err := operations.ListWriteAdapterRecoveries(root, operations.WriteAdapterRecoveryOptions{ExecutionID: adapterReport.Executions[0].ID, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recoveryReport.Recoveries) != 1 {
+		t.Fatalf("expected adapter recovery, got %+v", recoveryReport)
+	}
+	item, err := Enqueue(root, QueueOptions{
+		Steps:             []string{StepDecisionLedgerRefresh},
+		MaintenanceWindow: "always",
+		AdapterRecoveryID: recoveryReport.Recoveries[0].ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := RunQueue(context.Background(), root, QueueRunOptions{MaxItems: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := queueItemByID(report.QueueItems, item.ID)
+	if updated.Status != "manual_required" || updated.Decision != "CONTROL_QUEUE_RECOVERY_REVIEW_REQUIRED" || updated.RunID != "" {
+		t.Fatalf("expected adapter recovery queue item to require review before execution, got %+v", updated)
+	}
+	if !queueReasonsContain(updated.Reasons, "write_adapter_recovery_open:"+recoveryReport.Recoveries[0].ID) {
+		t.Fatalf("expected recovery binding reason, got %+v", updated.Reasons)
+	}
+}
+
 func assertStep(t *testing.T, run RunRecord, stepType string) {
 	t.Helper()
 	for _, step := range run.Steps {
@@ -276,4 +314,13 @@ func queueItemByID(items []QueueItem, id string) QueueItem {
 		}
 	}
 	return QueueItem{}
+}
+
+func queueReasonsContain(reasons []string, expected string) bool {
+	for _, reason := range reasons {
+		if reason == expected {
+			return true
+		}
+	}
+	return false
 }

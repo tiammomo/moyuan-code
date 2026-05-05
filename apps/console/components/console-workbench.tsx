@@ -2211,6 +2211,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       {item.review_packet_id ? <code>{compactID(item.review_packet_id)}</code> : null}
                       {item.admission_id ? <code>{compactID(item.admission_id)}</code> : null}
                       {item.remote_rehearsal_id ? <code>{compactID(item.remote_rehearsal_id)}</code> : null}
+                      {item.adapter_recovery_id ? <code>{compactID(item.adapter_recovery_id)}</code> : null}
                       {item.due_at ? <code>{shortTimestamp(item.due_at)}</code> : null}
                       {item.run_id ? <code>{compactID(item.run_id)}</code> : null}
                     </div>

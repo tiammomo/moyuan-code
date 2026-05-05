@@ -103,6 +103,7 @@ type controlLoopQueueRequest struct {
 	AdmissionID           string   `json:"admission_id"`
 	RemoteRehearsalID     string   `json:"remote_rehearsal_id"`
 	ReviewPacketID        string   `json:"review_packet_id"`
+	AdapterRecoveryID     string   `json:"adapter_recovery_id"`
 }
 
 type controlLoopQueueRunRequest struct {
@@ -3645,6 +3646,7 @@ func NewRouter(options Options) *gin.Engine {
 			AdmissionID:           req.AdmissionID,
 			RemoteRehearsalID:     req.RemoteRehearsalID,
 			ReviewPacketID:        req.ReviewPacketID,
+			AdapterRecoveryID:     req.AdapterRecoveryID,
 		})
 		if err != nil {
 			writeError(c, http.StatusInternalServerError, err.Error())

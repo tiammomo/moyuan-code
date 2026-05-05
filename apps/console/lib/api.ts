@@ -1749,6 +1749,7 @@ function normalizeControlLoopQueue(rawItems: unknown[]): ControlLoopQueueItemSum
     admission_id: readString(raw, "admission_id", ""),
     remote_rehearsal_id: readString(raw, "remote_rehearsal_id", ""),
     review_packet_id: readString(raw, "review_packet_id", ""),
+    adapter_recovery_id: readString(raw, "adapter_recovery_id", ""),
     run_id: readString(raw, "run_id", ""),
     reasons: readArray(raw, "reasons"),
     created_at: readString(raw, "created_at", ""),

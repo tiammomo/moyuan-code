@@ -1437,6 +1437,7 @@ export type ControlLoopQueueItemSummary = {
   admission_id?: string;
   remote_rehearsal_id?: string;
   review_packet_id?: string;
+  adapter_recovery_id?: string;
   run_id?: string;
   reasons: string[];
   created_at?: string;

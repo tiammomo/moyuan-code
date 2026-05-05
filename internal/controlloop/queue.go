@@ -29,6 +29,7 @@ type QueueOptions struct {
 	AdmissionID           string   `json:"admission_id,omitempty"`
 	RemoteRehearsalID     string   `json:"remote_rehearsal_id,omitempty"`
 	ReviewPacketID        string   `json:"review_packet_id,omitempty"`
+	AdapterRecoveryID     string   `json:"adapter_recovery_id,omitempty"`
 }
 
 type QueueListOptions struct {
@@ -76,6 +77,7 @@ type QueueItem struct {
 	AdmissionID           string   `json:"admission_id,omitempty"`
 	RemoteRehearsalID     string   `json:"remote_rehearsal_id,omitempty"`
 	ReviewPacketID        string   `json:"review_packet_id,omitempty"`
+	AdapterRecoveryID     string   `json:"adapter_recovery_id,omitempty"`
 	RunID                 string   `json:"run_id,omitempty"`
 	Reasons               []string `json:"reasons,omitempty"`
 	CreatedAt             string   `json:"created_at"`
@@ -107,6 +109,7 @@ func Enqueue(rootDir string, options QueueOptions) (QueueItem, error) {
 		AdmissionID:           options.AdmissionID,
 		RemoteRehearsalID:     options.RemoteRehearsalID,
 		ReviewPacketID:        options.ReviewPacketID,
+		AdapterRecoveryID:     options.AdapterRecoveryID,
 		Reasons:               []string{"control_queue_item_created"},
 		CreatedAt:             now.Format(time.RFC3339Nano),
 		UpdatedAt:             now.Format(time.RFC3339Nano),
@@ -290,6 +293,7 @@ func normalizeQueueOptions(options QueueOptions) QueueOptions {
 	options.AdmissionID = strings.TrimSpace(options.AdmissionID)
 	options.RemoteRehearsalID = strings.TrimSpace(options.RemoteRehearsalID)
 	options.ReviewPacketID = strings.TrimSpace(options.ReviewPacketID)
+	options.AdapterRecoveryID = strings.TrimSpace(options.AdapterRecoveryID)
 	if options.RetryBudget < 0 {
 		options.RetryBudget = 0
 	}
@@ -442,6 +446,21 @@ func queueReviewGateAllows(rootDir string, item QueueItem) (bool, string, []stri
 			return false, "CONTROL_QUEUE_REVIEW_GATE_MANUAL_REQUIRED", []string{"write_review_packet_not_ready:" + packet.Decision}, nil
 		}
 		reasons = appendUniqueQueueReason(reasons, "write_review_packet_ready:"+packet.ID)
+	}
+	if item.AdapterRecoveryID != "" {
+		recovery, found, err := operations.LoadWriteAdapterRecovery(rootDir, item.AdapterRecoveryID)
+		if err != nil {
+			return false, "", nil, err
+		}
+		if !found {
+			return false, "CONTROL_QUEUE_RECOVERY_REVIEW_REQUIRED", []string{"write_adapter_recovery_missing:" + item.AdapterRecoveryID}, nil
+		}
+		if recovery.Status != "open" {
+			return false, "CONTROL_QUEUE_RECOVERY_REVIEW_REQUIRED", []string{"write_adapter_recovery_not_open:" + recovery.Decision}, nil
+		}
+		reasons = appendUniqueQueueReason(reasons, "write_adapter_recovery_open:"+recovery.ID)
+		reasons = appendUniqueQueueReason(reasons, "write_adapter_recovery_action:"+recovery.RecoveryAction)
+		return false, "CONTROL_QUEUE_RECOVERY_REVIEW_REQUIRED", reasons, nil
 	}
 	return true, "CONTROL_QUEUE_REVIEW_GATE_READY", reasons, nil
 }

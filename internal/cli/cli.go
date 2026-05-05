@@ -274,7 +274,7 @@ func usage() string {
 		"moyuan operations write-adapter-executions list [--execution-plan-id <id>] [--mode preview|apply] [--adapter-id <id>] [--status <status>] [--decision <decision>] [--limit 20]",
 		"moyuan operations write-adapter-recoveries list [--execution-id <id>] [--execution-plan-id <id>] [--adapter-id <id>] [--status <status>] [--decision <decision>] [--failure-class <class>] [--limit 20]",
 		"moyuan control-loop run [--step <type>] [--idempotency-key <key>] [--retry-budget 0] [--environment <env>] [--deployment-execution-id <id>]",
-		"moyuan control-loop queue add [--step <type>] [--environment <env>] [--maintenance-window always|due:YYYY-MM-DD|after:RFC3339|between:HH:MM-HH:MM] [--due-at RFC3339] [--retry-budget 0] [--admission-id <id>] [--remote-rehearsal-id <id>] [--review-packet-id <id>]",
+		"moyuan control-loop queue add [--step <type>] [--environment <env>] [--maintenance-window always|due:YYYY-MM-DD|after:RFC3339|between:HH:MM-HH:MM] [--due-at RFC3339] [--retry-budget 0] [--admission-id <id>] [--remote-rehearsal-id <id>] [--review-packet-id <id>] [--adapter-recovery-id <id>]",
 		"moyuan control-loop queue list [--status <status>] [--environment <env>] [--limit 20]",
 		"moyuan control-loop queue run [--environment <env>] [--max-items 5]",
 		"moyuan control-loop list [--limit 20]",
@@ -2147,6 +2147,7 @@ func handleControlLoop(ctx context.Context, args []string, cwd string) (string, 
 				AdmissionID:           flagValue(subargs, "--admission-id", ""),
 				RemoteRehearsalID:     flagValue(subargs, "--remote-rehearsal-id", ""),
 				ReviewPacketID:        flagValue(subargs, "--review-packet-id", ""),
+				AdapterRecoveryID:     flagValue(subargs, "--adapter-recovery-id", ""),
 			})
 			return "", map[string]any{"control_loop_queue_item": item}, 0, err
 		case "list":
