@@ -23,8 +23,8 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 | 优先级 | Issue | 名称 | 状态 | 目标 | 验收 |
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase20-001` | `write-proof-admission-policy` | completed | 写入准入报告 | proof -> admission 可解释且不执行写入 |
-| P0 | `phase20-002` | `provider-specific-proof-pack` | next | provider 最小权限要求 | GitHub/Gitee/SSH/cloud 要求可配置 |
-| P1 | `phase20-003` | `remote-execution-rehearsal-runner` | planned | 远程执行演练 | rehearsal 不执行生产变更 |
+| P0 | `phase20-002` | `provider-specific-proof-pack` | completed | provider 最小权限要求 | GitHub/Gitee/SSH/cloud 要求可配置 |
+| P1 | `phase20-003` | `remote-execution-rehearsal-runner` | next | 远程执行演练 | rehearsal 不执行生产变更 |
 | P1 | `phase20-004` | `control-runner-queue-window` | planned | 长期任务队列与窗口 | 维护窗口、retry、handoff 可审计 |
 | P1 | `phase20-005` | `console-proof-admission-drilldown` | planned | Console 单条钻取 | 展示 proof/admission/runner step |
 | P2 | `phase20-006` | `phase20-readiness` | planned | Phase 20 收口 | 全量门禁和生产边界完成 |
@@ -62,7 +62,7 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 
 ## 4. 执行规划：`phase20-002 provider-specific-proof-pack`
 
-实现状态：next。
+实现状态：completed。
 
 范围：
 
@@ -76,7 +76,32 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 - GitHub/Gitee/SSH/cloud/local_registry 默认规则可测试。
 - API、CLI 和单测覆盖未知 provider、provider 不支持 operation、缺 required evidence/secret/approval 的解释。
 
-## 5. 验证要求
+完成记录：
+
+- `internal/operations` 新增 provider proof requirements report，默认覆盖 `generic_git`、`github`、`gitee`、`local`、`ssh`、`cloud`、`aliyun`、`tencent_cloud` 和 `local_registry`。
+- 每条 requirement 显式声明 secret ref、evidence、approval、write switch、production review、least privilege scopes 和 replay guard。
+- Write admission 现在会引用 provider requirement id、policy version 和 rule refs，并在缺少 provider requirement 时阻断真实写入准入。
+- API 增加 `GET /v1/projects/:project_id/operations/provider-proof-requirements`。
+- CLI 增加 `moyuan operations provider-proof-requirements ...`。
+- 单测覆盖 provider/operation 过滤、未知 provider 空结果、API、CLI 和 admission provider requirement 引用。
+
+## 5. 执行规划：`phase20-003 remote-execution-rehearsal-runner`
+
+实现状态：next。
+
+范围：
+
+- 新增 remote execution rehearsal report，读取 write admission 和 provider requirement，验证目标、命令 allowlist、auth ref、证据引用和回滚准备。
+- rehearsal 只输出 preview、blocked 或 manual handoff，不执行 SSH、cloud、Git provider 或生产命令。
+- 产物需要能被 operations timeline、decision ledger 或 control runner 后续引用。
+
+验收：
+
+- 可按 environment、provider、status、decision 查询 remote execution rehearsal。
+- blocked/manual/ready rehearsal 都有 reasons、rule refs、evidence refs 和 source admission。
+- API、CLI 和单测覆盖 dry-run、缺 provider requirement、缺 auth ref 和生产边界。
+
+## 6. 验证要求
 
 每完成一个 Phase 20 issue，至少运行：
 

@@ -47,31 +47,34 @@ type WriteAdmissionSummary struct {
 }
 
 type WriteAdmissionEntry struct {
-	ID                   string         `json:"id"`
-	ProofID              string         `json:"proof_id"`
-	ProofDecision        string         `json:"proof_decision"`
-	OperationType        string         `json:"operation_type"`
-	OperationID          string         `json:"operation_id"`
-	Provider             string         `json:"provider,omitempty"`
-	Environment          string         `json:"environment,omitempty"`
-	Mode                 string         `json:"mode,omitempty"`
-	Status               string         `json:"status"`
-	Decision             string         `json:"decision"`
-	Reasons              []string       `json:"reasons,omitempty"`
-	RuleRefs             []string       `json:"rule_refs,omitempty"`
-	SourceRef            string         `json:"source_ref,omitempty"`
-	DryRun               bool           `json:"dry_run"`
-	WriteEnabled         bool           `json:"write_enabled"`
-	RehearsalAllowed     bool           `json:"rehearsal_allowed"`
-	ApprovalRequired     bool           `json:"approval_required"`
-	ApprovalSatisfied    bool           `json:"approval_satisfied"`
-	ApprovalID           string         `json:"approval_id,omitempty"`
-	SecretRefStatus      string         `json:"secret_ref_status,omitempty"`
-	ProviderEvidenceRefs []string       `json:"provider_evidence_refs,omitempty"`
-	LeastPrivilege       string         `json:"least_privilege,omitempty"`
-	ReplayGuard          string         `json:"replay_guard,omitempty"`
-	CreatedAt            string         `json:"created_at,omitempty"`
-	Metadata             map[string]any `json:"metadata,omitempty"`
+	ID                         string         `json:"id"`
+	ProofID                    string         `json:"proof_id"`
+	ProofDecision              string         `json:"proof_decision"`
+	OperationType              string         `json:"operation_type"`
+	OperationID                string         `json:"operation_id"`
+	Provider                   string         `json:"provider,omitempty"`
+	Environment                string         `json:"environment,omitempty"`
+	Mode                       string         `json:"mode,omitempty"`
+	Status                     string         `json:"status"`
+	Decision                   string         `json:"decision"`
+	Reasons                    []string       `json:"reasons,omitempty"`
+	RuleRefs                   []string       `json:"rule_refs,omitempty"`
+	SourceRef                  string         `json:"source_ref,omitempty"`
+	DryRun                     bool           `json:"dry_run"`
+	WriteEnabled               bool           `json:"write_enabled"`
+	RehearsalAllowed           bool           `json:"rehearsal_allowed"`
+	ApprovalRequired           bool           `json:"approval_required"`
+	ApprovalSatisfied          bool           `json:"approval_satisfied"`
+	ApprovalID                 string         `json:"approval_id,omitempty"`
+	SecretRefStatus            string         `json:"secret_ref_status,omitempty"`
+	ProviderEvidenceRefs       []string       `json:"provider_evidence_refs,omitempty"`
+	ProviderRequirementID      string         `json:"provider_requirement_id,omitempty"`
+	ProviderRequirementVersion string         `json:"provider_requirement_version,omitempty"`
+	ProviderRequirementRefs    []string       `json:"provider_requirement_refs,omitempty"`
+	LeastPrivilege             string         `json:"least_privilege,omitempty"`
+	ReplayGuard                string         `json:"replay_guard,omitempty"`
+	CreatedAt                  string         `json:"created_at,omitempty"`
+	Metadata                   map[string]any `json:"metadata,omitempty"`
 }
 
 func BuildWriteAdmissions(rootDir string, options WriteAdmissionOptions) (WriteAdmissionReport, error) {
@@ -196,6 +199,36 @@ func writeAdmissionFromProof(proof WriteProof, target string) WriteAdmissionEntr
 		entry.RuleRefs = appendUnique(entry.RuleRefs, rule)
 		entry.RehearsalAllowed = true
 	}
+	if requirement, found := providerRequirementFor(proof.Provider, proof.OperationType); found {
+		entry.ProviderRequirementID = requirement.ID
+		entry.ProviderRequirementVersion = defaultProviderProofPolicyVersion
+		entry.ProviderRequirementRefs = append([]string{}, requirement.RuleRefs...)
+		entry.Metadata["provider_requirement_id"] = requirement.ID
+		entry.Metadata["provider_requirement_policy"] = defaultProviderProofPolicyID
+		if requirement.ReplayGuard != "" && entry.ReplayGuard == "" {
+			entry.ReplayGuard = requirement.ReplayGuard
+		}
+		if requirement.RequireEvidence && len(proof.ProviderEvidenceRefs) == 0 {
+			block("WRITE_ADMISSION_EVIDENCE_REQUIRED", "provider_evidence_required", "provider_evidence_required")
+		}
+		if requirement.RequiredSecretRefStatus != "" && !writeAdmissionSecretRequirementSatisfied(proof, requirement.RequiredSecretRefStatus) {
+			block("WRITE_ADMISSION_SECRET_REF_MISSING", "secret_or_auth_ref_missing_or_invalid", "secret_ref_required")
+		}
+		if requirement.RequireApproval && proof.WriteEnabled && !proof.DryRun && proof.ApprovalRequired && !proof.ApprovalSatisfied {
+			manual("WRITE_ADMISSION_APPROVAL_REQUIRED", "approval_required_before_real_write", "approval_required")
+		}
+		if requirement.ProductionReviewRequired && proof.Environment == "production" {
+			manual("WRITE_ADMISSION_PRODUCTION_REVIEW_REQUIRED", "production_real_write_requires_manual_review", "production_review_required")
+		}
+		if requirement.RequireWriteSwitch && (!proof.WriteEnabled || proof.DryRun) {
+			rehearsalOnly("WRITE_ADMISSION_WRITE_DISABLED", "real_write_requires_write_enabled_non_dry_run_proof", "write_switch_required")
+		}
+		for _, rule := range requirement.RuleRefs {
+			entry.RuleRefs = appendUnique(entry.RuleRefs, rule)
+		}
+	} else {
+		block("WRITE_ADMISSION_PROVIDER_REQUIREMENT_MISSING", "provider_requirement_missing", "provider_requirement_required")
+	}
 
 	if proof.Status == "failed" {
 		block("WRITE_ADMISSION_SOURCE_FAILED", "write_proof_source_failed", "source_proof_must_not_fail")
@@ -228,6 +261,7 @@ func writeAdmissionFromProof(proof WriteProof, target string) WriteAdmissionEntr
 	entry.Reasons = compactStrings(entry.Reasons)
 	entry.RuleRefs = compactStrings(entry.RuleRefs)
 	entry.ProviderEvidenceRefs = compactStrings(entry.ProviderEvidenceRefs)
+	entry.ProviderRequirementRefs = compactStrings(entry.ProviderRequirementRefs)
 	return entry
 }
 
@@ -237,6 +271,30 @@ func writeAdmissionRequiresEvidence(proof WriteProof) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func writeAdmissionSecretRequirementSatisfied(proof WriteProof, required string) bool {
+	required = normalizeType(required)
+	actual := normalizeType(proof.SecretRefStatus)
+	if required == "" {
+		return true
+	}
+	if !proof.WriteEnabled || proof.DryRun {
+		switch actual {
+		case "not_required_for_dry_run", "not_required_until_write_enabled", "not_applicable", "referenced", "referenced_by_provider_config":
+			return true
+		}
+	}
+	switch required {
+	case "not_applicable":
+		return actual == "not_applicable"
+	case "referenced":
+		return actual == "referenced" || actual == "referenced_by_provider_config"
+	case "referenced_by_provider_config":
+		return actual == "referenced_by_provider_config" || actual == "referenced"
+	default:
+		return actual == required
 	}
 }
 

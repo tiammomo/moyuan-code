@@ -467,6 +467,37 @@ func TestBuildWriteProofsAggregatesProviderDeploymentAndResourceControls(t *test
 	}
 }
 
+func TestBuildProviderProofRequirementsFiltersProviderOperations(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	report, err := BuildProviderProofRequirements(root, ProviderProofRequirementOptions{Provider: "github", OperationType: "release-provider-execution", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.PolicyID != defaultProviderProofPolicyID || report.PolicyVersion != defaultProviderProofPolicyVersion {
+		t.Fatalf("unexpected provider proof policy metadata: %+v", report)
+	}
+	if len(report.Requirements) != 1 {
+		t.Fatalf("expected one github release requirement, got %+v", report.Requirements)
+	}
+	requirement := report.Requirements[0]
+	if requirement.Provider != "github" || requirement.OperationType != "release_provider_execution" || !requirement.RequireEvidence || !requirement.RequireApproval || !requirement.RequireWriteSwitch {
+		t.Fatalf("unexpected github requirement: %+v", requirement)
+	}
+	if len(requirement.LeastPrivilegeScopes) == 0 || requirement.ReplayGuard == "" || len(requirement.RuleRefs) == 0 {
+		t.Fatalf("expected least privilege, replay guard and rule refs: %+v", requirement)
+	}
+	empty, err := BuildProviderProofRequirements(root, ProviderProofRequirementOptions{Provider: "unknown", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(empty.Requirements) != 0 || empty.Summary.RequirementCount != 0 {
+		t.Fatalf("expected unknown provider filter to be empty, got %+v", empty)
+	}
+}
+
 func TestBuildWriteAdmissionsEvaluatesWriteProofGates(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {
@@ -511,15 +542,15 @@ func TestBuildWriteAdmissionsEvaluatesWriteProofGates(t *testing.T) {
 		t.Fatalf("unexpected write admission summary: %+v", report.Summary)
 	}
 	releaseAdmission := writeAdmissionForOperation(report.Entries, "release_provider_execution", releaseExecution.ID)
-	if releaseAdmission.OperationID == "" || releaseAdmission.Status != "rehearsal_only" || releaseAdmission.Decision != "WRITE_ADMISSION_WRITE_DISABLED" || len(releaseAdmission.ProviderEvidenceRefs) == 0 {
+	if releaseAdmission.OperationID == "" || releaseAdmission.Status != "rehearsal_only" || releaseAdmission.Decision != "WRITE_ADMISSION_WRITE_DISABLED" || len(releaseAdmission.ProviderEvidenceRefs) == 0 || releaseAdmission.ProviderRequirementID == "" {
 		t.Fatalf("expected release provider admission to require write enablement, got %+v", releaseAdmission)
 	}
 	deploymentAdmission := writeAdmissionForOperation(report.Entries, "deployment_execution", deploymentExecution.ID)
-	if deploymentAdmission.OperationID == "" || deploymentAdmission.Status != "rehearsal_only" || deploymentAdmission.Decision != "WRITE_ADMISSION_WRITE_DISABLED" || !deploymentAdmission.RehearsalAllowed {
+	if deploymentAdmission.OperationID == "" || deploymentAdmission.Status != "rehearsal_only" || deploymentAdmission.Decision != "WRITE_ADMISSION_WRITE_DISABLED" || !deploymentAdmission.RehearsalAllowed || deploymentAdmission.ProviderRequirementID == "" {
 		t.Fatalf("expected dry-run deployment admission to be rehearsal-only, got %+v", deploymentAdmission)
 	}
 	resourceAdmission := writeAdmissionForOperation(report.Entries, "resource_maintenance", renewal.ID)
-	if resourceAdmission.OperationID == "" || resourceAdmission.Status != "ready" || resourceAdmission.Decision != "WRITE_ADMISSION_READY" {
+	if resourceAdmission.OperationID == "" || resourceAdmission.Status != "ready" || resourceAdmission.Decision != "WRITE_ADMISSION_READY" || resourceAdmission.ProviderRequirementID == "" {
 		t.Fatalf("expected test_dev resource maintenance admission to be ready, got %+v", resourceAdmission)
 	}
 	readyOnly, err := BuildWriteAdmissions(root, WriteAdmissionOptions{Status: "ready", Limit: 10})

@@ -226,6 +226,13 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	assertContains(t, writeAdmissions.stdout, `"write_admissions"`)
 	assertContains(t, writeAdmissions.stdout, `"operation_type": "deployment_execution"`)
 	assertContains(t, writeAdmissions.stdout, `"WRITE_ADMISSION_WRITE_DISABLED"`)
+	assertContains(t, writeAdmissions.stdout, `"provider_requirement_id"`)
+
+	providerRequirements := runCLI(t, root, "operations", "provider-proof-requirements", "--provider", "local", "--operation-type", "deployment_execution", "--limit", "5")
+	assertContains(t, providerRequirements.stdout, `"provider_proof_requirements"`)
+	assertContains(t, providerRequirements.stdout, `"provider": "local"`)
+	assertContains(t, providerRequirements.stdout, `"operation_type": "deployment_execution"`)
+	assertContains(t, providerRequirements.stdout, `"PROVIDER_PROOF_REQUIREMENT_SUPPORTED"`)
 }
 
 func TestControlLoopCLIRunsDurableIdempotentSteps(t *testing.T) {

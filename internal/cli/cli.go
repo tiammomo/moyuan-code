@@ -263,6 +263,7 @@ func usage() string {
 		"moyuan operations decision-ledger [--source-type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
 		"moyuan operations write-proofs [--provider <provider>] [--operation-type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
 		"moyuan operations write-admissions [--provider <provider>] [--operation-type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--target real_write] [--limit 20]",
+		"moyuan operations provider-proof-requirements [--provider <provider>] [--operation-type <type>] [--limit 20]",
 		"moyuan control-loop run [--step <type>] [--idempotency-key <key>] [--retry-budget 0] [--environment <env>] [--deployment-execution-id <id>]",
 		"moyuan control-loop list [--limit 20]",
 		"moyuan control-loop show <run-id>",
@@ -1940,6 +1941,17 @@ func handleOperations(args []string, cwd string) (string, any, int, error) {
 			Limit:         flagInt(args, "--limit", 20),
 		})
 		return "", map[string]any{"write_admissions": report}, 0, err
+	case "provider-proof-requirements":
+		operationType := flagValue(args, "--operation-type", "")
+		if operationType == "" {
+			operationType = flagValue(args, "--type", "")
+		}
+		report, err := operations.BuildProviderProofRequirements(rootDir, operations.ProviderProofRequirementOptions{
+			Provider:      flagValue(args, "--provider", ""),
+			OperationType: operationType,
+			Limit:         flagInt(args, "--limit", 20),
+		})
+		return "", map[string]any{"provider_proof_requirements": report}, 0, err
 	}
 	return "unknown operations command\n", nil, 1, nil
 }
