@@ -19,6 +19,7 @@ import (
 	"moyuan-code/internal/scheduler"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
+	"moyuan-code/internal/worktree"
 )
 
 type PlanOptions struct {
@@ -81,6 +82,9 @@ type RunItem struct {
 	RuntimeID       string `json:"runtime_id,omitempty"`
 	ProviderID      string `json:"provider_id,omitempty"`
 	ModelID         string `json:"model_id,omitempty"`
+	WorktreeID      string `json:"worktree_id,omitempty"`
+	WorktreePath    string `json:"worktree_path,omitempty"`
+	Branch          string `json:"branch,omitempty"`
 	RunID           string `json:"run_id,omitempty"`
 	SubagentID      string `json:"subagent_id,omitempty"`
 	QualityReportID string `json:"quality_report_id,omitempty"`
@@ -235,9 +239,7 @@ func Run(ctx context.Context, rootDir string, options RunOptions) (RunRecord, er
 		return finishRun(rootDir, run)
 	}
 	if options.Mode == "local_shell" && options.MaxIssues > 1 {
-		options.MaxIssues = 1
-		run.MaxIssues = 1
-		run.Reasons = append(run.Reasons, "shared_worktree_serial_limit")
+		run.Reasons = append(run.Reasons, "isolated_worktree_serial_execution")
 	}
 	items := dispatchItems(plan, options.MaxIssues)
 	if len(items) == 0 {
@@ -464,14 +466,6 @@ func runLocalShellBatch(ctx context.Context, rootDir string, run RunRecord, item
 	run.Decision = "BATCH_RUN_COMPLETED"
 	for _, item := range items {
 		start := time.Now().UTC().Format(time.RFC3339Nano)
-		result, err := orchestrator.RunIssueWithOptions(ctx, rootDir, item.IssueID, orchestrator.RunOptions{
-			RuntimeID:  "local_shell",
-			ProviderID: item.ProviderID,
-			ModelID:    item.ModelID,
-			EpicID:     run.EpicID,
-			Role:       item.Role,
-			Prompt:     options.Prompt,
-		})
 		runItem := RunItem{
 			IssueID:    item.IssueID,
 			Status:     "failed",
@@ -482,6 +476,49 @@ func runLocalShellBatch(ctx context.Context, rootDir string, run RunRecord, item
 			StartedAt:  start,
 			FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
 		}
+		wt, err := worktree.Prepare(ctx, rootDir, worktree.PrepareOptions{
+			EpicID:      run.EpicID,
+			BatchID:     run.BatchID,
+			IssueID:     item.IssueID,
+			RequestedBy: run.RequestedBy,
+		})
+		runItem.WorktreeID = wt.ID
+		runItem.WorktreePath = wt.WorktreePath
+		runItem.Branch = wt.Branch
+		if err != nil {
+			runItem.Reason = err.Error()
+			run.Status = "failed"
+			run.Decision = "BATCH_RUN_FAILED"
+			run.Reasons = append(run.Reasons, "worktree_error:"+item.IssueID)
+			run.Items = append(run.Items, runItem)
+			if !options.ContinueOnFailure {
+				break
+			}
+			continue
+		}
+		if wt.Decision != "WORKTREE_READY" {
+			runItem.Decision = "BATCH_ITEM_WORKTREE_BLOCKED"
+			runItem.Reason = strings.Join(wt.Reasons, ",")
+			run.Status = "failed"
+			run.Decision = "BATCH_RUN_FAILED"
+			run.Reasons = append(run.Reasons, "worktree_blocked:"+item.IssueID)
+			run.Items = append(run.Items, runItem)
+			if !options.ContinueOnFailure {
+				break
+			}
+			continue
+		}
+		result, err := orchestrator.RunIssueWithOptions(ctx, rootDir, item.IssueID, orchestrator.RunOptions{
+			RuntimeID:    "local_shell",
+			ProviderID:   item.ProviderID,
+			ModelID:      item.ModelID,
+			EpicID:       run.EpicID,
+			Role:         item.Role,
+			Prompt:       options.Prompt,
+			WorktreePath: wt.WorktreePath,
+			Branch:       wt.Branch,
+		})
+		runItem.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
 		if err != nil {
 			runItem.Reason = err.Error()
 			run.Status = "failed"

@@ -31,12 +31,14 @@ type Result struct {
 }
 
 type RunOptions struct {
-	RuntimeID  string `json:"runtime_id"`
-	ProviderID string `json:"provider_id,omitempty"`
-	ModelID    string `json:"model_id,omitempty"`
-	EpicID     string `json:"epic_id,omitempty"`
-	Role       string `json:"role"`
-	Prompt     string `json:"prompt"`
+	RuntimeID    string `json:"runtime_id"`
+	ProviderID   string `json:"provider_id,omitempty"`
+	ModelID      string `json:"model_id,omitempty"`
+	EpicID       string `json:"epic_id,omitempty"`
+	Role         string `json:"role"`
+	Prompt       string `json:"prompt"`
+	WorktreePath string `json:"worktree_path,omitempty"`
+	Branch       string `json:"branch,omitempty"`
 }
 
 func Plan(rootDir string, epicID string) (scheduler.Plan, error) {
@@ -59,6 +61,9 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	}
 	if options.EpicID == "" {
 		options.EpicID = "phase1-epic"
+	}
+	if options.WorktreePath == "" {
+		options.WorktreePath = rootDir
 	}
 	if options.ProviderID == "" && options.RuntimeID != "local_shell" {
 		decision, err := providers.Route(rootDir, providers.RouteRequest{
@@ -129,7 +134,8 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		ModelID:        options.ModelID,
 		Mode:           "code",
 		WorkspaceRoot:  rootDir,
-		WorktreePath:   rootDir,
+		WorktreePath:   options.WorktreePath,
+		Branch:         options.Branch,
 		Prompt:         options.Prompt,
 		ProtectedPaths: protectedPaths(rootDir),
 	})
@@ -155,6 +161,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		DiffSummaryPath: rt.DiffSummaryPath,
 		ProtectedFiles:  rt.Diff.ProtectedFiles,
 		RuntimeRisks:    rt.Risks,
+		WorktreePath:    options.WorktreePath,
 	})
 	if err != nil {
 		_, _ = transitionIssue(rootDir, options.EpicID, issueID, "failed", "quality_error", run.ID, nil)

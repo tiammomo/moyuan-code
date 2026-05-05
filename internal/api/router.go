@@ -33,6 +33,7 @@ import (
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/subagent"
 	"moyuan-code/internal/visuals"
+	issueworktree "moyuan-code/internal/worktree"
 )
 
 const Version = "phase1-gin-gorm"
@@ -442,6 +443,44 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"batch_run": run})
+	})
+	router.GET("/v1/projects/:project_id/worktrees", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		records, err := issueworktree.List(rootDir, c.Query("issue_id"), queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"worktrees": records})
+	})
+	router.GET("/v1/projects/:project_id/worktrees/:worktree_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		record, found, err := issueworktree.Load(rootDir, c.Param("worktree_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "worktree not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"worktree": record})
 	})
 	router.GET("/v1/projects/:project_id/runs", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

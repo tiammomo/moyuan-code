@@ -30,6 +30,7 @@ import (
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/visuals"
 	"moyuan-code/internal/workspace"
+	issueworktree "moyuan-code/internal/worktree"
 )
 
 func TestGinRouterServesHealthAndProjectsFromGORMStore(t *testing.T) {
@@ -193,6 +194,10 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	worktreeRecord, err := issueworktree.Prepare(context.Background(), root, issueworktree.PrepareOptions{EpicID: reqPlan.EpicID, IssueID: "api-worktree", RequestedBy: "api-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	signal, err := repair.CaptureSignal(root, "test_failure", "sample API repair status", result.RunID)
 	if err != nil {
 		t.Fatal(err)
@@ -230,6 +235,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/batch-runs?limit=3", http.StatusOK, `"batch_runs"`, `"BATCH_RUN_DRY_RUN"`)
 	assertGETContains(t, router, "/v1/projects/managed/batch-runs/"+batchRuns[0].ID, http.StatusOK, `"batch_run"`, batchPlans[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/worktrees?issue_id=api-worktree", http.StatusOK, `"worktrees"`, worktreeRecord.ID, `"WORKTREE_READY"`)
+	assertGETContains(t, router, "/v1/projects/managed/worktrees/"+worktreeRecord.ID, http.StatusOK, `"worktree"`, `"api-worktree"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)
 	assertGETContains(t, router, "/v1/projects/managed/runs?limit=1", http.StatusOK, `"runs"`, result.RunID)
 	assertGETContains(t, router, "/v1/projects/managed/runs/"+result.RunID, http.StatusOK, `"run"`, `"completed"`)

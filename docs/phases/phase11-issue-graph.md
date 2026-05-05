@@ -20,7 +20,7 @@ Phase 11 的目标是把当前 scheduler、orchestrator、subagent、quality 和
 | --- | --- | --- | --- | --- | --- | --- |
 | `phase11-001` | `issue-batch-dispatch-preview` | completed | batch plan、dispatch snapshot、并发槽、write scope 冲突、runtime/provider route 摘要 | Phase 10 readiness | `orchestrator_owner` + `backend_owner` | 可对 epic 生成 dry-run batch execution plan，并解释每个 issue 为什么 dispatch/wait/block |
 | `phase11-002` | `bounded-issue-batch-run` | completed | 受控 batch run、串行/有限并发执行、run artifact、失败停止策略 | `phase11-001` | `backend_owner` + `qa_owner` | 可在审批和安全模式下执行一批 issue，记录每个 issue 的 runtime、quality 和 review 结果 |
-| `phase11-003` | `parallel-worktree-isolation` | planned | 每个并发 issue 的隔离 worktree、branch 命名、cleanup、冲突检测 | `phase11-002` | `backend_owner` | 并发 issue 不共享写入目录，冲突只在 merge queue 暴露 |
+| `phase11-003` | `parallel-worktree-isolation` | completed | 每个并发 issue 的隔离 worktree、branch 命名、cleanup、冲突检测 | `phase11-002` | `backend_owner` | 并发 issue 不共享写入目录，冲突只在 merge queue 暴露 |
 | `phase11-004` | `quality-review-merge-queue` | planned | batch 质量聚合、review queue、merge decision queue、失败返工 | `phase11-002` | `qa_owner` | issue 只有 quality + review 通过后才能进入 merge ready |
 | `phase11-005` | `console-batch-execution-surface` | planned | batch plan、batch runs、waiting reason、merge readiness Console 展示 | `phase11-001`,`phase11-004` | `frontend_owner` | Console 可查看 batch plan/run，并触发 dry-run preview |
 
@@ -36,6 +36,6 @@ Phase 11 的目标是把当前 scheduler、orchestrator、subagent、quality 和
 
 - 没有 batch plan，不允许 batch run。
 - 没有 write scope，不允许真实并发。
-- 没有 worktree isolation，不允许多个写入型 issue 同时执行；真实 batch run 自动收敛为单 issue 串行执行。
+- 真实写入型 issue 必须分配独立 issue worktree；真正并发执行只能基于 issue worktree，不允许共享主工作区。
 - 没有 quality report 和 review decision，不允许进入 merge ready。
 - Console 只能展示后端 batch plan/run 事实源，不自行计算 merge 结论。

@@ -163,7 +163,7 @@ func TestRunLocalShellExecutesOneIssueWhenEnabled(t *testing.T) {
 		t.Fatalf("expected completed local shell run, got %+v", run)
 	}
 	item := run.Items[0]
-	if item.Decision != "BATCH_ITEM_ACCEPTED" || item.RunID == "" || item.SubagentID == "" || item.QualityReportID == "" {
+	if item.Decision != "BATCH_ITEM_ACCEPTED" || item.RunID == "" || item.SubagentID == "" || item.QualityReportID == "" || item.WorktreeID == "" || item.WorktreePath == "" || item.Branch == "" {
 		t.Fatalf("expected accepted item with artifacts, got %+v", item)
 	}
 	state, found, err := orchestrator.LoadIssueState(root, item.IssueID)

@@ -54,6 +54,7 @@ type ReviewInput struct {
 	DiffSummaryPath string
 	ProtectedFiles  []string
 	RuntimeRisks    []string
+	WorktreePath    string
 }
 
 type Policy struct {
@@ -93,11 +94,15 @@ func RunWithReview(ctx context.Context, rootDir string, taskID string, input Rev
 	if err != nil {
 		return Report{}, err
 	}
+	checkRoot := rootDir
+	if strings.TrimSpace(input.WorktreePath) != "" {
+		checkRoot = input.WorktreePath
+	}
 	reportID := "quality-" + taskID + "-" + time.Now().UTC().Format("20060102150405")
 	checks := []Check{}
-	checks = appendChecks(ctx, rootDir, checks, "build", ws.Project.Stack.BuildCommands)
-	checks = appendChecks(ctx, rootDir, checks, "lint", ws.Project.Stack.LintCommands)
-	checks = appendChecks(ctx, rootDir, checks, "test", ws.Project.Stack.TestCommands)
+	checks = appendChecks(ctx, checkRoot, checks, "build", ws.Project.Stack.BuildCommands)
+	checks = appendChecks(ctx, checkRoot, checks, "lint", ws.Project.Stack.LintCommands)
+	checks = appendChecks(ctx, checkRoot, checks, "test", ws.Project.Stack.TestCommands)
 	findings := reviewFindings(rootDir, input, ws.Project.Workspace.ProtectedPaths)
 	status := "passed"
 	for _, check := range checks {

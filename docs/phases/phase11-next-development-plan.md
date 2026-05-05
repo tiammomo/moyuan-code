@@ -22,7 +22,7 @@ Phase 10 已完成并通过 readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase11-001` | `issue-batch-dispatch-preview` | completed | 批量执行预览 | 可生成 batch plan，解释 dispatch/wait/block、并发槽和 write scope 冲突 |
 | P0 | `phase11-002` | `bounded-issue-batch-run` | completed | 受控批量执行 | 审批/安全模式下可执行一批 issue，并记录每个 issue 结果 |
-| P1 | `phase11-003` | `parallel-worktree-isolation` | planned | 并发隔离 | 并发 issue 使用独立 worktree/branch，不共享写入目录 |
+| P1 | `phase11-003` | `parallel-worktree-isolation` | completed | 并发隔离 | 并发 issue 使用独立 worktree/branch，不共享写入目录 |
 | P1 | `phase11-004` | `quality-review-merge-queue` | planned | 质量复核合入队列 | issue 通过 quality + review 后进入 merge ready |
 | P2 | `phase11-005` | `console-batch-execution-surface` | planned | Console 批量执行面 | Console 可查看 batch plan/run 和 merge readiness |
 
@@ -94,7 +94,41 @@ Phase 10 已完成并通过 readiness：
 - `orchestrator.RunIssueWithOptions` 支持 `epic_id`，避免自定义 issue graph 回写到默认 Phase1 epic。
 - API 新增 `POST /v1/projects/:project_id/batches/:batch_id/run`、`GET /v1/projects/:project_id/batch-runs`、`GET /v1/projects/:project_id/batch-runs/:run_id`。
 
-## 5. 验证要求
+## 5. 执行规划：`phase11-003 parallel-worktree-isolation`
+
+实现状态：completed。
+
+范围：
+
+- 新增 issue worktree manager，负责创建、记录、查询和清理 Git worktree。
+- worktree branch 使用 `moyuan/<epic>/<issue>/<worktree-id>` 命名，实际目录位于 `.moyuan/worktrees/`。
+- worktree 记录写入 `.moyuan/orchestrator/worktrees/` 和 `.moyuan/orchestrator/worktrees.jsonl`。
+- 创建 worktree 前检查主仓库是否为 Git repo，并用 user dirty 口径阻断用户改动；`.moyuan` 控制文件不视为用户改动。
+- `batch_run local_shell` 为每个 issue 分配独立 worktree，再在 worktree 内运行 Runtime、diff capture 和 quality checks。
+- `orchestrator.RunIssueWithOptions` 支持 `worktree_path` 和 `branch`，质量检查也切到 issue worktree 内执行。
+- API 支持查看 worktree 列表和详情。
+
+非目标：
+
+- 不在本阶段启动 goroutine 并发执行。
+- 不自动删除 task branch。
+- 不自动合入 integration branch。
+
+验收：
+
+- 可为 issue 创建独立 Git worktree 和 branch。
+- dirty user worktree 会阻断创建。
+- cleanup 可移除 worktree 并记录状态。
+- batch run item 会记录 `worktree_id`、`worktree_path` 和 `branch`。
+- Console 可通过 API 读取 worktree 事实源。
+
+落地结果：
+
+- 新增 `internal/worktree`。
+- API 新增 `GET /v1/projects/:project_id/worktrees`、`GET /v1/projects/:project_id/worktrees/:worktree_id`。
+- `batch.Run(local_shell)` 不再共享主工作区执行 issue。
+
+## 6. 验证要求
 
 每完成一个 Phase 11 issue，至少运行：
 
