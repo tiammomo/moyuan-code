@@ -113,7 +113,20 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const latestMonitorSummary = snapshot.monitor_summaries[0];
   const latestRehearsal = snapshot.deployment_rehearsals[0];
   const latestAdmission = snapshot.release_admissions[0];
+  const latestSchedulerRun = snapshot.rehearsal_scheduler_runs[0];
   const latestRiskHandoff = snapshot.deployment_risk_handoffs[0];
+  const latestRiskReviewQueueItem = snapshot.deployment_risk_review_queue[0];
+  const latestRiskReview = snapshot.deployment_risk_reviews[0];
+  const hasDeploymentOpsHistory = Boolean(
+    latestMonitorSummary ||
+      latestRehearsal ||
+      latestAdmission ||
+      latestSchedulerRun ||
+      latestRiskHandoff ||
+      latestRiskReviewQueueItem ||
+      latestRiskReview ||
+      snapshot.rollback_executions.length > 0,
+  );
   const activeSessions = snapshot.auth_sessions.filter((session) => session.status === "active");
   const activeTokens = snapshot.api_tokens.filter((token) => token.status === "active");
   const activeServiceAccounts = snapshot.service_accounts.filter((account) => account.status === "active");
@@ -406,6 +419,36 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
       router.refresh();
     } catch (error) {
       setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Deployment rehearsal failed." });
+    }
+  }
+
+  async function runRehearsalScheduler() {
+    const execution = snapshot.executions[0];
+    if (!latestDeployment && !execution && !snapshot.release_candidates[0]) {
+      setDeploymentActionState({ status: "error", message: "No candidate, deployment, or execution available for scheduler." });
+      return;
+    }
+    setDeploymentActionState({ status: "running", message: "Running bounded rehearsal scheduler..." });
+    try {
+      const payload = await postJSON<RehearsalSchedulerEnvelope>(`/api/projects/${snapshot.project.id}/deployment-rehearsal-scheduler-runs`, {
+        candidate_id: snapshot.release_candidates[0]?.id,
+        deployment_id: latestDeployment?.id,
+        execution_id: execution?.id,
+        environment: latestDeployment?.environment || execution?.environment,
+        max_targets: 3,
+      });
+      const run = payload.rehearsal_scheduler_run;
+      if (!run) {
+        throw new Error(payload.error ?? "Rehearsal scheduler returned no run.");
+      }
+      setDeploymentActionState({
+        status: run.status === "blocked" || run.status === "attention_required" ? "blocked" : "completed",
+        id: run.id,
+        message: `${run.decision ?? run.status ?? "scheduler run recorded"}${run.blocked_count ? ` / blocked ${run.blocked_count}` : ""}`,
+      });
+      router.refresh();
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Rehearsal scheduler failed." });
     }
   }
 
@@ -1235,6 +1278,10 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <CircleDotDashed size={13} />
                 <span>Rehearsal</span>
               </button>
+              <button className="inlineActionButton" disabled={deploymentActionState.status === "running"} onClick={() => void runRehearsalScheduler()} type="button">
+                <RefreshCw size={13} />
+                <span>Scheduler</span>
+              </button>
               <button className="inlineActionButton" disabled={deploymentActionState.status === "running"} onClick={() => void createReleaseAdmission()} type="button">
                 <ShieldCheck size={13} />
                 <span>Admission</span>
@@ -1317,9 +1364,20 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   <div>
                     <strong>{compactID(latestAdmission.id)}</strong>
                     <span>{`${latestAdmission.decision} / ${latestAdmission.signals.length} signals`}</span>
-                    <span>{latestAdmission.reasons[0] || "reason pending"}</span>
+                    <span>{`${latestAdmission.policy_id || snapshot.release_admission_policy?.id || "policy pending"} / ${latestAdmission.matched_rules.length} matched rules`}</span>
+                    <span>{latestAdmission.policy_decision?.reasons[0] || latestAdmission.reasons[0] || "reason pending"}</span>
                   </div>
                   <StatusPill tone={toneForStatus(latestAdmission.status)} label={latestAdmission.status} />
+                </div>
+              ) : null}
+              {latestSchedulerRun ? (
+                <div className="maintenanceItem">
+                  <div>
+                    <strong>{compactID(latestSchedulerRun.id)}</strong>
+                    <span>{`${latestSchedulerRun.decision} / created ${latestSchedulerRun.created_count} / skipped ${latestSchedulerRun.skipped_count}`}</span>
+                    <span>{`${latestSchedulerRun.blocked_count} blocked / ${latestSchedulerRun.manual_count} manual / ${latestSchedulerRun.targets[0]?.reason || "target reason pending"}`}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(latestSchedulerRun.status)} label={latestSchedulerRun.status} />
                 </div>
               ) : null}
               {latestRiskHandoff ? (
@@ -1327,9 +1385,31 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   <div>
                     <strong>{compactID(latestRiskHandoff.id)}</strong>
                     <span>{`${latestRiskHandoff.decision} / ${latestRiskHandoff.failure_class}`}</span>
-                    <span>{latestRiskHandoff.repair_plan_id ? compactID(latestRiskHandoff.repair_plan_id) : "repair not required"}</span>
+                    <span>{`${latestRiskHandoff.review_decision || (latestRiskHandoff.review_required ? "pending review" : "review not required")} / ${
+                      latestRiskHandoff.repair_plan_id ? compactID(latestRiskHandoff.repair_plan_id) : "repair not required"
+                    }`}</span>
                   </div>
                   <StatusPill tone={toneForStatus(latestRiskHandoff.status)} label={latestRiskHandoff.status} />
+                </div>
+              ) : null}
+              {latestRiskReviewQueueItem ? (
+                <div className="maintenanceItem">
+                  <div>
+                    <strong>{compactID(latestRiskReviewQueueItem.handoff_id)}</strong>
+                    <span>{`${latestRiskReviewQueueItem.decision} / ${latestRiskReviewQueueItem.failure_class}`}</span>
+                    <span>{`${latestRiskReviewQueueItem.review_decision || "pending"} / ${latestRiskReviewQueueItem.review_next_step || latestRiskReviewQueueItem.reasons[0] || "next step pending"}`}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(latestRiskReviewQueueItem.status)} label={latestRiskReviewQueueItem.status} />
+                </div>
+              ) : null}
+              {latestRiskReview ? (
+                <div className="maintenanceItem">
+                  <div>
+                    <strong>{compactID(latestRiskReview.id)}</strong>
+                    <span>{`${latestRiskReview.decision} / ${latestRiskReview.next_step || "next step pending"}`}</span>
+                    <span>{latestRiskReview.reason || latestRiskReview.failure_class || "review reason pending"}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(latestRiskReview.status)} label={latestRiskReview.status} />
                 </div>
               ) : null}
               {snapshot.rollback_executions.slice(0, 2).map((rollback) => (
@@ -1357,9 +1437,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 ))
               ) : (
                 <div className="emptyState compact">
-                  {latestMonitorSummary || latestRehearsal || latestAdmission || latestRiskHandoff || snapshot.rollback_executions.length > 0
-                    ? "No post deployment history"
-                    : "No deployment ops history"}
+                  {hasDeploymentOpsHistory ? "No post deployment history" : "No deployment ops history"}
                 </div>
               )}
             </div>
@@ -3066,6 +3144,16 @@ type DeploymentRehearsalEnvelope = {
     id?: string;
     status?: string;
     decision?: string;
+  };
+};
+
+type RehearsalSchedulerEnvelope = {
+  error?: string;
+  rehearsal_scheduler_run?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+    blocked_count?: number;
   };
 };
 

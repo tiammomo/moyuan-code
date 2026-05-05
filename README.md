@@ -30,7 +30,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - Repair 已具备受控 attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
 - Batch Execution 已具备 dry-run plan、受控 run、隔离 worktree、质量复核、合入队列和 Console 操作面。
 - Release/Deployment 已具备 release candidate、provider preview/publish gate、PR/MR plan、deployment execution、approval proof、rollback preview、monitor summary、deployment rehearsal、release admission 和风险修复 handoff。
-- 当前实现重点：Phase 17，release admission policy pack、bounded rehearsal scheduler 和 risk review queue 已完成，继续推进 Console policy/risk drill-down。
+- 当前实现重点：Phase 17，release admission policy pack、bounded rehearsal scheduler、risk review queue 和 Console policy/risk drill-down 已完成，下一步进入 Phase 17 readiness 收口。
 
 ## 本地运行
 

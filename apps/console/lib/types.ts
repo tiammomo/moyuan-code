@@ -296,6 +296,11 @@ export type ReleaseAdmissionSummary = {
   decision: string;
   reasons: string[];
   signals: ReleaseAdmissionSignalSummary[];
+  policy_id?: string;
+  policy_version?: string;
+  policy_source?: string;
+  matched_rules: AdmissionRuleMatchSummary[];
+  policy_decision?: ReleaseAdmissionPolicyDecisionSummary;
   evidence_ids: string[];
   created_at?: string;
 };
@@ -307,6 +312,85 @@ export type ReleaseAdmissionSignalSummary = {
   decision: string;
   severity?: string;
   reason?: string;
+};
+
+export type ReleaseAdmissionPolicyPackSummary = {
+  id: string;
+  version?: string;
+  source?: string;
+  default_environment?: string;
+  environment_count: number;
+  rule_count: number;
+  rules: ReleaseAdmissionPolicyRuleSummary[];
+};
+
+export type ReleaseAdmissionPolicyRuleSummary = {
+  id: string;
+  signal_type?: string;
+  effect: string;
+  reason: string;
+};
+
+export type ReleaseAdmissionPolicyDecisionSummary = {
+  policy_id: string;
+  policy_version?: string;
+  policy_source?: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  matched_rule_count: number;
+  blocked: boolean;
+  manual_required: boolean;
+};
+
+export type AdmissionRuleMatchSummary = {
+  policy_id: string;
+  rule_id: string;
+  signal_type?: string;
+  signal_id?: string;
+  status?: string;
+  decision?: string;
+  effect: string;
+  reason: string;
+};
+
+export type RehearsalSchedulerRunSummary = {
+  id: string;
+  trigger: string;
+  requested_by?: string;
+  candidate_id?: string;
+  deployment_id?: string;
+  execution_id?: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  max_targets: number;
+  skip_admission: boolean;
+  created_count: number;
+  skipped_count: number;
+  blocked_count: number;
+  manual_count: number;
+  targets: RehearsalSchedulerTargetSummary[];
+  rehearsal_ids: string[];
+  admission_ids: string[];
+  evidence_ids: string[];
+  started_at?: string;
+  finished_at?: string;
+};
+
+export type RehearsalSchedulerTargetSummary = {
+  type: string;
+  candidate_id?: string;
+  deployment_id?: string;
+  execution_id?: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  reason?: string;
+  rehearsal_id?: string;
+  admission_id?: string;
 };
 
 export type DeploymentRiskHandoffSummary = {
@@ -322,6 +406,50 @@ export type DeploymentRiskHandoffSummary = {
   evidence_refs: string[];
   reasons: string[];
   review_required: boolean;
+  review_id?: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  review_decision?: string;
+  review_reason?: string;
+  review_next_step?: string;
+  created_at?: string;
+};
+
+export type DeploymentRiskReviewQueueItemSummary = {
+  handoff_id: string;
+  source_type: string;
+  source_id: string;
+  status: string;
+  decision: string;
+  failure_class: string;
+  review_required: boolean;
+  review_id?: string;
+  review_decision?: string;
+  review_next_step?: string;
+  signal_id?: string;
+  bug_candidate_id?: string;
+  repair_plan_id?: string;
+  evidence_refs: string[];
+  reasons: string[];
+  created_at?: string;
+  reviewed_at?: string;
+};
+
+export type DeploymentRiskReviewSummary = {
+  id: string;
+  handoff_id: string;
+  source_type: string;
+  source_id: string;
+  decision: string;
+  status: string;
+  reviewer_id?: string;
+  reason?: string;
+  next_step?: string;
+  failure_class?: string;
+  signal_id?: string;
+  bug_candidate_id?: string;
+  repair_plan_id?: string;
+  evidence_refs: string[];
   created_at?: string;
 };
 
@@ -981,7 +1109,11 @@ export type ConsoleSnapshot = {
   monitor_summaries: DeploymentMonitorSummary[];
   deployment_rehearsals: DeploymentRehearsalSummary[];
   release_admissions: ReleaseAdmissionSummary[];
+  release_admission_policy?: ReleaseAdmissionPolicyPackSummary;
+  rehearsal_scheduler_runs: RehearsalSchedulerRunSummary[];
   deployment_risk_handoffs: DeploymentRiskHandoffSummary[];
+  deployment_risk_review_queue: DeploymentRiskReviewQueueItemSummary[];
+  deployment_risk_reviews: DeploymentRiskReviewSummary[];
   release_provider_executions: ReleaseProviderExecutionSummary[];
   evidence: EvidenceSummary[];
   operation_history: OperationHistoryItem[];
