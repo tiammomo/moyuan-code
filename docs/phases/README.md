@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+- [Phase 12 实现 Issue Graph](./phase12-issue-graph.md)：Phase 12 真实并发执行与集成合入准备的依赖图。
+- [Phase 12 实施记录](./phase12-next-development-plan.md)：Phase 12 当前任务、执行范围和验收记录。
 - [Phase 11 Release Readiness](./phase11-release-readiness.md)：Phase 11 Issue Graph 批量执行控制器的收口验证。
 - [Phase 11 实现 Issue Graph](./phase11-issue-graph.md)：Phase 11 Issue Graph 批量执行控制器的依赖图。
 - [Phase 11 实施记录](./phase11-next-development-plan.md)：Phase 11 当前任务、执行范围和验收记录。
