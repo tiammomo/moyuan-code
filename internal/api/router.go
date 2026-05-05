@@ -839,6 +839,69 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"release_candidate_apply": apply})
 	})
+	router.POST("/v1/projects/:project_id/release-candidates/:candidate_id/provider-preview", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		preview, found, err := release.ProviderPreviewForCandidate(rootDir, c.Param("candidate_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "release candidate not found")
+			return
+		}
+		status := http.StatusOK
+		if preview.Status == "blocked" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"release_candidate_provider_preview": preview})
+	})
+	router.GET("/v1/projects/:project_id/release-candidate-provider-previews", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		previews, err := release.ListCandidateProviderPreviews(rootDir, c.Query("candidate_id"), queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"release_candidate_provider_previews": previews})
+	})
+	router.GET("/v1/projects/:project_id/release-candidate-provider-previews/:preview_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		preview, found, err := release.LoadCandidateProviderPreview(rootDir, c.Param("preview_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "release candidate provider preview not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"release_candidate_provider_preview": preview})
+	})
 	router.GET("/v1/projects/:project_id/worktrees", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3095,6 +3158,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "release.candidate.plan", Risk: "normal", Scopes: []string{"release:write"}}, true
 	case "/v1/projects/:project_id/release-candidates/:candidate_id/apply":
 		return authzRule{Action: "release.candidate.apply", Risk: "high", Scopes: []string{"release:write", "git:write"}}, true
+	case "/v1/projects/:project_id/release-candidates/:candidate_id/provider-preview":
+		return authzRule{Action: "release.candidate.provider_preview", Risk: "normal", Scopes: []string{"release:write"}}, true
 	case "/v1/projects/:project_id/providers/ops/refresh":
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case "/v1/projects/:project_id/control-loop/run":
@@ -3153,6 +3218,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "release.candidate.plan", Risk: "normal", Scopes: []string{"release:write"}}, true
 	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/apply"):
 		return authzRule{Action: "release.candidate.apply", Risk: "high", Scopes: []string{"release:write", "git:write"}}, true
+	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/provider-preview"):
+		return authzRule{Action: "release.candidate.provider_preview", Risk: "normal", Scopes: []string{"release:write"}}, true
 	case strings.Contains(rawPath, "/providers/ops/refresh"):
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case strings.Contains(rawPath, "/control-loop/run"):

@@ -23,7 +23,7 @@ Phase 12 已完成并通过 readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase13-001` | `release-candidate-plan-from-batch` | completed | Release Candidate 事实源 | suggested release batch 可生成 release candidate plan |
 | P0 | `phase13-002` | `guarded-local-release-branch-apply` | completed | 本地 release branch 受控 apply | 审批和开关满足后可更新本地 release branch |
-| P1 | `phase13-003` | `release-candidate-provider-preview` | planned | 远程发布预览 | Candidate 可生成 PR/MR、tag、release 和 workflow guarded preview |
+| P1 | `phase13-003` | `release-candidate-provider-preview` | completed | 远程发布预览 | Candidate 可生成 PR/MR、tag、release 和 workflow guarded preview |
 | P1 | `phase13-004` | `deployment-handoff-from-release-candidate` | planned | 部署交接 | Candidate 可生成 deployment dry-run plan |
 | P2 | `phase13-005` | `console-release-candidate-surface` | planned | Console 发布候选面 | Console 可见 candidate 到 provider/deploy 的完整链路 |
 
@@ -92,11 +92,43 @@ Phase 12 已完成并通过 readiness：
 - API 新增 `POST /v1/projects/:project_id/release-candidates/:candidate_id/apply`、`GET /v1/projects/:project_id/release-candidate-applies`、`GET /v1/projects/:project_id/release-candidate-applies/:apply_id`。
 - release candidate apply 是本地 Git ref 层的受控动作，远程发布仍留给后续 provider preview/publish。
 
-## 5. 后续执行占位
+## 5. 执行规划：`phase13-003 release-candidate-provider-preview`
 
-`phase13-003` 之后的实际落地结果在对应 issue 完成后补充，稳定设计会回写到 release、git provider、deployment 和 Console 相关主线文档。
+实现状态：completed。
 
-## 6. 验证要求
+范围：
+
+- 新增 release candidate provider preview 事实源。
+- Preview 必须基于 ready release candidate，且要求已有 completed local release branch apply。
+- 生成 release provider remote plan，包含 push branch、create tag、push tag、create release、workflow dispatch 的 guarded action。
+- 生成 PR/MR preview 摘要，记录 base branch、head branch、title、body、provider type 和 preview decision。
+- Preview 写入 `.moyuan/lifecycle/releases/candidate-provider-previews/` 和 `release-candidate-provider-previews.jsonl`。
+- API 支持生成、列表和详情查询。
+
+非目标：
+
+- 不执行 push branch、tag、release、workflow dispatch 或 PR/MR create。
+- 不消费 approval。
+- 不创建 deployment execution。
+
+验收：
+
+- Candidate 未 ready 时 provider preview blocked。
+- Candidate 没有 completed release branch apply 时 provider preview blocked。
+- Provider preview ready 时包含 release provider guarded actions 和 PR/MR preview。
+- 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- 新增 `release.ProviderPreviewForCandidate`、`LoadCandidateProviderPreview`、`ListCandidateProviderPreviews`。
+- API 新增 `POST /v1/projects/:project_id/release-candidates/:candidate_id/provider-preview`、`GET /v1/projects/:project_id/release-candidate-provider-previews`、`GET /v1/projects/:project_id/release-candidate-provider-previews/:preview_id`。
+- Candidate provider preview 仍是远程发布预览层，不进行远程写入。
+
+## 6. 后续执行占位
+
+`phase13-004` 之后的实际落地结果在对应 issue 完成后补充，稳定设计会回写到 release、git provider、deployment 和 Console 相关主线文档。
+
+## 7. 验证要求
 
 每完成一个 Phase 13 issue，至少运行：
 

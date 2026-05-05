@@ -279,6 +279,13 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/release-candidate-applies?candidate_id="+releaseCandidates[0].ID, http.StatusOK, `"release_candidate_applies"`, releaseCandidateApplies[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/release-candidate-applies/"+releaseCandidateApplies[0].ID, http.StatusOK, `"release_candidate_apply"`, `"RELEASE_BRANCH_APPLY_BLOCKED"`)
+	assertPostContains(t, router, "/v1/projects/managed/release-candidates/"+releaseCandidates[0].ID+"/provider-preview", `{}`, http.StatusAccepted, `"release_candidate_provider_preview"`, `"RELEASE_CANDIDATE_PROVIDER_PREVIEW_BLOCKED"`, "release_candidate_not_ready:")
+	releaseCandidateProviderPreviews, err := release.ListCandidateProviderPreviews(root, releaseCandidates[0].ID, 1)
+	if err != nil || len(releaseCandidateProviderPreviews) != 1 {
+		t.Fatalf("expected API release candidate provider preview, previews=%+v err=%v", releaseCandidateProviderPreviews, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/release-candidate-provider-previews?candidate_id="+releaseCandidates[0].ID, http.StatusOK, `"release_candidate_provider_previews"`, releaseCandidateProviderPreviews[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/release-candidate-provider-previews/"+releaseCandidateProviderPreviews[0].ID, http.StatusOK, `"release_candidate_provider_preview"`, `"RELEASE_CANDIDATE_PROVIDER_PREVIEW_BLOCKED"`)
 	assertGETContains(t, router, "/v1/projects/managed/worktrees?issue_id=api-worktree", http.StatusOK, `"worktrees"`, worktreeRecord.ID, `"WORKTREE_READY"`)
 	assertGETContains(t, router, "/v1/projects/managed/worktrees/"+worktreeRecord.ID, http.StatusOK, `"worktree"`, `"api-worktree"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)

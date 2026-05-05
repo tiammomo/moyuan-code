@@ -183,6 +183,69 @@ func TestApplyCandidateBlocksWhenCandidateNotReady(t *testing.T) {
 	}
 }
 
+func TestProviderPreviewForCandidateRequiresAppliedReleaseBranchAndBuildsPreview(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseProviderRepositoryConfig(t, root, "https://api.github.test")
+	candidate, err := finishCandidate(root, Candidate{
+		ID:             "release-candidate-provider",
+		ReleaseBatchID: "release-batch-v0.2.0",
+		Status:         "ready",
+		Decision:       "RELEASE_CANDIDATE_READY",
+		Version:        "v0.2.0",
+		Provider:       "github",
+		RemoteName:     "origin",
+		RemoteURL:      "git@github.com:owner/repo.git",
+		ReleaseBranch:  "release/v0.2.0",
+		SourceBranch:   "moyuan/integration/release",
+		CreatedAt:      "2026-05-05T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocked, found, err := ProviderPreviewForCandidate(root, candidate.ID)
+	if err != nil || !found {
+		t.Fatalf("expected blocked provider preview record, found=%v err=%v", found, err)
+	}
+	if blocked.Decision != "RELEASE_CANDIDATE_PROVIDER_PREVIEW_BLOCKED" || !containsReleaseReason(blocked.Reasons, "release_branch_apply_missing") {
+		t.Fatalf("expected preview blocked by missing release branch apply, got %+v", blocked)
+	}
+	_, err = finishCandidateApply(root, CandidateApply{
+		ID:             "release-candidate-apply-provider",
+		CandidateID:    candidate.ID,
+		ReleaseBatchID: candidate.ReleaseBatchID,
+		Status:         "applied",
+		Decision:       "RELEASE_BRANCH_APPLY_COMPLETED",
+		ReleaseBranch:  candidate.ReleaseBranch,
+		SourceBranch:   candidate.SourceBranch,
+		StartedAt:      "2026-05-05T00:01:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preview, found, err := ProviderPreviewForCandidate(root, candidate.ID)
+	if err != nil || !found {
+		t.Fatalf("expected provider preview, found=%v err=%v", found, err)
+	}
+	if preview.Decision != "RELEASE_CANDIDATE_PROVIDER_PREVIEW_READY" || preview.PRMR.Type != "pull_request" || preview.PRMR.HeadBranch != candidate.ReleaseBranch {
+		t.Fatalf("expected candidate provider preview ready, got %+v", preview)
+	}
+	if preview.RemotePlan.Decision != "RELEASE_PROVIDER_REMOTE_PLAN_READY" || !hasProviderAction(preview.RemotePlan.Actions, "create_release", "planned") {
+		t.Fatalf("expected release provider remote plan, got %+v", preview.RemotePlan)
+	}
+	loaded, found, err := LoadCandidateProviderPreview(root, preview.ID)
+	if err != nil || !found || loaded.ID != preview.ID {
+		t.Fatalf("expected persisted provider preview, found=%v loaded=%+v err=%v", found, loaded, err)
+	}
+	previews, err := ListCandidateProviderPreviews(root, candidate.ID, 10)
+	if err != nil || len(previews) < 2 || previews[0].ID != preview.ID {
+		t.Fatalf("expected listed provider previews, previews=%+v err=%v", previews, err)
+	}
+}
+
 func TestPlanBatchSuggestsReleaseWhenIntegrationApplyThresholdMet(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {
