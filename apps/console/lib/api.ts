@@ -67,6 +67,9 @@ import type {
   MergeQueueSummary,
   WriteAdmissionReportSummary,
   WriteAdmissionSummary,
+  WriteAdapterExecutionReportSummary,
+  WriteAdapterExecutionSummary,
+  WriteAdapterGuardSummary,
   WriteExecutionPlanReportSummary,
   WriteExecutionPlanSummary,
   WriteReviewPacketReportSummary,
@@ -165,6 +168,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     remoteExecutionRehearsalsResponse,
     writeReviewPacketsResponse,
     writeExecutionPlansResponse,
+    writeAdapterExecutionsResponse,
     controlLoopQueueResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
@@ -226,6 +230,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ remote_execution_rehearsals: unknown }>>(`/projects/${project.id}/operations/remote-execution-rehearsals?limit=20`),
     apiGet<ApiEnvelope<{ write_review_packets: unknown }>>(`/projects/${project.id}/operations/write-review-packets?limit=20`),
     apiGet<ApiEnvelope<{ write_execution_plans: unknown }>>(`/projects/${project.id}/operations/write-execution-plans?limit=20`),
+    apiGet<ApiEnvelope<{ write_adapter_executions: unknown }>>(`/projects/${project.id}/operations/write-adapter-executions?limit=20`),
     apiGet<ApiEnvelope<{ control_loop_queue: unknown[] }>>(`/projects/${project.id}/control-loop/queue?limit=20`),
   ]);
 
@@ -290,6 +295,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const remoteExecutionRehearsals = normalizeRemoteExecutionRehearsalReport(remoteExecutionRehearsalsResponse?.remote_execution_rehearsals);
   const writeReviewPackets = normalizeWriteReviewPacketReport(writeReviewPacketsResponse?.write_review_packets);
   const writeExecutionPlans = normalizeWriteExecutionPlanReport(writeExecutionPlansResponse?.write_execution_plans);
+  const writeAdapterExecutions = normalizeWriteAdapterExecutionReport(writeAdapterExecutionsResponse?.write_adapter_executions);
   const controlLoopQueue = normalizeControlLoopQueue(controlLoopQueueResponse?.control_loop_queue ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
@@ -381,6 +387,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     remote_execution_rehearsals: remoteExecutionRehearsals,
     write_review_packets: writeReviewPackets,
     write_execution_plans: writeExecutionPlans,
+    write_adapter_executions: writeAdapterExecutions,
     control_loop_queue: controlLoopQueue,
     git_provider_plans: gitProviderPlans,
     auth_sessions: authSessions,
@@ -1573,6 +1580,62 @@ function normalizeWriteExecutionPlan(raw: unknown, index: number): WriteExecutio
     apply_allowed: readBoolean(raw, "apply_allowed"),
     external_write_performed: readBoolean(raw, "external_write_performed"),
     created_at: readString(raw, "created_at", ""),
+  };
+}
+
+function normalizeWriteAdapterExecutionReport(raw: unknown): WriteAdapterExecutionReportSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const summary = readUnknown(raw, "summary");
+  return {
+    id: readString(raw, "id", "write-adapter-executions"),
+    generated_at: readString(raw, "generated_at", ""),
+    execution_count: readNumber(summary, "execution_count"),
+    completed_count: readNumber(summary, "completed_count"),
+    blocked_count: readNumber(summary, "blocked_count"),
+    manual_required_count: readNumber(summary, "manual_required_count"),
+    external_attempt_count: readNumber(summary, "external_attempt_count"),
+    external_write_count: readNumber(summary, "external_write_count"),
+    by_adapter: readNumberMap(summary, "by_adapter"),
+    by_mode: readNumberMap(summary, "by_mode"),
+    by_status: readNumberMap(summary, "by_status"),
+    by_decision: readNumberMap(summary, "by_decision"),
+    executions: readObjectArray(raw, "executions").map(normalizeWriteAdapterExecution),
+  };
+}
+
+function normalizeWriteAdapterExecution(raw: unknown, index: number): WriteAdapterExecutionSummary {
+  return {
+    id: readString(raw, "id", `write-adapter-execution-${index + 1}`),
+    execution_plan_id: readString(raw, "execution_plan_id", ""),
+    review_packet_id: readString(raw, "review_packet_id", ""),
+    operation_type: readString(raw, "operation_type", ""),
+    operation_id: readString(raw, "operation_id", ""),
+    provider: readString(raw, "provider", ""),
+    environment: readString(raw, "environment", ""),
+    adapter_id: readString(raw, "adapter_id", ""),
+    mode: readString(raw, "mode", "preview"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    rule_refs: readArray(raw, "rule_refs"),
+    evidence_refs: readArray(raw, "evidence_refs"),
+    guard_results: readObjectArray(raw, "guard_results").map(normalizeWriteAdapterGuard),
+    apply_allowed: readBoolean(raw, "apply_allowed"),
+    external_write_attempted: readBoolean(raw, "external_write_attempted"),
+    external_write_performed: readBoolean(raw, "external_write_performed"),
+    created_at: readString(raw, "created_at", ""),
+    finished_at: readString(raw, "finished_at", ""),
+  };
+}
+
+function normalizeWriteAdapterGuard(raw: unknown, index: number): WriteAdapterGuardSummary {
+  return {
+    name: readString(raw, "name", `guard-${index + 1}`),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reason: readString(raw, "reason", ""),
   };
 }
 

@@ -768,6 +768,81 @@ func TestCreateWriteExecutionPlansGuardsApplyMode(t *testing.T) {
 	}
 }
 
+func TestCreateWriteAdapterExecutionsDispatchesWithoutExternalWrite(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "adapter-resource",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2099-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, renewal, found, err := serverresources.Renew(root, serverresources.RenewalOptions{ResourceID: "adapter-resource", ExpiresAt: "2099-02-01", ActorID: "ops", Reason: "adapter dispatch test"})
+	if err != nil || !found {
+		t.Fatalf("expected renewal, found=%v err=%v", found, err)
+	}
+	reviewReport, err := CreateWriteReviewPackets(root, WriteReviewPacketOptions{OperationID: renewal.ID, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	planReport, err := CreateWriteExecutionPlans(root, WriteExecutionPlanOptions{ReviewPacketID: reviewReport.Packets[0].ID, Mode: "preview", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := planReport.Plans[0]
+
+	report, err := CreateWriteAdapterExecutions(root, WriteAdapterExecutionOptions{ExecutionPlanID: plan.ID, Mode: "preview", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.ExecutionCount != 1 || report.Summary.CompletedCount != 1 || report.Summary.ExternalWriteCount != 0 || report.Summary.ExternalAttemptCount != 0 {
+		t.Fatalf("expected completed preview adapter execution without external writes, got %+v", report.Summary)
+	}
+	execution := report.Executions[0]
+	if execution.AdapterID != "server_resource_registry_adapter" || execution.Decision != "WRITE_ADAPTER_PREVIEW_READY" || execution.ExternalWriteAttempted || execution.ExternalWritePerformed {
+		t.Fatalf("unexpected adapter execution: %+v", execution)
+	}
+	if len(execution.GuardResults) == 0 || execution.GuardResults[0].Decision != "WRITE_ADAPTER_RESOLVED" {
+		t.Fatalf("expected adapter guard result, got %+v", execution.GuardResults)
+	}
+	loaded, found, err := LoadWriteAdapterExecution(root, execution.ID)
+	if err != nil || !found || loaded.ID != execution.ID {
+		t.Fatalf("expected persisted write adapter execution, found=%v err=%v loaded=%+v", found, err, loaded)
+	}
+	listed, err := ListWriteAdapterExecutions(root, WriteAdapterExecutionOptions{AdapterID: "server_resource_registry_adapter", Limit: 5})
+	if err != nil || len(listed.Executions) != 1 || listed.Executions[0].ID != execution.ID {
+		t.Fatalf("expected listed adapter execution, got %+v err=%v", listed.Executions, err)
+	}
+	timeline, err := Timeline(root, TimelineOptions{Type: "write_adapter_execution", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(timeline) != 1 || timeline[0].ID != execution.ID || len(timeline[0].EvidenceRefs) == 0 {
+		t.Fatalf("expected adapter execution in timeline with evidence, got %+v", timeline)
+	}
+
+	t.Setenv("MOYUAN_ALLOW_REAL_WRITE", "1")
+	applyPlanReport, err := CreateWriteExecutionPlans(root, WriteExecutionPlanOptions{ReviewPacketID: reviewReport.Packets[0].ID, Mode: "apply", ApprovalID: "approval-adapter", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MOYUAN_ENABLE_WRITE_ADAPTERS", "1")
+	manual, err := CreateWriteAdapterExecutions(root, WriteAdapterExecutionOptions{ExecutionPlanID: applyPlanReport.Plans[0].ID, Mode: "apply", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manual.Executions[0].Status != "manual_required" || manual.Executions[0].Decision != "WRITE_ADAPTER_IMPLEMENTATION_REQUIRED" || manual.Executions[0].ExternalWriteAttempted || manual.Executions[0].ExternalWritePerformed {
+		t.Fatalf("expected apply adapter handoff without external write, got %+v", manual.Executions[0])
+	}
+}
+
 func timelineContainsType(items []TimelineItem, typ string) bool {
 	for _, item := range items {
 		if item.Type == typ {

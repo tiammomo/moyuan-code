@@ -4,6 +4,9 @@
 
 ## 当前阶段
 
+- [Phase 23 实现 Issue Graph](./phase23-issue-graph.md)：Phase 23 Write Adapter Dispatch Scaffold 的依赖图。
+- [Phase 23 实施记录](./phase23-next-development-plan.md)：Phase 23 当前任务、执行范围和验收记录。
+- [Phase 23 Release Readiness](./phase23-release-readiness.md)：Phase 23 Write Adapter Dispatch Scaffold 的收口验证。
 - [Phase 22 实现 Issue Graph](./phase22-issue-graph.md)：Phase 22 受保护真实写入执行计划契约的依赖图。
 - [Phase 22 实施记录](./phase22-next-development-plan.md)：Phase 22 当前任务、执行范围和验收记录。
 - [Phase 22 Release Readiness](./phase22-release-readiness.md)：Phase 22 受保护真实写入执行计划契约的收口验证。

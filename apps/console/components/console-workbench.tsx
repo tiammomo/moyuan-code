@@ -145,6 +145,8 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const writeReviewPackets = writeReviewPacketReport?.packets ?? [];
   const writeExecutionPlanReport = snapshot.write_execution_plans;
   const writeExecutionPlans = writeExecutionPlanReport?.plans ?? [];
+  const writeAdapterExecutionReport = snapshot.write_adapter_executions;
+  const writeAdapterExecutions = writeAdapterExecutionReport?.executions ?? [];
   const controlLoopQueue = snapshot.control_loop_queue ?? [];
   const decisionEntries = decisionLedger?.entries ?? [];
   const latestControlLoopRun = snapshot.control_loop_runs[0];
@@ -2034,6 +2036,60 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 </>
               ) : (
                 <div className="emptyState">No write execution plans</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle
+              icon={<Wrench size={18} />}
+              title="Write Adapter Execution"
+              meta={writeAdapterExecutionReport ? `${writeAdapterExecutionReport.execution_count} executions` : "not generated"}
+            />
+            <div className="signalList">
+              {writeAdapterExecutionReport ? (
+                <>
+                  <div className="signalItem">
+                    <div className="signalHeader">
+                      <strong>{compactID(writeAdapterExecutionReport.id)}</strong>
+                      <StatusPill tone={writeAdapterExecutionReport.external_write_count > 0 ? "blocked" : writeAdapterExecutionReport.blocked_count > 0 ? "blocked" : "ok"} label={`${writeAdapterExecutionReport.completed_count} completed`} />
+                    </div>
+                    <span>
+                      manual {writeAdapterExecutionReport.manual_required_count} / attempts {writeAdapterExecutionReport.external_attempt_count} / writes{" "}
+                      {writeAdapterExecutionReport.external_write_count}
+                    </span>
+                    <div className="signalMeta">
+                      {Object.entries(writeAdapterExecutionReport.by_adapter)
+                        .slice(0, 3)
+                        .map(([adapter, count]) => (
+                          <code key={adapter}>
+                            {adapter}:{count}
+                          </code>
+                        ))}
+                    </div>
+                  </div>
+                  {writeAdapterExecutions.slice(0, 4).map((execution) => (
+                    <div className="signalItem" key={execution.id}>
+                      <div className="signalHeader">
+                        <strong>{execution.adapter_id || "adapter"}</strong>
+                        <StatusPill tone={toneForStatus(execution.status)} label={execution.decision} />
+                      </div>
+                      <span>
+                        {execution.mode} / {execution.provider || "provider"} / {compactID(execution.operation_id || execution.execution_plan_id || execution.id)}
+                      </span>
+                      <div className="signalMeta">
+                        {execution.execution_plan_id ? <code>{compactID(execution.execution_plan_id)}</code> : null}
+                        <code>{execution.guard_results.length} guards</code>
+                        <code>{execution.external_write_attempted ? "attempted" : "not attempted"}</code>
+                        <code>{execution.external_write_performed ? "external write" : "no external write"}</code>
+                        {execution.evidence_refs.length ? <code>{execution.evidence_refs.length} evidence</code> : null}
+                      </div>
+                      {execution.guard_results[0] ? <small>{execution.guard_results[0].decision}</small> : execution.reasons[0] ? <small>{execution.reasons[0]}</small> : null}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="emptyState">No write adapter executions</div>
               )}
             </div>
           </div>

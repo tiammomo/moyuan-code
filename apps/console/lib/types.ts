@@ -1305,6 +1305,52 @@ export type WriteExecutionPlanReportSummary = {
   plans: WriteExecutionPlanSummary[];
 };
 
+export type WriteAdapterGuardSummary = {
+  name: string;
+  status: string;
+  decision: string;
+  reason?: string;
+};
+
+export type WriteAdapterExecutionSummary = {
+  id: string;
+  execution_plan_id?: string;
+  review_packet_id?: string;
+  operation_type?: string;
+  operation_id?: string;
+  provider?: string;
+  environment?: string;
+  adapter_id?: string;
+  mode: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  rule_refs: string[];
+  evidence_refs: string[];
+  guard_results: WriteAdapterGuardSummary[];
+  apply_allowed: boolean;
+  external_write_attempted: boolean;
+  external_write_performed: boolean;
+  created_at?: string;
+  finished_at?: string;
+};
+
+export type WriteAdapterExecutionReportSummary = {
+  id: string;
+  generated_at?: string;
+  execution_count: number;
+  completed_count: number;
+  blocked_count: number;
+  manual_required_count: number;
+  external_attempt_count: number;
+  external_write_count: number;
+  by_adapter: Record<string, number>;
+  by_mode: Record<string, number>;
+  by_status: Record<string, number>;
+  by_decision: Record<string, number>;
+  executions: WriteAdapterExecutionSummary[];
+};
+
 export type ControlLoopQueueItemSummary = {
   id: string;
   status: string;
@@ -1473,6 +1519,7 @@ export type ConsoleSnapshot = {
   remote_execution_rehearsals?: RemoteExecutionRehearsalReportSummary;
   write_review_packets?: WriteReviewPacketReportSummary;
   write_execution_plans?: WriteExecutionPlanReportSummary;
+  write_adapter_executions?: WriteAdapterExecutionReportSummary;
   control_loop_queue?: ControlLoopQueueItemSummary[];
   git_provider_plans: GitProviderPlanSummary[];
   auth_sessions: AuthSessionSummary[];

@@ -416,6 +416,38 @@ func Timeline(rootDir string, options TimelineOptions) ([]TimelineItem, error) {
 		})
 	}
 
+	adapterExecutionReport, err := ListWriteAdapterExecutions(rootDir, WriteAdapterExecutionOptions{Limit: sourceLimit})
+	if err != nil {
+		return nil, err
+	}
+	for _, execution := range adapterExecutionReport.Executions {
+		refs, err := evidenceRefs(rootDir, "write_adapter_execution", execution.ID, execution.EvidenceRefs)
+		if err != nil {
+			return nil, err
+		}
+		add(TimelineItem{
+			ID:           execution.ID,
+			Type:         "write_adapter_execution",
+			Operation:    "operations.write_adapter_execution.create",
+			Status:       execution.Status,
+			Decision:     execution.Decision,
+			Reasons:      append([]string{}, execution.Reasons...),
+			PrimaryRef:   execution.OperationID,
+			SecondaryRef: execution.ExecutionPlanID,
+			Environment:  execution.Environment,
+			EvidenceRefs: refs,
+			Timestamp:    firstNonEmpty(execution.FinishedAt, execution.CreatedAt),
+			Metadata: map[string]any{
+				"provider":                 execution.Provider,
+				"adapter_id":               execution.AdapterID,
+				"mode":                     execution.Mode,
+				"guard_count":              len(execution.GuardResults),
+				"external_write_attempted": execution.ExternalWriteAttempted,
+				"external_write_performed": execution.ExternalWritePerformed,
+			},
+		})
+	}
+
 	admissions, err := deployment.ListReleaseAdmissions(rootDir, sourceLimit)
 	if err != nil {
 		return nil, err

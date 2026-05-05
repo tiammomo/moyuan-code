@@ -270,6 +270,8 @@ func usage() string {
 		"moyuan operations write-review-packets list [--admission-id <id>] [--operation-id <id>] [--status <status>] [--decision <decision>] [--limit 20]",
 		"moyuan operations write-execution-plans create --review-packet-id <id> [--mode preview|apply] [--approval-id <id>] [--requested-by <actor>] [--limit 20]",
 		"moyuan operations write-execution-plans list [--review-packet-id <id>] [--mode preview|apply] [--status <status>] [--decision <decision>] [--limit 20]",
+		"moyuan operations write-adapter-executions create --execution-plan-id <id> [--mode preview|apply] [--adapter-id <id>] [--limit 20]",
+		"moyuan operations write-adapter-executions list [--execution-plan-id <id>] [--mode preview|apply] [--adapter-id <id>] [--status <status>] [--decision <decision>] [--limit 20]",
 		"moyuan control-loop run [--step <type>] [--idempotency-key <key>] [--retry-budget 0] [--environment <env>] [--deployment-execution-id <id>]",
 		"moyuan control-loop queue add [--step <type>] [--environment <env>] [--maintenance-window always|due:YYYY-MM-DD|after:RFC3339|between:HH:MM-HH:MM] [--due-at RFC3339] [--retry-budget 0] [--admission-id <id>] [--remote-rehearsal-id <id>] [--review-packet-id <id>]",
 		"moyuan control-loop queue list [--status <status>] [--environment <env>] [--limit 20]",
@@ -2041,6 +2043,30 @@ func handleOperations(args []string, cwd string) (string, any, int, error) {
 		}
 		report, err := operations.CreateWriteExecutionPlans(rootDir, options)
 		return "", map[string]any{"write_execution_plans": report}, 0, err
+	case "write-adapter-executions":
+		action := "create"
+		subargs := args[1:]
+		if len(subargs) > 0 && !strings.HasPrefix(subargs[0], "--") {
+			action = subargs[0]
+			subargs = subargs[1:]
+		}
+		options := operations.WriteAdapterExecutionOptions{
+			ExecutionPlanID: flagValue(subargs, "--execution-plan-id", ""),
+			Mode:            flagValue(subargs, "--mode", "preview"),
+			AdapterID:       flagValue(subargs, "--adapter-id", ""),
+			Status:          flagValue(subargs, "--status", ""),
+			Decision:        flagValue(subargs, "--decision", ""),
+			Limit:           flagInt(subargs, "--limit", 20),
+		}
+		if action == "list" {
+			report, err := operations.ListWriteAdapterExecutions(rootDir, options)
+			return "", map[string]any{"write_adapter_executions": report}, 0, err
+		}
+		if action != "create" {
+			return "unknown operations write-adapter-executions command\n", nil, 1, nil
+		}
+		report, err := operations.CreateWriteAdapterExecutions(rootDir, options)
+		return "", map[string]any{"write_adapter_executions": report}, 0, err
 	}
 	return "unknown operations command\n", nil, 1, nil
 }
