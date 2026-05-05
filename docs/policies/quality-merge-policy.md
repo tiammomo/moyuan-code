@@ -134,7 +134,8 @@ else:
 
 - 单 issue merge decision 写入 `.moyuan/lifecycle/reviews/merge-decisions/` 和 `.moyuan/lifecycle/reviews/merge-decisions.jsonl`。
 - batch merge queue 写入 `.moyuan/lifecycle/merge-reports/queues/` 和 `.moyuan/lifecycle/merge-reports/merge-queues.jsonl`。
-- merge queue 只生成 `ready_to_merge`、`needs_rework`、`blocked` 决策事实源，不执行真实 Git merge。
+- integration preview 写入 `.moyuan/lifecycle/merge-reports/integration-previews/` 和 `.moyuan/lifecycle/merge-reports/integration-previews.jsonl`。
+- merge queue 生成 `ready_to_merge`、`needs_rework`、`blocked` 决策事实源；integration preview 只做 merge dry-run、冲突检测和 protected path guard，不执行真实 Git merge apply。
 
 日志：
 

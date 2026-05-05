@@ -499,6 +499,27 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"merge_queues": queues})
 	})
+	router.POST("/v1/projects/:project_id/merge-queues/:queue_id/integration-preview", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		preview, err := review.BuildIntegrationPreview(c.Request.Context(), rootDir, c.Param("queue_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusAccepted
+		if preview.Status == "ready" {
+			status = http.StatusOK
+		}
+		c.JSON(status, gin.H{"integration_preview": preview})
+	})
 	router.GET("/v1/projects/:project_id/merge-queues/:queue_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -519,6 +540,44 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"merge_queue": queue})
+	})
+	router.GET("/v1/projects/:project_id/integration-previews", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		previews, err := review.ListIntegrationPreviews(rootDir, c.Query("queue_id"), queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"integration_previews": previews})
+	})
+	router.GET("/v1/projects/:project_id/integration-previews/:preview_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		preview, found, err := review.LoadIntegrationPreview(rootDir, c.Param("preview_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "integration preview not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"integration_preview": preview})
 	})
 	router.GET("/v1/projects/:project_id/worktrees", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
@@ -2766,6 +2825,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "batch.run", Risk: "high", Scopes: []string{"run:write"}}, true
 	case "/v1/projects/:project_id/batches/:batch_id/merge-queue":
 		return authzRule{Action: "merge.queue", Risk: "normal", Scopes: []string{"review:write"}}, true
+	case "/v1/projects/:project_id/merge-queues/:queue_id/integration-preview":
+		return authzRule{Action: "merge.integration_preview", Risk: "normal", Scopes: []string{"review:write", "git:read"}}, true
 	case "/v1/projects/:project_id/providers/ops/refresh":
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case "/v1/projects/:project_id/control-loop/run":
@@ -2814,6 +2875,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "batch.run", Risk: "high", Scopes: []string{"run:write"}}, true
 	case strings.Contains(rawPath, "/batches/") && strings.HasSuffix(rawPath, "/merge-queue"):
 		return authzRule{Action: "merge.queue", Risk: "normal", Scopes: []string{"review:write"}}, true
+	case strings.Contains(rawPath, "/merge-queues/") && strings.HasSuffix(rawPath, "/integration-preview"):
+		return authzRule{Action: "merge.integration_preview", Risk: "normal", Scopes: []string{"review:write", "git:read"}}, true
 	case strings.Contains(rawPath, "/providers/ops/refresh"):
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case strings.Contains(rawPath, "/control-loop/run"):

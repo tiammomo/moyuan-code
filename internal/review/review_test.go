@@ -114,6 +114,86 @@ func TestBuildMergeQueueAllowsAcceptedBatchItem(t *testing.T) {
 	}
 }
 
+func TestBuildIntegrationPreviewAllowsReadyMergeQueue(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	initReviewGitRepo(t, root)
+	t.Setenv("MOYUAN_ALLOW_BATCH_RUN", "1")
+	graph := issues.Graph{
+		Epic: issues.Epic{ID: "phase12-integration", Title: "integration preview", Status: "planned"},
+		Nodes: []issues.Node{
+			{ID: "backend-api", Title: "backend api", Status: "ready"},
+		},
+	}
+	if err := issues.SaveGraph(root, graph); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := batch.CreatePlan(root, batch.PlanOptions{EpicID: graph.Epic.ID, MaxParallel: 1, RequestedBy: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := batch.Run(context.Background(), root, batch.RunOptions{BatchID: plan.ID, Mode: "local_shell", Approved: true, Prompt: "printf ok"}); err != nil {
+		t.Fatal(err)
+	}
+	queue, err := BuildMergeQueue(root, plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preview, err := BuildIntegrationPreview(context.Background(), root, queue.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Decision != "INTEGRATION_PREVIEW_READY" || preview.ReadyCount != 1 || preview.WorktreePath == "" || preview.IntegrationBranch == "" {
+		t.Fatalf("expected ready integration preview, got %+v", preview)
+	}
+	if preview.Items[0].Decision != "INTEGRATION_ITEM_READY" || preview.Items[0].Branch == "" {
+		t.Fatalf("expected ready integration item, got %+v", preview.Items[0])
+	}
+	loaded, found, err := LoadIntegrationPreview(root, preview.ID)
+	if err != nil || !found || loaded.ID != preview.ID {
+		t.Fatalf("expected persisted preview, found=%v loaded=%+v err=%v", found, loaded, err)
+	}
+	previews, err := ListIntegrationPreviews(root, queue.ID, 10)
+	if err != nil || len(previews) != 1 || previews[0].ID != preview.ID {
+		t.Fatalf("expected listed preview, previews=%+v err=%v", previews, err)
+	}
+}
+
+func TestBuildIntegrationPreviewBlocksUnreadyMergeQueue(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	graph := issues.Graph{
+		Epic: issues.Epic{ID: "phase12-blocked-preview", Title: "blocked integration preview", Status: "planned"},
+		Nodes: []issues.Node{
+			{ID: "backend-api", Title: "backend api", Status: "ready"},
+		},
+	}
+	if err := issues.SaveGraph(root, graph); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := batch.CreatePlan(root, batch.PlanOptions{EpicID: graph.Epic.ID, MaxParallel: 1, RequestedBy: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queue, err := BuildMergeQueue(root, plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preview, err := BuildIntegrationPreview(context.Background(), root, queue.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Decision != "INTEGRATION_PREVIEW_BLOCKED" || !containsReasonPrefix(preview.Reasons, "merge_queue_not_ready:") {
+		t.Fatalf("expected unready queue block, got %+v", preview)
+	}
+}
+
 func TestBuildMergeQueueBlocksWithoutBatchRun(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {
@@ -182,6 +262,15 @@ func runReviewGit(t *testing.T, root string, args ...string) {
 func containsReason(reasons []string, target string) bool {
 	for _, reason := range reasons {
 		if reason == target {
+			return true
+		}
+	}
+	return false
+}
+
+func containsReasonPrefix(reasons []string, prefix string) bool {
+	for _, reason := range reasons {
+		if strings.HasPrefix(reason, prefix) {
 			return true
 		}
 	}
