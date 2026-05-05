@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+- [Phase 18 实现 Issue Graph](./phase18-issue-graph.md)：Phase 18 生产运维闭环与策略化维护控制面的依赖图。
+- [Phase 18 实施记录](./phase18-next-development-plan.md)：Phase 18 当前任务、执行范围和验收记录。
 - [Phase 17 实现 Issue Graph](./phase17-issue-graph.md)：Phase 17 发布准入策略包、演练调度与风险修复 drill-down 的依赖图。
 - [Phase 17 实施记录](./phase17-next-development-plan.md)：Phase 17 当前任务、执行范围和验收记录。
 - [Phase 17 Release Readiness](./phase17-release-readiness.md)：Phase 17 发布准入策略包、演练调度与风险修复 drill-down 的收口验证。
