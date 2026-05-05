@@ -53,6 +53,73 @@ func TestCreatePlanUsesDefaultDeploymentCheckTemplates(t *testing.T) {
 	}
 }
 
+func TestCreatePlanFromCandidateUsesReleaseCandidateAndResources(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	candidate := release.Candidate{
+		ID:             "release-candidate-deploy",
+		ReleaseBatchID: "release-batch-deploy",
+		Status:         "ready",
+		Decision:       "RELEASE_CANDIDATE_READY",
+		Version:        "v0.2.0",
+		ReleaseBranch:  "release/v0.2.0",
+		SourceBranch:   "moyuan/integration/release",
+		CreatedAt:      "2026-05-05T00:00:00Z",
+	}
+	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(root).ReleasesDir, "candidates", candidate.ID+".json"), candidate); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "candidate-host",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "devops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		Status:      "active",
+		Healthcheck: serverresources.Healthcheck{Type: "http", Target: "http://127.0.0.1/healthz"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := CreatePlanFromCandidate(root, CandidatePlanOptions{CandidateID: candidate.ID, Environment: "test_dev"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Decision != "DEPLOY_PLAN_READY" || plan.ReleaseID != candidate.ID || len(plan.Resources) != 1 {
+		t.Fatalf("expected deployment handoff from candidate, got %+v", plan)
+	}
+	if !containsString(plan.Reasons, "release_candidate_and_resources_ready") || plan.SmokePlan.TemplateID == "" || plan.MonitorPlan.TemplateID == "" {
+		t.Fatalf("expected candidate deployment check plans, got %+v", plan)
+	}
+}
+
+func TestCreatePlanFromCandidateBlocksWhenCandidateNotReady(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	candidate := release.Candidate{
+		ID:        "release-candidate-blocked-deploy",
+		Status:    "blocked",
+		Decision:  "RELEASE_CANDIDATE_BLOCKED",
+		Version:   "v0.2.0",
+		CreatedAt: "2026-05-05T00:00:00Z",
+	}
+	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(root).ReleasesDir, "candidates", candidate.ID+".json"), candidate); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := CreatePlanFromCandidate(root, CandidatePlanOptions{CandidateID: candidate.ID, Environment: "test_dev"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Decision != "DEPLOY_BLOCKED" || !containsString(plan.Reasons, "release_candidate_not_ready:RELEASE_CANDIDATE_BLOCKED") {
+		t.Fatalf("expected deployment handoff blocked by candidate readiness, got %+v", plan)
+	}
+}
+
 func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {

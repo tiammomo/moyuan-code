@@ -24,7 +24,7 @@ Phase 12 已完成并通过 readiness：
 | P0 | `phase13-001` | `release-candidate-plan-from-batch` | completed | Release Candidate 事实源 | suggested release batch 可生成 release candidate plan |
 | P0 | `phase13-002` | `guarded-local-release-branch-apply` | completed | 本地 release branch 受控 apply | 审批和开关满足后可更新本地 release branch |
 | P1 | `phase13-003` | `release-candidate-provider-preview` | completed | 远程发布预览 | Candidate 可生成 PR/MR、tag、release 和 workflow guarded preview |
-| P1 | `phase13-004` | `deployment-handoff-from-release-candidate` | planned | 部署交接 | Candidate 可生成 deployment dry-run plan |
+| P1 | `phase13-004` | `deployment-handoff-from-release-candidate` | completed | 部署交接 | Candidate 可生成 deployment dry-run plan |
 | P2 | `phase13-005` | `console-release-candidate-surface` | planned | Console 发布候选面 | Console 可见 candidate 到 provider/deploy 的完整链路 |
 
 ## 3. 执行规划：`phase13-001 release-candidate-plan-from-batch`
@@ -124,11 +124,41 @@ Phase 12 已完成并通过 readiness：
 - API 新增 `POST /v1/projects/:project_id/release-candidates/:candidate_id/provider-preview`、`GET /v1/projects/:project_id/release-candidate-provider-previews`、`GET /v1/projects/:project_id/release-candidate-provider-previews/:preview_id`。
 - Candidate provider preview 仍是远程发布预览层，不进行远程写入。
 
-## 6. 后续执行占位
+## 6. 执行规划：`phase13-004 deployment-handoff-from-release-candidate`
 
-`phase13-004` 之后的实际落地结果在对应 issue 完成后补充，稳定设计会回写到 release、git provider、deployment 和 Console 相关主线文档。
+实现状态：completed。
 
-## 7. 验证要求
+范围：
+
+- 在 deployment 模块新增基于 release candidate 的 deployment plan 创建入口。
+- Candidate 必须 ready，否则 deployment plan blocked 并记录 candidate reason。
+- 复用现有 server resource、environment、smoke/monitor template、production approval 和 rollback plan 规则。
+- API 支持从 release candidate 创建 deployment plan。
+
+非目标：
+
+- 不执行 deployment execution。
+- 不执行 SSH、local shell deploy、线上 smoke 或 monitor。
+- 不改变现有 deployment execution 的生产写入边界。
+
+验收：
+
+- Ready candidate + active server resource 可生成 `DEPLOY_PLAN_READY`。
+- Candidate 未 ready 时生成 blocked deployment plan。
+- 生产环境仍需要 approval。
+- 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- 新增 `deployment.CreatePlanFromCandidate`。
+- API 新增 `POST /v1/projects/:project_id/release-candidates/:candidate_id/deployment-plan`。
+- Release candidate 到 deployment plan 的交接只生成部署计划，不执行部署。
+
+## 7. 后续执行占位
+
+`phase13-005` 之后的实际落地结果在对应 issue 完成后补充，稳定设计会回写到 release、git provider、deployment 和 Console 相关主线文档。
+
+## 8. 验证要求
 
 每完成一个 Phase 13 issue，至少运行：
 

@@ -902,6 +902,33 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"release_candidate_provider_preview": preview})
 	})
+	router.POST("/v1/projects/:project_id/release-candidates/:candidate_id/deployment-plan", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var request deployment.CandidatePlanOptions
+		if err := c.BindJSON(&request); err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		request.CandidateID = c.Param("candidate_id")
+		plan, err := deployment.CreatePlanFromCandidate(rootDir, request)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if plan.Status == "blocked" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"deployment": plan})
+	})
 	router.GET("/v1/projects/:project_id/worktrees", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3160,6 +3187,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "release.candidate.apply", Risk: "high", Scopes: []string{"release:write", "git:write"}}, true
 	case "/v1/projects/:project_id/release-candidates/:candidate_id/provider-preview":
 		return authzRule{Action: "release.candidate.provider_preview", Risk: "normal", Scopes: []string{"release:write"}}, true
+	case "/v1/projects/:project_id/release-candidates/:candidate_id/deployment-plan":
+		return authzRule{Action: "release.candidate.deployment_plan", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case "/v1/projects/:project_id/providers/ops/refresh":
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case "/v1/projects/:project_id/control-loop/run":
@@ -3220,6 +3249,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "release.candidate.apply", Risk: "high", Scopes: []string{"release:write", "git:write"}}, true
 	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/provider-preview"):
 		return authzRule{Action: "release.candidate.provider_preview", Risk: "normal", Scopes: []string{"release:write"}}, true
+	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/deployment-plan"):
+		return authzRule{Action: "release.candidate.deployment_plan", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case strings.Contains(rawPath, "/providers/ops/refresh"):
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case strings.Contains(rawPath, "/control-loop/run"):
