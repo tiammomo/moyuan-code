@@ -321,11 +321,16 @@ moyuan release prepare
 moyuan release suggest
 moyuan release show <release-id>
 moyuan release publish <release-id>
+moyuan release admission policy [--environment <env>]
 moyuan deploy run <release-id> --env <env>
 moyuan deploy plan <release-id> --environment <env> [--resource <host-id>]
 moyuan deploy show <deployment-id>
 moyuan deploy status <release-id>
 moyuan deploy rollback <execution-id> [--mode preview|local_shell]
+moyuan deploy rehearsal create [--candidate-id <id>] [--deployment-id <id>] [--execution-id <id>] [--environment <env>]
+moyuan deploy rehearsal schedule [--candidate-id <id>] [--deployment-id <id>] [--execution-id <id>] [--environment <env>] [--max-targets 3]
+moyuan deploy rehearsal-scheduler <run-id>
+moyuan deploy rehearsal-schedulers
 moyuan resources add
 moyuan resources list
 moyuan resources show <host-id>
@@ -573,7 +578,7 @@ Phase 1 的执行结果：
 
 Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力、Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力、Phase 6 approval consumption/adapter telemetry/Console schema forms 能力、Phase 7 受控真实外部执行准备、Phase 8 受控外部执行 Beta、Phase 9 生产运维控制面增强、Phase 10 控制面自动化闭环增强、Phase 11 Issue Graph 批量执行控制器、Phase 12 真实并发执行与集成合入准备、Phase 13 Release Candidate 远程发布与部署交接、Phase 14 受控远程发布与部署执行、Phase 15 部署审批加固、回退执行与生产可观测性增强和 Phase 16 部署演练、运行风险闭环与发布准入增强已完成。
 
-当前已进入 Phase 17，阶段入口见 [Phase 17 实现 Issue Graph](./phases/phase17-issue-graph.md) 和 [Phase 17 实施记录](./phases/phase17-next-development-plan.md)。Phase 17 已完成 release admission policy pack，下一步聚焦 bounded rehearsal scheduler、风险复核队列和 Console drill-down。
+当前已进入 Phase 17，阶段入口见 [Phase 17 实现 Issue Graph](./phases/phase17-issue-graph.md) 和 [Phase 17 实施记录](./phases/phase17-next-development-plan.md)。Phase 17 已完成 release admission policy pack 和 bounded rehearsal scheduler，下一步聚焦风险复核队列和 Console drill-down。
 
 Phase 1 第一批实现模块：
 

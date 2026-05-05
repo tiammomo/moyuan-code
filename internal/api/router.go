@@ -159,6 +159,18 @@ type deploymentRehearsalRequest struct {
 	MonitorLimit int    `json:"monitor_limit"`
 }
 
+type rehearsalSchedulerRequest struct {
+	Trigger       string `json:"trigger"`
+	CandidateID   string `json:"candidate_id"`
+	DeploymentID  string `json:"deployment_id"`
+	ExecutionID   string `json:"execution_id"`
+	Environment   string `json:"environment"`
+	MonitorLimit  int    `json:"monitor_limit"`
+	MaxTargets    int    `json:"max_targets"`
+	SkipAdmission bool   `json:"skip_admission"`
+	RequestedBy   string `json:"requested_by"`
+}
+
 type releaseAdmissionRequest struct {
 	RehearsalID  string `json:"rehearsal_id"`
 	CandidateID  string `json:"candidate_id"`
@@ -2590,6 +2602,80 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"deployment_rehearsal": rehearsal})
 	})
+	router.POST("/v1/projects/:project_id/deployment-rehearsal-scheduler-runs", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req rehearsalSchedulerRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		run, err := deployment.RunRehearsalScheduler(c.Request.Context(), rootDir, deployment.RehearsalSchedulerOptions{
+			Trigger:       req.Trigger,
+			CandidateID:   req.CandidateID,
+			DeploymentID:  req.DeploymentID,
+			ExecutionID:   req.ExecutionID,
+			Environment:   req.Environment,
+			MonitorLimit:  req.MonitorLimit,
+			MaxTargets:    req.MaxTargets,
+			SkipAdmission: req.SkipAdmission,
+			RequestedBy:   req.RequestedBy,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusCreated
+		if run.Status == "blocked" || run.Status == "attention_required" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"rehearsal_scheduler_run": run})
+	})
+	router.GET("/v1/projects/:project_id/deployment-rehearsal-scheduler-runs", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		runs, err := deployment.ListRehearsalSchedulerRuns(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"rehearsal_scheduler_runs": runs})
+	})
+	router.GET("/v1/projects/:project_id/deployment-rehearsal-scheduler-runs/:run_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		run, found, err := deployment.LoadRehearsalSchedulerRun(rootDir, c.Param("run_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "rehearsal scheduler run not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"rehearsal_scheduler_run": run})
+	})
 	router.POST("/v1/projects/:project_id/release-admissions", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3735,6 +3821,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "deployment.monitor.summary", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case "/v1/projects/:project_id/deployment-rehearsals":
 		return authzRule{Action: "deployment.rehearsal", Risk: "normal", Scopes: []string{"deploy:write"}}, true
+	case "/v1/projects/:project_id/deployment-rehearsal-scheduler-runs":
+		return authzRule{Action: "deployment.rehearsal.scheduler", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case "/v1/projects/:project_id/release-admissions":
 		return authzRule{Action: "release.admission", Risk: "normal", Scopes: []string{"release:write", "deploy:write"}}, true
 	case "/v1/projects/:project_id/visuals/assets/:asset_id/render":
@@ -3813,6 +3901,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "deployment.monitor.summary", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case strings.HasSuffix(rawPath, "/deployment-rehearsals"):
 		return authzRule{Action: "deployment.rehearsal", Risk: "normal", Scopes: []string{"deploy:write"}}, true
+	case strings.HasSuffix(rawPath, "/deployment-rehearsal-scheduler-runs"):
+		return authzRule{Action: "deployment.rehearsal.scheduler", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case strings.HasSuffix(rawPath, "/release-admissions"):
 		return authzRule{Action: "release.admission", Risk: "normal", Scopes: []string{"release:write", "deploy:write"}}, true
 	case strings.Contains(rawPath, "/visuals/assets/") && strings.HasSuffix(rawPath, "/render"):

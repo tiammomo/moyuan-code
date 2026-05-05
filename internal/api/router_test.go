@@ -392,6 +392,13 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/deployment-rehearsals?limit=5", http.StatusOK, `"deployment_rehearsals"`, rehearsals[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-rehearsals/"+rehearsals[0].ID, http.StatusOK, `"deployment_rehearsal"`, `"deployment_execution"`)
+	assertPostContains(t, router, "/v1/projects/managed/deployment-rehearsal-scheduler-runs", `{"execution_id":"`+evidenceRecords[0].ParentID+`","max_targets":1}`, http.StatusAccepted, `"rehearsal_scheduler_run"`, `"REHEARSAL_SCHEDULER_ADMISSION_BLOCKED"`)
+	schedulerRuns, err := deployment.ListRehearsalSchedulerRuns(root, 1)
+	if err != nil || len(schedulerRuns) != 1 {
+		t.Fatalf("expected rehearsal scheduler run, runs=%+v err=%v", schedulerRuns, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/deployment-rehearsal-scheduler-runs?limit=5", http.StatusOK, `"rehearsal_scheduler_runs"`, schedulerRuns[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/deployment-rehearsal-scheduler-runs/"+schedulerRuns[0].ID, http.StatusOK, `"rehearsal_scheduler_run"`, `"targets"`)
 	assertGETContains(t, router, "/v1/projects/managed/release-admission-policy?environment=production", http.StatusOK, `"release_admission_policy_pack"`, `"release-admission-default-v1"`, `"production"`)
 	assertPostContains(t, router, "/v1/projects/managed/release-admissions", `{"rehearsal_id":"`+rehearsals[0].ID+`"}`, http.StatusAccepted, `"release_admission"`, `"RELEASE_ADMISSION_BLOCKED"`, `"policy_decision"`)
 	admissions, err := deployment.ListReleaseAdmissions(root, 1)

@@ -233,11 +233,14 @@ func usage() string {
 		"moyuan deploy rollback <execution-id> [--mode preview|local_shell] [--approved] [--approval-id <approval-id>] [--command <safe-command>]",
 		"moyuan deploy monitor summarize [--environment test_dev] [--limit 20]",
 		"moyuan deploy rehearsal create [--candidate-id <id>] [--deployment-id <id>] [--execution-id <id>] [--environment test_dev]",
+		"moyuan deploy rehearsal schedule [--candidate-id <id>] [--deployment-id <id>] [--execution-id <id>] [--environment test_dev] [--max-targets 3] [--skip-admission]",
 		"moyuan deploy show <deployment-id>",
 		"moyuan deploy execution <execution-id>",
 		"moyuan deploy rollback-execution <rollback-execution-id>",
 		"moyuan deploy monitor-summary <monitor-summary-id>",
 		"moyuan deploy rehearsal <rehearsal-id>",
+		"moyuan deploy rehearsal-scheduler <run-id>",
+		"moyuan deploy rehearsal-schedulers",
 		"moyuan deploy rehearsals",
 		"moyuan evidence list [--parent-type <type>] [--parent-id <id>] [--limit 20]",
 		"moyuan evidence show <evidence-id>",
@@ -1693,6 +1696,24 @@ func handleDeploy(ctx context.Context, args []string, cwd string) (string, any, 
 			}
 			return "", rehearsal, code, err
 		}
+		if args[1] == "schedule" {
+			run, err := deployment.RunRehearsalScheduler(ctx, rootDir, deployment.RehearsalSchedulerOptions{
+				Trigger:       flagValue(args, "--trigger", "manual"),
+				CandidateID:   flagValue(args, "--candidate-id", ""),
+				DeploymentID:  flagValue(args, "--deployment-id", ""),
+				ExecutionID:   flagValue(args, "--execution-id", ""),
+				Environment:   flagValue(args, "--environment", ""),
+				MonitorLimit:  flagInt(args, "--monitor-limit", 10),
+				MaxTargets:    flagInt(args, "--max-targets", 3),
+				SkipAdmission: hasFlag(args, "--skip-admission"),
+				RequestedBy:   flagValue(args, "--requested-by", ""),
+			})
+			code := 0
+			if run.Status == "blocked" || run.Status == "attention_required" {
+				code = 1
+			}
+			return "", run, code, err
+		}
 		rehearsal, ok, err := deployment.LoadRehearsal(rootDir, args[1])
 		if err != nil {
 			return "", nil, 1, err
@@ -1705,6 +1726,21 @@ func handleDeploy(ctx context.Context, args []string, cwd string) (string, any, 
 		limit, _ := strconv.Atoi(flagValue(args, "--limit", "20"))
 		rehearsals, err := deployment.ListRehearsals(rootDir, limit)
 		return "", map[string]any{"rehearsals": rehearsals}, 0, err
+	case "rehearsal-scheduler":
+		if len(args) < 2 {
+			return "missing rehearsal scheduler run id\n", nil, 1, nil
+		}
+		run, ok, err := deployment.LoadRehearsalSchedulerRun(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", run, 0, nil
+	case "rehearsal-schedulers":
+		runs, err := deployment.ListRehearsalSchedulerRuns(rootDir, flagInt(args, "--limit", 20))
+		return "", map[string]any{"rehearsal_scheduler_runs": runs}, 0, err
 	}
 	return "unknown deploy command\n", nil, 1, nil
 }
