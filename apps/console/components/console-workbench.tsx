@@ -131,6 +131,12 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
       latestVerification ||
       snapshot.rollback_executions.length > 0,
   );
+  const operationsAuditExport = snapshot.operations_audit_export;
+  const decisionLedger = snapshot.decision_ledger;
+  const writeProofReport = snapshot.write_proofs;
+  const writeProofs = writeProofReport?.proofs ?? [];
+  const decisionEntries = decisionLedger?.entries ?? [];
+  const latestControlLoopRun = snapshot.control_loop_runs[0];
   const activeSessions = snapshot.auth_sessions.filter((session) => session.status === "active");
   const activeTokens = snapshot.api_tokens.filter((token) => token.status === "active");
   const activeServiceAccounts = snapshot.service_accounts.filter((account) => account.status === "active");
@@ -1628,6 +1634,175 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
             ) : (
               <div className="emptyState">Select an operation</div>
             )}
+          </div>
+        </section>
+
+        <section className="observabilityGrid" hidden={!viewVisible(activeView, ["Projects", "Operations", "Audit"])}>
+          <div className="panel">
+            <PanelTitle
+              icon={<ScrollText size={18} />}
+              title="Audit Export"
+              meta={operationsAuditExport ? `${operationsAuditExport.timeline_item_count} timeline` : "not generated"}
+            />
+            {operationsAuditExport ? (
+              <div className="signalList">
+                <div className="signalItem">
+                  <div className="signalHeader">
+                    <strong>{compactID(operationsAuditExport.id)}</strong>
+                    <StatusPill tone={operationsAuditExport.attention_item_count > 0 ? "warning" : "ok"} label={operationsAuditExport.format} />
+                  </div>
+                  <span>
+                    evidence {operationsAuditExport.evidence_ref_count} / verification {operationsAuditExport.post_deployment_verification_count} / refs{" "}
+                    {operationsAuditExport.resource_deployment_ref_count}
+                  </span>
+                  <div className="signalMeta">
+                    <code>{operationsAuditExport.redaction_applied ? "redaction applied" : "redaction clear"}</code>
+                    <code>{operationsAuditExport.risk_handoff_recommended_count} risk handoff</code>
+                    <code>{shortTimestamp(operationsAuditExport.generated_at)}</code>
+                  </div>
+                  <div className="routeCandidateGrid compact">
+                    {Object.entries(operationsAuditExport.by_type)
+                      .slice(0, 4)
+                      .map(([type, count]) => (
+                        <div className="routeCandidate" key={type}>
+                          <strong>{type}</strong>
+                          <span>{count} records</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="emptyState">No audit export</div>
+            )}
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<ShieldCheck size={18} />} title="Decision Ledger" meta={decisionLedger ? `${decisionLedger.entry_count} entries` : "not generated"} />
+            <div className="signalList">
+              {decisionLedger ? (
+                <>
+                  <div className="signalItem">
+                    <div className="signalHeader">
+                      <strong>{compactID(decisionLedger.id)}</strong>
+                      <StatusPill tone={decisionLedger.attention_count > 0 ? "warning" : "ok"} label={`${decisionLedger.attention_count} attention`} />
+                    </div>
+                    <span>
+                      evidence {decisionLedger.evidence_ref_count} / redaction {decisionLedger.redaction_applied ? "applied" : "clear"}
+                    </span>
+                    <div className="signalMeta">
+                      {Object.entries(decisionLedger.by_source_type)
+                        .slice(0, 4)
+                        .map(([type, count]) => (
+                          <code key={type}>
+                            {type}:{count}
+                          </code>
+                        ))}
+                    </div>
+                  </div>
+                  {decisionEntries.slice(0, 3).map((entry) => (
+                    <div className="signalItem" key={entry.id}>
+                      <div className="signalHeader">
+                        <strong>{entry.source_type}</strong>
+                        <StatusPill tone={toneForStatus(entry.status)} label={entry.decision} />
+                      </div>
+                      <span>
+                        {compactID(entry.source_id)} / {entry.environment || "all"}
+                      </span>
+                      <div className="signalMeta">
+                        {entry.rule_refs[0] ? <code>{entry.rule_refs[0]}</code> : null}
+                        {entry.evidence_refs.length ? <code>{entry.evidence_refs.length} evidence</code> : null}
+                        {entry.parent_ref ? <code>{compactID(entry.parent_ref)}</code> : null}
+                      </div>
+                      {entry.reasons[0] ? <small>{entry.reasons[0]}</small> : null}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="emptyState">No decision ledger</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<Lock size={18} />} title="Write Proof" meta={writeProofReport ? `${writeProofReport.proof_count} proofs` : "not generated"} />
+            <div className="signalList">
+              {writeProofReport ? (
+                <>
+                  <div className="signalItem">
+                    <div className="signalHeader">
+                      <strong>{compactID(writeProofReport.id)}</strong>
+                      <StatusPill tone={writeProofReport.blocked_count > 0 ? "blocked" : "ok"} label={`${writeProofReport.blocked_count} blocked`} />
+                    </div>
+                    <span>
+                      manual {writeProofReport.manual_required_count} / redaction {writeProofReport.redaction_applied ? "applied" : "clear"}
+                    </span>
+                    <div className="signalMeta">
+                      {Object.entries(writeProofReport.by_operation_type)
+                        .slice(0, 4)
+                        .map(([type, count]) => (
+                          <code key={type}>
+                            {type}:{count}
+                          </code>
+                        ))}
+                    </div>
+                  </div>
+                  {writeProofs.slice(0, 4).map((proof) => (
+                    <div className="signalItem" key={proof.id}>
+                      <div className="signalHeader">
+                        <strong>{proof.operation_type}</strong>
+                        <StatusPill tone={toneForStatus(proof.status)} label={proof.decision} />
+                      </div>
+                      <span>
+                        {proof.provider || "provider"} / {proof.mode || "mode"} / {compactID(proof.operation_id)}
+                      </span>
+                      <div className="signalMeta">
+                        <code>{proof.write_enabled ? "write enabled" : "write disabled"}</code>
+                        <code>{proof.dry_run ? "dry-run" : "write path"}</code>
+                        <code>{proof.approval_satisfied ? "approval ok" : proof.approval_required ? "approval required" : "approval n/a"}</code>
+                        {proof.secret_ref_status ? <code>{proof.secret_ref_status}</code> : null}
+                        {proof.provider_evidence_refs.length ? <code>{proof.provider_evidence_refs.length} evidence</code> : null}
+                      </div>
+                      {proof.least_privilege ? <small>{proof.least_privilege}</small> : null}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="emptyState">No write proofs</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<RefreshCw size={18} />} title="Control Runner" meta={latestControlLoopRun ? compactID(latestControlLoopRun.id) : "no runs"} />
+            <div className="signalList">
+              {latestControlLoopRun ? (
+                <div className="signalItem">
+                  <div className="signalHeader">
+                    <strong>{latestControlLoopRun.trigger}</strong>
+                    <StatusPill tone={toneForStatus(latestControlLoopRun.status)} label={latestControlLoopRun.decision} />
+                  </div>
+                  <span>
+                    {latestControlLoopRun.steps.length} steps / {shortTimestamp(latestControlLoopRun.finished_at || latestControlLoopRun.started_at)}
+                  </span>
+                  <div className="routeCandidateGrid compact">
+                    {latestControlLoopRun.steps.slice(0, 4).map((step) => (
+                      <div className="routeCandidate" key={step.id}>
+                        <strong>{step.type}</strong>
+                        <span>{step.summary || step.decision}</span>
+                        <div className="signalMeta">
+                          <code>{step.status}</code>
+                          {step.evidence_count ? <code>{step.evidence_count} evidence</code> : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {latestControlLoopRun.reasons[0] ? <small>{latestControlLoopRun.reasons[0]}</small> : null}
+                </div>
+              ) : (
+                <div className="emptyState">No control loop runs</div>
+              )}
+            </div>
           </div>
         </section>
 

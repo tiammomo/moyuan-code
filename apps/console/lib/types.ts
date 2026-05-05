@@ -1039,6 +1039,87 @@ export type AuditEventSummary = {
   reason?: string;
 };
 
+export type OperationsAuditExportSummary = {
+  id: string;
+  generated_at?: string;
+  format: string;
+  timeline_item_count: number;
+  post_deployment_verification_count: number;
+  resource_deployment_ref_count: number;
+  evidence_ref_count: number;
+  attention_item_count: number;
+  risk_handoff_recommended_count: number;
+  redaction_applied: boolean;
+  by_type: Record<string, number>;
+  evidence_refs: string[];
+};
+
+export type DecisionLedgerEntrySummary = {
+  id: string;
+  source_type: string;
+  source_id: string;
+  parent_ref?: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  rule_refs: string[];
+  evidence_refs: string[];
+  created_at?: string;
+};
+
+export type DecisionLedgerReportSummary = {
+  id: string;
+  generated_at?: string;
+  entry_count: number;
+  evidence_ref_count: number;
+  attention_count: number;
+  redaction_applied: boolean;
+  by_source_type: Record<string, number>;
+  by_status: Record<string, number>;
+  by_decision: Record<string, number>;
+  entries: DecisionLedgerEntrySummary[];
+};
+
+export type ProviderWriteProofSummary = {
+  id: string;
+  operation_type: string;
+  operation_id: string;
+  provider?: string;
+  environment?: string;
+  mode?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  source_ref?: string;
+  dry_run: boolean;
+  write_enabled: boolean;
+  approval_id?: string;
+  approval_consumed: boolean;
+  approval_required: boolean;
+  approval_satisfied: boolean;
+  secret_ref_status?: string;
+  provider_evidence_refs: string[];
+  least_privilege?: string;
+  replay_guard?: string;
+  created_at?: string;
+};
+
+export type ProviderWriteProofReportSummary = {
+  id: string;
+  generated_at?: string;
+  proof_count: number;
+  blocked_count: number;
+  manual_required_count: number;
+  redaction_applied: boolean;
+  by_operation_type: Record<string, number>;
+  by_provider: Record<string, number>;
+  by_environment: Record<string, number>;
+  by_status: Record<string, number>;
+  by_decision: Record<string, number>;
+  proofs: ProviderWriteProofSummary[];
+};
+
 export type ApprovalRecordSummary = {
   id: string;
   target_type: string;
@@ -1178,6 +1259,9 @@ export type ConsoleSnapshot = {
   quality_explanations: QualityExplanation[];
   approvals: ApprovalRecordSummary[];
   audit_events: AuditEventSummary[];
+  operations_audit_export?: OperationsAuditExportSummary;
+  decision_ledger?: DecisionLedgerReportSummary;
+  write_proofs?: ProviderWriteProofReportSummary;
   git_provider_plans: GitProviderPlanSummary[];
   auth_sessions: AuthSessionSummary[];
   api_tokens: APITokenSummary[];

@@ -10,6 +10,8 @@ import type {
   BatchPlanSummary,
   BatchRunSummary,
   ControlLoopRunSummary,
+  DecisionLedgerEntrySummary,
+  DecisionLedgerReportSummary,
   DeploymentExecutionSummary,
   DeploymentMonitorSummary,
   DeploymentRehearsalSummary,
@@ -27,9 +29,12 @@ import type {
   OperationDetailSummary,
   OperationHistoryItem,
   OperationRepairCandidateSummary,
+  OperationsAuditExportSummary,
   PostDeploymentHistorySummary,
   PostDeploymentVerificationSummary,
   ProjectSummary,
+  ProviderWriteProofReportSummary,
+  ProviderWriteProofSummary,
   ProviderSummary,
   ProviderTelemetrySummary,
   QualityExplanation,
@@ -141,6 +146,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiTokensResponse,
     serviceAccountsResponse,
     operationsTimelineResponse,
+    operationsAuditExportResponse,
+    decisionLedgerResponse,
+    writeProofsResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
     apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: unknown[]; waiting_queue?: unknown[]; subagent_backlog?: unknown[] } }>>(
@@ -193,6 +201,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ api_tokens: unknown[] }>>(`/projects/${project.id}/auth/api-tokens`),
     apiGet<ApiEnvelope<{ service_accounts: unknown[] }>>(`/projects/${project.id}/auth/service-accounts`),
     apiGet<ApiEnvelope<{ operations_timeline: unknown[] }>>(`/projects/${project.id}/operations/timeline?limit=20`),
+    apiGet<ApiEnvelope<{ operations_audit_export: unknown }>>(`/projects/${project.id}/operations/audit-export?limit=20`),
+    apiGet<ApiEnvelope<{ decision_ledger: unknown }>>(`/projects/${project.id}/operations/decision-ledger?limit=20`),
+    apiGet<ApiEnvelope<{ write_proofs: unknown }>>(`/projects/${project.id}/operations/write-proofs?limit=20`),
   ]);
 
   const schedule = [
@@ -248,6 +259,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const authSessions = normalizeAuthSessions(sessionsResponse?.sessions ?? []);
   const apiTokens = normalizeAPITokens(apiTokensResponse?.api_tokens ?? []);
   const serviceAccounts = normalizeServiceAccounts(serviceAccountsResponse?.service_accounts ?? []);
+  const operationsAuditExport = normalizeOperationsAuditExport(operationsAuditExportResponse?.operations_audit_export);
+  const decisionLedger = normalizeDecisionLedgerReport(decisionLedgerResponse?.decision_ledger);
+  const writeProofs = normalizeProviderWriteProofReport(writeProofsResponse?.write_proofs);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
   const operationsTimeline = normalizeOperationsTimeline(operationsTimelineResponse?.operations_timeline ?? []);
@@ -330,6 +344,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     quality_explanations: qualityExplanations,
     approvals,
     audit_events: auditEvents,
+    operations_audit_export: operationsAuditExport,
+    decision_ledger: decisionLedger,
+    write_proofs: writeProofs,
     git_provider_plans: gitProviderPlans,
     auth_sessions: authSessions,
     api_tokens: apiTokens,
@@ -1193,6 +1210,109 @@ function normalizeApprovals(rawApprovals: unknown[]): ApprovalRecordSummary[] {
     requested_at: readString(raw, "requested_at", ""),
     decided_at: readString(raw, "decided_at", ""),
   }));
+}
+
+function normalizeOperationsAuditExport(raw: unknown): OperationsAuditExportSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const summary = readUnknown(raw, "summary");
+  return {
+    id: readString(raw, "id", "operations-audit-export"),
+    generated_at: readString(raw, "generated_at", ""),
+    format: readString(raw, "format", "json"),
+    timeline_item_count: readNumber(summary, "timeline_item_count"),
+    post_deployment_verification_count: readNumber(summary, "post_deployment_verification_count"),
+    resource_deployment_ref_count: readNumber(summary, "resource_deployment_ref_count"),
+    evidence_ref_count: readNumber(summary, "evidence_ref_count"),
+    attention_item_count: readNumber(summary, "attention_item_count"),
+    risk_handoff_recommended_count: readNumber(summary, "risk_handoff_recommended_count"),
+    redaction_applied: readBoolean(summary, "redaction_applied"),
+    by_type: readNumberMap(summary, "by_type"),
+    evidence_refs: readArray(raw, "evidence_refs"),
+  };
+}
+
+function normalizeDecisionLedgerReport(raw: unknown): DecisionLedgerReportSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const summary = readUnknown(raw, "summary");
+  return {
+    id: readString(raw, "id", "decision-ledger"),
+    generated_at: readString(raw, "generated_at", ""),
+    entry_count: readNumber(summary, "entry_count"),
+    evidence_ref_count: readNumber(summary, "evidence_ref_count"),
+    attention_count: readNumber(summary, "attention_count"),
+    redaction_applied: readBoolean(summary, "redaction_applied"),
+    by_source_type: readNumberMap(summary, "by_source_type"),
+    by_status: readNumberMap(summary, "by_status"),
+    by_decision: readNumberMap(summary, "by_decision"),
+    entries: readObjectArray(raw, "entries").map(normalizeDecisionLedgerEntry),
+  };
+}
+
+function normalizeDecisionLedgerEntry(raw: unknown, index: number): DecisionLedgerEntrySummary {
+  return {
+    id: readString(raw, "id", `decision-entry-${index + 1}`),
+    source_type: readString(raw, "source_type", "unknown"),
+    source_id: readString(raw, "source_id", ""),
+    parent_ref: readString(raw, "parent_ref", ""),
+    environment: readString(raw, "environment", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    rule_refs: readArray(raw, "rule_refs"),
+    evidence_refs: readArray(raw, "evidence_refs"),
+    created_at: readString(raw, "created_at", ""),
+  };
+}
+
+function normalizeProviderWriteProofReport(raw: unknown): ProviderWriteProofReportSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const summary = readUnknown(raw, "summary");
+  return {
+    id: readString(raw, "id", "write-proof-report"),
+    generated_at: readString(raw, "generated_at", ""),
+    proof_count: readNumber(summary, "proof_count"),
+    blocked_count: readNumber(summary, "blocked_count"),
+    manual_required_count: readNumber(summary, "manual_required_count"),
+    redaction_applied: readBoolean(summary, "redaction_applied"),
+    by_operation_type: readNumberMap(summary, "by_operation_type"),
+    by_provider: readNumberMap(summary, "by_provider"),
+    by_environment: readNumberMap(summary, "by_environment"),
+    by_status: readNumberMap(summary, "by_status"),
+    by_decision: readNumberMap(summary, "by_decision"),
+    proofs: readObjectArray(raw, "proofs").map(normalizeProviderWriteProof),
+  };
+}
+
+function normalizeProviderWriteProof(raw: unknown, index: number): ProviderWriteProofSummary {
+  return {
+    id: readString(raw, "id", `write-proof-${index + 1}`),
+    operation_type: readString(raw, "operation_type", "unknown"),
+    operation_id: readString(raw, "operation_id", ""),
+    provider: readString(raw, "provider", ""),
+    environment: readString(raw, "environment", ""),
+    mode: readString(raw, "mode", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    source_ref: readString(raw, "source_ref", ""),
+    dry_run: readBoolean(raw, "dry_run"),
+    write_enabled: readBoolean(raw, "write_enabled"),
+    approval_id: readString(raw, "approval_id", ""),
+    approval_consumed: readBoolean(raw, "approval_consumed"),
+    approval_required: readBoolean(raw, "approval_required"),
+    approval_satisfied: readBoolean(raw, "approval_satisfied"),
+    secret_ref_status: readString(raw, "secret_ref_status", ""),
+    provider_evidence_refs: readArray(raw, "provider_evidence_refs"),
+    least_privilege: readString(raw, "least_privilege", ""),
+    replay_guard: readString(raw, "replay_guard", ""),
+    created_at: readString(raw, "created_at", ""),
+  };
 }
 
 function normalizeGitProviderPlans(rawPlans: unknown[]): GitProviderPlanSummary[] {
