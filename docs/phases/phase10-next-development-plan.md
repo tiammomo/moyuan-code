@@ -22,7 +22,7 @@ Phase 9 已完成并通过 release readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase10-001` | `background-control-loop-scheduler` | completed | 控制循环调度底座 | 一次 run 可触发多个受控 step，并写入状态、日志和审计 |
 | P0 | `phase10-002` | `operation-repair-candidate-review-flow` | completed | 修复候选复核流转 | approve/reject 后可生成 issue 或受控 repair attempt |
-| P1 | `phase10-003` | `release-provider-branch-tag-workflow-preview` | planned | release provider 扩展预览 | branch/tag/workflow 有 preview plan 和 guardrail |
+| P1 | `phase10-003` | `release-provider-branch-tag-workflow-preview` | completed | release provider 扩展预览 | branch/tag/workflow 有 preview plan 和 guardrail |
 | P1 | `phase10-004` | `deployment-check-template-policy` | planned | 部署检查模板策略 | smoke/monitor 失败分级可配置、可追踪 |
 | P2 | `phase10-005` | `console-route-repair-operator-surfaces` | planned | Console 操作面增强 | route candidates、repair review、control loop history 可见 |
 
@@ -86,7 +86,29 @@ Phase 9 已完成并通过 release readiness：
 - `repair_attempt.status=review_ready` 表示进入人工复核后的受控准备态，仍不代表代码已修改。
 - `operation-candidates` 列表按 candidate id 去重，展示最新 review 状态。
 
-## 5. 验证要求
+## 5. 执行规划：`phase10-003 release-provider-branch-tag-workflow-preview`
+
+实现状态：completed。
+
+范围：
+
+- Release provider remote plan 中的 `push_branch`、`create_tag`、`push_tag`、`create_release` 和 `trigger_workflow` 均带结构化 `risk_level`、`execution_mode` 和 `guardrails`。
+- Preview 能明确标记 branch/tag/workflow 动作仍是受控计划，不代表真实远程写入。
+- Publish 中被跳过的 branch/tag/workflow action result 会保留 guardrails，方便审计和 Console 展示。
+
+非目标：
+
+- 不执行真实 branch push、tag push 或 workflow dispatch。
+- 不扩大 `MOYUAN_ALLOW_RELEASE_PROVIDER_WRITE=1` 的真实写入范围。
+- 不消费 approval 来执行未启用的 branch/tag/workflow 动作。
+
+落地结果：
+
+- `ProviderAction` 增加 `risk_level`、`execution_mode` 和 `guardrails`。
+- `ProviderActionResult` 增加 `guardrails`。
+- branch/tag/workflow 预览固定包含 approval、write switch、replay guard、secret ref 和动作特定检查项。
+
+## 6. 验证要求
 
 每完成一个 Phase 10 issue，至少运行：
 

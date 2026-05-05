@@ -32,6 +32,11 @@ func TestProviderPreviewAndPublishApprovalFlow(t *testing.T) {
 	if preview.RemotePlan.Decision != "RELEASE_PROVIDER_REMOTE_PLAN_READY" || !hasProviderAction(preview.RemotePlan.Actions, "create_release", "planned") || !hasProviderAction(preview.RemotePlan.Actions, "trigger_workflow", "planned") {
 		t.Fatalf("expected provider release and workflow actions, got %+v", preview.RemotePlan)
 	}
+	if !hasProviderActionGuard(preview.RemotePlan.Actions, "push_branch", "release_branch_required") ||
+		!hasProviderActionGuard(preview.RemotePlan.Actions, "create_tag", "tag_collision_check_required") ||
+		!hasProviderActionGuard(preview.RemotePlan.Actions, "trigger_workflow", "workflow_ref_required") {
+		t.Fatalf("expected branch/tag/workflow preview guardrails, got %+v", preview.RemotePlan.Actions)
+	}
 
 	blocked, found, err := ProviderPublish(root, ProviderOptions{ReleaseID: plan.ID})
 	if err != nil {
@@ -233,6 +238,10 @@ func TestProviderPublishUsesReleaseProviderAdapterWhenWriteSwitchEnabled(t *test
 		!hasProviderResult(execution.RemoteResults, "create_release", "completed") {
 		t.Fatalf("expected controlled remote action results, got %+v", execution.RemoteResults)
 	}
+	if !hasProviderResultGuard(execution.RemoteResults, "push_branch", "release_branch_required") ||
+		!hasProviderResultGuard(execution.RemoteResults, "trigger_workflow", "workflow_ref_required") {
+		t.Fatalf("expected skipped action results to retain guardrails, got %+v", execution.RemoteResults)
+	}
 	if _, _, err := approvals.VerifyApproved(root, blocked.ApprovalID, approvals.RequestOptions{TargetType: "release_provider_publish", TargetID: plan.ID, Action: "release.provider.publish"}); err == nil {
 		t.Fatal("expected consumed release provider approval to fail verification")
 	}
@@ -279,10 +288,38 @@ func hasProviderAction(actions []ProviderAction, actionType string, status strin
 	return false
 }
 
+func hasProviderActionGuard(actions []ProviderAction, actionType string, guardrail string) bool {
+	for _, action := range actions {
+		if action.Type != actionType {
+			continue
+		}
+		for _, item := range action.Guardrails {
+			if item == guardrail {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func hasProviderResult(results []ProviderActionResult, actionType string, status string) bool {
 	for _, result := range results {
 		if result.Type == actionType && result.Status == status {
 			return true
+		}
+	}
+	return false
+}
+
+func hasProviderResultGuard(results []ProviderActionResult, actionType string, guardrail string) bool {
+	for _, result := range results {
+		if result.Type != actionType {
+			continue
+		}
+		for _, item := range result.Guardrails {
+			if item == guardrail {
+				return true
+			}
 		}
 	}
 	return false

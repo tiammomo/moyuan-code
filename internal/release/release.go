@@ -99,22 +99,26 @@ type RemotePlan struct {
 }
 
 type ProviderAction struct {
-	Type     string `json:"type"`
-	Status   string `json:"status"`
-	Command  string `json:"command,omitempty"`
-	Endpoint string `json:"endpoint,omitempty"`
-	Reason   string `json:"reason,omitempty"`
+	Type          string   `json:"type"`
+	Status        string   `json:"status"`
+	Command       string   `json:"command,omitempty"`
+	Endpoint      string   `json:"endpoint,omitempty"`
+	Reason        string   `json:"reason,omitempty"`
+	RiskLevel     string   `json:"risk_level,omitempty"`
+	ExecutionMode string   `json:"execution_mode,omitempty"`
+	Guardrails    []string `json:"guardrails,omitempty"`
 }
 
 type ProviderActionResult struct {
-	Type       string `json:"type"`
-	Status     string `json:"status"`
-	Decision   string `json:"decision"`
-	Endpoint   string `json:"endpoint,omitempty"`
-	HTTPStatus int    `json:"http_status,omitempty"`
-	RemoteID   string `json:"remote_id,omitempty"`
-	RemoteLink string `json:"remote_link,omitempty"`
-	Reason     string `json:"reason,omitempty"`
+	Type       string   `json:"type"`
+	Status     string   `json:"status"`
+	Decision   string   `json:"decision"`
+	Endpoint   string   `json:"endpoint,omitempty"`
+	HTTPStatus int      `json:"http_status,omitempty"`
+	RemoteID   string   `json:"remote_id,omitempty"`
+	RemoteLink string   `json:"remote_link,omitempty"`
+	Reason     string   `json:"reason,omitempty"`
+	Guardrails []string `json:"guardrails,omitempty"`
 }
 
 type releaseProviderAPIConfig struct {
@@ -505,23 +509,57 @@ func buildProviderRemotePlan(rootDir string, plan Plan) RemotePlan {
 		CreatedAt:     time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	remotePlan.Actions = append(remotePlan.Actions,
-		ProviderAction{Type: "push_branch", Status: "planned", Command: "git push " + defaultString(plan.RemoteName, "origin") + " " + plan.ReleaseBranch},
-		ProviderAction{Type: "create_tag", Status: "planned", Command: "git tag " + plan.Version},
-		ProviderAction{Type: "push_tag", Status: "planned", Command: "git push " + defaultString(plan.RemoteName, "origin") + " " + plan.Version},
+		guardedAction("push_branch", "planned", "git_command_preview", "high", "git push "+defaultString(plan.RemoteName, "origin")+" "+plan.ReleaseBranch, ""),
+		guardedAction("create_tag", "planned", "local_git_preview", "high", "git tag "+plan.Version, ""),
+		guardedAction("push_tag", "planned", "git_command_preview", "high", "git push "+defaultString(plan.RemoteName, "origin")+" "+plan.Version, ""),
 	)
 	releaseEndpoint, ok := releaseEndpoint(cfg)
 	if ok {
-		remotePlan.Actions = append(remotePlan.Actions, ProviderAction{Type: "create_release", Status: "planned", Endpoint: releaseEndpoint})
+		action := guardedAction("create_release", "planned", "provider_api_preview", "high", "", "")
+		action.Endpoint = releaseEndpoint
+		remotePlan.Actions = append(remotePlan.Actions, action)
 	} else {
-		remotePlan.Actions = append(remotePlan.Actions, ProviderAction{Type: "create_release", Status: "manual_required", Reason: "provider_release_api_unsupported:" + normalize(plan.Provider)})
+		remotePlan.Actions = append(remotePlan.Actions, guardedAction("create_release", "manual_required", "manual", "medium", "", "provider_release_api_unsupported:"+normalize(plan.Provider)))
 	}
 	workflowEndpoint, ok := workflowEndpoint(cfg)
 	if ok {
-		remotePlan.Actions = append(remotePlan.Actions, ProviderAction{Type: "trigger_workflow", Status: "planned", Endpoint: workflowEndpoint})
+		action := guardedAction("trigger_workflow", "planned", "workflow_dispatch_preview", "high", "", "")
+		action.Endpoint = workflowEndpoint
+		remotePlan.Actions = append(remotePlan.Actions, action)
 	} else {
-		remotePlan.Actions = append(remotePlan.Actions, ProviderAction{Type: "trigger_workflow", Status: "manual_required", Reason: "provider_workflow_api_unsupported:" + normalize(plan.Provider)})
+		remotePlan.Actions = append(remotePlan.Actions, guardedAction("trigger_workflow", "manual_required", "manual", "medium", "", "provider_workflow_api_unsupported:"+normalize(plan.Provider)))
 	}
 	return remotePlan
+}
+
+func guardedAction(actionType string, status string, executionMode string, riskLevel string, command string, reason string) ProviderAction {
+	return ProviderAction{
+		Type:          actionType,
+		Status:        status,
+		Command:       command,
+		Reason:        reason,
+		RiskLevel:     riskLevel,
+		ExecutionMode: executionMode,
+		Guardrails:    releaseProviderActionGuardrails(actionType),
+	}
+}
+
+func releaseProviderActionGuardrails(actionType string) []string {
+	base := []string{"approval_required", "write_switch_required", "replay_guard_required", "secret_ref_required"}
+	switch actionType {
+	case "push_branch":
+		return append(base, "clean_worktree_required", "release_branch_required")
+	case "create_tag":
+		return append(base, "tag_version_required", "tag_collision_check_required")
+	case "push_tag":
+		return append(base, "tag_created_or_existing_check_required")
+	case "create_release":
+		return append(base, "release_notes_required", "provider_endpoint_required")
+	case "trigger_workflow":
+		return append(base, "workflow_endpoint_required", "workflow_ref_required")
+	default:
+		return base
+	}
 }
 
 func releaseEndpoint(cfg releaseProviderAPIConfig) (string, bool) {
@@ -625,18 +663,20 @@ func executeReleaseProviderAdapter(ctx context.Context, execution ProviderExecut
 		switch action.Type {
 		case "push_branch", "create_tag", "push_tag":
 			results = append(results, ProviderActionResult{
-				Type:     action.Type,
-				Status:   "skipped",
-				Decision: "RELEASE_PROVIDER_ACTION_SKIPPED",
-				Reason:   "git_command_execution_not_enabled_in_release_provider_adapter",
+				Type:       action.Type,
+				Status:     "skipped",
+				Decision:   "RELEASE_PROVIDER_ACTION_SKIPPED",
+				Reason:     "git_command_execution_not_enabled_in_release_provider_adapter",
+				Guardrails: append([]string{}, action.Guardrails...),
 			})
 		case "trigger_workflow":
 			results = append(results, ProviderActionResult{
-				Type:     action.Type,
-				Status:   "skipped",
-				Decision: "RELEASE_PROVIDER_ACTION_SKIPPED",
-				Endpoint: action.Endpoint,
-				Reason:   "workflow_dispatch_not_enabled_in_release_provider_adapter",
+				Type:       action.Type,
+				Status:     "skipped",
+				Decision:   "RELEASE_PROVIDER_ACTION_SKIPPED",
+				Endpoint:   action.Endpoint,
+				Reason:     "workflow_dispatch_not_enabled_in_release_provider_adapter",
+				Guardrails: append([]string{}, action.Guardrails...),
 			})
 		case "create_release":
 			result := createRemoteRelease(ctx, cfg, execution, token)
