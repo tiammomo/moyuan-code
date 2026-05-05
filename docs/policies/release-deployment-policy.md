@@ -6,7 +6,7 @@
 
 Release note、发版前置条件、批次规则、禁止发版条件和覆盖率门禁由 [工程流程规范](../engineering-process-standards.md) 维护。
 
-当前实现已支持 release/deploy 计划层判断、Release batch readiness、Release provider create release 受控真实写入 Beta、SSH execute 受控真实执行 Beta。branch push、tag push 和 workflow dispatch 仍不执行真实写入，但必须在 provider preview/result 中给出 risk、execution mode 和 guardrails。Deployment smoke/monitor 已具备默认检查模板，执行报告和 post-deployment history 会保留 template、severity 和 failure class。
+当前实现已支持 release/deploy 计划层判断、Release batch readiness、Release provider create release 受控真实写入 Beta、SSH execute 受控真实执行 Beta。branch push、tag push 和 workflow dispatch 仍不执行真实写入，但必须在 provider preview/result 中给出 risk、execution mode 和 guardrails。Deployment smoke/monitor 已具备默认检查模板，执行报告和 post-deployment history 会保留 template、severity 和 failure class；post-deployment verification 会聚合 history、monitor summary、rollback suggestion 和 evidence，失败时只建议风险复核，不自动修复生产。
 
 ## 2. 输入事实
 
@@ -123,6 +123,8 @@ else if monitor window has critical alerts:
     ROLLBACK_REQUIRED
   else:
     MANUAL_INTERVENTION_REQUIRED
+else if post-deployment verification is failed or attention_required:
+  MANUAL_INTERVENTION_REQUIRED
 else:
   mark release healthy
 ```
@@ -171,3 +173,4 @@ else:
 - 生产发布缺少审批时不能部署。
 - 资源组不健康时不能部署。
 - 冒烟失败且可回滚时必须回滚。
+- post-deployment verification 失败时必须进入人工复核或风险修复 handoff，不自动运行生产 repair。

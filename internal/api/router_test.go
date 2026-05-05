@@ -427,6 +427,13 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/operations/timeline?limit=20&type=deployment_execution", http.StatusOK, `"operations_timeline"`, `"deployment_execution"`, evidenceRecords[0].ParentID)
 	assertGETContains(t, router, "/v1/projects/managed/operations/timeline?limit=20&environment=test_dev", http.StatusOK, `"operations_timeline"`, `"resource_health_scan"`, `"server_resource"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/"+evidenceRecords[0].ParentID+"/post-deployment-history", http.StatusOK, `"post_deployment_history"`, `"execution_blocked"`)
+	assertPostContains(t, router, "/v1/projects/managed/post-deployment-verifications", `{"execution_id":"`+evidenceRecords[0].ParentID+`","monitor_limit":5}`, http.StatusAccepted, `"post_deployment_verification"`, `"POST_DEPLOYMENT_VERIFICATION_ATTENTION_REQUIRED"`)
+	verifications, err := deployment.ListPostDeploymentVerifications(root, 1)
+	if err != nil || len(verifications) != 1 {
+		t.Fatalf("expected post deployment verification, verifications=%+v err=%v", verifications, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/post-deployment-verifications?limit=5", http.StatusOK, `"post_deployment_verifications"`, verifications[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/post-deployment-verifications/"+verifications[0].ID, http.StatusOK, `"post_deployment_verification"`, `"risk_handoff_recommended"`)
 	assertGETContains(t, router, "/v1/projects/managed/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"evidence"`, evidenceRecords[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/operations/deployment/"+evidenceRecords[0].ParentID, http.StatusOK, `"operation_detail"`, `"deployment.execute.dry_run"`, `"artifact_count":1`)
 	assertPostContains(t, router, "/v1/projects/managed/operations/deployment/"+evidenceRecords[0].ParentID+"/repair-candidate", `{}`, http.StatusCreated, `"operation_repair_candidate"`, `"REPAIR_CANDIDATE_CREATED"`, `"candidate_review_required"`)

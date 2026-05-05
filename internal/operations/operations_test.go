@@ -126,6 +126,10 @@ func TestTimelineAggregatesOperationsAndFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	verification, err := deployment.BuildPostDeploymentVerification(root, deployment.PostDeploymentVerificationOptions{ExecutionID: execution.ID, Environment: "test_dev", MonitorLimit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
 	rehearsal, err := deployment.BuildRehearsal(context.Background(), root, deployment.RehearsalOptions{ExecutionID: execution.ID, Environment: "test_dev"})
 	if err != nil {
 		t.Fatal(err)
@@ -177,6 +181,7 @@ func TestTimelineAggregatesOperationsAndFilters(t *testing.T) {
 		"release_provider_execution",
 		"deployment_execution",
 		"deployment_monitor_summary",
+		"post_deployment_verification",
 		"deployment_rehearsal",
 		"release_admission",
 		"rehearsal_scheduler_run",
@@ -204,6 +209,9 @@ func TestTimelineAggregatesOperationsAndFilters(t *testing.T) {
 	}
 	if !timelineContainsID(envFiltered, schedulerRun.ID) || !timelineContainsID(envFiltered, summary.ID) {
 		t.Fatalf("expected environment filtered operations, got %+v", envFiltered)
+	}
+	if !timelineContainsID(envFiltered, verification.ID) {
+		t.Fatalf("expected verification in environment filtered operations, got %+v", envFiltered)
 	}
 }
 

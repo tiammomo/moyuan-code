@@ -252,6 +252,36 @@ func Timeline(rootDir string, options TimelineOptions) ([]TimelineItem, error) {
 		})
 	}
 
+	verifications, err := deployment.ListPostDeploymentVerifications(rootDir, sourceLimit)
+	if err != nil {
+		return nil, err
+	}
+	for _, verification := range verifications {
+		add(TimelineItem{
+			ID:           verification.ID,
+			Type:         "post_deployment_verification",
+			Operation:    "deployment.post_deployment.verify",
+			Status:       verification.Status,
+			Decision:     verification.Decision,
+			Reasons:      append([]string{}, verification.Reasons...),
+			PrimaryRef:   verification.ExecutionID,
+			SecondaryRef: verification.RiskSourceID,
+			Environment:  verification.Environment,
+			EvidenceRefs: append([]string{}, verification.EvidenceIDs...),
+			Timestamp:    verification.CreatedAt,
+			Metadata: map[string]any{
+				"history_id":               verification.HistoryID,
+				"history_decision":         verification.HistoryDecision,
+				"monitor_summary_id":       verification.MonitorSummaryID,
+				"monitor_decision":         verification.MonitorDecision,
+				"smoke_decision":           verification.SmokeDecision,
+				"rollback_required":        verification.RollbackRequired,
+				"risk_handoff_recommended": verification.RiskHandoffRecommended,
+				"risk_source_type":         verification.RiskSourceType,
+			},
+		})
+	}
+
 	rehearsals, err := deployment.ListRehearsals(rootDir, sourceLimit)
 	if err != nil {
 		return nil, err

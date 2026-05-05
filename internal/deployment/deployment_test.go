@@ -211,6 +211,13 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	if okHistory.Checks[0].TemplateID != "deploy-smoke-test_dev-v1" || okHistory.Checks[0].Severity != "high" || okHistory.Checks[0].FailureClass != "none" {
 		t.Fatalf("expected smoke history template policy, got %+v", okHistory.Checks[0])
 	}
+	okVerification, err := BuildPostDeploymentVerification(root, PostDeploymentVerificationOptions{ExecutionID: okExecution.ID, Environment: "test_dev", MonitorLimit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if okVerification.Status != "completed" || okVerification.Decision != "POST_DEPLOYMENT_VERIFICATION_PASSED" || okVerification.RiskHandoffRecommended {
+		t.Fatalf("expected passed post deployment verification, got %+v", okVerification)
+	}
 
 	failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "fail", http.StatusInternalServerError)
@@ -259,6 +266,20 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	}
 	if failedHistory.Severity != "high" || failedHistory.Checks[0].TemplateID != "deploy-smoke-test_dev-v1" || failedHistory.Checks[0].FailureClass != "smoke_failed" {
 		t.Fatalf("expected failed history severity and template policy, got %+v", failedHistory)
+	}
+	failedVerification, err := BuildPostDeploymentVerification(root, PostDeploymentVerificationOptions{ExecutionID: failedExecution.ID, Environment: "test_dev", MonitorLimit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failedVerification.Status != "failed" || failedVerification.Decision != "POST_DEPLOYMENT_VERIFICATION_FAILED" || !failedVerification.RiskHandoffRecommended || failedVerification.RiskSourceType != "post_deployment_history" {
+		t.Fatalf("expected failed verification with risk recommendation, got %+v", failedVerification)
+	}
+	verifications, err := ListPostDeploymentVerifications(root, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(verifications) != 2 {
+		t.Fatalf("expected two post deployment verifications, got %+v", verifications)
 	}
 	histories, err := ListPostDeploymentHistories(root, 10)
 	if err != nil {

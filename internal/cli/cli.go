@@ -239,6 +239,9 @@ func usage() string {
 		"moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell] [--approved] [--approval-id <approval-id>] [--command <safe-command>]",
 		"moyuan deploy rollback <execution-id> [--mode preview|local_shell] [--approved] [--approval-id <approval-id>] [--command <safe-command>]",
 		"moyuan deploy monitor summarize [--environment test_dev] [--limit 20]",
+		"moyuan deploy verify create --execution-id <id> [--environment test_dev] [--monitor-limit 20]",
+		"moyuan deploy verify list [--limit 20]",
+		"moyuan deploy verify show <verification-id>",
 		"moyuan deploy rehearsal create [--candidate-id <id>] [--deployment-id <id>] [--execution-id <id>] [--environment test_dev]",
 		"moyuan deploy rehearsal schedule [--candidate-id <id>] [--deployment-id <id>] [--execution-id <id>] [--environment test_dev] [--max-targets 3] [--skip-admission]",
 		"moyuan deploy show <deployment-id>",
@@ -1727,6 +1730,39 @@ func handleDeploy(ctx context.Context, args []string, cwd string) (string, any, 
 			return "", map[string]any{}, 1, nil
 		}
 		return "", summary, 0, nil
+	case "verify":
+		if len(args) < 2 {
+			return "missing verify command\n", nil, 1, nil
+		}
+		switch args[1] {
+		case "create":
+			verification, err := deployment.BuildPostDeploymentVerification(rootDir, deployment.PostDeploymentVerificationOptions{
+				ExecutionID:  flagValue(args, "--execution-id", ""),
+				Environment:  flagValue(args, "--environment", ""),
+				MonitorLimit: flagInt(args, "--monitor-limit", 20),
+			})
+			code := 0
+			if verification.Status == "blocked" || verification.Status == "attention_required" || verification.Status == "failed" {
+				code = 1
+			}
+			return "", verification, code, err
+		case "list":
+			verifications, err := deployment.ListPostDeploymentVerifications(rootDir, flagInt(args, "--limit", 20))
+			return "", map[string]any{"post_deployment_verifications": verifications}, 0, err
+		case "show":
+			if len(args) < 3 {
+				return "missing verification id\n", nil, 1, nil
+			}
+			verification, ok, err := deployment.LoadPostDeploymentVerification(rootDir, args[2])
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !ok {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", verification, 0, nil
+		}
+		return "unknown verify command\n", nil, 1, nil
 	case "rehearsal":
 		if len(args) < 2 {
 			return "missing rehearsal command\n", nil, 1, nil

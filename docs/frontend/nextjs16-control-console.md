@@ -162,7 +162,7 @@ apps/console/
 | Visual Assets | 查看架构图 plan、diagram spec、prompt、route decision、render execution、script path 和图片生成状态；支持受控 dry-run render |
 | Git & Release | 查看分支、PR/MR plan、release suggestion 和 tag/push 计划；通过受控按钮触发 PR/MR preview、sync 和携带 Approval ID 的 create |
 | Server Resources | 查看 test_dev、production 机器、到期、健康和维护窗口；通过受控表单记录续期和退役 |
-| Deployments | 查看部署计划、审批、post-deployment history、线上冒烟、监控和 rollback |
+| Deployments | 查看部署计划、审批、post-deployment history、post-deployment verification、线上冒烟、监控和 rollback |
 | Logs & Audit | 查看核心日志、审计事件和 trace |
 | Settings | 项目配置索引、权限、策略和 schema 校验结果 |
 
@@ -205,7 +205,7 @@ apps/console/
 - Schema-aware Forms：表单从 contract/schema 生成约束，错误能定位到字段；当前已先落地必填字段预检，后续再接入完整 schema metadata。
 - Provider Telemetry Surface：Provider 面板展示 health/quota/cost/quality 摘要和近期 telemetry 记录；Provider route preview 展示 selected/skipped/blocked candidates、score、runtime/model 和 provider 侧原因。
 - Resource Lifecycle Surface：Server Resources 面板展示 lifecycle alerts、expiration state、maintenance records 和资源续期/退役动作状态。
-- Deployment Monitor Surface：Deployment Executions 面板展示 post-deployment history，把 smoke/monitor 状态、失败分类、rollback runbook 状态和 evidence chain 作为后端事实源展示，不在前端自行推断高风险结论。
+- Deployment Monitor Surface：Deployment Executions 面板展示 post-deployment history 和 post-deployment verification，把 smoke/monitor 状态、失败分类、rollback runbook、risk handoff recommendation 和 evidence chain 作为后端事实源展示，不在前端自行推断高风险结论。
 - Control Loop Surface：Console 展示 control loop run、step decision、summary、duration、evidence 数量；手动触发只运行 bounded control loop，不启动常驻 scheduler。
 - Batch Execution Surface：Console 展示后端 `batch_plans`、`batch_runs`、`worktrees` 和 `merge_queues`，用户可触发 batch dry-run 和 merge queue build；dependency、write scope、quality/review 和 merge readiness 只以后端事实源为准。
 - AI Assist Surface：保留“让 agent 解释当前状态 / 生成修复建议 / 生成发布说明”的入口，但不能绕过后端门禁。

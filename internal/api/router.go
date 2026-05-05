@@ -166,6 +166,12 @@ type deploymentRehearsalRequest struct {
 	MonitorLimit int    `json:"monitor_limit"`
 }
 
+type postDeploymentVerificationRequest struct {
+	ExecutionID  string `json:"execution_id"`
+	Environment  string `json:"environment"`
+	MonitorLimit int    `json:"monitor_limit"`
+}
+
 type rehearsalSchedulerRequest struct {
 	Trigger       string `json:"trigger"`
 	CandidateID   string `json:"candidate_id"`
@@ -2564,6 +2570,74 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"monitor_summaries": summaries})
+	})
+	router.POST("/v1/projects/:project_id/post-deployment-verifications", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req postDeploymentVerificationRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		verification, err := deployment.BuildPostDeploymentVerification(rootDir, deployment.PostDeploymentVerificationOptions{
+			ExecutionID:  req.ExecutionID,
+			Environment:  req.Environment,
+			MonitorLimit: req.MonitorLimit,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusCreated
+		if verification.Status == "blocked" || verification.Status == "attention_required" || verification.Status == "failed" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"post_deployment_verification": verification})
+	})
+	router.GET("/v1/projects/:project_id/post-deployment-verifications", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		verifications, err := deployment.ListPostDeploymentVerifications(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"post_deployment_verifications": verifications})
+	})
+	router.GET("/v1/projects/:project_id/post-deployment-verifications/:verification_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		verification, found, err := deployment.LoadPostDeploymentVerification(rootDir, c.Param("verification_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "post deployment verification not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"post_deployment_verification": verification})
 	})
 	router.POST("/v1/projects/:project_id/deployment-rehearsals", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
