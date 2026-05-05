@@ -26,18 +26,23 @@ type ReleaseAdmissionOptions struct {
 }
 
 type ReleaseAdmission struct {
-	ID           string            `json:"id"`
-	RehearsalID  string            `json:"rehearsal_id,omitempty"`
-	CandidateID  string            `json:"candidate_id,omitempty"`
-	DeploymentID string            `json:"deployment_id,omitempty"`
-	ExecutionID  string            `json:"execution_id,omitempty"`
-	Environment  string            `json:"environment,omitempty"`
-	Status       string            `json:"status"`
-	Decision     string            `json:"decision"`
-	Reasons      []string          `json:"reasons"`
-	Signals      []AdmissionSignal `json:"signals"`
-	EvidenceIDs  []string          `json:"evidence_ids,omitempty"`
-	CreatedAt    string            `json:"created_at"`
+	ID             string                         `json:"id"`
+	RehearsalID    string                         `json:"rehearsal_id,omitempty"`
+	CandidateID    string                         `json:"candidate_id,omitempty"`
+	DeploymentID   string                         `json:"deployment_id,omitempty"`
+	ExecutionID    string                         `json:"execution_id,omitempty"`
+	Environment    string                         `json:"environment,omitempty"`
+	Status         string                         `json:"status"`
+	Decision       string                         `json:"decision"`
+	Reasons        []string                       `json:"reasons"`
+	Signals        []AdmissionSignal              `json:"signals"`
+	PolicyID       string                         `json:"policy_id,omitempty"`
+	PolicyVersion  string                         `json:"policy_version,omitempty"`
+	PolicySource   string                         `json:"policy_source,omitempty"`
+	MatchedRules   []AdmissionRuleMatch           `json:"matched_rules,omitempty"`
+	PolicyDecision ReleaseAdmissionPolicyDecision `json:"policy_decision,omitempty"`
+	EvidenceIDs    []string                       `json:"evidence_ids,omitempty"`
+	CreatedAt      string                         `json:"created_at"`
 }
 
 type AdmissionSignal struct {
@@ -76,7 +81,7 @@ func BuildReleaseAdmission(ctx context.Context, rootDir string, options ReleaseA
 	}
 	if !found {
 		admission.Reasons = append(admission.Reasons, "deployment_rehearsal_missing")
-		return finishReleaseAdmission(rootDir, admission)
+		return finalizeAndFinishReleaseAdmission(rootDir, admission)
 	}
 	admission.RehearsalID = rehearsal.ID
 	admission.CandidateID = firstNonEmpty(options.CandidateID, rehearsal.CandidateID)
@@ -149,7 +154,7 @@ func BuildReleaseAdmission(ctx context.Context, rootDir string, options ReleaseA
 			}
 		}
 	}
-	return finishReleaseAdmission(rootDir, finalizeAdmission(admission))
+	return finalizeAndFinishReleaseAdmission(rootDir, admission)
 }
 
 func LoadReleaseAdmission(rootDir string, id string) (ReleaseAdmission, bool, error) {
@@ -206,66 +211,12 @@ func resolveAdmissionRehearsal(ctx context.Context, rootDir string, options Rele
 	return rehearsal, rehearsal.ID != "", err
 }
 
-func finalizeAdmission(admission ReleaseAdmission) ReleaseAdmission {
-	blocked := false
-	manual := false
-	for _, signal := range admission.Signals {
-		switch signal.Type {
-		case "deployment_rehearsal":
-			if signal.Status == "blocked" {
-				blocked = true
-				admission.Reasons = append(admission.Reasons, "rehearsal_blocked")
-			}
-			if strings.Contains(signal.Reason, "deployment_execution:failed") {
-				blocked = true
-				admission.Reasons = append(admission.Reasons, "deployment_execution_failed")
-			}
-			if signal.Status == "attention_required" {
-				manual = true
-				admission.Reasons = append(admission.Reasons, "rehearsal_attention_required")
-			}
-		case "monitor_summary":
-			if signal.Status == "critical" {
-				blocked = true
-				admission.Reasons = append(admission.Reasons, "monitor_critical")
-			}
-			if signal.Status == "attention_required" || signal.Status == "unknown" {
-				manual = true
-				admission.Reasons = append(admission.Reasons, "monitor_attention_required")
-			}
-		case "rollback_preview":
-			manual = true
-			admission.Reasons = append(admission.Reasons, "rollback_required")
-		case "candidate_deployment_feedback":
-			if signal.Status == "failed" || signal.Status == "blocked" {
-				blocked = true
-				admission.Reasons = append(admission.Reasons, "candidate_deployment_risk")
-			}
-			if signal.Status == "manual_required" || signal.Status == "pending" {
-				manual = true
-				admission.Reasons = append(admission.Reasons, "candidate_deployment_manual_review")
-			}
-		case "resource_status":
-			if signal.Status == "disabled" || signal.Status == "retired" || signal.Status == "expired" {
-				blocked = true
-				admission.Reasons = append(admission.Reasons, "resource_not_available:"+signal.ID)
-			}
-		}
+func finalizeAndFinishReleaseAdmission(rootDir string, admission ReleaseAdmission) (ReleaseAdmission, error) {
+	pack, err := LoadReleaseAdmissionPolicyPack(rootDir, admission.Environment)
+	if err != nil {
+		return ReleaseAdmission{}, err
 	}
-	if blocked {
-		admission.Status = "blocked"
-		admission.Decision = "RELEASE_ADMISSION_BLOCKED"
-		return admission
-	}
-	if manual {
-		admission.Status = "manual_required"
-		admission.Decision = "RELEASE_ADMISSION_MANUAL_REVIEW_REQUIRED"
-		return admission
-	}
-	admission.Status = "allowed"
-	admission.Decision = "RELEASE_ADMISSION_ALLOWED"
-	admission.Reasons = append(admission.Reasons, "release_admission_allowed")
-	return admission
+	return finishReleaseAdmission(rootDir, EvaluateReleaseAdmissionPolicy(pack, admission))
 }
 
 func finishReleaseAdmission(rootDir string, admission ReleaseAdmission) (ReleaseAdmission, error) {

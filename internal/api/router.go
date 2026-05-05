@@ -2623,6 +2623,23 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(status, gin.H{"release_admission": admission})
 	})
+	router.GET("/v1/projects/:project_id/release-admission-policy", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		policy, err := deployment.LoadReleaseAdmissionPolicyPack(rootDir, c.Query("environment"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"release_admission_policy_pack": policy})
+	})
 	router.GET("/v1/projects/:project_id/release-admissions", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

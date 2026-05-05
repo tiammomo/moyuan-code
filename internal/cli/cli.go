@@ -216,6 +216,7 @@ func usage() string {
 		"moyuan release provider publish <release-id> [--approved] [--approval-id <approval-id>]",
 		"moyuan release provider execution <execution-id>",
 		"moyuan release admission create [--rehearsal-id <id>] [--candidate-id <id>] [--deployment-id <id>] [--execution-id <id>]",
+		"moyuan release admission policy [--environment <env>]",
 		"moyuan release admission <admission-id>",
 		"moyuan release admissions",
 		"moyuan resources add --id <id> --environment test_dev --host <host>",
@@ -1411,6 +1412,10 @@ func handleRelease(ctx context.Context, args []string, cwd string) (string, any,
 				code = 1
 			}
 			return "", admission, code, err
+		}
+		if args[1] == "policy" {
+			policy, err := deployment.LoadReleaseAdmissionPolicyPack(rootDir, flagValue(args, "--environment", ""))
+			return "", map[string]any{"release_admission_policy_pack": policy}, 0, err
 		}
 		admission, ok, err := deployment.LoadReleaseAdmission(rootDir, args[1])
 		if err != nil {

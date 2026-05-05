@@ -772,6 +772,9 @@ func TestBuildRehearsalLinksExecutionRollbackMonitorAndEvidence(t *testing.T) {
 	if admission.Status != "blocked" || admission.Decision != "RELEASE_ADMISSION_BLOCKED" {
 		t.Fatalf("expected blocked admission from risky rehearsal, got %+v", admission)
 	}
+	if admission.PolicyID != defaultReleaseAdmissionPolicyID || admission.PolicyDecision.MatchedRuleCount == 0 || !hasAdmissionRuleMatch(admission.MatchedRules, "deployment_execution_failed") {
+		t.Fatalf("expected release admission policy explanation, got %+v", admission)
+	}
 	if !hasAdmissionSignal(admission.Signals, "deployment_rehearsal") || !hasAdmissionSignal(admission.Signals, "monitor_summary") || !hasAdmissionSignal(admission.Signals, "rollback_preview") {
 		t.Fatalf("expected admission signals, got %+v", admission.Signals)
 	}

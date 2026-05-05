@@ -575,12 +575,18 @@ Skill Binding 字段：
 | `release.gates.require_rollback_plan` | required | `true` | 必须为 true |
 | `release.git` | required | 无 | release branch 和 tag 策略 |
 | `release.deployment` | conditional_required | null | `deploy_to_environment` 时必填 |
+| `release_admission_policy_pack` | optional | 内置 `release-admission-default-v1` | Phase 17 发布准入策略包扩展 |
+| `release_admission_policy_pack.id` | optional | `release-admission-default-v1` | 策略包 ID |
+| `release_admission_policy_pack.environments` | optional | 内置 default/production | 环境级 signal 要求和 unknown monitor 策略 |
+| `release_admission_policy_pack.rules` | optional | 内置安全规则 | 追加式结构化规则，不替换内置安全门禁 |
 
 必须为空：
 
 - `mode = branch_only` 时，`release.deployment.enabled` 必须为 false 或 `release.deployment` 为 null。
 - `mode = deploy_to_environment` 时，`release.deployment` 不能为 null。
 - `release.gates.require_release_note`、`release.gates.require_coverage_passed`、`release.gates.require_rollback_plan` 必须为 true。
+- `release_admission_policy_pack.rules` 可以为空数组；为空时使用内置策略。
+- 自定义 rule 的 `effect` 只允许 `block`、`manual`、`allow`，其中 `allow` 不能覆盖内置 block/manual 门禁。
 
 ## 24. policies/budget.yaml
 

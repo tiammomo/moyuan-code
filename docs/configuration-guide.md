@@ -86,7 +86,7 @@
 | `policies/logging.yaml` | run、agent、model、git、quality、release、memory、audit、error 日志 | 是 | 是 | [日志与审计事件契约](./contracts/logging-audit-event-contract.md) |
 | `policies/secrets.yaml` | secret provider、引用规则、用途校验和轮换策略 | 否 | 是 | [Secret Resolver 契约](./contracts/secret-resolver-contract.md) |
 | `policies/budget.yaml` | 模型、Runtime、并发和成本预算 | 否 | 建议 | [模型与工具适配规划](./model-tool-adapters.md) |
-| `policies/release.yaml` | release branch、tag、PR/MR、发布批次和审批 | 否 | 是 | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
+| `policies/release.yaml` | release branch、tag、PR/MR、发布批次、审批和 release admission policy pack | 否 | 是 | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
 | `policies/server-resources.yaml` | 测试开发机、生产机、云资产、到期和巡检 | 否 | 是 | [服务器资源管理主线](./mainlines/server-resource-management.md) |
 | `policies/environments.yaml` | 环境、部署方式、冒烟、监控、回滚 | 否 | 是 | [DevOps 发布投产主线](./mainlines/devops-release-deployment.md) |
 | `visuals/architecture-visuals.yaml` | gpt-image-2 架构图和流程图生成 | 否 | 否 | [模型与工具适配规划](./model-tool-adapters.md) |
