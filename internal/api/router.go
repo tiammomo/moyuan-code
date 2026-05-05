@@ -1575,6 +1575,44 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"executions": executions})
 	})
+	router.GET("/v1/projects/:project_id/deployment-monitor-history", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		histories, err := deployment.ListPostDeploymentHistories(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"post_deployment_histories": histories})
+	})
+	router.GET("/v1/projects/:project_id/deployment-executions/:execution_id/post-deployment-history", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		history, found, err := deployment.LoadPostDeploymentHistory(rootDir, c.Param("execution_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "post deployment history not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"post_deployment_history": history})
+	})
 	router.GET("/v1/projects/:project_id/deployment-executions/:execution_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

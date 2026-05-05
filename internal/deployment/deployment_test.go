@@ -49,6 +49,13 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 		!hasEvidenceOperation(evidenceRecords, "deployment.rollback.not_required", "ROLLBACK_NOT_REQUIRED") {
 		t.Fatalf("expected execution, smoke, monitor, and rollback evidence, got %+v", evidenceRecords)
 	}
+	okHistory, found, err := LoadPostDeploymentHistory(root, okExecution.ID)
+	if err != nil || !found {
+		t.Fatalf("expected post deployment history, found=%v err=%v", found, err)
+	}
+	if okHistory.Status != "passed" || okHistory.FailureClass != "none" || okHistory.Rollback.Status != "not_required" || len(okHistory.Checks) != 2 || len(okHistory.EvidenceIDs) != 4 {
+		t.Fatalf("expected passed post deployment history, got %+v", okHistory)
+	}
 
 	failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "fail", http.StatusInternalServerError)
@@ -84,7 +91,22 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	if !hasEvidenceArtifact(failedEvidenceRecords, "deployment.rollback.suggested", "rollback_runbook") {
 		t.Fatalf("expected rollback runbook artifact evidence, got %+v", failedEvidenceRecords)
 	}
+	failedHistory, found, err := LoadPostDeploymentHistory(root, failedExecution.ID)
+	if err != nil || !found {
+		t.Fatalf("expected failed post deployment history, found=%v err=%v", found, err)
+	}
+	if failedHistory.Status != "failed" || failedHistory.FailureClass != "smoke_failed" || failedHistory.Rollback.Status != "suggested" || failedHistory.Rollback.RunbookPath == "" || failedHistory.Rollback.StepCount < 3 {
+		t.Fatalf("expected failed smoke history with rollback runbook, got %+v", failedHistory)
+	}
+	histories, err := ListPostDeploymentHistories(root, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(histories) != 2 {
+		t.Fatalf("expected two post deployment histories, got %+v", histories)
+	}
 	assertDeploymentFileExists(t, filepath.Join(workspace.ForRoot(root).DeploymentsDir, "rollback-runbooks", failedExecution.ID+".json"))
+	assertDeploymentFileExists(t, filepath.Join(workspace.ForRoot(root).DeploymentsDir, "post-deployment-history", failedExecution.ID+".json"))
 	releaseLog, found, err := fsutil.ReadText(filepath.Join(workspace.ForRoot(root).LogsDir, "release.jsonl"))
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +114,8 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	if !found ||
 		!strings.Contains(releaseLog, "deployment.smoke.completed") ||
 		!strings.Contains(releaseLog, "deployment.monitor.completed") ||
-		!strings.Contains(releaseLog, "deployment.rollback.suggested") {
+		!strings.Contains(releaseLog, "deployment.rollback.suggested") ||
+		!strings.Contains(releaseLog, "deployment.post_deployment_history.recorded") {
 		t.Fatalf("expected smoke, monitor, and rollback logs, found=%v log=%s", found, releaseLog)
 	}
 }

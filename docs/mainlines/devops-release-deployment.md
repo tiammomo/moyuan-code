@@ -12,7 +12,7 @@ Release note、发版批次、覆盖率门禁、禁止发版条件和回退后 f
 
 - CLI：`moyuan release suggest [--version <version>] [--min-issues <n>]`、`moyuan release show <release-id>`、`moyuan release provider preview <release-id>`、`moyuan release provider publish <release-id> [--approved] [--approval-id <approval-id>]`、`moyuan evidence list/show`。
 - CLI：`moyuan deploy plan <release-id> --environment <env> [--resource <host-id>]`、`moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell]`、`moyuan deploy show <deployment-id>`。
-- API：`POST /v1/projects/:project_id/releases/suggest`、`GET /v1/projects/:project_id/releases/:release_id`、`POST /v1/projects/:project_id/releases/:release_id/provider-preview`、`POST /v1/projects/:project_id/releases/:release_id/provider-publish`、`GET /v1/projects/:project_id/release-provider-executions`、`GET /v1/projects/:project_id/release-provider-executions/:execution_id`、`POST /v1/projects/:project_id/deployments/plan`、`GET /v1/projects/:project_id/deployments/:deployment_id`、`POST /v1/projects/:project_id/deployments/:deployment_id/execute`、`GET /v1/projects/:project_id/evidence`、`GET /v1/projects/:project_id/operations/:operation_type/:operation_id`。
+- API：`POST /v1/projects/:project_id/releases/suggest`、`GET /v1/projects/:project_id/releases/:release_id`、`POST /v1/projects/:project_id/releases/:release_id/provider-preview`、`POST /v1/projects/:project_id/releases/:release_id/provider-publish`、`GET /v1/projects/:project_id/release-provider-executions`、`GET /v1/projects/:project_id/release-provider-executions/:execution_id`、`POST /v1/projects/:project_id/deployments/plan`、`GET /v1/projects/:project_id/deployments/:deployment_id`、`POST /v1/projects/:project_id/deployments/:deployment_id/execute`、`GET /v1/projects/:project_id/deployment-monitor-history`、`GET /v1/projects/:project_id/deployment-executions/:execution_id/post-deployment-history`、`GET /v1/projects/:project_id/evidence`、`GET /v1/projects/:project_id/operations/:operation_type/:operation_id`。
 - Console：Deployment Executions 面板可触发 `Suggest Release`、最新 deployment `Dry Run` 和 `test_dev` `Health Scan`；Release Pipeline 面板可触发 release provider `Preview`/`Publish`，所有动作都走后端受控 API。
 - 输出位置：`.moyuan/lifecycle/releases/` 和 `.moyuan/lifecycle/deployments/`。
 - 当前生成 release suggestion、release branch plan、tag suggestion、release notes draft、provider release/tag/workflow action preview、deploy/smoke/monitor/rollback plan，并在受控 `local_shell` 执行后自动记录 smoke/monitor 结果；`ssh_preview` 可生成远程目标执行预览，`ssh_execute` 默认不开启真实 SSH 连接或生产部署。
@@ -21,6 +21,7 @@ Release note、发版批次、覆盖率门禁、禁止发版条件和回退后 f
 - Release provider execution 和 deployment execution 会自动写入 `.moyuan/lifecycle/evidence/`；deployment 会额外拆出 smoke、monitor 和 rollback/not-required evidence，作为发布、部署、烟测、监控和回滚证据链的统一索引。
 - Operation detail 聚合 API 会按 operation type/id 返回 execution 摘要、evidence chain 和 artifact references；该接口不返回 secret、SSH key、完整 stdout/stderr 或 provider response body。
 - 失败部署会生成结构化 rollback runbook artifact，位置为 `.moyuan/lifecycle/deployments/rollback-runbooks/<execution-id>.json`；runbook 默认要求人工审查，不自动回滚生产。
+- 每次 deployment execution 完成后会生成 post-deployment history，位置为 `.moyuan/lifecycle/deployments/post-deployment-history/<execution-id>.json`；其中固定包含 smoke/monitor 检查摘要、失败分类、rollback runbook 状态、evidence ids 和 artifact references。
 - 已接入门禁：dirty worktree、remote 缺失、无 accepted issue、存在 unresolved issue 时阻断。
 - production deployment plan 缺少 approval 时阻断；test_dev 可生成演练计划。
 
@@ -130,6 +131,8 @@ integration branch accepted
 ```text
 .moyuan/lifecycle/releases/
 .moyuan/lifecycle/deployments/
+.moyuan/lifecycle/deployments/post-deployment-history/
+.moyuan/lifecycle/deployments/rollback-runbooks/
 .moyuan/lifecycle/rollback/
 .moyuan/lifecycle/retrospectives/
 ```

@@ -152,8 +152,49 @@ export type DeploymentExecutionSummary = {
   decision: string;
   reasons: string[];
   step_count: number;
+  smoke_status?: string;
+  monitor_status?: string;
+  rollback_required?: boolean;
   started_at?: string;
   finished_at?: string;
+};
+
+export type PostDeploymentHistorySummary = {
+  id: string;
+  execution_id: string;
+  deployment_id: string;
+  release_id?: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  failure_class: string;
+  checks: PostDeploymentCheckSummary[];
+  rollback: RollbackHistorySummary;
+  evidence_ids: string[];
+  artifacts: EvidenceArtifactSummary[];
+  reasons: string[];
+  created_at?: string;
+};
+
+export type PostDeploymentCheckSummary = {
+  type: string;
+  status: string;
+  decision: string;
+  result_count: number;
+  reasons: string[];
+  checked_at?: string;
+};
+
+export type RollbackHistorySummary = {
+  required: boolean;
+  status: string;
+  decision: string;
+  reason?: string;
+  runbook_status?: string;
+  runbook_decision?: string;
+  runbook_path?: string;
+  step_count: number;
+  actions: string[];
 };
 
 export type ReleaseProviderExecutionSummary = {
@@ -509,6 +550,7 @@ export type ConsoleSnapshot = {
   maintenance_records: MaintenanceRecordSummary[];
   deployments: DeploymentSummary[];
   executions: DeploymentExecutionSummary[];
+  post_deployment_histories: PostDeploymentHistorySummary[];
   release_provider_executions: ReleaseProviderExecutionSummary[];
   evidence: EvidenceSummary[];
   operation_history: OperationHistoryItem[];

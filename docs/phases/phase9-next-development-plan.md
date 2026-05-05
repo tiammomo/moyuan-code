@@ -22,7 +22,7 @@ Phase 8 已完成并通过 release readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase9-001` | `operation-detail-aggregation-api` | completed | Operation detail 后端聚合 | Console/API 可按 operation id 获取 execution/evidence/artifact detail |
 | P0 | `phase9-002` | `server-resource-lifecycle-alerts` | completed | 服务器资源生命周期提醒 | expiring/expired/maintenance_due 可查询并写入 audit |
-| P1 | `phase9-003` | `deployment-monitor-history` | planned | 部署后检查历史和失败分类 | smoke/monitor/rollback 可按 execution 查询历史 |
+| P1 | `phase9-003` | `deployment-monitor-history` | completed | 部署后检查历史和失败分类 | smoke/monitor/rollback 可按 execution 查询历史 |
 | P1 | `phase9-004` | `provider-route-explanation-v2` | planned | Provider 路由解释增强 | selected/skipped provider signals 可解释 |
 | P2 | `phase9-005` | `self-repair-candidate-from-operations` | planned | 从失败 operation 生成修复候选 | repair candidate 可审查，不自动越权 |
 
@@ -80,7 +80,30 @@ Phase 8 已完成并通过 release readiness：
 - `maintenance_window` 支持 `due:YYYY-MM-DD` 或 `YYYY-MM-DD` 形式的 due 判断；其他自然语言窗口只保留为信息，不强行判断。
 - 生命周期提醒会沉淀到 `.moyuan/resources/lifecycle-alerts.jsonl` 和 `.moyuan/resources/lifecycle-scans/`。
 
-## 5. 验证要求
+## 5. 执行规划：`phase9-003 deployment-monitor-history`
+
+实现状态：completed。
+
+范围：
+
+- 每次 deployment execution 完成后生成 post-deployment history，统一记录 smoke/monitor 检查、失败分类、rollback 状态、evidence ids 和 artifact references。
+- API 支持查询最近 history 和按 execution id 查询单个 history。
+- Console Deployment Executions 面板展示 smoke/monitor 状态、rollback suggested 和 post-deployment history 摘要。
+- history 不读取完整 stdout/stderr，不包含 secret、SSH key 或生产远程响应正文。
+
+非目标：
+
+- 不自动执行 rollback。
+- 不扩大 production real execution 权限。
+- 不替代监控平台，只沉淀本系统可审计的 post-deployment 结果。
+
+落地结果：
+
+- 新增 `PostDeploymentHistory`、`PostDeploymentCheck` 和 `RollbackHistory`，产物路径为 `.moyuan/lifecycle/deployments/post-deployment-history/<execution-id>.json`。
+- 新增 API：`GET /v1/projects/:project_id/deployment-monitor-history` 和 `GET /v1/projects/:project_id/deployment-executions/:execution_id/post-deployment-history`。
+- 失败分类包括 `smoke_failed`、`monitor_failed`、`execution_failed`、`execution_blocked`、`manual_check_required` 和 `none`。
+
+## 6. 验证要求
 
 每完成一个 Phase 9 issue，至少运行：
 

@@ -157,6 +157,44 @@ type RollbackRunbookStep struct {
 	Manual       bool   `json:"manual"`
 }
 
+type PostDeploymentHistory struct {
+	ID           string                 `json:"id"`
+	ExecutionID  string                 `json:"execution_id"`
+	DeploymentID string                 `json:"deployment_id"`
+	ReleaseID    string                 `json:"release_id,omitempty"`
+	Environment  string                 `json:"environment,omitempty"`
+	Status       string                 `json:"status"`
+	Decision     string                 `json:"decision"`
+	FailureClass string                 `json:"failure_class"`
+	Checks       []PostDeploymentCheck  `json:"checks"`
+	Rollback     RollbackHistory        `json:"rollback"`
+	EvidenceIDs  []string               `json:"evidence_ids"`
+	Artifacts    []evidence.ArtifactRef `json:"artifacts,omitempty"`
+	Reasons      []string               `json:"reasons"`
+	CreatedAt    string                 `json:"created_at"`
+}
+
+type PostDeploymentCheck struct {
+	Type      string        `json:"type"`
+	Status    string        `json:"status"`
+	Decision  string        `json:"decision"`
+	Results   []CheckResult `json:"results"`
+	Reasons   []string      `json:"reasons"`
+	CheckedAt string        `json:"checked_at,omitempty"`
+}
+
+type RollbackHistory struct {
+	Required        bool     `json:"required"`
+	Status          string   `json:"status"`
+	Decision        string   `json:"decision"`
+	Reason          string   `json:"reason,omitempty"`
+	RunbookStatus   string   `json:"runbook_status,omitempty"`
+	RunbookDecision string   `json:"runbook_decision,omitempty"`
+	RunbookPath     string   `json:"runbook_path,omitempty"`
+	StepCount       int      `json:"step_count"`
+	Actions         []string `json:"actions,omitempty"`
+}
+
 func CreatePlan(rootDir string, options PlanOptions) (Plan, error) {
 	if err := workspace.EnsureDirs(workspace.ForRoot(rootDir)); err != nil {
 		return Plan{}, err
@@ -491,6 +529,55 @@ func ListExecutions(rootDir string, limit int) ([]Execution, error) {
 	return executions, nil
 }
 
+func LoadPostDeploymentHistory(rootDir string, executionID string) (PostDeploymentHistory, bool, error) {
+	var history PostDeploymentHistory
+	found, err := fsutil.ReadJSON(postDeploymentHistoryPath(rootDir, executionID), &history)
+	if err != nil {
+		return PostDeploymentHistory{}, false, err
+	}
+	if found && history.ID != "" {
+		return history, true, nil
+	}
+	execution, executionFound, err := LoadExecution(rootDir, executionID)
+	if err != nil || !executionFound {
+		return PostDeploymentHistory{}, executionFound, err
+	}
+	history, err = buildPostDeploymentHistory(rootDir, execution)
+	return history, true, err
+}
+
+func ListPostDeploymentHistories(rootDir string, limit int) ([]PostDeploymentHistory, error) {
+	dir := postDeploymentHistoryDir(rootDir)
+	if err := fsutil.EnsureDir(dir); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	histories := []PostDeploymentHistory{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var history PostDeploymentHistory
+		found, err := fsutil.ReadJSON(filepath.Join(dir, entry.Name()), &history)
+		if err != nil {
+			return nil, err
+		}
+		if found && history.ID != "" {
+			histories = append(histories, history)
+		}
+	}
+	sort.SliceStable(histories, func(i, j int) bool {
+		return histories[i].CreatedAt > histories[j].CreatedAt
+	})
+	if limit > 0 && len(histories) > limit {
+		return histories[:limit], nil
+	}
+	return histories, nil
+}
+
 func finish(rootDir string, plan Plan) (Plan, error) {
 	if err := fsutil.WriteJSON(planPath(rootDir, plan.ID), plan); err != nil {
 		return Plan{}, err
@@ -537,6 +624,9 @@ func finishExecution(rootDir string, execution Execution) (Execution, error) {
 		return Execution{}, err
 	}
 	if err := addPostDeploymentEvidence(rootDir, execution); err != nil {
+		return Execution{}, err
+	}
+	if err := savePostDeploymentHistory(rootDir, execution); err != nil {
 		return Execution{}, err
 	}
 	return execution, nil
@@ -638,6 +728,157 @@ func writeRollbackRunbook(rootDir string, execution Execution) (string, error) {
 	return rel, fsutil.WriteJSON(path, execution.RollbackSuggestion.Runbook)
 }
 
+func savePostDeploymentHistory(rootDir string, execution Execution) error {
+	history, err := buildPostDeploymentHistory(rootDir, execution)
+	if err != nil {
+		return err
+	}
+	if err := fsutil.WriteJSON(postDeploymentHistoryPath(rootDir, execution.ID), history); err != nil {
+		return err
+	}
+	if err := fsutil.AppendJSONL(filepath.Join(workspace.ForRoot(rootDir).DeploymentsDir, "post-deployment-history.jsonl"), history); err != nil {
+		return err
+	}
+	_ = logging.Log(rootDir, "release", "deployment.post_deployment_history.recorded", map[string]any{
+		"execution_id":  execution.ID,
+		"deployment_id": execution.DeploymentID,
+		"decision":      history.Decision,
+		"status":        history.Status,
+		"failure_class": history.FailureClass,
+		"checks":        len(history.Checks),
+	})
+	return nil
+}
+
+func buildPostDeploymentHistory(rootDir string, execution Execution) (PostDeploymentHistory, error) {
+	records, err := evidence.List(rootDir, evidence.ListOptions{ParentType: "deployment_execution", ParentID: execution.ID, Limit: 100})
+	if err != nil {
+		return PostDeploymentHistory{}, err
+	}
+	evidenceIDs := []string{}
+	artifacts := []evidence.ArtifactRef{}
+	artifactSeen := map[string]bool{}
+	for _, record := range records {
+		evidenceIDs = append(evidenceIDs, record.ID)
+		for _, artifact := range record.Artifacts {
+			key := artifact.Kind + "\x00" + artifact.ID + "\x00" + artifact.Path
+			if !artifactSeen[key] {
+				artifacts = append(artifacts, artifact)
+				artifactSeen[key] = true
+			}
+		}
+	}
+	createdAt := execution.FinishedAt
+	if createdAt == "" {
+		createdAt = time.Now().UTC().Format(time.RFC3339Nano)
+	}
+	history := PostDeploymentHistory{
+		ID:           "post-deployment-history-" + execution.ID,
+		ExecutionID:  execution.ID,
+		DeploymentID: execution.DeploymentID,
+		ReleaseID:    execution.ReleaseID,
+		Environment:  execution.Environment,
+		Checks:       postDeploymentChecks(execution),
+		Rollback:     rollbackHistory(execution, artifacts),
+		EvidenceIDs:  evidenceIDs,
+		Artifacts:    artifacts,
+		Reasons:      append([]string{}, execution.Reasons...),
+		CreatedAt:    createdAt,
+	}
+	history.Status, history.Decision, history.FailureClass = classifyPostDeploymentHistory(execution, history.Checks)
+	for _, check := range history.Checks {
+		history.Reasons = append(history.Reasons, check.Reasons...)
+	}
+	return history, nil
+}
+
+func postDeploymentChecks(execution Execution) []PostDeploymentCheck {
+	checks := []PostDeploymentCheck{}
+	if execution.SmokeReport.Status != "" {
+		checks = append(checks, PostDeploymentCheck{
+			Type:      "smoke",
+			Status:    execution.SmokeReport.Status,
+			Decision:  execution.SmokeReport.Decision,
+			Results:   append([]CheckResult{}, execution.SmokeReport.Results...),
+			Reasons:   checkReportReasons(execution.SmokeReport),
+			CheckedAt: execution.SmokeReport.CheckedAt,
+		})
+	}
+	if execution.MonitorReport.Status != "" {
+		checks = append(checks, PostDeploymentCheck{
+			Type:      "monitor",
+			Status:    execution.MonitorReport.Status,
+			Decision:  execution.MonitorReport.Decision,
+			Results:   append([]CheckResult{}, execution.MonitorReport.Results...),
+			Reasons:   checkReportReasons(execution.MonitorReport),
+			CheckedAt: execution.MonitorReport.CheckedAt,
+		})
+	}
+	return checks
+}
+
+func rollbackHistory(execution Execution, artifacts []evidence.ArtifactRef) RollbackHistory {
+	rollback := execution.RollbackSuggestion
+	history := RollbackHistory{
+		Required: rollback.Required,
+		Status:   "not_applicable",
+		Decision: rollback.Decision,
+		Reason:   rollback.Reason,
+		Actions:  append([]string{}, rollback.Actions...),
+	}
+	if rollback.Decision == "" {
+		return history
+	}
+	history.Status = "not_required"
+	if rollback.Required {
+		history.Status = "suggested"
+	}
+	if rollback.Runbook != nil {
+		history.RunbookStatus = rollback.Runbook.Status
+		history.RunbookDecision = rollback.Runbook.Decision
+		history.StepCount = len(rollback.Runbook.Steps)
+	}
+	for _, artifact := range artifacts {
+		if artifact.Kind == "rollback_runbook" && artifact.Path != "" {
+			history.RunbookPath = artifact.Path
+			break
+		}
+	}
+	return history
+}
+
+func classifyPostDeploymentHistory(execution Execution, checks []PostDeploymentCheck) (string, string, string) {
+	if len(checks) == 0 {
+		switch execution.Status {
+		case "failed":
+			return "failed", "POST_DEPLOYMENT_EXECUTION_FAILED", "execution_failed"
+		case "blocked":
+			return "blocked", "POST_DEPLOYMENT_NOT_STARTED", "execution_blocked"
+		default:
+			return "skipped", "POST_DEPLOYMENT_NOT_APPLICABLE", "none"
+		}
+	}
+	manualRequired := false
+	for _, check := range checks {
+		if check.Status == "failed" {
+			if check.Type == "smoke" {
+				return "failed", "POST_DEPLOYMENT_CHECKS_FAILED", "smoke_failed"
+			}
+			if check.Type == "monitor" {
+				return "failed", "POST_DEPLOYMENT_CHECKS_FAILED", "monitor_failed"
+			}
+			return "failed", "POST_DEPLOYMENT_CHECKS_FAILED", "check_failed"
+		}
+		if check.Status == "manual_required" || check.Status == "blocked" {
+			manualRequired = true
+		}
+	}
+	if manualRequired {
+		return "manual_required", "POST_DEPLOYMENT_MANUAL_REVIEW_REQUIRED", "manual_check_required"
+	}
+	return "passed", "POST_DEPLOYMENT_CHECKS_PASSED", "none"
+}
+
 func checkReportReasons(report CheckReport) []string {
 	reasons := []string{}
 	for _, result := range report.Results {
@@ -668,6 +909,14 @@ func planPath(rootDir string, id string) string {
 
 func executionPath(rootDir string, id string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).DeploymentsDir, "executions", id+".json")
+}
+
+func postDeploymentHistoryDir(rootDir string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).DeploymentsDir, "post-deployment-history")
+}
+
+func postDeploymentHistoryPath(rootDir string, executionID string) string {
+	return filepath.Join(postDeploymentHistoryDir(rootDir), executionID+".json")
 }
 
 func resolveResources(rootDir string, environment string, ids []string) ([]serverresources.Resource, error) {

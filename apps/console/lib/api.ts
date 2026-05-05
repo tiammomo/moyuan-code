@@ -15,6 +15,7 @@ import type {
   MaintenanceRecordSummary,
   OperationDetailSummary,
   OperationHistoryItem,
+  PostDeploymentHistorySummary,
   ProjectSummary,
   ProviderSummary,
   ProviderTelemetrySummary,
@@ -76,6 +77,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     maintenanceResponse,
     deploymentsResponse,
     executionsResponse,
+    postDeploymentHistoriesResponse,
     releaseProviderExecutionsResponse,
     evidenceResponse,
     runsResponse,
@@ -103,6 +105,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ maintenance_records: unknown[] }>>(`/projects/${project.id}/resources/maintenance?limit=5`),
     apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
     apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
+    apiGet<ApiEnvelope<{ post_deployment_histories: unknown[] }>>(`/projects/${project.id}/deployment-monitor-history?limit=5`),
     apiGet<ApiEnvelope<{ release_provider_executions: unknown[] }>>(`/projects/${project.id}/release-provider-executions?limit=6`),
     apiGet<ApiEnvelope<{ evidence: unknown[] }>>(`/projects/${project.id}/evidence?limit=30`),
     apiGet<ApiEnvelope<{ runs: unknown[] }>>(`/projects/${project.id}/runs?limit=12`),
@@ -132,6 +135,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const maintenanceRecords = normalizeMaintenanceRecords(maintenanceResponse?.maintenance_records ?? []);
   const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
   const executions = normalizeExecutions(executionsResponse?.executions ?? []);
+  const postDeploymentHistories = normalizePostDeploymentHistories(postDeploymentHistoriesResponse?.post_deployment_histories ?? []);
   const releaseProviderExecutions = normalizeReleaseProviderExecutions(releaseProviderExecutionsResponse?.release_provider_executions ?? []);
   const evidence = normalizeEvidence(evidenceResponse?.evidence ?? []);
   const runs = normalizeRuns(runsResponse?.runs ?? []);
@@ -181,6 +185,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     maintenance_records: maintenanceRecords,
     deployments,
     executions,
+    post_deployment_histories: postDeploymentHistories,
     release_provider_executions: releaseProviderExecutions,
     evidence,
     operation_history: operationHistory,
@@ -393,18 +398,65 @@ function normalizeDeployments(rawDeployments: unknown[]): DeploymentSummary[] {
 }
 
 function normalizeExecutions(rawExecutions: unknown[]): DeploymentExecutionSummary[] {
-  return rawExecutions.map((raw, index) => ({
-    id: readString(raw, "id", `execution-${index + 1}`),
-    deployment_id: readString(raw, "deployment_id", ""),
-    environment: readString(raw, "environment", "test_dev"),
-    mode: readString(raw, "mode", "dry_run"),
-    status: readString(raw, "status", "unknown"),
-    decision: readString(raw, "decision", "unknown"),
-    reasons: readArray(raw, "reasons"),
-    step_count: readObjectArray(raw, "steps").length,
-    started_at: readString(raw, "started_at", ""),
-    finished_at: readString(raw, "finished_at", ""),
-  }));
+  return rawExecutions.map((raw, index) => {
+    const smokeReport = readUnknown(raw, "smoke_report");
+    const monitorReport = readUnknown(raw, "monitor_report");
+    const rollbackSuggestion = readUnknown(raw, "rollback_suggestion");
+    return {
+      id: readString(raw, "id", `execution-${index + 1}`),
+      deployment_id: readString(raw, "deployment_id", ""),
+      environment: readString(raw, "environment", "test_dev"),
+      mode: readString(raw, "mode", "dry_run"),
+      status: readString(raw, "status", "unknown"),
+      decision: readString(raw, "decision", "unknown"),
+      reasons: readArray(raw, "reasons"),
+      step_count: readObjectArray(raw, "steps").length,
+      smoke_status: readString(smokeReport, "status", ""),
+      monitor_status: readString(monitorReport, "status", ""),
+      rollback_required: readBoolean(rollbackSuggestion, "required"),
+      started_at: readString(raw, "started_at", ""),
+      finished_at: readString(raw, "finished_at", ""),
+    };
+  });
+}
+
+function normalizePostDeploymentHistories(rawHistories: unknown[]): PostDeploymentHistorySummary[] {
+  return rawHistories.map((raw, index) => {
+    const rollback = readUnknown(raw, "rollback");
+    return {
+      id: readString(raw, "id", `post-deployment-history-${index + 1}`),
+      execution_id: readString(raw, "execution_id", ""),
+      deployment_id: readString(raw, "deployment_id", ""),
+      release_id: readString(raw, "release_id", ""),
+      environment: readString(raw, "environment", ""),
+      status: readString(raw, "status", "unknown"),
+      decision: readString(raw, "decision", "unknown"),
+      failure_class: readString(raw, "failure_class", "unknown"),
+      checks: readObjectArray(raw, "checks").map((check) => ({
+        type: readString(check, "type", "check"),
+        status: readString(check, "status", "unknown"),
+        decision: readString(check, "decision", "unknown"),
+        result_count: readObjectArray(check, "results").length,
+        reasons: readArray(check, "reasons"),
+        checked_at: readString(check, "checked_at", ""),
+      })),
+      rollback: {
+        required: readBoolean(rollback, "required"),
+        status: readString(rollback, "status", "not_applicable"),
+        decision: readString(rollback, "decision", ""),
+        reason: readString(rollback, "reason", ""),
+        runbook_status: readString(rollback, "runbook_status", ""),
+        runbook_decision: readString(rollback, "runbook_decision", ""),
+        runbook_path: readString(rollback, "runbook_path", ""),
+        step_count: Number(readUnknown(rollback, "step_count") ?? 0),
+        actions: readArray(rollback, "actions"),
+      },
+      evidence_ids: readArray(raw, "evidence_ids"),
+      artifacts: normalizeEvidenceArtifacts(readObjectArray(raw, "artifacts")),
+      reasons: readArray(raw, "reasons"),
+      created_at: readString(raw, "created_at", ""),
+    };
+  });
 }
 
 function normalizeReleaseProviderExecutions(rawExecutions: unknown[]): ReleaseProviderExecutionSummary[] {

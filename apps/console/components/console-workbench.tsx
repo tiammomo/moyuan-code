@@ -644,7 +644,16 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   <div className="executionItem" key={execution.id}>
                     <div>
                       <strong>{execution.mode}</strong>
-                      <span>{execution.decision}</span>
+                      <span>
+                        {[
+                          execution.decision,
+                          execution.smoke_status ? `smoke ${execution.smoke_status}` : "",
+                          execution.monitor_status ? `monitor ${execution.monitor_status}` : "",
+                          execution.rollback_required ? "rollback suggested" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" / ")}
+                      </span>
                     </div>
                     <StatusPill tone={toneForStatus(execution.status)} label={execution.status} />
                   </div>
@@ -661,6 +670,21 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 ))
               ) : (
                 <div className="emptyState">No deployment executions yet</div>
+              )}
+            </div>
+            <div className="maintenanceList">
+              {snapshot.post_deployment_histories.length > 0 ? (
+                snapshot.post_deployment_histories.slice(0, 3).map((history) => (
+                  <div className="maintenanceItem" key={history.id}>
+                    <div>
+                      <strong>{compactID(history.execution_id)}</strong>
+                      <span>{`${history.decision} / ${history.checks.length} checks / rollback ${history.rollback.status}`}</span>
+                    </div>
+                    <StatusPill tone={toneForStatus(history.failure_class === "none" ? history.status : history.failure_class)} label={history.failure_class} />
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState compact">No post deployment history</div>
               )}
             </div>
           </div>
@@ -1952,7 +1976,12 @@ function toneForStatus(status: string): StatusTone {
     status === "unhealthy" ||
     status === "down" ||
     status === "expired" ||
-    status === "critical"
+    status === "critical" ||
+    status === "smoke_failed" ||
+    status === "monitor_failed" ||
+    status === "execution_failed" ||
+    status === "execution_blocked" ||
+    status === "check_failed"
   )
     return "blocked";
   if (
@@ -1962,7 +1991,10 @@ function toneForStatus(status: string): StatusTone {
     status === "open" ||
     status === "warning" ||
     status === "degraded" ||
-    status === "attention_required"
+    status === "attention_required" ||
+    status === "manual_required" ||
+    status === "manual_check_required" ||
+    status === "suggested"
   )
     return "warning";
   return "neutral";
