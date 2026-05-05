@@ -481,6 +481,9 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/control-loop/runs?limit=5", http.StatusOK, `"control_loop_runs"`, controlLoopRun.ID, `"resource_health_scan"`)
 	assertGETContains(t, router, "/v1/projects/managed/control-loop/runs/"+controlLoopRun.ID, http.StatusOK, `"control_loop_run"`, `"decision_ledger_refresh"`)
+	assertPostContains(t, router, "/v1/projects/managed/control-loop/queue", `{"steps":["resource_lifecycle_scan"],"maintenance_window":"always","requested_by":"ops"}`, http.StatusCreated, `"control_loop_queue_item"`, `"CONTROL_QUEUE_QUEUED"`)
+	assertGETContains(t, router, "/v1/projects/managed/control-loop/queue?limit=5", http.StatusOK, `"control_loop_queue"`, `"resource_lifecycle_scan"`)
+	assertPostContains(t, router, "/v1/projects/managed/control-loop/queue/run", `{"max_items":5}`, http.StatusAccepted, `"control_loop_queue_run"`, `"CONTROL_QUEUE_EXECUTED"`)
 	assertPostContains(t, router, "/v1/projects/managed/providers/glm-api/ops", `{"quota":{"status":"exhausted"}}`, http.StatusOK, `"quota"`, `"exhausted"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"memory_curator","task_type":"memory_extraction","includes_project_memory":true}`, http.StatusOK, `"route"`, `"codex_cli"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"backend","requires_repo_edit":true,"includes_secrets":true}`, http.StatusAccepted, `"ROUTE_BLOCKED"`, `"contains_secret_context"`)

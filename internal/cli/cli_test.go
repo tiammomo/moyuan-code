@@ -261,6 +261,16 @@ func TestControlLoopCLIRunsDurableIdempotentSteps(t *testing.T) {
 	assertContains(t, list.stdout, runID)
 	shown := runCLI(t, root, "control-loop", "show", runID)
 	assertContains(t, shown.stdout, `"decision_ledger_refresh"`)
+
+	queued := runCLI(t, root, "control-loop", "queue", "add", "--step", "resource_lifecycle_scan", "--maintenance-window", "always", "--requested-by", "ops")
+	assertContains(t, queued.stdout, `"control_loop_queue_item"`)
+	assertContains(t, queued.stdout, `"CONTROL_QUEUE_QUEUED"`)
+	queueList := runCLI(t, root, "control-loop", "queue", "list")
+	assertContains(t, queueList.stdout, `"control_loop_queue"`)
+	assertContains(t, queueList.stdout, `"resource_lifecycle_scan"`)
+	queueRun := runCLI(t, root, "control-loop", "queue", "run", "--max-items", "5")
+	assertContains(t, queueRun.stdout, `"control_loop_queue_run"`)
+	assertContains(t, queueRun.stdout, `"CONTROL_QUEUE_EXECUTED"`)
 }
 
 func TestMaintenancePolicyCLIExplainsProductionGate(t *testing.T) {

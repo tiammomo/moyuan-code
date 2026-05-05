@@ -267,6 +267,9 @@ func usage() string {
 		"moyuan operations remote-execution-rehearsals run [--admission-id <id>] [--execution-id <id>] [--provider <provider>] [--environment <env>] [--limit 20]",
 		"moyuan operations remote-execution-rehearsals list [--execution-id <id>] [--provider <provider>] [--environment <env>] [--status <status>] [--decision <decision>] [--limit 20]",
 		"moyuan control-loop run [--step <type>] [--idempotency-key <key>] [--retry-budget 0] [--environment <env>] [--deployment-execution-id <id>]",
+		"moyuan control-loop queue add [--step <type>] [--environment <env>] [--maintenance-window always|due:YYYY-MM-DD|after:RFC3339|between:HH:MM-HH:MM] [--due-at RFC3339] [--retry-budget 0]",
+		"moyuan control-loop queue list [--status <status>] [--environment <env>] [--limit 20]",
+		"moyuan control-loop queue run [--environment <env>] [--max-items 5]",
 		"moyuan control-loop list [--limit 20]",
 		"moyuan control-loop show <run-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
@@ -2015,6 +2018,44 @@ func handleControlLoop(ctx context.Context, args []string, cwd string) (string, 
 	case "list":
 		runs, err := controlloop.List(rootDir, flagInt(args, "--limit", 20))
 		return "", map[string]any{"control_loop_runs": runs}, 0, err
+	case "queue":
+		if len(args) < 2 {
+			return "unknown control-loop queue command\n", nil, 1, nil
+		}
+		subargs := args[2:]
+		switch args[1] {
+		case "add":
+			item, err := controlloop.Enqueue(rootDir, controlloop.QueueOptions{
+				Trigger:               flagValue(subargs, "--trigger", "queue"),
+				RequestedBy:           flagValue(subargs, "--requested-by", ""),
+				IdempotencyKey:        flagValue(subargs, "--idempotency-key", ""),
+				RetryBudget:           flagInt(subargs, "--retry-budget", 0),
+				Steps:                 flagValues(subargs, "--step"),
+				Environment:           flagValue(subargs, "--environment", ""),
+				ResourceIDs:           flagValues(subargs, "--resource-id"),
+				DeploymentExecutionID: flagValue(subargs, "--deployment-execution-id", ""),
+				MaintenanceWindow:     flagValue(subargs, "--maintenance-window", ""),
+				DueAt:                 flagValue(subargs, "--due-at", ""),
+				Priority:              flagInt(subargs, "--priority", 0),
+			})
+			return "", map[string]any{"control_loop_queue_item": item}, 0, err
+		case "list":
+			items, err := controlloop.ListQueue(rootDir, controlloop.QueueListOptions{
+				Status:      flagValue(subargs, "--status", ""),
+				Environment: flagValue(subargs, "--environment", ""),
+				Limit:       flagInt(subargs, "--limit", 20),
+			})
+			return "", map[string]any{"control_loop_queue": items}, 0, err
+		case "run":
+			report, err := controlloop.RunQueue(ctx, rootDir, controlloop.QueueRunOptions{
+				Status:      flagValue(subargs, "--status", ""),
+				Environment: flagValue(subargs, "--environment", ""),
+				MaxItems:    flagInt(subargs, "--max-items", 5),
+			})
+			return "", map[string]any{"control_loop_queue_run": report}, 0, err
+		default:
+			return "unknown control-loop queue command\n", nil, 1, nil
+		}
 	case "show":
 		if len(args) < 2 {
 			return "missing control loop run id\n", nil, 1, nil

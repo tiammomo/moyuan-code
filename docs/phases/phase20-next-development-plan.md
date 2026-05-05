@@ -25,8 +25,8 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 | P0 | `phase20-001` | `write-proof-admission-policy` | completed | 写入准入报告 | proof -> admission 可解释且不执行写入 |
 | P0 | `phase20-002` | `provider-specific-proof-pack` | completed | provider 最小权限要求 | GitHub/Gitee/SSH/cloud 要求可配置 |
 | P1 | `phase20-003` | `remote-execution-rehearsal-runner` | completed | 远程执行演练 | rehearsal 不执行生产变更 |
-| P1 | `phase20-004` | `control-runner-queue-window` | next | 长期任务队列与窗口 | 维护窗口、retry、handoff 可审计 |
-| P1 | `phase20-005` | `console-proof-admission-drilldown` | planned | Console 单条钻取 | 展示 proof/admission/runner step |
+| P1 | `phase20-004` | `control-runner-queue-window` | completed | 长期任务队列与窗口 | 维护窗口、retry、handoff 可审计 |
+| P1 | `phase20-005` | `console-proof-admission-drilldown` | next | Console 单条钻取 | 展示 proof/admission/runner step |
 | P2 | `phase20-006` | `phase20-readiness` | planned | Phase 20 收口 | 全量门禁和生产边界完成 |
 
 ## 3. 执行规划：`phase20-001 write-proof-admission-policy`
@@ -111,7 +111,7 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 
 ## 6. 执行规划：`phase20-004 control-runner-queue-window`
 
-实现状态：next。
+实现状态：completed。
 
 范围：
 
@@ -125,7 +125,32 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 - 不在维护窗口内的任务必须进入 waiting 或 manual handoff，不能直接执行。
 - API、CLI 和单测覆盖队列、窗口、retry/handoff 和幂等 replay。
 
-## 7. 验证要求
+完成记录：
+
+- `internal/controlloop` 新增 queue item、queue list 和 queue runner，持久化 `.moyuan/control-loop/queue/*.json` 与 `queue.jsonl`。
+- 维护窗口支持 `always`、`due:YYYY-MM-DD`、`after:RFC3339` 和 `between:HH:MM-HH:MM`；未到窗口保持 `waiting`，非法窗口进入 `manual_required`。
+- Queue runner 会把到期任务转换为 durable control loop run，并复用 idempotency key、retry budget、environment、resource 和 deployment execution 参数。
+- API 增加 `POST/GET /v1/projects/:project_id/control-loop/queue` 和 `POST /v1/projects/:project_id/control-loop/queue/run`。
+- CLI 增加 `moyuan control-loop queue add|list|run ...`。
+- 单测覆盖 due item 执行、future window 等待、非法窗口 handoff、API 和 CLI。
+
+## 7. 执行规划：`phase20-005 console-proof-admission-drilldown`
+
+实现状态：next。
+
+范围：
+
+- Console operations 面板新增 proof/admission/provider requirement/remote rehearsal/control queue 的 drill-down 数据读取。
+- 前端只展示 API 返回的事实源，不重新计算 admission、proof 或 queue decision。
+- 提供只读导出入口，便于用户把单条 proof/admission/rehearsal/queue 复制到 issue 或 release review。
+
+验收：
+
+- Console 能展示 write proof、write admission、provider requirement、remote rehearsal 和 control queue 摘要/详情。
+- drill-down 展示 reasons、rule refs、evidence refs、source refs、provider requirement refs 和 queue/run 关联。
+- `npm run typecheck` 和 `npm run build` 通过。
+
+## 8. 验证要求
 
 每完成一个 Phase 20 issue，至少运行：
 

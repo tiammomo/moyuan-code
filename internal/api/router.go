@@ -88,6 +88,26 @@ type controlLoopRunRequest struct {
 	ComprehensionSince    string   `json:"comprehension_since"`
 }
 
+type controlLoopQueueRequest struct {
+	Trigger               string   `json:"trigger"`
+	RequestedBy           string   `json:"requested_by"`
+	IdempotencyKey        string   `json:"idempotency_key"`
+	RetryBudget           int      `json:"retry_budget"`
+	Steps                 []string `json:"steps"`
+	Environment           string   `json:"environment"`
+	ResourceIDs           []string `json:"resource_ids"`
+	DeploymentExecutionID string   `json:"deployment_execution_id"`
+	MaintenanceWindow     string   `json:"maintenance_window"`
+	DueAt                 string   `json:"due_at"`
+	Priority              int      `json:"priority"`
+}
+
+type controlLoopQueueRunRequest struct {
+	Status      string `json:"status"`
+	Environment string `json:"environment"`
+	MaxItems    int    `json:"max_items"`
+}
+
 type batchPlanRequest struct {
 	Mode        string `json:"mode"`
 	MaxParallel int    `json:"max_parallel"`
@@ -3365,6 +3385,87 @@ func NewRouter(options Options) *gin.Engine {
 			status = http.StatusAccepted
 		}
 		c.JSON(status, gin.H{"control_loop_run": run})
+	})
+	router.POST("/v1/projects/:project_id/control-loop/queue", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req controlLoopQueueRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		item, err := controlloop.Enqueue(rootDir, controlloop.QueueOptions{
+			Trigger:               req.Trigger,
+			RequestedBy:           req.RequestedBy,
+			IdempotencyKey:        req.IdempotencyKey,
+			RetryBudget:           req.RetryBudget,
+			Steps:                 req.Steps,
+			Environment:           req.Environment,
+			ResourceIDs:           req.ResourceIDs,
+			DeploymentExecutionID: req.DeploymentExecutionID,
+			MaintenanceWindow:     req.MaintenanceWindow,
+			DueAt:                 req.DueAt,
+			Priority:              req.Priority,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"control_loop_queue_item": item})
+	})
+	router.GET("/v1/projects/:project_id/control-loop/queue", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		items, err := controlloop.ListQueue(rootDir, controlloop.QueueListOptions{
+			Status:      c.Query("status"),
+			Environment: c.Query("environment"),
+			Limit:       queryLimit(c, 20),
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"control_loop_queue": items})
+	})
+	router.POST("/v1/projects/:project_id/control-loop/queue/run", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req controlLoopQueueRunRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		report, err := controlloop.RunQueue(c.Request.Context(), rootDir, controlloop.QueueRunOptions{
+			Status:      req.Status,
+			Environment: req.Environment,
+			MaxItems:    req.MaxItems,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"control_loop_queue_run": report})
 	})
 	router.GET("/v1/projects/:project_id/control-loop/runs", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))

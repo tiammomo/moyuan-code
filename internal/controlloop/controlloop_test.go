@@ -3,6 +3,7 @@ package controlloop
 import (
 	"context"
 	"testing"
+	"time"
 
 	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/providers"
@@ -167,6 +168,71 @@ func TestRunRejectsUnboundedStepList(t *testing.T) {
 	}
 }
 
+func TestQueueRunsDueItemsAndWaitsForMaintenanceWindow(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	due, err := Enqueue(root, QueueOptions{
+		RequestedBy:       "ops",
+		Steps:             []string{StepResourceLifecycleScan},
+		MaintenanceWindow: "always",
+		RetryBudget:       1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	future, err := Enqueue(root, QueueOptions{
+		RequestedBy:       "ops",
+		Steps:             []string{StepResourceLifecycleScan},
+		MaintenanceWindow: "after:" + time.Now().UTC().Add(time.Hour).Format(time.RFC3339),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := RunQueue(context.Background(), root, QueueRunOptions{MaxItems: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Processed != 2 || report.Executed != 1 || report.Waiting != 1 {
+		t.Fatalf("unexpected queue run report: %+v", report)
+	}
+	completed := queueItemByID(report.QueueItems, due.ID)
+	if completed.ID == "" || completed.Status != "completed" || completed.RunID == "" {
+		t.Fatalf("expected due item to execute, got %+v", completed)
+	}
+	waiting := queueItemByID(report.QueueItems, future.ID)
+	if waiting.ID == "" || waiting.Status != "waiting" || waiting.Decision != "CONTROL_QUEUE_WAITING_MAINTENANCE_WINDOW" {
+		t.Fatalf("expected future item to wait, got %+v", waiting)
+	}
+	list, err := ListQueue(root, QueueListOptions{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected queue items to persist, got %+v", list)
+	}
+}
+
+func TestQueueInvalidMaintenanceWindowRequiresManualHandoff(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	item, err := Enqueue(root, QueueOptions{Steps: []string{StepResourceLifecycleScan}, MaintenanceWindow: "between:bad"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := RunQueue(context.Background(), root, QueueRunOptions{MaxItems: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := queueItemByID(report.QueueItems, item.ID)
+	if updated.Status != "manual_required" || updated.Decision != "CONTROL_QUEUE_MANUAL_HANDOFF" {
+		t.Fatalf("expected manual handoff for invalid window, got %+v", updated)
+	}
+}
+
 func assertStep(t *testing.T, run RunRecord, stepType string) {
 	t.Helper()
 	for _, step := range run.Steps {
@@ -175,4 +241,13 @@ func assertStep(t *testing.T, run RunRecord, stepType string) {
 		}
 	}
 	t.Fatalf("missing step %s in %+v", stepType, run.Steps)
+}
+
+func queueItemByID(items []QueueItem, id string) QueueItem {
+	for _, item := range items {
+		if item.ID == id {
+			return item
+		}
+	}
+	return QueueItem{}
 }
