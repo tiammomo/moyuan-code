@@ -2,7 +2,7 @@
 
 Moyuan Code 是面向代码开发全生命周期的多 Agent 编排框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
-当前已完成 Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 18 的主要闭环；Phase 19 已启动，聚焦受控自动化执行增强与生产可观测性深化。
+当前已完成 Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 19 的主要闭环；Phase 19 已完成受控自动化执行增强与生产可观测性深化的第一批能力。
 
 核心设计入口见 [docs/README.md](./docs/README.md)。
 Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
@@ -20,7 +20,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - 前端控制台：Next.js 16，默认端口 `3000`。
 - 图像生成辅助脚本：Node.js，仅保留在 `scripts/`。
 - Phase 1 已实现最小 CLI 骨架：workspace、auth、logging、git、project comprehension、issue graph、runtime adapter、orchestrator、scheduler、memory、repair、quality gate。
-- Beta 到 Phase 19 已推进控制面 API、Issue Graph、批量并发执行、Provider Registry、runtime routing、Git Provider、release candidate、deployment execution、rollback execution、monitor summary、deployment rehearsal、release admission、deployment risk handoff、operations timeline、maintenance policy、post-deployment verification、server resource lifecycle、Console operations dashboard、operations audit export、decision ledger、durable control runner 和 provider write proof contract。
+- Beta 到 Phase 19 已推进控制面 API、Issue Graph、批量并发执行、Provider Registry、runtime routing、Git Provider、release candidate、deployment execution、rollback execution、monitor summary、deployment rehearsal、release admission、deployment risk handoff、operations timeline、maintenance policy、post-deployment verification、server resource lifecycle、Console operations dashboard、operations audit export、decision ledger、durable control runner、provider write proof contract 和 Console observability drill-down。
 - Runtime 已捕获 before/after git snapshot、changed files、diff summary，并能阻断脏工作区和保护路径变更。
 - Claude CLI / Codex CLI 已具备 prompt file、cwd、env allowlist、provider env profile、stdout/stderr、result contract 和失败分类的最小调用契约。
 - Orchestrator 已持久化 issue/run 状态机，并支持查询 accepted、needs_rework、runtime 和 quality 状态。
@@ -30,7 +30,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - Repair 已具备受控 attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
 - Batch Execution 已具备 dry-run plan、受控 run、隔离 worktree、质量复核、合入队列和 Console 操作面。
 - Release/Deployment 已具备 release candidate、provider preview/publish gate、PR/MR plan、deployment execution、approval proof、rollback preview、monitor summary、deployment rehearsal、release admission 和风险修复 handoff。
-- 当前实现重点：Phase 19，operations audit export、decision ledger、durable control runner、provider write proof contract 和 Console observability drill-down 已完成，下一步进入 Phase 19 readiness 收口。
+- 当前实现重点：Phase 19 已完成 readiness 收口，后续暂不启动 Phase 20 实现。
 
 ## 本地运行
 
