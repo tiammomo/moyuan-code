@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+- [Phase 14 实现 Issue Graph](./phase14-issue-graph.md)：Phase 14 受控远程发布与部署执行的依赖图。
+- [Phase 14 实施记录](./phase14-next-development-plan.md)：Phase 14 当前任务、执行范围和验收记录。
 - [Phase 13 Release Readiness](./phase13-release-readiness.md)：Phase 13 Release Candidate 远程发布与部署交接的收口验证。
 - [Phase 13 实现 Issue Graph](./phase13-issue-graph.md)：Phase 13 Release Candidate 远程发布与部署交接的依赖图。
 - [Phase 13 实施记录](./phase13-next-development-plan.md)：Phase 13 完成任务、执行范围和验收记录。
