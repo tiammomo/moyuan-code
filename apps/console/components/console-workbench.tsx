@@ -111,6 +111,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const latestDeployment = snapshot.deployments[0];
   const latestRollbackCandidate = snapshot.executions.find((execution) => execution.rollback_required);
   const latestMonitorSummary = snapshot.monitor_summaries[0];
+  const latestRehearsal = snapshot.deployment_rehearsals[0];
+  const latestAdmission = snapshot.release_admissions[0];
+  const latestRiskHandoff = snapshot.deployment_risk_handoffs[0];
   const activeSessions = snapshot.auth_sessions.filter((session) => session.status === "active");
   const activeTokens = snapshot.api_tokens.filter((token) => token.status === "active");
   const activeServiceAccounts = snapshot.service_accounts.filter((account) => account.status === "active");
@@ -375,6 +378,83 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
       router.refresh();
     } catch (error) {
       setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Monitor summary failed." });
+    }
+  }
+
+  async function createDeploymentRehearsal() {
+    const execution = snapshot.executions[0];
+    if (!latestDeployment && !execution) {
+      setDeploymentActionState({ status: "error", message: "No deployment or execution available for rehearsal." });
+      return;
+    }
+    setDeploymentActionState({ status: "running", message: "Creating deployment rehearsal..." });
+    try {
+      const payload = await postJSON<DeploymentRehearsalEnvelope>(`/api/projects/${snapshot.project.id}/deployment-rehearsals`, {
+        deployment_id: latestDeployment?.id,
+        execution_id: execution?.id,
+        environment: latestDeployment?.environment || execution?.environment,
+      });
+      const rehearsal = payload.deployment_rehearsal;
+      if (!rehearsal) {
+        throw new Error(payload.error ?? "Deployment rehearsal returned no record.");
+      }
+      setDeploymentActionState({
+        status: rehearsal.status === "blocked" ? "blocked" : "completed",
+        id: rehearsal.id,
+        message: rehearsal.decision ?? rehearsal.status ?? "deployment rehearsal recorded",
+      });
+      router.refresh();
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Deployment rehearsal failed." });
+    }
+  }
+
+  async function createReleaseAdmission() {
+    setDeploymentActionState({ status: "running", message: "Creating release admission..." });
+    try {
+      const payload = await postJSON<ReleaseAdmissionEnvelope>(`/api/projects/${snapshot.project.id}/release-admissions`, {
+        rehearsal_id: latestRehearsal?.id,
+        deployment_id: latestDeployment?.id,
+        execution_id: snapshot.executions[0]?.id,
+        environment: latestDeployment?.environment || snapshot.executions[0]?.environment,
+      });
+      const admission = payload.release_admission;
+      if (!admission) {
+        throw new Error(payload.error ?? "Release admission returned no record.");
+      }
+      setDeploymentActionState({
+        status: admission.status === "blocked" ? "blocked" : "completed",
+        id: admission.id,
+        message: admission.decision ?? admission.status ?? "release admission recorded",
+      });
+      router.refresh();
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Release admission failed." });
+    }
+  }
+
+  async function createDeploymentRiskHandoff() {
+    if (!latestAdmission) {
+      setDeploymentActionState({ status: "error", message: "No release admission available for risk handoff." });
+      return;
+    }
+    setDeploymentActionState({ status: "running", message: "Creating deployment risk handoff..." });
+    try {
+      const payload = await postJSON<DeploymentRiskHandoffEnvelope>(`/api/projects/${snapshot.project.id}/repair/deployment-risk-handoffs`, {
+        admission_id: latestAdmission.id,
+      });
+      const handoff = payload.deployment_risk_handoff;
+      if (!handoff) {
+        throw new Error(payload.error ?? "Deployment risk handoff returned no record.");
+      }
+      setDeploymentActionState({
+        status: handoff.status === "blocked" ? "blocked" : "completed",
+        id: handoff.id,
+        message: handoff.decision ?? handoff.status ?? "deployment risk handoff recorded",
+      });
+      router.refresh();
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Deployment risk handoff failed." });
     }
   }
 
@@ -1151,6 +1231,23 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <Activity size={13} />
                 <span>Monitor Summary</span>
               </button>
+              <button className="inlineActionButton" disabled={deploymentActionState.status === "running"} onClick={() => void createDeploymentRehearsal()} type="button">
+                <CircleDotDashed size={13} />
+                <span>Rehearsal</span>
+              </button>
+              <button className="inlineActionButton" disabled={deploymentActionState.status === "running"} onClick={() => void createReleaseAdmission()} type="button">
+                <ShieldCheck size={13} />
+                <span>Admission</span>
+              </button>
+              <button
+                className="inlineActionButton"
+                disabled={deploymentActionState.status === "running" || !latestAdmission}
+                onClick={() => void createDeploymentRiskHandoff()}
+                type="button"
+              >
+                <Wrench size={13} />
+                <span>Risk Handoff</span>
+              </button>
               {deploymentActionState.message ? (
                 <small className={`actionMessage ${deploymentActionState.status}`}>
                   {deploymentActionState.id ? `${compactID(deploymentActionState.id)} / ` : ""}
@@ -1205,6 +1302,36 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   <StatusPill tone={toneForStatus(latestMonitorSummary.status)} label={latestMonitorSummary.status} />
                 </div>
               ) : null}
+              {latestRehearsal ? (
+                <div className="maintenanceItem">
+                  <div>
+                    <strong>{compactID(latestRehearsal.id)}</strong>
+                    <span>{`${latestRehearsal.decision} / ${latestRehearsal.timeline.length} steps`}</span>
+                    <span>{`${latestRehearsal.monitor_status || "monitor pending"} / ${latestRehearsal.rollback_decision || "rollback pending"}`}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(latestRehearsal.status)} label={latestRehearsal.status} />
+                </div>
+              ) : null}
+              {latestAdmission ? (
+                <div className="maintenanceItem">
+                  <div>
+                    <strong>{compactID(latestAdmission.id)}</strong>
+                    <span>{`${latestAdmission.decision} / ${latestAdmission.signals.length} signals`}</span>
+                    <span>{latestAdmission.reasons[0] || "reason pending"}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(latestAdmission.status)} label={latestAdmission.status} />
+                </div>
+              ) : null}
+              {latestRiskHandoff ? (
+                <div className="maintenanceItem">
+                  <div>
+                    <strong>{compactID(latestRiskHandoff.id)}</strong>
+                    <span>{`${latestRiskHandoff.decision} / ${latestRiskHandoff.failure_class}`}</span>
+                    <span>{latestRiskHandoff.repair_plan_id ? compactID(latestRiskHandoff.repair_plan_id) : "repair not required"}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(latestRiskHandoff.status)} label={latestRiskHandoff.status} />
+                </div>
+              ) : null}
               {snapshot.rollback_executions.slice(0, 2).map((rollback) => (
                 <div className="maintenanceItem" key={rollback.id}>
                   <div>
@@ -1229,7 +1356,11 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   </div>
                 ))
               ) : (
-                <div className="emptyState compact">{latestMonitorSummary || snapshot.rollback_executions.length > 0 ? "No post deployment history" : "No deployment ops history"}</div>
+                <div className="emptyState compact">
+                  {latestMonitorSummary || latestRehearsal || latestAdmission || latestRiskHandoff || snapshot.rollback_executions.length > 0
+                    ? "No post deployment history"
+                    : "No deployment ops history"}
+                </div>
               )}
             </div>
           </div>
@@ -2929,6 +3060,33 @@ type MonitorSummaryEnvelope = {
   };
 };
 
+type DeploymentRehearsalEnvelope = {
+  error?: string;
+  deployment_rehearsal?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type ReleaseAdmissionEnvelope = {
+  error?: string;
+  release_admission?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type DeploymentRiskHandoffEnvelope = {
+  error?: string;
+  deployment_risk_handoff?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
 type ResourceHealthScanEnvelope = {
   error?: string;
   health_scan?: {
@@ -3283,6 +3441,7 @@ function toneForStatus(status: string): StatusTone {
     status === "completed" ||
     status === "planned" ||
     status === "applied" ||
+    status === "allowed" ||
     status === "ok" ||
     status === "healthy"
   )
@@ -3319,6 +3478,7 @@ function toneForStatus(status: string): StatusTone {
     status === "attention_required" ||
     status === "manual_required" ||
     status === "manual_check_required" ||
+    status === "review_required" ||
     status === "suggested" ||
     status === "not_ready"
   )

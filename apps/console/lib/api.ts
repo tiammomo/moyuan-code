@@ -12,6 +12,8 @@ import type {
   ControlLoopRunSummary,
   DeploymentExecutionSummary,
   DeploymentMonitorSummary,
+  DeploymentRehearsalSummary,
+  DeploymentRiskHandoffSummary,
   DeploymentSummary,
   EvidenceSummary,
   GitProviderPlanSummary,
@@ -30,6 +32,7 @@ import type {
   QualityExplanation,
   QualitySignal,
   ReleaseProviderExecutionSummary,
+  ReleaseAdmissionSummary,
   RollbackExecutionSummary,
   ReleaseBatchSummary,
   ReleaseCandidateApplySummary,
@@ -95,6 +98,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     postDeploymentHistoriesResponse,
     rollbackExecutionsResponse,
     monitorSummariesResponse,
+    deploymentRehearsalsResponse,
+    releaseAdmissionsResponse,
+    deploymentRiskHandoffsResponse,
     releaseProviderExecutionsResponse,
     evidenceResponse,
     runsResponse,
@@ -137,6 +143,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ post_deployment_histories: unknown[] }>>(`/projects/${project.id}/deployment-monitor-history?limit=5`),
     apiGet<ApiEnvelope<{ rollback_executions: unknown[] }>>(`/projects/${project.id}/deployment-rollback-executions?limit=5`),
     apiGet<ApiEnvelope<{ monitor_summaries: unknown[] }>>(`/projects/${project.id}/deployment-monitor-summaries?limit=5`),
+    apiGet<ApiEnvelope<{ deployment_rehearsals: unknown[] }>>(`/projects/${project.id}/deployment-rehearsals?limit=5`),
+    apiGet<ApiEnvelope<{ release_admissions: unknown[] }>>(`/projects/${project.id}/release-admissions?limit=5`),
+    apiGet<ApiEnvelope<{ deployment_risk_handoffs: unknown[] }>>(`/projects/${project.id}/repair/deployment-risk-handoffs?limit=5`),
     apiGet<ApiEnvelope<{ release_provider_executions: unknown[] }>>(`/projects/${project.id}/release-provider-executions?limit=6`),
     apiGet<ApiEnvelope<{ evidence: unknown[] }>>(`/projects/${project.id}/evidence?limit=30`),
     apiGet<ApiEnvelope<{ runs: unknown[] }>>(`/projects/${project.id}/runs?limit=12`),
@@ -181,6 +190,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const postDeploymentHistories = normalizePostDeploymentHistories(postDeploymentHistoriesResponse?.post_deployment_histories ?? []);
   const rollbackExecutions = normalizeRollbackExecutions(rollbackExecutionsResponse?.rollback_executions ?? []);
   const monitorSummaries = normalizeMonitorSummaries(monitorSummariesResponse?.monitor_summaries ?? []);
+  const deploymentRehearsals = normalizeDeploymentRehearsals(deploymentRehearsalsResponse?.deployment_rehearsals ?? []);
+  const releaseAdmissions = normalizeReleaseAdmissions(releaseAdmissionsResponse?.release_admissions ?? []);
+  const deploymentRiskHandoffs = normalizeDeploymentRiskHandoffs(deploymentRiskHandoffsResponse?.deployment_risk_handoffs ?? []);
   const releaseProviderExecutions = normalizeReleaseProviderExecutions(releaseProviderExecutionsResponse?.release_provider_executions ?? []);
   const evidence = normalizeEvidence(evidenceResponse?.evidence ?? []);
   const runs = normalizeRuns(runsResponse?.runs ?? []);
@@ -257,6 +269,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     post_deployment_histories: postDeploymentHistories,
     rollback_executions: rollbackExecutions,
     monitor_summaries: monitorSummaries,
+    deployment_rehearsals: deploymentRehearsals,
+    release_admissions: releaseAdmissions,
+    deployment_risk_handoffs: deploymentRiskHandoffs,
     release_provider_executions: releaseProviderExecutions,
     evidence,
     operation_history: operationHistory,
@@ -598,6 +613,79 @@ function normalizeMonitorSummaries(rawSummaries: unknown[]): DeploymentMonitorSu
       created_at: readString(history, "created_at", ""),
     })),
     evidence_ids: readArray(raw, "evidence_ids"),
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeDeploymentRehearsals(rawRehearsals: unknown[]): DeploymentRehearsalSummary[] {
+  return rawRehearsals.map((raw, index) => ({
+    id: readString(raw, "id", `deployment-rehearsal-${index + 1}`),
+    candidate_id: readString(raw, "candidate_id", ""),
+    deployment_id: readString(raw, "deployment_id", ""),
+    execution_id: readString(raw, "execution_id", ""),
+    release_id: readString(raw, "release_id", ""),
+    environment: readString(raw, "environment", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    timeline: readObjectArray(raw, "timeline").map((item, itemIndex) => ({
+      type: readString(item, "type", `timeline-${itemIndex + 1}`),
+      id: readString(item, "id", ""),
+      status: readString(item, "status", "unknown"),
+      decision: readString(item, "decision", "unknown"),
+      detail: readString(item, "detail", ""),
+      evidence_ids: readArray(item, "evidence_ids"),
+      created_at: readString(item, "created_at", ""),
+    })),
+    monitor_summary_id: readString(raw, "monitor_summary_id", ""),
+    monitor_status: readString(raw, "monitor_status", ""),
+    monitor_decision: readString(raw, "monitor_decision", ""),
+    rollback_execution_id: readString(raw, "rollback_execution_id", ""),
+    rollback_status: readString(raw, "rollback_status", ""),
+    rollback_decision: readString(raw, "rollback_decision", ""),
+    evidence_ids: readArray(raw, "evidence_ids"),
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeReleaseAdmissions(rawAdmissions: unknown[]): ReleaseAdmissionSummary[] {
+  return rawAdmissions.map((raw, index) => ({
+    id: readString(raw, "id", `release-admission-${index + 1}`),
+    rehearsal_id: readString(raw, "rehearsal_id", ""),
+    candidate_id: readString(raw, "candidate_id", ""),
+    deployment_id: readString(raw, "deployment_id", ""),
+    execution_id: readString(raw, "execution_id", ""),
+    environment: readString(raw, "environment", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    signals: readObjectArray(raw, "signals").map((signal, signalIndex) => ({
+      type: readString(signal, "type", `signal-${signalIndex + 1}`),
+      id: readString(signal, "id", ""),
+      status: readString(signal, "status", "unknown"),
+      decision: readString(signal, "decision", "unknown"),
+      severity: readString(signal, "severity", ""),
+      reason: readString(signal, "reason", ""),
+    })),
+    evidence_ids: readArray(raw, "evidence_ids"),
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeDeploymentRiskHandoffs(rawHandoffs: unknown[]): DeploymentRiskHandoffSummary[] {
+  return rawHandoffs.map((raw, index) => ({
+    id: readString(raw, "id", `deployment-risk-handoff-${index + 1}`),
+    source_type: readString(raw, "source_type", ""),
+    source_id: readString(raw, "source_id", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    failure_class: readString(raw, "failure_class", ""),
+    signal_id: readString(raw, "signal_id", ""),
+    bug_candidate_id: readString(raw, "bug_candidate_id", ""),
+    repair_plan_id: readString(raw, "repair_plan_id", ""),
+    evidence_refs: readArray(raw, "evidence_refs"),
+    reasons: readArray(raw, "reasons"),
+    review_required: readBoolean(raw, "review_required"),
     created_at: readString(raw, "created_at", ""),
   }));
 }

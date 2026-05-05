@@ -21,7 +21,7 @@ Phase 16 的目标是把 Phase 15 已完成的 deployment execution、rollback e
 | `phase16-001` | `deployment-rehearsal-controller` | completed | 新增 deployment rehearsal 记录，串联 candidate、deployment、execution、rollback preview、monitor summary 和 evidence | Phase 15 readiness | `devops_owner` + `backend_owner` | 可通过 CLI/API 创建和查询一次 rehearsal，真实写入仍不发生 |
 | `phase16-002` | `release-admission-risk-gate` | completed | release/deploy 准入读取 monitor summary、candidate feedback、resource health、rollback signal | `phase16-001` | `release_owner` + `qa_owner` | 输出 allow/block/manual 的后端准入结论和原因 |
 | `phase16-003` | `monitor-risk-repair-bridge` | completed | critical monitor 或 rollback required 生成 repair candidate/maintenance handoff | `phase16-001`,`phase16-002` | `qa_owner` + `backend_owner` | 风险能进入自修复或人工复核队列，不自动改生产 |
-| `phase16-004` | `console-rehearsal-risk-surface` | planned | Console 展示 rehearsal timeline、admission gate 和 repair handoff | `phase16-001`,`phase16-003` | `frontend_owner` | Console 只展示后端事实源和触发低风险 preview |
+| `phase16-004` | `console-rehearsal-risk-surface` | completed | Console 展示 rehearsal timeline、admission gate 和 repair handoff | `phase16-001`,`phase16-003` | `frontend_owner` | Console 只展示后端事实源和触发低风险 preview |
 | `phase16-005` | `phase16-readiness` | planned | 收口验证、文档回写、剩余风险和下一阶段入口 | `phase16-004` | `release_owner` + `security_owner` | 全量门禁通过，投产演练边界清晰 |
 
 ## 3. 建议执行顺序

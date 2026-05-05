@@ -254,6 +254,77 @@ export type DeploymentMonitorSummary = {
   created_at?: string;
 };
 
+export type DeploymentRehearsalSummary = {
+  id: string;
+  candidate_id?: string;
+  deployment_id?: string;
+  execution_id?: string;
+  release_id?: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  timeline: DeploymentRehearsalTimelineItem[];
+  monitor_summary_id?: string;
+  monitor_status?: string;
+  monitor_decision?: string;
+  rollback_execution_id?: string;
+  rollback_status?: string;
+  rollback_decision?: string;
+  evidence_ids: string[];
+  created_at?: string;
+};
+
+export type DeploymentRehearsalTimelineItem = {
+  type: string;
+  id: string;
+  status: string;
+  decision: string;
+  detail?: string;
+  evidence_ids: string[];
+  created_at?: string;
+};
+
+export type ReleaseAdmissionSummary = {
+  id: string;
+  rehearsal_id?: string;
+  candidate_id?: string;
+  deployment_id?: string;
+  execution_id?: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  signals: ReleaseAdmissionSignalSummary[];
+  evidence_ids: string[];
+  created_at?: string;
+};
+
+export type ReleaseAdmissionSignalSummary = {
+  type: string;
+  id?: string;
+  status: string;
+  decision: string;
+  severity?: string;
+  reason?: string;
+};
+
+export type DeploymentRiskHandoffSummary = {
+  id: string;
+  source_type: string;
+  source_id: string;
+  status: string;
+  decision: string;
+  failure_class: string;
+  signal_id?: string;
+  bug_candidate_id?: string;
+  repair_plan_id?: string;
+  evidence_refs: string[];
+  reasons: string[];
+  review_required: boolean;
+  created_at?: string;
+};
+
 export type ReleaseProviderExecutionSummary = {
   id: string;
   release_id: string;
@@ -908,6 +979,9 @@ export type ConsoleSnapshot = {
   post_deployment_histories: PostDeploymentHistorySummary[];
   rollback_executions: RollbackExecutionSummary[];
   monitor_summaries: DeploymentMonitorSummary[];
+  deployment_rehearsals: DeploymentRehearsalSummary[];
+  release_admissions: ReleaseAdmissionSummary[];
+  deployment_risk_handoffs: DeploymentRiskHandoffSummary[];
   release_provider_executions: ReleaseProviderExecutionSummary[];
   evidence: EvidenceSummary[];
   operation_history: OperationHistoryItem[];
