@@ -1,6 +1,6 @@
 # Phase 12 实施记录
 
-状态：in_progress
+状态：completed
 责任角色：orchestrator_owner + backend_owner + git_owner + release_owner + frontend_owner + qa_owner
 最后更新：2026-05-05
 
@@ -24,7 +24,7 @@ Phase 11 已完成并通过 readiness：
 | P0 | `phase12-002` | `integration-merge-preview` | completed | 集成合入预览 | ready merge queue 可生成 merge dry-run 和冲突报告 |
 | P1 | `phase12-003` | `controlled-merge-apply` | completed | 受控真实合入 | 审批和开关满足后可合入 integration branch |
 | P1 | `phase12-004` | `release-batch-readiness` | completed | 发版批次建议 | 根据合入量、风险和版本策略生成 release batch plan |
-| P2 | `phase12-005` | `console-parallel-merge-surface` | planned | Console 并发与合入面 | Console 可见 worker slot、merge preview 和 release batch readiness |
+| P2 | `phase12-005` | `console-parallel-merge-surface` | completed | Console 并发与合入面 | Console 可见 worker slot、merge preview 和 release batch readiness |
 
 ## 3. 执行规划：`phase12-001 parallel-batch-worker-executor`
 
@@ -157,7 +157,39 @@ Phase 11 已完成并通过 readiness：
 - API 新增 `POST /v1/projects/:project_id/integration-applies/:apply_id/release-batch`、`GET /v1/projects/:project_id/release-batches`、`GET /v1/projects/:project_id/release-batches/:batch_id`。
 - release batch 仍是建议层，不执行 Git 或远程发布写入。
 
-## 7. 验证要求
+## 7. 执行规划：`phase12-005 console-parallel-merge-surface`
+
+实现状态：completed。
+
+范围：
+
+- Console snapshot 接入 `integration_previews`、`integration_applies` 和 `release_batches`。
+- `Batches` 视图在 batch plan/run、worktree/merge queue 之后展示 Integration & Release 链路。
+- merge queue 可触发后端 `integration-preview` 受控预览。
+- ready integration preview 可触发 `apply dry-run`，只生成 apply 计划，不更新 Git ref。
+- integration apply 可触发 release batch readiness 检查，输出建议或未达阈值原因。
+- demo snapshot 同步补齐 integration preview、integration apply 和 release batch 示例。
+
+非目标：
+
+- 不在前端执行真实 Git 命令。
+- 不在前端推导 merge readiness 或 release readiness。
+- 不默认触发真实 integration apply、release branch、tag、push 或 publish。
+
+验收：
+
+- Console live snapshot 能读取并展示最近 integration preview、integration apply 和 release batch。
+- Console 所有新增操作都只调用后端受控 API，成功后刷新 server snapshot。
+- 无后端时 demo snapshot 仍能展示完整并发到发版建议链路。
+- 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- `ConsoleSnapshot` 增加 `integration_previews`、`integration_applies` 和 `release_batches`。
+- Console `Integration & Release` 面板展示 preview/apply/release batch 的状态、reason、branch、ready count 和命令预览。
+- Phase 12 从真实并发执行到集成预览、受控应用、发版批次建议和 Console 可见性形成闭环。
+
+## 8. 验证要求
 
 每完成一个 Phase 12 issue，至少运行：
 

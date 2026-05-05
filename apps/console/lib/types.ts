@@ -453,6 +453,77 @@ export type MergeQueueSummary = {
   created_at?: string;
 };
 
+export type IntegrationPreviewItemSummary = {
+  issue_id: string;
+  status: string;
+  decision: string;
+  reason?: string;
+  branch?: string;
+  worktree_id?: string;
+  commit?: string;
+  changed_files: string[];
+  conflicted_files: string[];
+  protected_files: string[];
+};
+
+export type IntegrationPreviewSummary = {
+  id: string;
+  merge_queue_id: string;
+  batch_id?: string;
+  epic_id?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  base_ref?: string;
+  integration_branch?: string;
+  ready_count: number;
+  conflict_count: number;
+  blocked_count: number;
+  item_count: number;
+  items: IntegrationPreviewItemSummary[];
+  created_at?: string;
+};
+
+export type IntegrationApplySummary = {
+  id: string;
+  preview_id: string;
+  merge_queue_id?: string;
+  batch_id?: string;
+  epic_id?: string;
+  mode: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  approved: boolean;
+  requested_by?: string;
+  source_branch?: string;
+  target_branch?: string;
+  write_enabled: boolean;
+  action_count: number;
+  started_at?: string;
+  finished_at?: string;
+};
+
+export type ReleaseBatchSummary = {
+  id: string;
+  integration_apply_id: string;
+  integration_preview_id?: string;
+  merge_queue_id?: string;
+  batch_id?: string;
+  epic_id?: string;
+  status: string;
+  decision: string;
+  version: string;
+  release_branch: string;
+  source_branch?: string;
+  ready_item_count: number;
+  min_items: number;
+  reasons: string[];
+  commands: string[];
+  requested_by?: string;
+  created_at?: string;
+};
+
 export type VisualAssetSummary = {
   id: string;
   diagram_spec_id: string;
@@ -698,6 +769,9 @@ export type ConsoleSnapshot = {
     batch_runs: number;
     worktrees: number;
     merge_queues: number;
+    integration_previews: number;
+    integration_applies: number;
+    release_batches: number;
   };
   issues: IssueNode[];
   schedule: ScheduleItem[];
@@ -723,6 +797,9 @@ export type ConsoleSnapshot = {
   batch_runs: BatchRunSummary[];
   worktrees: WorktreeSummary[];
   merge_queues: MergeQueueSummary[];
+  integration_previews: IntegrationPreviewSummary[];
+  integration_applies: IntegrationApplySummary[];
+  release_batches: ReleaseBatchSummary[];
   visual_assets: VisualAssetSummary[];
   visual_render_executions: VisualRenderExecutionSummary[];
   quality_explanations: QualityExplanation[];

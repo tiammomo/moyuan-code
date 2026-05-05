@@ -13,6 +13,8 @@ import type {
   DeploymentSummary,
   EvidenceSummary,
   GitProviderPlanSummary,
+  IntegrationApplySummary,
+  IntegrationPreviewSummary,
   IssueNode,
   LifecycleAlertSummary,
   MaintenanceRecordSummary,
@@ -26,6 +28,7 @@ import type {
   QualityExplanation,
   QualitySignal,
   ReleaseProviderExecutionSummary,
+  ReleaseBatchSummary,
   RuntimeRecoverySummary,
   RunSummary,
   ResourceSummary,
@@ -102,6 +105,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     batchRunsResponse,
     worktreesResponse,
     mergeQueuesResponse,
+    integrationPreviewsResponse,
+    integrationAppliesResponse,
+    releaseBatchesResponse,
     sessionsResponse,
     apiTokensResponse,
     serviceAccountsResponse,
@@ -136,6 +142,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ batch_runs: unknown[] }>>(`/projects/${project.id}/batch-runs?limit=5`),
     apiGet<ApiEnvelope<{ worktrees: unknown[] }>>(`/projects/${project.id}/worktrees?limit=5`),
     apiGet<ApiEnvelope<{ merge_queues: unknown[] }>>(`/projects/${project.id}/merge-queues?limit=5`),
+    apiGet<ApiEnvelope<{ integration_previews: unknown[] }>>(`/projects/${project.id}/integration-previews?limit=5`),
+    apiGet<ApiEnvelope<{ integration_applies: unknown[] }>>(`/projects/${project.id}/integration-applies?limit=5`),
+    apiGet<ApiEnvelope<{ release_batches: unknown[] }>>(`/projects/${project.id}/release-batches?limit=5`),
     apiGet<ApiEnvelope<{ sessions: unknown[] }>>(`/projects/${project.id}/auth/sessions`),
     apiGet<ApiEnvelope<{ api_tokens: unknown[] }>>(`/projects/${project.id}/auth/api-tokens`),
     apiGet<ApiEnvelope<{ service_accounts: unknown[] }>>(`/projects/${project.id}/auth/service-accounts`),
@@ -171,6 +180,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const batchRuns = normalizeBatchRuns(batchRunsResponse?.batch_runs ?? []);
   const worktrees = normalizeWorktrees(worktreesResponse?.worktrees ?? []);
   const mergeQueues = normalizeMergeQueues(mergeQueuesResponse?.merge_queues ?? []);
+  const integrationPreviews = normalizeIntegrationPreviews(integrationPreviewsResponse?.integration_previews ?? []);
+  const integrationApplies = normalizeIntegrationApplies(integrationAppliesResponse?.integration_applies ?? []);
+  const releaseBatches = normalizeReleaseBatches(releaseBatchesResponse?.release_batches ?? []);
   const authSessions = normalizeAuthSessions(sessionsResponse?.sessions ?? []);
   const apiTokens = normalizeAPITokens(apiTokensResponse?.api_tokens ?? []);
   const serviceAccounts = normalizeServiceAccounts(serviceAccountsResponse?.service_accounts ?? []);
@@ -203,6 +215,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       batch_runs: batchRuns.length,
       worktrees: worktrees.length,
       merge_queues: mergeQueues.length,
+      integration_previews: integrationPreviews.length,
+      integration_applies: integrationApplies.length,
+      release_batches: releaseBatches.length,
     },
     issues: issues.length > 0 ? issues : demoSnapshot.issues,
     schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
@@ -228,6 +243,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     batch_runs: batchRuns,
     worktrees,
     merge_queues: mergeQueues,
+    integration_previews: integrationPreviews,
+    integration_applies: integrationApplies,
+    release_batches: releaseBatches,
     visual_assets: visualAssets,
     visual_render_executions: visualRenderExecutions,
     quality_explanations: qualityExplanations,
@@ -935,6 +953,84 @@ function normalizeMergeQueues(rawQueues: unknown[]): MergeQueueSummary[] {
       worktree_id: readString(item, "worktree_id", ""),
       branch: readString(item, "branch", ""),
     })),
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeIntegrationPreviews(rawPreviews: unknown[]): IntegrationPreviewSummary[] {
+  return rawPreviews.map((raw, index) => {
+    const items = readObjectArray(raw, "items").map((item) => ({
+      issue_id: readString(item, "issue_id", ""),
+      status: readString(item, "status", "unknown"),
+      decision: readString(item, "decision", "unknown"),
+      reason: readString(item, "reason", ""),
+      branch: readString(item, "branch", ""),
+      worktree_id: readString(item, "worktree_id", ""),
+      commit: readString(item, "commit", ""),
+      changed_files: readArray(item, "changed_files"),
+      conflicted_files: readArray(item, "conflicted_files"),
+      protected_files: readArray(item, "protected_files"),
+    }));
+    return {
+      id: readString(raw, "id", `integration-preview-${index + 1}`),
+      merge_queue_id: readString(raw, "merge_queue_id", ""),
+      batch_id: readString(raw, "batch_id", ""),
+      epic_id: readString(raw, "epic_id", ""),
+      status: readString(raw, "status", "unknown"),
+      decision: readString(raw, "decision", "unknown"),
+      reasons: readArray(raw, "reasons"),
+      base_ref: readString(raw, "base_ref", ""),
+      integration_branch: readString(raw, "integration_branch", ""),
+      ready_count: readNumber(raw, "ready_count"),
+      conflict_count: readNumber(raw, "conflict_count"),
+      blocked_count: readNumber(raw, "blocked_count"),
+      item_count: items.length,
+      items,
+      created_at: readString(raw, "created_at", ""),
+    };
+  });
+}
+
+function normalizeIntegrationApplies(rawApplies: unknown[]): IntegrationApplySummary[] {
+  return rawApplies.map((raw, index) => ({
+    id: readString(raw, "id", `integration-apply-${index + 1}`),
+    preview_id: readString(raw, "preview_id", ""),
+    merge_queue_id: readString(raw, "merge_queue_id", ""),
+    batch_id: readString(raw, "batch_id", ""),
+    epic_id: readString(raw, "epic_id", ""),
+    mode: readString(raw, "mode", "dry_run"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    approved: readBoolean(raw, "approved"),
+    requested_by: readString(raw, "requested_by", ""),
+    source_branch: readString(raw, "source_branch", ""),
+    target_branch: readString(raw, "target_branch", ""),
+    write_enabled: readBoolean(raw, "write_enabled"),
+    action_count: readNumber(raw, "action_count"),
+    started_at: readString(raw, "started_at", ""),
+    finished_at: readString(raw, "finished_at", ""),
+  }));
+}
+
+function normalizeReleaseBatches(rawBatches: unknown[]): ReleaseBatchSummary[] {
+  return rawBatches.map((raw, index) => ({
+    id: readString(raw, "id", `release-batch-${index + 1}`),
+    integration_apply_id: readString(raw, "integration_apply_id", ""),
+    integration_preview_id: readString(raw, "integration_preview_id", ""),
+    merge_queue_id: readString(raw, "merge_queue_id", ""),
+    batch_id: readString(raw, "batch_id", ""),
+    epic_id: readString(raw, "epic_id", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    version: readString(raw, "version", ""),
+    release_branch: readString(raw, "release_branch", ""),
+    source_branch: readString(raw, "source_branch", ""),
+    ready_item_count: readNumber(raw, "ready_item_count"),
+    min_items: readNumber(raw, "min_items"),
+    reasons: readArray(raw, "reasons"),
+    commands: readArray(raw, "commands"),
+    requested_by: readString(raw, "requested_by", ""),
     created_at: readString(raw, "created_at", ""),
   }));
 }

@@ -693,6 +693,102 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
     }
   }
 
+  async function buildIntegrationPreview(queueID: string) {
+    const actionKey = `${queueID}:integration-preview`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Creating integration preview..." },
+    }));
+    try {
+      const payload = await postJSON<IntegrationPreviewEnvelope>(
+        `/api/projects/${snapshot.project.id}/merge-queues/${encodeURIComponent(queueID)}/integration-preview`,
+        {},
+      );
+      const preview = payload.integration_preview;
+      if (!preview) {
+        throw new Error(payload.error ?? "Integration preview returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: {
+          status: preview.status === "ready" ? "completed" : "blocked",
+          id: preview.id,
+          message: preview.decision ?? preview.status,
+        },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Integration preview failed." },
+      }));
+    }
+  }
+
+  async function dryRunIntegrationApply(previewID: string) {
+    const actionKey = `${previewID}:apply-dry-run`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Planning integration apply..." },
+    }));
+    try {
+      const payload = await postJSON<IntegrationApplyEnvelope>(`/api/projects/${snapshot.project.id}/integration-previews/${encodeURIComponent(previewID)}/apply`, {
+        mode: "dry_run",
+        requested_by: "console",
+      });
+      const apply = payload.integration_apply;
+      if (!apply) {
+        throw new Error(payload.error ?? "Integration apply returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: {
+          status: apply.status === "planned" || apply.status === "applied" ? "completed" : "blocked",
+          id: apply.id,
+          message: apply.decision ?? apply.status,
+        },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Integration apply failed." },
+      }));
+    }
+  }
+
+  async function planReleaseBatch(applyID: string) {
+    const actionKey = `${applyID}:release-batch`;
+    setBatchActionState((current) => ({
+      ...current,
+      [actionKey]: { status: "running", message: "Checking release batch readiness..." },
+    }));
+    try {
+      const payload = await postJSON<ReleaseBatchEnvelope>(`/api/projects/${snapshot.project.id}/integration-applies/${encodeURIComponent(applyID)}/release-batch`, {
+        min_items: 3,
+        requested_by: "console",
+      });
+      const releaseBatch = payload.release_batch;
+      if (!releaseBatch) {
+        throw new Error(payload.error ?? "Release batch returned no result.");
+      }
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: {
+          status: releaseBatch.status === "suggested" ? "completed" : "blocked",
+          id: releaseBatch.id,
+          message: `${releaseBatch.decision ?? releaseBatch.status}${releaseBatch.ready_item_count ? ` / ${releaseBatch.ready_item_count} ready` : ""}`,
+        },
+      }));
+      router.refresh();
+    } catch (error) {
+      setBatchActionState((current) => ({
+        ...current,
+        [actionKey]: { status: "error", message: error instanceof Error ? error.message : "Release batch check failed." },
+      }));
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -1264,34 +1360,49 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
             <PanelTitle icon={<GitBranch size={18} />} title="Worktrees & Merge" meta={`${snapshot.worktrees.length} worktrees / ${snapshot.merge_queues.length} queues`} />
             <div className="signalList">
               {snapshot.merge_queues.length > 0 ? (
-                snapshot.merge_queues.map((queue) => (
-                  <div className="signalItem" key={queue.id}>
-                    <div className="signalHeader">
-                      <strong>{compactID(queue.id)}</strong>
-                      <StatusPill tone={toneForStatus(queue.status)} label={queue.decision} />
-                    </div>
-                    <span>
-                      ready {queue.ready_count} / rework {queue.needs_rework_count} / blocked {queue.blocked_count}
-                    </span>
-                    <div className="signalMeta">
-                      <code>{compactID(queue.batch_id)}</code>
-                      {queue.batch_run_id ? <code>{compactID(queue.batch_run_id)}</code> : null}
-                      {queue.reasons[0] ? <code>{queue.reasons[0]}</code> : null}
-                    </div>
-                    <div className="routeCandidateGrid compact">
-                      {queue.items.slice(0, 3).map((item) => (
-                        <div className="routeCandidate" key={`${queue.id}-${item.issue_id}`}>
-                          <strong>{compactID(item.issue_id)}</strong>
-                          <span>{item.reason || item.decision}</span>
-                          <div className="signalMeta">
-                            <code>{item.status}</code>
-                            {item.worktree_id ? <code>{compactID(item.worktree_id)}</code> : null}
+                snapshot.merge_queues.map((queue) => {
+                  const previewState = batchActionState[`${queue.id}:integration-preview`];
+                  return (
+                    <div className="signalItem" key={queue.id}>
+                      <div className="signalHeader">
+                        <strong>{compactID(queue.id)}</strong>
+                        <StatusPill tone={toneForStatus(queue.status)} label={queue.decision} />
+                      </div>
+                      <span>
+                        ready {queue.ready_count} / rework {queue.needs_rework_count} / blocked {queue.blocked_count}
+                      </span>
+                      <div className="signalMeta">
+                        <code>{compactID(queue.batch_id)}</code>
+                        {queue.batch_run_id ? <code>{compactID(queue.batch_run_id)}</code> : null}
+                        {queue.reasons[0] ? <code>{queue.reasons[0]}</code> : null}
+                      </div>
+                      <div className="routeCandidateGrid compact">
+                        {queue.items.slice(0, 3).map((item) => (
+                          <div className="routeCandidate" key={`${queue.id}-${item.issue_id}`}>
+                            <strong>{compactID(item.issue_id)}</strong>
+                            <span>{item.reason || item.decision}</span>
+                            <div className="signalMeta">
+                              <code>{item.status}</code>
+                              {item.worktree_id ? <code>{compactID(item.worktree_id)}</code> : null}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                      <div className="signalActions">
+                        <button
+                          className="inlineActionButton"
+                          disabled={previewState?.status === "running"}
+                          onClick={() => void buildIntegrationPreview(queue.id)}
+                          type="button"
+                        >
+                          <GitBranch size={13} />
+                          <span>{previewState?.status === "running" ? "Previewing" : "Integration Preview"}</span>
+                        </button>
+                      </div>
+                      <ActionFeedback state={previewState} />
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="emptyState compact">No merge queues</div>
               )}
@@ -1306,6 +1417,112 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                     {record.batch_id ? <code>{compactID(record.batch_id)}</code> : null}
                     {record.worktree_path ? <code>{shortPath(record.worktree_path)}</code> : null}
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle
+              icon={<Rocket size={18} />}
+              title="Integration & Release"
+              meta={`${snapshot.integration_previews.length} previews / ${snapshot.release_batches.length} batches`}
+            />
+            <div className="signalList">
+              {snapshot.integration_previews.length > 0 ? (
+                snapshot.integration_previews.slice(0, 3).map((preview) => {
+                  const applyState = batchActionState[`${preview.id}:apply-dry-run`];
+                  return (
+                    <div className="signalItem" key={preview.id}>
+                      <div className="signalHeader">
+                        <strong>{compactID(preview.id)}</strong>
+                        <StatusPill tone={toneForStatus(preview.status)} label={preview.decision} />
+                      </div>
+                      <span>
+                        ready {preview.ready_count} / conflict {preview.conflict_count} / blocked {preview.blocked_count}
+                      </span>
+                      <div className="signalMeta">
+                        {preview.merge_queue_id ? <code>{compactID(preview.merge_queue_id)}</code> : null}
+                        {preview.integration_branch ? <code>{compactID(preview.integration_branch)}</code> : null}
+                        {preview.base_ref ? <code>base {preview.base_ref}</code> : null}
+                      </div>
+                      <div className="routeCandidateGrid compact">
+                        {preview.items.slice(0, 2).map((item) => (
+                          <div className="routeCandidate" key={`${preview.id}-${item.issue_id}`}>
+                            <strong>{compactID(item.issue_id)}</strong>
+                            <span>{item.reason || item.decision}</span>
+                            <div className="signalMeta">
+                              <code>{item.status}</code>
+                              {item.changed_files.length > 0 ? <code>{item.changed_files.length} files</code> : null}
+                              {item.conflicted_files.length > 0 ? <code>{item.conflicted_files.length} conflicts</code> : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="signalActions">
+                        <button
+                          className="inlineActionButton"
+                          disabled={applyState?.status === "running"}
+                          onClick={() => void dryRunIntegrationApply(preview.id)}
+                          type="button"
+                        >
+                          <ShieldCheck size={13} />
+                          <span>{applyState?.status === "running" ? "Planning" : "Apply Dry Run"}</span>
+                        </button>
+                      </div>
+                      <ActionFeedback state={applyState} />
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="emptyState compact">No integration previews</div>
+              )}
+              {snapshot.integration_applies.slice(0, 2).map((apply) => {
+                const releaseState = batchActionState[`${apply.id}:release-batch`];
+                return (
+                  <div className="signalItem" key={apply.id}>
+                    <div className="signalHeader">
+                      <strong>{compactID(apply.id)}</strong>
+                      <StatusPill tone={toneForStatus(apply.status)} label={apply.decision} />
+                    </div>
+                    <span>
+                      {apply.mode} / {apply.write_enabled ? "write enabled" : "guarded"} / {apply.action_count} actions
+                    </span>
+                    <div className="signalMeta">
+                      {apply.preview_id ? <code>{compactID(apply.preview_id)}</code> : null}
+                      {apply.target_branch ? <code>{compactID(apply.target_branch)}</code> : null}
+                      {apply.requested_by ? <code>{apply.requested_by}</code> : null}
+                    </div>
+                    <div className="signalActions">
+                      <button
+                        className="inlineActionButton"
+                        disabled={releaseState?.status === "running"}
+                        onClick={() => void planReleaseBatch(apply.id)}
+                        type="button"
+                      >
+                        <Rocket size={13} />
+                        <span>{releaseState?.status === "running" ? "Checking" : "Release Batch"}</span>
+                      </button>
+                    </div>
+                    <ActionFeedback state={releaseState} />
+                  </div>
+                );
+              })}
+              {snapshot.release_batches.slice(0, 2).map((releaseBatch) => (
+                <div className="signalItem" key={releaseBatch.id}>
+                  <div className="signalHeader">
+                    <strong>{compactID(releaseBatch.version || releaseBatch.id)}</strong>
+                    <StatusPill tone={toneForStatus(releaseBatch.status)} label={releaseBatch.decision} />
+                  </div>
+                  <span>
+                    ready {releaseBatch.ready_item_count}/{releaseBatch.min_items} / {releaseBatch.release_branch || "release branch pending"}
+                  </span>
+                  <div className="signalMeta">
+                    {releaseBatch.integration_apply_id ? <code>{compactID(releaseBatch.integration_apply_id)}</code> : null}
+                    {releaseBatch.source_branch ? <code>{compactID(releaseBatch.source_branch)}</code> : null}
+                    {releaseBatch.reasons[0] ? <code>{releaseBatch.reasons[0]}</code> : null}
+                  </div>
+                  {releaseBatch.commands[0] ? <small>{releaseBatch.commands[0]}</small> : null}
                 </div>
               ))}
             </div>
@@ -2424,6 +2641,34 @@ type MergeQueueEnvelope = {
   };
 };
 
+type IntegrationPreviewEnvelope = {
+  error?: string;
+  integration_preview?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type IntegrationApplyEnvelope = {
+  error?: string;
+  integration_apply?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type ReleaseBatchEnvelope = {
+  error?: string;
+  release_batch?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+    ready_item_count?: number;
+  };
+};
+
 type OperationRepairReviewEnvelope = {
   error?: string;
   operation_repair_review?: {
@@ -2562,6 +2807,7 @@ function toneForStatus(status: string): StatusTone {
     status === "ready_to_merge" ||
     status === "completed" ||
     status === "planned" ||
+    status === "applied" ||
     status === "ok" ||
     status === "healthy"
   )
@@ -2582,7 +2828,8 @@ function toneForStatus(status: string): StatusTone {
     status === "execution_blocked" ||
     status === "operation_failed" ||
     status === "operation_blocked" ||
-    status === "check_failed"
+    status === "check_failed" ||
+    status === "conflict"
   )
     return "blocked";
   if (
@@ -2597,7 +2844,8 @@ function toneForStatus(status: string): StatusTone {
     status === "attention_required" ||
     status === "manual_required" ||
     status === "manual_check_required" ||
-    status === "suggested"
+    status === "suggested" ||
+    status === "not_ready"
   )
     return "warning";
   return "neutral";
