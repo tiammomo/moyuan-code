@@ -70,6 +70,8 @@ import type {
   WriteAdapterExecutionReportSummary,
   WriteAdapterExecutionSummary,
   WriteAdapterGuardSummary,
+  WriteAdapterRollbackBindingSummary,
+  WriteAdapterSandboxSummary,
   WriteExecutionPlanReportSummary,
   WriteExecutionPlanSummary,
   WriteReviewPacketReportSummary,
@@ -1595,6 +1597,8 @@ function normalizeWriteAdapterExecutionReport(raw: unknown): WriteAdapterExecuti
     completed_count: readNumber(summary, "completed_count"),
     blocked_count: readNumber(summary, "blocked_count"),
     manual_required_count: readNumber(summary, "manual_required_count"),
+    sandbox_result_count: readNumber(summary, "sandbox_result_count"),
+    rollback_bound_count: readNumber(summary, "rollback_bound_count"),
     external_attempt_count: readNumber(summary, "external_attempt_count"),
     external_write_count: readNumber(summary, "external_write_count"),
     by_adapter: readNumberMap(summary, "by_adapter"),
@@ -1622,6 +1626,8 @@ function normalizeWriteAdapterExecution(raw: unknown, index: number): WriteAdapt
     rule_refs: readArray(raw, "rule_refs"),
     evidence_refs: readArray(raw, "evidence_refs"),
     guard_results: readObjectArray(raw, "guard_results").map(normalizeWriteAdapterGuard),
+    sandbox_results: readObjectArray(raw, "sandbox_results").map(normalizeWriteAdapterSandbox),
+    rollback_binding: normalizeWriteAdapterRollbackBinding(readUnknown(raw, "rollback_binding")),
     apply_allowed: readBoolean(raw, "apply_allowed"),
     external_write_attempted: readBoolean(raw, "external_write_attempted"),
     external_write_performed: readBoolean(raw, "external_write_performed"),
@@ -1636,6 +1642,39 @@ function normalizeWriteAdapterGuard(raw: unknown, index: number): WriteAdapterGu
     status: readString(raw, "status", "unknown"),
     decision: readString(raw, "decision", "unknown"),
     reason: readString(raw, "reason", ""),
+  };
+}
+
+function normalizeWriteAdapterSandbox(raw: unknown, index: number): WriteAdapterSandboxSummary {
+  return {
+    resource_id: readString(raw, "resource_id", `resource-${index + 1}`),
+    environment: readString(raw, "environment", ""),
+    provider: readString(raw, "provider", ""),
+    host_status: readString(raw, "host_status", ""),
+    command: readString(raw, "command", ""),
+    allowlist: readArray(raw, "allowlist"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reason: readString(raw, "reason", ""),
+    preview_only: readBoolean(raw, "preview_only"),
+    no_remote_write: readBoolean(raw, "no_remote_write"),
+  };
+}
+
+function normalizeWriteAdapterRollbackBinding(raw: unknown): WriteAdapterRollbackBindingSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  return {
+    deployment_id: readString(raw, "deployment_id", ""),
+    required: readBoolean(raw, "required"),
+    status: readString(raw, "status", ""),
+    decision: readString(raw, "decision", ""),
+    reason: readString(raw, "reason", ""),
+    plan_ref: readString(raw, "plan_ref", ""),
+    runbook_ref: readString(raw, "runbook_ref", ""),
+    action_count: readNumber(raw, "action_count"),
+    step_count: readNumber(raw, "step_count"),
   };
 }
 

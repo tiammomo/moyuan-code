@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/fsutil"
@@ -843,6 +844,98 @@ func TestCreateWriteAdapterExecutionsDispatchesWithoutExternalWrite(t *testing.T
 	}
 }
 
+func TestCreateWriteAdapterExecutionsBuildsSSHSandboxAndRollbackBinding(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "ssh-adapter-resource",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2099-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	releasePlan := release.Plan{ID: "release-ssh-adapter-sandbox", Status: "ready", Decision: "RELEASE_SUGGESTED", Version: "v0.25.0"}
+	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(root).ReleasesDir, releasePlan.ID+".json"), releasePlan); err != nil {
+		t.Fatal(err)
+	}
+	deploymentPlan, err := deployment.CreatePlan(root, deployment.PlanOptions{
+		ReleaseID:   releasePlan.ID,
+		Environment: "test_dev",
+		ResourceIDs: []string{"ssh-adapter-resource"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deploymentExecution, err := deployment.Execute(context.Background(), root, deployment.ExecuteOptions{
+		DeploymentID: deploymentPlan.ID,
+		Mode:         "ssh_preview",
+		Commands:     []string{"echo health"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deploymentExecution.RemotePlan == nil || deploymentExecution.RemotePlan.Decision != "SSH_PREVIEW_READY" {
+		t.Fatalf("expected ssh preview remote plan, got %+v", deploymentExecution.RemotePlan)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	executionPlan, err := finishWriteExecutionPlan(root, WriteExecutionPlan{
+		ID:            "write-execution-plan-ssh-sandbox-test",
+		OperationType: "deployment_execution",
+		OperationID:   deploymentExecution.ID,
+		Provider:      "ssh",
+		Environment:   "test_dev",
+		Mode:          "preview",
+		Status:        "planned",
+		Decision:      "WRITE_EXECUTION_PREVIEW_READY",
+		Reasons:       []string{"test_preview_plan"},
+		RuleRefs:      []string{"test_write_adapter_ssh_sandbox"},
+		EvidenceRefs:  []string{},
+		CreatedAt:     now,
+		Metadata:      map[string]any{"test": true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := CreateWriteAdapterExecutions(root, WriteAdapterExecutionOptions{ExecutionPlanID: executionPlan.ID, Mode: "preview", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.ExecutionCount != 1 || report.Summary.CompletedCount != 1 || report.Summary.SandboxResultCount != 1 || report.Summary.RollbackBoundCount != 1 {
+		t.Fatalf("expected completed ssh adapter preview with sandbox and rollback summary, got %+v", report.Summary)
+	}
+	execution := report.Executions[0]
+	if execution.AdapterID != "ssh_deployment_adapter" || execution.Decision != "WRITE_ADAPTER_PREVIEW_READY" || execution.ExternalWriteAttempted || execution.ExternalWritePerformed {
+		t.Fatalf("unexpected ssh adapter execution: %+v", execution)
+	}
+	if len(execution.SandboxResults) != 1 || execution.SandboxResults[0].Decision != "WRITE_ADAPTER_SSH_SANDBOX_PREVIEW_COMMAND_RECORDED" || !execution.SandboxResults[0].PreviewOnly || !execution.SandboxResults[0].NoRemoteWrite {
+		t.Fatalf("expected preview-only sandbox result, got %+v", execution.SandboxResults)
+	}
+	if !execution.RollbackBinding.Required || execution.RollbackBinding.Decision != "WRITE_ADAPTER_ROLLBACK_PLAN_BOUND" || execution.RollbackBinding.ActionCount == 0 {
+		t.Fatalf("expected rollback plan binding, got %+v", execution.RollbackBinding)
+	}
+	if !writeAdapterGuardContains(execution.GuardResults, "ssh_command_sandbox", "WRITE_ADAPTER_SSH_SANDBOX_READY") {
+		t.Fatalf("expected ssh sandbox guard, got %+v", execution.GuardResults)
+	}
+}
+
+func TestSSHAdapterSandboxCommandStatusBlocksShellControlTokens(t *testing.T) {
+	status, decision, reason, previewOnly, noRemoteWrite := sshAdapterSandboxCommandStatus("ssh_preview", false, "echo ok; rm -rf /")
+	if status != "blocked" || decision != "WRITE_ADAPTER_SSH_SANDBOX_COMMAND_UNSAFE" || reason != "preview_command_contains_shell_control_token" || !previewOnly || !noRemoteWrite {
+		t.Fatalf("expected unsafe preview command to be blocked, got status=%s decision=%s reason=%s preview=%v no_remote=%v", status, decision, reason, previewOnly, noRemoteWrite)
+	}
+	status, decision, reason, previewOnly, noRemoteWrite = sshAdapterSandboxCommandStatus("ssh_execute", true, "printf ok")
+	if status != "ready" || decision != "WRITE_ADAPTER_SSH_SANDBOX_COMMAND_ALLOWLISTED" || reason != "remote_command_allowlisted" || previewOnly || noRemoteWrite {
+		t.Fatalf("expected allowlisted real command to be ready, got status=%s decision=%s reason=%s preview=%v no_remote=%v", status, decision, reason, previewOnly, noRemoteWrite)
+	}
+}
+
 func timelineContainsType(items []TimelineItem, typ string) bool {
 	for _, item := range items {
 		if item.Type == typ {
@@ -864,6 +957,15 @@ func timelineContainsID(items []TimelineItem, id string) bool {
 func decisionLedgerContainsSource(entries []DecisionEntry, sourceType string) bool {
 	for _, entry := range entries {
 		if entry.SourceType == sourceType {
+			return true
+		}
+	}
+	return false
+}
+
+func writeAdapterGuardContains(guards []WriteAdapterGuardResult, name string, decision string) bool {
+	for _, guard := range guards {
+		if guard.Name == name && guard.Decision == decision {
 			return true
 		}
 	}

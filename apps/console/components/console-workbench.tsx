@@ -2058,6 +2058,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       manual {writeAdapterExecutionReport.manual_required_count} / attempts {writeAdapterExecutionReport.external_attempt_count} / writes{" "}
                       {writeAdapterExecutionReport.external_write_count}
                     </span>
+                    <span>
+                      sandbox {writeAdapterExecutionReport.sandbox_result_count} / rollback {writeAdapterExecutionReport.rollback_bound_count}
+                    </span>
                     <div className="signalMeta">
                       {Object.entries(writeAdapterExecutionReport.by_adapter)
                         .slice(0, 3)
@@ -2080,11 +2083,21 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       <div className="signalMeta">
                         {execution.execution_plan_id ? <code>{compactID(execution.execution_plan_id)}</code> : null}
                         <code>{execution.guard_results.length} guards</code>
+                        {execution.sandbox_results.length ? <code>{execution.sandbox_results.length} sandbox</code> : null}
+                        {execution.rollback_binding?.decision ? <code>{execution.rollback_binding.decision}</code> : null}
                         <code>{execution.external_write_attempted ? "attempted" : "not attempted"}</code>
                         <code>{execution.external_write_performed ? "external write" : "no external write"}</code>
                         {execution.evidence_refs.length ? <code>{execution.evidence_refs.length} evidence</code> : null}
                       </div>
-                      {execution.guard_results[0] ? <small>{execution.guard_results[0].decision}</small> : execution.reasons[0] ? <small>{execution.reasons[0]}</small> : null}
+                      {execution.sandbox_results[0] ? (
+                        <small>
+                          {execution.sandbox_results[0].decision} / {execution.sandbox_results[0].no_remote_write ? "no remote write" : "remote write gated"}
+                        </small>
+                      ) : execution.guard_results[0] ? (
+                        <small>{execution.guard_results[0].decision}</small>
+                      ) : execution.reasons[0] ? (
+                        <small>{execution.reasons[0]}</small>
+                      ) : null}
                     </div>
                   ))}
                 </>

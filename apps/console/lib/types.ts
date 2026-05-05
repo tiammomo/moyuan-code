@@ -1312,6 +1312,32 @@ export type WriteAdapterGuardSummary = {
   reason?: string;
 };
 
+export type WriteAdapterSandboxSummary = {
+  resource_id?: string;
+  environment?: string;
+  provider?: string;
+  host_status?: string;
+  command?: string;
+  allowlist: string[];
+  status: string;
+  decision: string;
+  reason?: string;
+  preview_only: boolean;
+  no_remote_write: boolean;
+};
+
+export type WriteAdapterRollbackBindingSummary = {
+  deployment_id?: string;
+  required: boolean;
+  status?: string;
+  decision?: string;
+  reason?: string;
+  plan_ref?: string;
+  runbook_ref?: string;
+  action_count?: number;
+  step_count?: number;
+};
+
 export type WriteAdapterExecutionSummary = {
   id: string;
   execution_plan_id?: string;
@@ -1328,6 +1354,8 @@ export type WriteAdapterExecutionSummary = {
   rule_refs: string[];
   evidence_refs: string[];
   guard_results: WriteAdapterGuardSummary[];
+  sandbox_results: WriteAdapterSandboxSummary[];
+  rollback_binding?: WriteAdapterRollbackBindingSummary;
   apply_allowed: boolean;
   external_write_attempted: boolean;
   external_write_performed: boolean;
@@ -1342,6 +1370,8 @@ export type WriteAdapterExecutionReportSummary = {
   completed_count: number;
   blocked_count: number;
   manual_required_count: number;
+  sandbox_result_count: number;
+  rollback_bound_count: number;
   external_attempt_count: number;
   external_write_count: number;
   by_adapter: Record<string, number>;

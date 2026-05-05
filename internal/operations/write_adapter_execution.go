@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
@@ -36,6 +37,8 @@ type WriteAdapterExecutionSummary struct {
 	CompletedCount       int            `json:"completed_count"`
 	BlockedCount         int            `json:"blocked_count"`
 	ManualRequiredCount  int            `json:"manual_required_count"`
+	SandboxResultCount   int            `json:"sandbox_result_count"`
+	RollbackBoundCount   int            `json:"rollback_bound_count"`
 	ExternalAttemptCount int            `json:"external_attempt_count"`
 	ExternalWriteCount   int            `json:"external_write_count"`
 	ByAdapter            map[string]int `json:"by_adapter,omitempty"`
@@ -45,27 +48,29 @@ type WriteAdapterExecutionSummary struct {
 }
 
 type WriteAdapterExecution struct {
-	ID                     string                    `json:"id"`
-	ExecutionPlanID        string                    `json:"execution_plan_id,omitempty"`
-	ReviewPacketID         string                    `json:"review_packet_id,omitempty"`
-	OperationType          string                    `json:"operation_type,omitempty"`
-	OperationID            string                    `json:"operation_id,omitempty"`
-	Provider               string                    `json:"provider,omitempty"`
-	Environment            string                    `json:"environment,omitempty"`
-	AdapterID              string                    `json:"adapter_id,omitempty"`
-	Mode                   string                    `json:"mode"`
-	Status                 string                    `json:"status"`
-	Decision               string                    `json:"decision"`
-	Reasons                []string                  `json:"reasons,omitempty"`
-	RuleRefs               []string                  `json:"rule_refs,omitempty"`
-	EvidenceRefs           []string                  `json:"evidence_refs,omitempty"`
-	GuardResults           []WriteAdapterGuardResult `json:"guard_results,omitempty"`
-	ApplyAllowed           bool                      `json:"apply_allowed"`
-	ExternalWriteAttempted bool                      `json:"external_write_attempted"`
-	ExternalWritePerformed bool                      `json:"external_write_performed"`
-	CreatedAt              string                    `json:"created_at"`
-	FinishedAt             string                    `json:"finished_at,omitempty"`
-	Metadata               map[string]any            `json:"metadata,omitempty"`
+	ID                     string                      `json:"id"`
+	ExecutionPlanID        string                      `json:"execution_plan_id,omitempty"`
+	ReviewPacketID         string                      `json:"review_packet_id,omitempty"`
+	OperationType          string                      `json:"operation_type,omitempty"`
+	OperationID            string                      `json:"operation_id,omitempty"`
+	Provider               string                      `json:"provider,omitempty"`
+	Environment            string                      `json:"environment,omitempty"`
+	AdapterID              string                      `json:"adapter_id,omitempty"`
+	Mode                   string                      `json:"mode"`
+	Status                 string                      `json:"status"`
+	Decision               string                      `json:"decision"`
+	Reasons                []string                    `json:"reasons,omitempty"`
+	RuleRefs               []string                    `json:"rule_refs,omitempty"`
+	EvidenceRefs           []string                    `json:"evidence_refs,omitempty"`
+	GuardResults           []WriteAdapterGuardResult   `json:"guard_results,omitempty"`
+	SandboxResults         []WriteAdapterSandboxResult `json:"sandbox_results,omitempty"`
+	RollbackBinding        WriteAdapterRollbackBinding `json:"rollback_binding,omitempty"`
+	ApplyAllowed           bool                        `json:"apply_allowed"`
+	ExternalWriteAttempted bool                        `json:"external_write_attempted"`
+	ExternalWritePerformed bool                        `json:"external_write_performed"`
+	CreatedAt              string                      `json:"created_at"`
+	FinishedAt             string                      `json:"finished_at,omitempty"`
+	Metadata               map[string]any              `json:"metadata,omitempty"`
 }
 
 type WriteAdapterGuardResult struct {
@@ -73,6 +78,32 @@ type WriteAdapterGuardResult struct {
 	Status   string `json:"status"`
 	Decision string `json:"decision"`
 	Reason   string `json:"reason,omitempty"`
+}
+
+type WriteAdapterSandboxResult struct {
+	ResourceID    string   `json:"resource_id,omitempty"`
+	Environment   string   `json:"environment,omitempty"`
+	Provider      string   `json:"provider,omitempty"`
+	HostStatus    string   `json:"host_status,omitempty"`
+	Command       string   `json:"command,omitempty"`
+	Allowlist     []string `json:"allowlist,omitempty"`
+	Status        string   `json:"status"`
+	Decision      string   `json:"decision"`
+	Reason        string   `json:"reason,omitempty"`
+	PreviewOnly   bool     `json:"preview_only"`
+	NoRemoteWrite bool     `json:"no_remote_write"`
+}
+
+type WriteAdapterRollbackBinding struct {
+	DeploymentID string `json:"deployment_id,omitempty"`
+	Required     bool   `json:"required"`
+	Status       string `json:"status,omitempty"`
+	Decision     string `json:"decision,omitempty"`
+	Reason       string `json:"reason,omitempty"`
+	PlanRef      string `json:"plan_ref,omitempty"`
+	RunbookRef   string `json:"runbook_ref,omitempty"`
+	ActionCount  int    `json:"action_count,omitempty"`
+	StepCount    int    `json:"step_count,omitempty"`
 }
 
 func CreateWriteAdapterExecutions(rootDir string, options WriteAdapterExecutionOptions) (WriteAdapterExecutionReport, error) {
@@ -229,6 +260,11 @@ func writeAdapterExecutionFromPlan(rootDir string, options WriteAdapterExecution
 		return normalizeWriteAdapterExecution(execution), nil
 	}
 	addGuard("adapter_resolution", "ready", "WRITE_ADAPTER_RESOLVED", execution.AdapterID)
+	if execution.AdapterID == "ssh_deployment_adapter" {
+		if err := addSSHAdapterSandbox(rootDir, &execution, plan, addGuard, block, manual); err != nil {
+			return WriteAdapterExecution{}, err
+		}
+	}
 	if plan.Status == "blocked" {
 		addGuard("execution_plan_status", "blocked", "WRITE_ADAPTER_PLAN_BLOCKED", plan.Decision)
 		block("WRITE_ADAPTER_PLAN_BLOCKED", "write_execution_plan_blocked:"+plan.Decision, "write_execution_plan_must_be_dispatchable")
@@ -268,6 +304,218 @@ func writeAdapterExecutionFromPlan(rootDir string, options WriteAdapterExecution
 	}
 	execution.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	return normalizeWriteAdapterExecution(execution), nil
+}
+
+func addSSHAdapterSandbox(rootDir string, execution *WriteAdapterExecution, plan WriteExecutionPlan, addGuard func(string, string, string, string), block func(string, string, string), manual func(string, string, string)) error {
+	execution.RuleRefs = appendUnique(execution.RuleRefs, "ssh_adapter_sandbox_required")
+	if strings.TrimSpace(plan.OperationID) == "" {
+		addGuard("ssh_execution_load", "blocked", "WRITE_ADAPTER_SSH_EXECUTION_ID_REQUIRED", "deployment_execution_id_required")
+		block("WRITE_ADAPTER_SSH_EXECUTION_ID_REQUIRED", "deployment_execution_id_required", "ssh_adapter_requires_deployment_execution")
+		return nil
+	}
+	deploymentExecution, found, err := deployment.LoadExecution(rootDir, plan.OperationID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		addGuard("ssh_execution_load", "blocked", "WRITE_ADAPTER_SSH_EXECUTION_MISSING", plan.OperationID)
+		block("WRITE_ADAPTER_SSH_EXECUTION_MISSING", "deployment_execution_missing:"+plan.OperationID, "ssh_adapter_requires_existing_deployment_execution")
+		return nil
+	}
+	execution.Metadata["deployment_execution_status"] = deploymentExecution.Status
+	execution.Metadata["deployment_execution_decision"] = deploymentExecution.Decision
+	execution.Metadata["deployment_execution_mode"] = deploymentExecution.Mode
+	execution.Metadata["deployment_remote_exec_enabled"] = deploymentExecution.RemoteExecEnabled
+	addGuard("ssh_execution_load", "ready", "WRITE_ADAPTER_SSH_EXECUTION_LOADED", deploymentExecution.ID)
+
+	if deploymentExecution.RemotePlan == nil || len(deploymentExecution.RemotePlan.Targets) == 0 {
+		addGuard("ssh_remote_plan", "blocked", "WRITE_ADAPTER_SSH_REMOTE_PLAN_MISSING", "remote_plan_missing")
+		block("WRITE_ADAPTER_SSH_REMOTE_PLAN_MISSING", "ssh_remote_plan_missing:"+deploymentExecution.ID, "ssh_adapter_requires_remote_plan")
+		return bindSSHAdapterRollback(rootDir, execution, deploymentExecution, addGuard, block, manual)
+	}
+	execution.Metadata["ssh_remote_plan_status"] = deploymentExecution.RemotePlan.Status
+	execution.Metadata["ssh_remote_plan_decision"] = deploymentExecution.RemotePlan.Decision
+	execution.Metadata["ssh_remote_target_count"] = len(deploymentExecution.RemotePlan.Targets)
+	addGuard("ssh_remote_plan", "ready", "WRITE_ADAPTER_SSH_REMOTE_PLAN_LOADED", deploymentExecution.RemotePlan.Decision)
+
+	for _, target := range deploymentExecution.RemotePlan.Targets {
+		targetReason := firstNonEmpty(target.Reason, "remote_target_ready")
+		if strings.TrimSpace(target.Host) == "" {
+			addGuard("ssh_target:"+target.ResourceID, "blocked", "WRITE_ADAPTER_SSH_TARGET_HOST_MISSING", "host_required")
+			block("WRITE_ADAPTER_SSH_TARGET_BLOCKED", "ssh_target_host_missing:"+target.ResourceID, "ssh_target_host_required")
+		} else if target.Status == "blocked" {
+			addGuard("ssh_target:"+target.ResourceID, "blocked", "WRITE_ADAPTER_SSH_TARGET_BLOCKED", targetReason)
+			block("WRITE_ADAPTER_SSH_TARGET_BLOCKED", "ssh_target_blocked:"+target.ResourceID+":"+targetReason, "ssh_target_must_be_ready")
+		} else {
+			addGuard("ssh_target:"+target.ResourceID, "ready", "WRITE_ADAPTER_SSH_TARGET_READY", targetReason)
+		}
+		authStatus, authDecision, authReason := remoteExecutionAuthStatus(target)
+		addGuard("ssh_auth_ref:"+target.ResourceID, authStatus, strings.Replace(authDecision, "REMOTE_", "WRITE_ADAPTER_SSH_", 1), authReason)
+		if authStatus == "blocked" {
+			block("WRITE_ADAPTER_SSH_AUTH_REF_BLOCKED", "ssh_auth_ref_blocked:"+target.ResourceID+":"+authReason, "ssh_auth_ref_required")
+		}
+		if len(target.Commands) == 0 {
+			execution.SandboxResults = append(execution.SandboxResults, WriteAdapterSandboxResult{
+				ResourceID:    target.ResourceID,
+				Environment:   target.Environment,
+				Provider:      normalizeProviderAlias(firstNonEmpty(target.Provider, plan.Provider), "deployment_execution"),
+				HostStatus:    hostStatus(target.Host),
+				Allowlist:     sshAdapterSandboxAllowlist(deploymentExecution.Mode),
+				Status:        "blocked",
+				Decision:      "WRITE_ADAPTER_SSH_SANDBOX_COMMAND_REQUIRED",
+				Reason:        "remote_command_required",
+				PreviewOnly:   sshAdapterPreviewOnly(deploymentExecution.Mode),
+				NoRemoteWrite: sshAdapterNoRemoteWrite(deploymentExecution.Mode, deploymentExecution.RemoteExecEnabled),
+			})
+			block("WRITE_ADAPTER_SSH_SANDBOX_COMMAND_BLOCKED", "ssh_command_required:"+target.ResourceID, "ssh_adapter_command_required")
+			continue
+		}
+		for _, command := range target.Commands {
+			status, decision, reason, previewOnly, noRemoteWrite := sshAdapterSandboxCommandStatus(deploymentExecution.Mode, deploymentExecution.RemoteExecEnabled, command)
+			execution.SandboxResults = append(execution.SandboxResults, WriteAdapterSandboxResult{
+				ResourceID:    target.ResourceID,
+				Environment:   target.Environment,
+				Provider:      normalizeProviderAlias(firstNonEmpty(target.Provider, plan.Provider), "deployment_execution"),
+				HostStatus:    hostStatus(target.Host),
+				Command:       strings.TrimSpace(command),
+				Allowlist:     sshAdapterSandboxAllowlist(deploymentExecution.Mode),
+				Status:        status,
+				Decision:      decision,
+				Reason:        reason,
+				PreviewOnly:   previewOnly,
+				NoRemoteWrite: noRemoteWrite,
+			})
+			switch status {
+			case "blocked":
+				block("WRITE_ADAPTER_SSH_SANDBOX_COMMAND_BLOCKED", "ssh_command_blocked:"+target.ResourceID+":"+reason, "ssh_adapter_command_allowlist_required")
+			case "manual_required":
+				manual("WRITE_ADAPTER_SSH_SANDBOX_MANUAL_REQUIRED", "ssh_command_manual_required:"+target.ResourceID+":"+reason, "ssh_adapter_command_manual_review")
+			}
+		}
+	}
+	execution.Metadata["ssh_sandbox_result_count"] = len(execution.SandboxResults)
+	if execution.Status == "completed" && len(execution.SandboxResults) > 0 && !writeAdapterSandboxHasStatus(execution.SandboxResults, "blocked") && !writeAdapterSandboxHasStatus(execution.SandboxResults, "manual_required") {
+		addGuard("ssh_command_sandbox", "ready", "WRITE_ADAPTER_SSH_SANDBOX_READY", fmt.Sprintf("%d_commands_checked", len(execution.SandboxResults)))
+		execution.Reasons = appendUnique(execution.Reasons, "ssh_adapter_sandbox_ready")
+	}
+	return bindSSHAdapterRollback(rootDir, execution, deploymentExecution, addGuard, block, manual)
+}
+
+func bindSSHAdapterRollback(rootDir string, execution *WriteAdapterExecution, deploymentExecution deployment.Execution, addGuard func(string, string, string, string), block func(string, string, string), manual func(string, string, string)) error {
+	binding := WriteAdapterRollbackBinding{
+		DeploymentID: deploymentExecution.DeploymentID,
+		Required:     false,
+		Status:       "ready",
+		Decision:     "WRITE_ADAPTER_ROLLBACK_NOT_REQUIRED",
+		Reason:       "rollback_not_required",
+	}
+	deploymentPlan, found, err := deployment.Load(rootDir, deploymentExecution.DeploymentID)
+	if err != nil {
+		return err
+	}
+	if found {
+		binding.PlanRef = filepath.ToSlash(filepath.Join(".moyuan", "lifecycle", "deployments", deploymentPlan.ID+".json"))
+		if deploymentPlan.RollbackPlan.Required || len(deploymentPlan.RollbackPlan.Actions) > 0 {
+			binding.Required = true
+			binding.Status = "ready"
+			binding.Decision = "WRITE_ADAPTER_ROLLBACK_PLAN_BOUND"
+			binding.Reason = "deployment_rollback_plan_bound"
+			binding.ActionCount = len(deploymentPlan.RollbackPlan.Actions)
+			if len(deploymentPlan.RollbackPlan.Actions) == 0 {
+				binding.Status = "blocked"
+				binding.Decision = "WRITE_ADAPTER_ROLLBACK_PLAN_MISSING"
+				binding.Reason = "rollback_actions_missing"
+				block("WRITE_ADAPTER_ROLLBACK_BLOCKED", "rollback_actions_missing:"+deploymentPlan.ID, "rollback_actions_required")
+			}
+		}
+	} else {
+		binding.Required = true
+		binding.Status = "blocked"
+		binding.Decision = "WRITE_ADAPTER_ROLLBACK_PLAN_MISSING"
+		binding.Reason = "deployment_plan_missing"
+		block("WRITE_ADAPTER_ROLLBACK_BLOCKED", "deployment_plan_missing:"+deploymentExecution.DeploymentID, "rollback_plan_required")
+	}
+	if deploymentExecution.RollbackSuggestion.Required {
+		binding.Required = true
+		binding.Reason = firstNonEmpty(deploymentExecution.RollbackSuggestion.Reason, "rollback_suggestion_required")
+		if deploymentExecution.RollbackSuggestion.Runbook == nil || len(deploymentExecution.RollbackSuggestion.Runbook.Steps) == 0 {
+			binding.Status = "blocked"
+			binding.Decision = "WRITE_ADAPTER_ROLLBACK_RUNBOOK_MISSING"
+			block("WRITE_ADAPTER_ROLLBACK_BLOCKED", "rollback_runbook_missing:"+deploymentExecution.ID, "rollback_runbook_required")
+		} else {
+			binding.Status = "ready"
+			binding.Decision = "WRITE_ADAPTER_ROLLBACK_RUNBOOK_BOUND"
+			binding.StepCount = len(deploymentExecution.RollbackSuggestion.Runbook.Steps)
+			binding.RunbookRef = filepath.ToSlash(filepath.Join(".moyuan", "lifecycle", "deployments", "rollback-runbooks", deploymentExecution.ID+".json"))
+		}
+	}
+	if deploymentExecution.Environment == "production" && binding.Required && binding.Status == "ready" {
+		binding.Status = "manual_required"
+		binding.Decision = "WRITE_ADAPTER_ROLLBACK_PRODUCTION_REVIEW_REQUIRED"
+		manual("WRITE_ADAPTER_ROLLBACK_PRODUCTION_REVIEW_REQUIRED", "production_rollback_binding_requires_manual_review", "production_rollback_review_required")
+	}
+	execution.RollbackBinding = binding
+	addGuard("rollback_binding", binding.Status, binding.Decision, binding.Reason)
+	if binding.Status == "ready" {
+		execution.Reasons = appendUnique(execution.Reasons, "ssh_adapter_rollback_bound")
+	}
+	return nil
+}
+
+func sshAdapterSandboxCommandStatus(mode string, remoteExecEnabled bool, command string) (string, string, string, bool, bool) {
+	command = strings.TrimSpace(command)
+	previewOnly := sshAdapterPreviewOnly(mode)
+	noRemoteWrite := sshAdapterNoRemoteWrite(mode, remoteExecEnabled)
+	if command == "" {
+		return "blocked", "WRITE_ADAPTER_SSH_SANDBOX_COMMAND_REQUIRED", "remote_command_required", previewOnly, noRemoteWrite
+	}
+	if previewOnly {
+		if sshAdapterPreviewCommandUnsafe(command) {
+			return "blocked", "WRITE_ADAPTER_SSH_SANDBOX_COMMAND_UNSAFE", "preview_command_contains_shell_control_token", previewOnly, noRemoteWrite
+		}
+		return "ready", "WRITE_ADAPTER_SSH_SANDBOX_PREVIEW_COMMAND_RECORDED", "preview_only_no_remote_command_executed", previewOnly, true
+	}
+	if !remoteExecutionCommandAllowed(command) {
+		return "blocked", "WRITE_ADAPTER_SSH_SANDBOX_COMMAND_NOT_ALLOWED", "remote_command_not_allowed", previewOnly, noRemoteWrite
+	}
+	return "ready", "WRITE_ADAPTER_SSH_SANDBOX_COMMAND_ALLOWLISTED", "remote_command_allowlisted", previewOnly, noRemoteWrite
+}
+
+func sshAdapterPreviewOnly(mode string) bool {
+	mode = normalizeType(mode)
+	return mode == "ssh_preview" || mode == "dry_run"
+}
+
+func sshAdapterNoRemoteWrite(mode string, remoteExecEnabled bool) bool {
+	return sshAdapterPreviewOnly(mode) || !remoteExecEnabled
+}
+
+func sshAdapterPreviewCommandUnsafe(command string) bool {
+	if strings.ContainsAny(command, "\n\r") {
+		return true
+	}
+	for _, token := range []string{";", "&&", "||", "`", "$(", ">", "<", "|"} {
+		if strings.Contains(command, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func sshAdapterSandboxAllowlist(mode string) []string {
+	if sshAdapterPreviewOnly(mode) {
+		return []string{"preview_only", "secret_ref_only", "no_remote_command_executed", "disallow_shell_control_tokens"}
+	}
+	return remoteExecutionCommandAllowlist("ssh_execute")
+}
+
+func writeAdapterSandboxHasStatus(results []WriteAdapterSandboxResult, status string) bool {
+	for _, result := range results {
+		if result.Status == status {
+			return true
+		}
+	}
+	return false
 }
 
 func deriveWriteAdapterID(plan WriteExecutionPlan) string {
@@ -366,6 +614,10 @@ func buildWriteAdapterExecutionSummary(executions []WriteAdapterExecution) Write
 		if execution.ExternalWritePerformed {
 			summary.ExternalWriteCount++
 		}
+		summary.SandboxResultCount += len(execution.SandboxResults)
+		if execution.RollbackBinding.Decision != "" {
+			summary.RollbackBoundCount++
+		}
 		switch execution.Status {
 		case "completed":
 			summary.CompletedCount++
@@ -407,6 +659,8 @@ func finishWriteAdapterExecution(rootDir string, execution WriteAdapterExecution
 		"mode":                     execution.Mode,
 		"status":                   execution.Status,
 		"decision":                 execution.Decision,
+		"sandbox_results":          len(execution.SandboxResults),
+		"rollback_binding":         execution.RollbackBinding.Decision,
 		"external_write_attempted": execution.ExternalWriteAttempted,
 		"external_write_performed": execution.ExternalWritePerformed,
 	})

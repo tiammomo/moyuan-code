@@ -4,6 +4,9 @@
 
 ## 当前阶段
 
+- [Phase 25 实现 Issue Graph](./phase25-issue-graph.md)：Phase 25 SSH Adapter Sandbox 与 Rollback Binding 的依赖图。
+- [Phase 25 实施记录](./phase25-next-development-plan.md)：Phase 25 当前任务、执行范围和验收记录。
+- [Phase 25 Release Readiness](./phase25-release-readiness.md)：Phase 25 SSH Adapter Sandbox 与 Rollback Binding 的收口验证。
 - [Phase 24 实现 Issue Graph](./phase24-issue-graph.md)：Phase 24 Server Resource Registry Apply Receipt 的依赖图。
 - [Phase 24 实施记录](./phase24-next-development-plan.md)：Phase 24 当前任务、执行范围和验收记录。
 - [Phase 24 Release Readiness](./phase24-release-readiness.md)：Phase 24 Server Resource Registry Apply Receipt 的收口验证。
