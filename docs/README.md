@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 19 已启动，operations audit export 已完成，后续聚焦 decision ledger；Phase 18 operations timeline、maintenance policy pack、post-deployment verification、服务器生命周期控制和 Console 运维 dashboard 已完成 readiness。
+当前阶段：Phase 19 已启动，operations audit export 和 decision ledger 已完成，后续聚焦 durable control runner；Phase 18 operations timeline、maintenance policy pack、post-deployment verification、服务器生命周期控制和 Console 运维 dashboard 已完成 readiness。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 

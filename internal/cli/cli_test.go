@@ -196,6 +196,7 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 
 	executed := runCLIAllowFailure(t, root, "deploy", "execute", "missing-deployment")
 	assertContains(t, executed.stdout, `"deployment_not_found"`)
+	executionID := decodeStringField(t, executed.stdout, "id")
 
 	timeline := runCLI(t, root, "operations", "timeline", "--type", "deployment_execution", "--limit", "5")
 	assertContains(t, timeline.stdout, `"operations_timeline"`)
@@ -208,6 +209,13 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	assertContains(t, report.stdout, `"format": "markdown"`)
 	assertContains(t, report.stdout, `"markdown":`)
 	assertContains(t, report.stdout, `"deployment_execution"`)
+
+	verify := runCLIAllowFailure(t, root, "deploy", "verify", "create", "--execution-id", executionID, "--environment", "test_dev")
+	assertContains(t, verify.stdout, `"POST_DEPLOYMENT_VERIFICATION_ATTENTION_REQUIRED"`)
+	ledger := runCLI(t, root, "operations", "decision-ledger", "--source-type", "post_deployment_verification", "--environment", "test_dev", "--limit", "5")
+	assertContains(t, ledger.stdout, `"decision_ledger"`)
+	assertContains(t, ledger.stdout, `"source_type": "post_deployment_verification"`)
+	assertContains(t, ledger.stdout, `"POST_DEPLOYMENT_VERIFICATION_ATTENTION_REQUIRED"`)
 }
 
 func TestMaintenancePolicyCLIExplainsProductionGate(t *testing.T) {

@@ -51,7 +51,7 @@ var (
 	envNamePattern         = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	secretIDPattern        = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 	credentialPattern      = regexp.MustCompile(`(?i)(api[_-]?key|token|password|secret|credential)\s*[:=]\s*[^,\s]+`)
-	openAIKeyPattern       = regexp.MustCompile(`sk-[A-Za-z0-9_-]{8,}`)
+	openAIKeyPattern       = regexp.MustCompile(`(^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{8,}`)
 	privateKeyBlockPattern = regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----`)
 )
 
@@ -95,7 +95,7 @@ func ParseReference(ref string) (string, string, bool) {
 func Redact(value string) string {
 	value = privateKeyBlockPattern.ReplaceAllString(value, "-----BEGIN PRIVATE KEY-----[REDACTED]-----END PRIVATE KEY-----")
 	value = credentialPattern.ReplaceAllString(value, "$1=[REDACTED]")
-	value = openAIKeyPattern.ReplaceAllString(value, "sk-[REDACTED]")
+	value = openAIKeyPattern.ReplaceAllString(value, "${1}sk-[REDACTED]")
 	return value
 }
 

@@ -310,6 +310,102 @@ func TestExportAuditBuildsMarkdownAndRedactsSecrets(t *testing.T) {
 	}
 }
 
+func TestBuildDecisionLedgerAggregatesDecisionSources(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "dev-ledger",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2000-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	execution, err := deployment.Execute(context.Background(), root, deployment.ExecuteOptions{DeploymentID: "missing-deployment", Mode: "dry_run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := deployment.BuildMonitorSummary(root, deployment.MonitorSummaryOptions{Environment: "test_dev", Limit: 5}); err != nil {
+		t.Fatal(err)
+	}
+	verification, err := deployment.BuildPostDeploymentVerification(root, deployment.PostDeploymentVerificationOptions{ExecutionID: execution.ID, Environment: "test_dev", MonitorLimit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rehearsal, err := deployment.BuildRehearsal(context.Background(), root, deployment.RehearsalOptions{ExecutionID: execution.ID, Environment: "test_dev"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	admission, err := deployment.BuildReleaseAdmission(context.Background(), root, deployment.ReleaseAdmissionOptions{RehearsalID: rehearsal.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoff := deploymentRiskHandoffTimeline{
+		ID:             "deployment-risk-handoff-ledger",
+		SourceType:     "release_admission",
+		SourceID:       admission.ID,
+		Status:         "review_required",
+		Decision:       "DEPLOYMENT_RISK_HANDOFF_REVIEW_REQUIRED",
+		FailureClass:   "release_admission_blocked",
+		EvidenceRefs:   append([]string{}, admission.EvidenceIDs...),
+		Reasons:        append([]string{}, admission.Reasons...),
+		ReviewRequired: true,
+		CreatedAt:      admission.CreatedAt,
+	}
+	if err := fsutil.WriteJSON(filepath.Join(deploymentRiskHandoffTimelineDir(root), handoff.ID+".json"), handoff); err != nil {
+		t.Fatal(err)
+	}
+	review := deploymentRiskReviewTimeline{
+		ID:           "deployment-risk-review-ledger",
+		HandoffID:    handoff.ID,
+		SourceType:   handoff.SourceType,
+		SourceID:     handoff.SourceID,
+		Decision:     "approved",
+		Status:       "completed",
+		ReviewerID:   "qa",
+		Reason:       "ledger test",
+		NextStep:     "repair_plan",
+		FailureClass: handoff.FailureClass,
+		EvidenceRefs: append([]string{}, handoff.EvidenceRefs...),
+		CreatedAt:    admission.CreatedAt,
+	}
+	if err := fsutil.WriteJSON(filepath.Join(deploymentRiskReviewTimelineDir(root), review.ID+".json"), review); err != nil {
+		t.Fatal(err)
+	}
+
+	ledger, err := BuildDecisionLedger(root, DecisionLedgerOptions{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceType := range []string{"release_admission", "maintenance_policy", "resource_readiness", "post_deployment_verification", "deployment_risk_handoff", "deployment_risk_review"} {
+		if !decisionLedgerContainsSource(ledger.Entries, sourceType) {
+			t.Fatalf("expected ledger source %s in %+v", sourceType, ledger.Entries)
+		}
+	}
+	if ledger.Summary.EntryCount != len(ledger.Entries) || ledger.Summary.EvidenceRefCount == 0 || ledger.Summary.AttentionCount == 0 {
+		t.Fatalf("unexpected ledger summary: %+v", ledger.Summary)
+	}
+	filtered, err := BuildDecisionLedger(root, DecisionLedgerOptions{SourceType: "post-deployment-verification", Environment: "test_dev", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filtered.Entries) != 1 || filtered.Entries[0].SourceID != verification.ID {
+		t.Fatalf("expected filtered verification entry, got %+v", filtered.Entries)
+	}
+	approved, err := BuildDecisionLedger(root, DecisionLedgerOptions{Decision: "approved", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(approved.Entries) != 1 || approved.Entries[0].SourceID != review.ID {
+		t.Fatalf("expected approved risk review entry, got %+v", approved.Entries)
+	}
+}
+
 func timelineContainsType(items []TimelineItem, typ string) bool {
 	for _, item := range items {
 		if item.Type == typ {
@@ -322,6 +418,15 @@ func timelineContainsType(items []TimelineItem, typ string) bool {
 func timelineContainsID(items []TimelineItem, id string) bool {
 	for _, item := range items {
 		if item.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func decisionLedgerContainsSource(entries []DecisionEntry, sourceType string) bool {
+	for _, entry := range entries {
+		if entry.SourceType == sourceType {
 			return true
 		}
 	}

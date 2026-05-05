@@ -257,6 +257,7 @@ func usage() string {
 		"moyuan evidence show <evidence-id>",
 		"moyuan operations timeline [--type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
 		"moyuan operations audit-export [--format json|markdown] [--type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
+		"moyuan operations decision-ledger [--source-type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -1893,6 +1894,15 @@ func handleOperations(args []string, cwd string) (string, any, int, error) {
 			Format:      flagValue(args, "--format", "json"),
 		})
 		return "", map[string]any{"operations_audit_export": report}, 0, err
+	case "decision-ledger":
+		ledger, err := operations.BuildDecisionLedger(rootDir, operations.DecisionLedgerOptions{
+			SourceType:  flagValue(args, "--source-type", ""),
+			Status:      flagValue(args, "--status", ""),
+			Decision:    flagValue(args, "--decision", ""),
+			Environment: flagValue(args, "--environment", ""),
+			Limit:       flagInt(args, "--limit", 20),
+		})
+		return "", map[string]any{"decision_ledger": ledger}, 0, err
 	}
 	return "unknown operations command\n", nil, 1, nil
 }

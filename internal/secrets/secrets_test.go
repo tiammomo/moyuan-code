@@ -91,6 +91,17 @@ func TestSecretReferenceReportsMissingPolicy(t *testing.T) {
 	}
 }
 
+func TestRedactDoesNotCorruptRiskReviewIDs(t *testing.T) {
+	value := "deployment-risk-review-ledger uses sk-real-secret-token"
+	redacted := Redact(value)
+	if strings.Contains(redacted, "sk-real-secret-token") {
+		t.Fatalf("expected sk token to be redacted: %s", redacted)
+	}
+	if !strings.Contains(redacted, "deployment-risk-review-ledger") {
+		t.Fatalf("risk review id should remain readable: %s", redacted)
+	}
+}
+
 func writeSecretPolicy(t *testing.T, root string, text string) {
 	t.Helper()
 	path := filepath.Join(workspace.ForRoot(root).MoyuanDir, "policies", "secrets.yaml")
