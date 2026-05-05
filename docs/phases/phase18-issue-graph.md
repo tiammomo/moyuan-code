@@ -1,6 +1,6 @@
 # Phase 18 实现 Issue Graph
 
-状态：in_progress
+状态：ready
 责任角色：devops_owner + release_owner + backend_owner + frontend_owner + qa_owner + security_owner
 最后更新：2026-05-05
 
@@ -23,7 +23,7 @@ Phase 18 的目标是把 Phase 17 的 policy、scheduler、review queue 和 depl
 | `phase18-003` | `post-deployment-smoke-monitor-loop` | completed | 发布后 smoke、monitor、rollback suggestion 和 risk review 形成闭环 | `phase18-001` | `qa_owner` + `devops_owner` | 线上验证可审计，失败不自动生产修复 |
 | `phase18-004` | `server-resource-lifecycle-control` | completed | 服务器资源到期、续费、退役、健康扫描和部署关系长期维护 | `phase18-001` | `devops_owner` | 测试开发机/生产机区分清晰 |
 | `phase18-005` | `console-operations-dashboard` | completed | Console 展示 operations timeline、维护策略、资源风险和受控动作 | `phase18-001`,`phase18-004` | `frontend_owner` | 前端只展示事实源，不重新决策 |
-| `phase18-006` | `phase18-readiness` | next | 收口验证、文档回写、剩余风险和 Phase 19 入口 | `phase18-005` | `release_owner` + `security_owner` | 全量门禁通过，生产边界清晰 |
+| `phase18-006` | `phase18-readiness` | completed | 收口验证、文档回写、剩余风险和 Phase 19 入口 | `phase18-005` | `release_owner` + `security_owner` | 全量门禁通过，生产边界清晰 |
 
 ## 3. 建议执行顺序
 
@@ -32,7 +32,7 @@ Phase 18 的目标是把 Phase 17 的 policy、scheduler、review queue 和 depl
 3. `phase18-003` 接线上 smoke/monitor loop，保证投产后反馈能形成复核对象。
 4. `phase18-004` 把服务器资源生命周期接入长期维护。
 5. `phase18-005` 做 Console dashboard。
-6. `phase18-006` 做 readiness 收口。
+6. `phase18-006` 已完成 readiness 收口。
 
 ## 4. 强制边界
 
