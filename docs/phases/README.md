@@ -4,8 +4,9 @@
 
 ## 当前阶段
 
+- [Phase 13 Release Readiness](./phase13-release-readiness.md)：Phase 13 Release Candidate 远程发布与部署交接的收口验证。
 - [Phase 13 实现 Issue Graph](./phase13-issue-graph.md)：Phase 13 Release Candidate 远程发布与部署交接的依赖图。
-- [Phase 13 实施记录](./phase13-next-development-plan.md)：Phase 13 当前任务、执行范围和验收记录。
+- [Phase 13 实施记录](./phase13-next-development-plan.md)：Phase 13 完成任务、执行范围和验收记录。
 - [Phase 12 Release Readiness](./phase12-release-readiness.md)：Phase 12 真实并发执行与集成合入准备的收口验证。
 - [Phase 12 实现 Issue Graph](./phase12-issue-graph.md)：Phase 12 真实并发执行与集成合入准备的依赖图。
 - [Phase 12 实施记录](./phase12-next-development-plan.md)：Phase 12 当前任务、执行范围和验收记录。

@@ -569,9 +569,9 @@ Phase 1 的执行结果：
 
 ## 10. 当前阶段状态
 
-Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力、Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力、Phase 6 approval consumption/adapter telemetry/Console schema forms 能力、Phase 7 受控真实外部执行准备、Phase 8 受控外部执行 Beta、Phase 9 生产运维控制面增强、Phase 10 控制面自动化闭环增强、Phase 11 Issue Graph 批量执行控制器和 Phase 12 真实并发执行与集成合入准备已完成。
+Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力、Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力、Phase 6 approval consumption/adapter telemetry/Console schema forms 能力、Phase 7 受控真实外部执行准备、Phase 8 受控外部执行 Beta、Phase 9 生产运维控制面增强、Phase 10 控制面自动化闭环增强、Phase 11 Issue Graph 批量执行控制器、Phase 12 真实并发执行与集成合入准备和 Phase 13 Release Candidate 远程发布与部署交接已完成。
 
-当前进入 Phase 13 前规划，上一阶段收口入口见 [Phase 12 Release Readiness](./phases/phase12-release-readiness.md)。Phase 13 应聚焦 Release Candidate 远程发布与部署交接，把 release batch readiness 推进到受控 release branch、Git Provider PR/MR、tag、部署计划和 Console 全链路可见性。
+当前进入 Phase 14 前规划，上一阶段收口入口见 [Phase 13 Release Readiness](./phases/phase13-release-readiness.md)。Phase 14 应聚焦受控远程发布与部署执行，把 release candidate 推进到 approval-gated GitHub/Gitee PR/MR、tag/release、deployment execution、线上 smoke、生产 monitor 和 Console 全链路可见性。
 
 Phase 1 第一批实现模块：
 

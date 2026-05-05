@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 12 真实并发执行与集成合入准备已完成并通过 readiness。下一步进入 Phase 13，聚焦 Release Candidate 远程发布与部署交接。
+当前阶段：Phase 13 Release Candidate 远程发布与部署交接已完成并通过 readiness。下一步进入 Phase 14，聚焦受控远程发布与部署执行。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
@@ -63,10 +63,11 @@
 
 ## 当前实施入口
 
-Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 12 已完成主要闭环。当前验收和状态入口：
+Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 13 已完成主要闭环。当前验收和状态入口：
 
+- [Phase 13 Release Readiness](./phases/phase13-release-readiness.md)：Release Candidate 远程发布与部署交接的收口验证。
 - [Phase 13 实现 Issue Graph](./phases/phase13-issue-graph.md)：Release Candidate 远程发布与部署交接的依赖图。
-- [Phase 13 实施记录](./phases/phase13-next-development-plan.md)：Phase 13 当前任务、验收标准和执行入口。
+- [Phase 13 实施记录](./phases/phase13-next-development-plan.md)：Phase 13 完成任务、验收标准和执行入口。
 - [Phase 12 Release Readiness](./phases/phase12-release-readiness.md)：真实并发执行与集成合入准备的收口验证。
 - [Phase 12 实现 Issue Graph](./phases/phase12-issue-graph.md)：真实并发执行与集成合入准备的依赖图。
 - [Phase 12 实施记录](./phases/phase12-next-development-plan.md)：Phase 12 完成任务、验收标准和执行入口。
