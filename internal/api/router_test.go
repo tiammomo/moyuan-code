@@ -251,6 +251,13 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/integration-previews?queue_id="+mergeQueues[0].ID, http.StatusOK, `"integration_previews"`, integrationPreviews[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/integration-previews/"+integrationPreviews[0].ID, http.StatusOK, `"integration_preview"`, `"INTEGRATION_PREVIEW_BLOCKED"`)
+	assertPostContains(t, router, "/v1/projects/managed/integration-previews/"+integrationPreviews[0].ID+"/apply", `{"mode":"dry_run","requested_by":"api-test"}`, http.StatusAccepted, `"integration_apply"`, `"INTEGRATION_APPLY_BLOCKED"`, "integration_preview_not_ready:")
+	integrationApplies, err := review.ListIntegrationApplies(root, integrationPreviews[0].ID, 1)
+	if err != nil || len(integrationApplies) != 1 {
+		t.Fatalf("expected API integration apply, applies=%+v err=%v", integrationApplies, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/integration-applies?preview_id="+integrationPreviews[0].ID, http.StatusOK, `"integration_applies"`, integrationApplies[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/integration-applies/"+integrationApplies[0].ID, http.StatusOK, `"integration_apply"`, `"INTEGRATION_APPLY_BLOCKED"`)
 	assertGETContains(t, router, "/v1/projects/managed/worktrees?issue_id=api-worktree", http.StatusOK, `"worktrees"`, worktreeRecord.ID, `"WORKTREE_READY"`)
 	assertGETContains(t, router, "/v1/projects/managed/worktrees/"+worktreeRecord.ID, http.StatusOK, `"worktree"`, `"api-worktree"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)

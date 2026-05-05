@@ -192,7 +192,8 @@ Phase 11 到 Phase 12 当前实现中，Orchestrator 已新增 batch dispatch pr
 - `merge_queue` 基于 batch run 聚合每个 issue 的 quality report、review status 和 merge decision，输出 ready、needs_rework、blocked 三类队列。
 - merge queue 输出到 `.moyuan/lifecycle/merge-reports/queues/` 和 `.moyuan/lifecycle/merge-reports/merge-queues.jsonl`。
 - `integration_preview` 基于 ready merge queue 创建独立 integration worktree，执行 merge dry-run、冲突检测和 protected path guard，输出到 `.moyuan/lifecycle/merge-reports/integration-previews/` 和 `.moyuan/lifecycle/merge-reports/integration-previews.jsonl`。
-- 当前 integration preview 不执行真实合入、PR/MR、tag、push 或 publish。
+- `integration_apply` 基于 ready integration preview 受控更新本地 integration branch，必须满足审批和 `MOYUAN_ALLOW_INTEGRATION_APPLY=1`；输出到 `.moyuan/lifecycle/merge-reports/integration-applies/` 和 `.moyuan/lifecycle/merge-reports/integration-applies.jsonl`。
+- 当前 integration apply 不合入 main、不 push、不创建 PR/MR、不 tag、不 publish。
 
 ## 7. 前端 Runtime 选择 / 后端 Codex
 

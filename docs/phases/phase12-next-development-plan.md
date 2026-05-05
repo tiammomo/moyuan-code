@@ -22,7 +22,7 @@ Phase 11 已完成并通过 readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase12-001` | `parallel-batch-worker-executor` | completed | 真实受控并发执行 | batch run 可按安全并发度执行多个 issue，并记录 worker slot 和 fail-fast |
 | P0 | `phase12-002` | `integration-merge-preview` | completed | 集成合入预览 | ready merge queue 可生成 merge dry-run 和冲突报告 |
-| P1 | `phase12-003` | `controlled-merge-apply` | planned | 受控真实合入 | 审批和开关满足后可合入 integration branch |
+| P1 | `phase12-003` | `controlled-merge-apply` | completed | 受控真实合入 | 审批和开关满足后可合入 integration branch |
 | P1 | `phase12-004` | `release-batch-readiness` | planned | 发版批次建议 | 根据合入量、风险和版本策略生成 release batch plan |
 | P2 | `phase12-005` | `console-parallel-merge-surface` | planned | Console 并发与合入面 | Console 可见 worker slot、merge preview 和 release batch readiness |
 
@@ -93,7 +93,40 @@ Phase 11 已完成并通过 readiness：
 - API 新增 `POST /v1/projects/:project_id/merge-queues/:queue_id/integration-preview`、`GET /v1/projects/:project_id/integration-previews`、`GET /v1/projects/:project_id/integration-previews/:preview_id`。
 - integration preview 仍是 dry-run / preview 层，不会执行真实合入。
 
-## 5. 验证要求
+## 5. 执行规划：`phase12-003 controlled-merge-apply`
+
+实现状态：completed。
+
+范围：
+
+- 新增 integration apply 事实源，基于 ready integration preview 执行。
+- 默认 `dry_run`，只验证 preview ready，不更新 Git ref。
+- 真实 `apply` 必须满足 `approved=true` 和 `MOYUAN_ALLOW_INTEGRATION_APPLY=1`。
+- 真实 apply 只把 preview branch 固化为本地 integration branch，不 push、不 PR/MR、不 tag。
+- apply 写入 `.moyuan/lifecycle/merge-reports/integration-applies/` 和 `integration-applies.jsonl`。
+- API 支持 apply、列表和详情查询。
+
+非目标：
+
+- 不合入 main。
+- 不推送远程。
+- 不创建 PR/MR 或 release。
+
+验收：
+
+- preview 未 ready 时 apply blocked。
+- 未审批或未开启环境开关时真实 apply blocked。
+- dry-run 不更新 Git ref。
+- 真实 apply 只更新本地 target integration branch。
+- 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- 新增 `review.ApplyIntegrationPreview`、`LoadIntegrationApply`、`ListIntegrationApplies`。
+- API 新增 `POST /v1/projects/:project_id/integration-previews/:preview_id/apply`、`GET /v1/projects/:project_id/integration-applies`、`GET /v1/projects/:project_id/integration-applies/:apply_id`。
+- integration apply 是本地 Git ref 层的受控动作，远程发布仍留给后续 release/provider 流水线。
+
+## 6. 验证要求
 
 每完成一个 Phase 12 issue，至少运行：
 

@@ -162,6 +162,77 @@ func TestBuildIntegrationPreviewAllowsReadyMergeQueue(t *testing.T) {
 	}
 }
 
+func TestApplyIntegrationPreviewGuardsAndUpdatesLocalBranch(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	initReviewGitRepo(t, root)
+	t.Setenv("MOYUAN_ALLOW_BATCH_RUN", "1")
+	graph := issues.Graph{
+		Epic: issues.Epic{ID: "phase12-apply", Title: "integration apply", Status: "planned"},
+		Nodes: []issues.Node{
+			{ID: "backend-api", Title: "backend api", Status: "ready"},
+		},
+	}
+	if err := issues.SaveGraph(root, graph); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := batch.CreatePlan(root, batch.PlanOptions{EpicID: graph.Epic.ID, MaxParallel: 1, RequestedBy: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := batch.Run(context.Background(), root, batch.RunOptions{BatchID: plan.ID, Mode: "local_shell", Approved: true, Prompt: "printf ok"}); err != nil {
+		t.Fatal(err)
+	}
+	queue, err := BuildMergeQueue(root, plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview, err := BuildIntegrationPreview(context.Background(), root, queue.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dryRun, err := ApplyIntegrationPreview(context.Background(), root, IntegrationApplyOptions{PreviewID: preview.ID, RequestedBy: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dryRun.Decision != "INTEGRATION_APPLY_DRY_RUN" || dryRun.WriteEnabled {
+		t.Fatalf("expected dry-run apply, got %+v", dryRun)
+	}
+	notApproved, err := ApplyIntegrationPreview(context.Background(), root, IntegrationApplyOptions{PreviewID: preview.ID, Mode: "apply", RequestedBy: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if notApproved.Decision != "INTEGRATION_APPLY_BLOCKED" || !containsReason(notApproved.Reasons, "integration_apply_approval_required") {
+		t.Fatalf("expected approval guard, got %+v", notApproved)
+	}
+	t.Setenv("MOYUAN_ALLOW_INTEGRATION_APPLY", "1")
+	applied, err := ApplyIntegrationPreview(context.Background(), root, IntegrationApplyOptions{
+		PreviewID:    preview.ID,
+		Mode:         "apply",
+		Approved:     true,
+		RequestedBy:  "test",
+		TargetBranch: "moyuan/integration/test-apply",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if applied.Decision != "INTEGRATION_APPLY_COMPLETED" || !applied.WriteEnabled {
+		t.Fatalf("expected completed apply, got %+v", applied)
+	}
+	runReviewGit(t, root, "rev-parse", "--verify", applied.TargetBranch)
+	loaded, found, err := LoadIntegrationApply(root, applied.ID)
+	if err != nil || !found || loaded.ID != applied.ID {
+		t.Fatalf("expected persisted apply, found=%v loaded=%+v err=%v", found, loaded, err)
+	}
+	applies, err := ListIntegrationApplies(root, preview.ID, 10)
+	if err != nil || len(applies) != 3 {
+		t.Fatalf("expected listed apply records, applies=%+v err=%v", applies, err)
+	}
+}
+
 func TestBuildIntegrationPreviewBlocksUnreadyMergeQueue(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {
