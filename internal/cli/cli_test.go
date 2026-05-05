@@ -190,6 +190,20 @@ func TestMemoryRecordGateStagesDedupesRejectsAndCompacts(t *testing.T) {
 	assertFileContains(t, root, ".moyuan/logs/memory.jsonl", "memory.candidate.evaluated")
 }
 
+func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+
+	executed := runCLIAllowFailure(t, root, "deploy", "execute", "missing-deployment")
+	assertContains(t, executed.stdout, `"deployment_not_found"`)
+
+	timeline := runCLI(t, root, "operations", "timeline", "--type", "deployment_execution", "--limit", "5")
+	assertContains(t, timeline.stdout, `"operations_timeline"`)
+	assertContains(t, timeline.stdout, `"type": "deployment_execution"`)
+	assertContains(t, timeline.stdout, `"primary_ref": "missing-deployment"`)
+	assertContains(t, timeline.stdout, `"evidence_refs"`)
+}
+
 func TestSkillsCLIRegistersListsAndDisablesSkillDefinitions(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)

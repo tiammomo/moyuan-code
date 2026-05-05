@@ -21,6 +21,7 @@ import (
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/memory"
+	"moyuan-code/internal/operations"
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/providers"
 	"moyuan-code/internal/quality"
@@ -105,6 +106,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleDeploy(ctx, argv[1:], cwd)
 	case "evidence":
 		text, result, exitCode, err = handleEvidence(argv[1:], cwd)
+	case "operations":
+		text, result, exitCode, err = handleOperations(argv[1:], cwd)
 	case "visuals":
 		text, result, exitCode, err = handleVisuals(ctx, argv[1:], cwd)
 	case "logs":
@@ -247,6 +250,7 @@ func usage() string {
 		"moyuan deploy rehearsals",
 		"moyuan evidence list [--parent-type <type>] [--parent-id <id>] [--limit 20]",
 		"moyuan evidence show <evidence-id>",
+		"moyuan operations timeline [--type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -1804,6 +1808,25 @@ func handleEvidence(args []string, cwd string) (string, any, int, error) {
 		return "", map[string]any{"evidence": record}, 0, nil
 	}
 	return "unknown evidence command\n", nil, 1, nil
+}
+
+func handleOperations(args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown operations command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "timeline":
+		items, err := operations.Timeline(rootDir, operations.TimelineOptions{
+			Type:        flagValue(args, "--type", ""),
+			Status:      flagValue(args, "--status", ""),
+			Decision:    flagValue(args, "--decision", ""),
+			Environment: flagValue(args, "--environment", ""),
+			Limit:       flagInt(args, "--limit", 20),
+		})
+		return "", map[string]any{"operations_timeline": items}, 0, err
+	}
+	return "unknown operations command\n", nil, 1, nil
 }
 
 func modelsFromCLI(args []string) []providers.Model {

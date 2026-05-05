@@ -2927,6 +2927,29 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"evidence": record})
 	})
+	router.GET("/v1/projects/:project_id/operations/timeline", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		items, err := operations.Timeline(rootDir, operations.TimelineOptions{
+			Type:        c.Query("type"),
+			Status:      c.Query("status"),
+			Decision:    c.Query("decision"),
+			Environment: c.Query("environment"),
+			Limit:       queryLimit(c, 20),
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"operations_timeline": items})
+	})
 	router.GET("/v1/projects/:project_id/operations/:operation_type/:operation_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

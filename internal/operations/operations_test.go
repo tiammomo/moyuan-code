@@ -2,10 +2,13 @@ package operations
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"moyuan-code/internal/deployment"
+	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/release"
+	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/workspace"
 )
 
@@ -81,4 +84,143 @@ func TestLoadEvidenceDetailAndUnsupportedType(t *testing.T) {
 	if _, found, err := Load(root, "visual_render", "missing"); err != nil || found {
 		t.Fatalf("unsupported operation type should not be found, found=%v err=%v", found, err)
 	}
+}
+
+func TestTimelineAggregatesOperationsAndFilters(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := release.Suggest(context.Background(), root, release.SuggestOptions{Version: "v0.2.0", MinIssues: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, found, err := release.ProviderPreview(root, plan.ID); err != nil || !found {
+		t.Fatalf("expected provider preview, found=%v err=%v", found, err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "dev-api",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2000-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.HealthScan(context.Background(), root, serverresources.HealthScanOptions{Environment: "test_dev"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.LifecycleScan(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.MaintenanceScan(root); err != nil {
+		t.Fatal(err)
+	}
+	execution, err := deployment.Execute(context.Background(), root, deployment.ExecuteOptions{DeploymentID: "missing-deployment", Mode: "dry_run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary, err := deployment.BuildMonitorSummary(root, deployment.MonitorSummaryOptions{Environment: "test_dev", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rehearsal, err := deployment.BuildRehearsal(context.Background(), root, deployment.RehearsalOptions{ExecutionID: execution.ID, Environment: "test_dev"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	schedulerRun, err := deployment.RunRehearsalScheduler(context.Background(), root, deployment.RehearsalSchedulerOptions{ExecutionID: execution.ID, Environment: "test_dev", MaxTargets: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	admission, err := deployment.BuildReleaseAdmission(context.Background(), root, deployment.ReleaseAdmissionOptions{RehearsalID: rehearsal.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoff := deploymentRiskHandoffTimeline{
+		ID:             "deployment-risk-handoff-test",
+		SourceType:     "release_admission",
+		SourceID:       admission.ID,
+		Status:         "review_required",
+		Decision:       "DEPLOYMENT_RISK_HANDOFF_REVIEW_REQUIRED",
+		FailureClass:   "release_admission_blocked",
+		EvidenceRefs:   append([]string{}, admission.EvidenceIDs...),
+		Reasons:        append([]string{}, admission.Reasons...),
+		ReviewRequired: true,
+		CreatedAt:      admission.CreatedAt,
+	}
+	if err := fsutil.WriteJSON(filepath.Join(deploymentRiskHandoffTimelineDir(root), handoff.ID+".json"), handoff); err != nil {
+		t.Fatal(err)
+	}
+	review := deploymentRiskReviewTimeline{
+		ID:           "deployment-risk-review-test",
+		HandoffID:    handoff.ID,
+		SourceType:   handoff.SourceType,
+		SourceID:     handoff.SourceID,
+		Decision:     "approved",
+		Status:       "completed",
+		ReviewerID:   "qa",
+		FailureClass: handoff.FailureClass,
+		EvidenceRefs: append([]string{}, handoff.EvidenceRefs...),
+		CreatedAt:    handoff.CreatedAt,
+	}
+	if err := fsutil.WriteJSON(filepath.Join(deploymentRiskReviewTimelineDir(root), review.ID+".json"), review); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := Timeline(root, TimelineOptions{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, typ := range []string{
+		"release_provider_execution",
+		"deployment_execution",
+		"deployment_monitor_summary",
+		"deployment_rehearsal",
+		"release_admission",
+		"rehearsal_scheduler_run",
+		"deployment_risk_handoff",
+		"deployment_risk_review",
+		"resource_health_scan",
+		"resource_maintenance",
+		"resource_lifecycle_alert",
+		"server_resource",
+	} {
+		if !timelineContainsType(items, typ) {
+			t.Fatalf("expected timeline type %s in %+v", typ, items)
+		}
+	}
+	filtered, err := Timeline(root, TimelineOptions{Type: "release-admission", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filtered) == 0 || filtered[0].ID != admission.ID || filtered[0].Type != "release_admission" || len(filtered[0].EvidenceRefs) == 0 {
+		t.Fatalf("expected filtered admission with evidence refs, got %+v", filtered)
+	}
+	envFiltered, err := Timeline(root, TimelineOptions{Environment: "test_dev", Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !timelineContainsID(envFiltered, schedulerRun.ID) || !timelineContainsID(envFiltered, summary.ID) {
+		t.Fatalf("expected environment filtered operations, got %+v", envFiltered)
+	}
+}
+
+func timelineContainsType(items []TimelineItem, typ string) bool {
+	for _, item := range items {
+		if item.Type == typ {
+			return true
+		}
+	}
+	return false
+}
+
+func timelineContainsID(items []TimelineItem, id string) bool {
+	for _, item := range items {
+		if item.ID == id {
+			return true
+		}
+	}
+	return false
 }

@@ -446,6 +446,43 @@ func ListLifecycleAlerts(rootDir string, limit int) ([]LifecycleAlert, error) {
 	return alerts, nil
 }
 
+func ListHealthScans(rootDir string, limit int) ([]HealthScanReport, error) {
+	if err := fsutil.EnsureDir(healthScanDir(rootDir)); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(healthScanDir(rootDir))
+	if err != nil {
+		return nil, err
+	}
+	reports := []HealthScanReport{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var report HealthScanReport
+		found, err := fsutil.ReadJSON(filepath.Join(healthScanDir(rootDir), entry.Name()), &report)
+		if err != nil {
+			return nil, err
+		}
+		if found && report.ID != "" {
+			reports = append(reports, report)
+		}
+	}
+	sort.SliceStable(reports, func(i, j int) bool {
+		return reports[i].CreatedAt > reports[j].CreatedAt
+	})
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if len(reports) > limit {
+		return reports[:limit], nil
+	}
+	return reports, nil
+}
+
 func ListMaintenance(rootDir string, limit int) ([]MaintenanceRecord, error) {
 	if err := fsutil.EnsureDir(maintenanceDir(rootDir)); err != nil {
 		return nil, err
@@ -625,8 +662,12 @@ func eventsPath(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "events.jsonl")
 }
 
+func healthScanDir(rootDir string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "checks")
+}
+
 func healthScanPath(rootDir string, id string) string {
-	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "checks", id+".json")
+	return filepath.Join(healthScanDir(rootDir), id+".json")
 }
 
 func lifecycleScanPath(rootDir string, id string) string {
