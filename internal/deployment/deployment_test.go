@@ -40,8 +40,14 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 		t.Fatalf("expected successful smoke and monitor, got %+v", okExecution)
 	}
 	evidenceRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "deployment_execution", ParentID: okExecution.ID, Limit: 10})
-	if err != nil || len(evidenceRecords) != 1 || evidenceRecords[0].Decision != okExecution.Decision {
+	if err != nil || len(evidenceRecords) != 4 {
 		t.Fatalf("expected deployment execution evidence, records=%+v err=%v", evidenceRecords, err)
+	}
+	if !hasEvidenceOperation(evidenceRecords, "deployment.execute.local_shell", okExecution.Decision) ||
+		!hasEvidenceOperation(evidenceRecords, "deployment.smoke.check", "SMOKE_PASSED") ||
+		!hasEvidenceOperation(evidenceRecords, "deployment.monitor.check", "MONITOR_PASSED") ||
+		!hasEvidenceOperation(evidenceRecords, "deployment.rollback.not_required", "ROLLBACK_NOT_REQUIRED") {
+		t.Fatalf("expected execution, smoke, monitor, and rollback evidence, got %+v", evidenceRecords)
 	}
 
 	failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +69,14 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	}
 	if !hasStep(failedExecution.Steps, "rollback", "suggested") {
 		t.Fatalf("expected rollback suggestion step: %+v", failedExecution.Steps)
+	}
+	failedEvidenceRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "deployment_execution", ParentID: failedExecution.ID, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasEvidenceOperation(failedEvidenceRecords, "deployment.smoke.check", "SMOKE_FAILED") ||
+		!hasEvidenceOperation(failedEvidenceRecords, "deployment.rollback.suggested", "ROLLBACK_RECOMMENDED") {
+		t.Fatalf("expected smoke failure and rollback evidence, got %+v", failedEvidenceRecords)
 	}
 	releaseLog, found, err := fsutil.ReadText(filepath.Join(workspace.ForRoot(root).LogsDir, "release.jsonl"))
 	if err != nil {
@@ -293,6 +307,15 @@ func createDeploymentPlanWithHealthTarget(t *testing.T, root string, id string, 
 func hasStep(steps []ExecutionStep, name string, status string) bool {
 	for _, step := range steps {
 		if step.Name == name && step.Status == status {
+			return true
+		}
+	}
+	return false
+}
+
+func hasEvidenceOperation(records []evidence.Record, operation string, decision string) bool {
+	for _, record := range records {
+		if record.Operation == operation && record.Decision == decision {
 			return true
 		}
 	}

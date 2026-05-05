@@ -22,7 +22,7 @@ Phase 7 已完成并通过 release readiness：
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase8-001` | `release-provider-real-adapter-beta` | completed | GitHub/Gitee release provider adapter 最小真实写入 | approval、secret resolver、write switch 和 replay guard 全部满足 |
 | P0 | `phase8-002` | `ssh-runner-controlled-execution` | completed | SSH runner 真实受控执行 | allowlist 命令可执行，非 allowlist 阻断，输出脱敏 |
-| P1 | `phase8-003` | `post-deploy-smoke-monitor-evidence` | planned | 部署后 smoke/monitor evidence | 失败能阻断发布完成并生成 evidence |
+| P1 | `phase8-003` | `post-deploy-smoke-monitor-evidence` | completed | 部署后 smoke/monitor evidence | 失败能阻断发布完成并生成 evidence |
 | P1 | `phase8-004` | `rollback-suggestion-and-runbook` | planned | 回滚建议和 runbook | 失败部署能生成可审查回滚建议 |
 | P2 | `phase8-005` | `console-operation-drilldown` | planned | Console operation detail 独立 drill-down | 用户能刷新并查看单个 operation/evidence detail |
 | P2 | `phase8-006` | `provider-real-quota-cost-feedback` | planned | Provider quota/cost/quality feedback 更真实 | route decision 读取可信 signals |
@@ -83,7 +83,25 @@ Phase 7 已完成并通过 release readiness：
 - secret 缺失、用途不匹配、资源缺失或命令不在 allowlist 时保持 blocked/failed，不执行远程命令。
 - 测试使用 fake `ssh` 二进制模拟成功和失败，断言 secret 不进入 execution、jsonl 或 audit log。
 
-## 5. 验证要求
+## 5. 执行规划：`phase8-003 post-deploy-smoke-monitor-evidence`
+
+实现状态：completed。
+
+范围：
+
+- deployment execution 主 evidence 之外，拆分独立 smoke、monitor 和 rollback evidence。
+- smoke report 写入 `deployment.smoke.check`，monitor report 写入 `deployment.monitor.check`。
+- rollback suggestion 写入 `deployment.rollback.suggested`；无需回滚时写入 `deployment.rollback.not_required`。
+- 每条 evidence 只引用 deployment execution artifact，不复制完整响应正文或命令输出。
+- smoke 失败和 monitor 失败继续阻断发布完成，并保留 rollback suggestion。
+
+落地结果：
+
+- 成功部署会形成 execution、smoke、monitor、rollback-not-required 四条 evidence。
+- smoke 失败会形成 execution、smoke failed、rollback suggested evidence，不再等待 monitor。
+- Console/API 后续 drill-down 可以按 `parent_type=deployment_execution&parent_id=<execution-id>` 读取完整证据链。
+
+## 6. 验证要求
 
 每完成一个 Phase 8 issue，至少运行：
 

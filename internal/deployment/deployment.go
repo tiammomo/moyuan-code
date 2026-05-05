@@ -519,7 +519,105 @@ func finishExecution(rootDir string, execution Execution) (Execution, error) {
 	}); err != nil {
 		return Execution{}, err
 	}
+	if err := addPostDeploymentEvidence(rootDir, execution); err != nil {
+		return Execution{}, err
+	}
 	return execution, nil
+}
+
+func addPostDeploymentEvidence(rootDir string, execution Execution) error {
+	artifactPath := filepath.ToSlash(filepath.Join(".moyuan", "lifecycle", "deployments", "executions", execution.ID+".json"))
+	if execution.SmokeReport.Status != "" {
+		if _, err := evidence.Add(rootDir, evidence.AddOptions{
+			ParentType:  "deployment_execution",
+			ParentID:    execution.ID,
+			SubjectType: "deployment",
+			SubjectID:   execution.DeploymentID,
+			Operation:   "deployment.smoke.check",
+			Status:      execution.SmokeReport.Status,
+			Decision:    execution.SmokeReport.Decision,
+			Reasons:     checkReportReasons(execution.SmokeReport),
+			Source:      "deployment",
+			Artifacts: []evidence.ArtifactRef{{
+				Kind: "smoke_report",
+				ID:   execution.ID,
+				Path: artifactPath,
+			}},
+		}); err != nil {
+			return err
+		}
+	}
+	if execution.MonitorReport.Status != "" {
+		if _, err := evidence.Add(rootDir, evidence.AddOptions{
+			ParentType:  "deployment_execution",
+			ParentID:    execution.ID,
+			SubjectType: "deployment",
+			SubjectID:   execution.DeploymentID,
+			Operation:   "deployment.monitor.check",
+			Status:      execution.MonitorReport.Status,
+			Decision:    execution.MonitorReport.Decision,
+			Reasons:     checkReportReasons(execution.MonitorReport),
+			Source:      "deployment",
+			Artifacts: []evidence.ArtifactRef{{
+				Kind: "monitor_report",
+				ID:   execution.ID,
+				Path: artifactPath,
+			}},
+		}); err != nil {
+			return err
+		}
+	}
+	if execution.RollbackSuggestion.Decision != "" {
+		operation := "deployment.rollback.not_required"
+		status := "not_required"
+		if execution.RollbackSuggestion.Required {
+			operation = "deployment.rollback.suggested"
+			status = "suggested"
+		}
+		if _, err := evidence.Add(rootDir, evidence.AddOptions{
+			ParentType:  "deployment_execution",
+			ParentID:    execution.ID,
+			SubjectType: "deployment",
+			SubjectID:   execution.DeploymentID,
+			Operation:   operation,
+			Status:      status,
+			Decision:    execution.RollbackSuggestion.Decision,
+			Reasons:     rollbackReasons(execution.RollbackSuggestion),
+			Source:      "deployment",
+			Artifacts: []evidence.ArtifactRef{{
+				Kind: "rollback_suggestion",
+				ID:   execution.ID,
+				Path: artifactPath,
+			}},
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkReportReasons(report CheckReport) []string {
+	reasons := []string{}
+	for _, result := range report.Results {
+		parts := []string{result.ResourceID, result.Status}
+		if result.Reason != "" {
+			parts = append(parts, result.Reason)
+		}
+		reasons = append(reasons, strings.Join(parts, ":"))
+	}
+	if len(reasons) == 0 && report.Status != "" {
+		reasons = append(reasons, report.Status)
+	}
+	return reasons
+}
+
+func rollbackReasons(rollback RollbackSuggestion) []string {
+	reasons := []string{}
+	if rollback.Reason != "" {
+		reasons = append(reasons, rollback.Reason)
+	}
+	reasons = append(reasons, rollback.Actions...)
+	return reasons
 }
 
 func planPath(rootDir string, id string) string {
