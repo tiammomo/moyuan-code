@@ -369,6 +369,10 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertPostContains(t, router, "/v1/projects/managed/resources/dev-api/renew", `{"expires_at":"2099-02-01","actor_id":"ops","reason":"renewal test"}`, http.StatusOK, `"maintenance_record"`, `"RESOURCE_RENEWAL_RECORDED"`)
 	assertPostContains(t, router, "/v1/projects/managed/resources/health-scan", `{"environment":"test_dev"}`, http.StatusOK, `"health_scan"`, `"HEALTH_SCAN_COMPLETED"`)
 	assertGETContains(t, router, "/v1/projects/managed/resources/maintenance-policy?environment=production&action=deploy&requested_at=2026-05-05", http.StatusOK, `"maintenance_policy_pack"`, `"maintenance_policy_decision"`, `"MAINTENANCE_POLICY_MANUAL_REVIEW_REQUIRED"`)
+	if err := serverresources.RecordDeploymentReference(root, serverresources.DeploymentRef{ResourceID: "dev-api", Kind: "deployment_plan", DeploymentID: "deployment-api-ref", ReleaseID: releasePlan.ID, Environment: "test_dev", Status: "planned", Decision: "DEPLOY_PLAN_READY"}); err != nil {
+		t.Fatal(err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/resources/deployment-refs?limit=5", http.StatusOK, `"resource_deployment_refs"`, `"deployment-api-ref"`)
 	assertPostContains(t, router, "/v1/projects/managed/resources/dev-api/retire", `{"actor_id":"ops","reason":"retire test"}`, http.StatusOK, `"maintenance_record"`, `"RESOURCE_RETIRED"`)
 	assertPostContains(t, router, "/v1/projects/managed/resources/dev-api/disable", `{}`, http.StatusOK, `"resource"`, `"disabled"`)
 	assertPostContains(t, router, "/v1/projects/managed/resources", `{"id":"prod-api","environment":"production","host":"prod.internal","provider":"aliyun","owner":"ops","auth_ref":"secret:prod_ssh_key"}`, http.StatusBadRequest, `"production_expires_at_required"`)

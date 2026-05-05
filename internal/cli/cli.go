@@ -232,6 +232,7 @@ func usage() string {
 		"moyuan resources expiration scan",
 		"moyuan resources maintenance scan|list",
 		"moyuan resources maintenance policy [--environment <env>] [--action <action>] [--requested-at <time>]",
+		"moyuan resources deployment-refs [--limit 20]",
 		"moyuan resources renew <resource-id> --expires-at YYYY-MM-DD",
 		"moyuan resources retire <resource-id>",
 		"moyuan resources health scan [--environment test_dev] [--resource <resource-id>] [--approved]",
@@ -1598,6 +1599,9 @@ func handleResources(ctx context.Context, args []string, cwd string) (string, an
 			records, err := serverresources.ListMaintenance(rootDir, 20)
 			return "", map[string]any{"maintenance_records": records}, 0, err
 		}
+	case "deployment-refs":
+		refs, err := serverresources.ListDeploymentReferences(rootDir, flagInt(args, "--limit", 20))
+		return "", map[string]any{"resource_deployment_refs": refs}, 0, err
 	case "health":
 		if len(args) >= 2 && args[1] == "scan" {
 			report, err := serverresources.HealthScan(ctx, rootDir, serverresources.HealthScanOptions{

@@ -24,28 +24,29 @@ type Registry struct {
 }
 
 type Resource struct {
-	ID                string      `json:"id"`
-	Environment       string      `json:"environment"`
-	Host              string      `json:"host"`
-	Provider          string      `json:"provider"`
-	Region            string      `json:"region,omitempty"`
-	InstanceID        string      `json:"instance_id,omitempty"`
-	Owner             string      `json:"owner"`
-	Purpose           string      `json:"purpose,omitempty"`
-	AuthRef           string      `json:"auth_ref"`
-	ExpiresAt         string      `json:"expires_at,omitempty"`
-	Spec              ServerSpec  `json:"spec"`
-	Healthcheck       Healthcheck `json:"healthcheck"`
-	Status            string      `json:"status"`
-	ExpirationState   string      `json:"expiration_state"`
-	MaintenanceWindow string      `json:"maintenance_window,omitempty"`
-	RenewedAt         string      `json:"renewed_at,omitempty"`
-	RenewedBy         string      `json:"renewed_by,omitempty"`
-	RetiredAt         string      `json:"retired_at,omitempty"`
-	RetiredBy         string      `json:"retired_by,omitempty"`
-	RetireReason      string      `json:"retire_reason,omitempty"`
-	CreatedAt         string      `json:"created_at"`
-	UpdatedAt         string      `json:"updated_at"`
+	ID                string         `json:"id"`
+	Environment       string         `json:"environment"`
+	Host              string         `json:"host"`
+	Provider          string         `json:"provider"`
+	Region            string         `json:"region,omitempty"`
+	InstanceID        string         `json:"instance_id,omitempty"`
+	Owner             string         `json:"owner"`
+	Purpose           string         `json:"purpose,omitempty"`
+	AuthRef           string         `json:"auth_ref"`
+	ExpiresAt         string         `json:"expires_at,omitempty"`
+	Spec              ServerSpec     `json:"spec"`
+	Healthcheck       Healthcheck    `json:"healthcheck"`
+	Status            string         `json:"status"`
+	ExpirationState   string         `json:"expiration_state"`
+	MaintenanceWindow string         `json:"maintenance_window,omitempty"`
+	RenewedAt         string         `json:"renewed_at,omitempty"`
+	RenewedBy         string         `json:"renewed_by,omitempty"`
+	RetiredAt         string         `json:"retired_at,omitempty"`
+	RetiredBy         string         `json:"retired_by,omitempty"`
+	RetireReason      string         `json:"retire_reason,omitempty"`
+	LastDeployment    *DeploymentRef `json:"last_deployment,omitempty"`
+	CreatedAt         string         `json:"created_at"`
+	UpdatedAt         string         `json:"updated_at"`
 }
 
 type ServerSpec struct {
@@ -59,6 +60,32 @@ type Healthcheck struct {
 	Type       string `json:"type,omitempty"`
 	Target     string `json:"target,omitempty"`
 	LastStatus string `json:"last_status,omitempty"`
+}
+
+type DeploymentReadiness struct {
+	ResourceID        string   `json:"resource_id"`
+	Environment       string   `json:"environment"`
+	TargetEnvironment string   `json:"target_environment"`
+	Status            string   `json:"status"`
+	Decision          string   `json:"decision"`
+	Reasons           []string `json:"reasons"`
+	ManualRequired    bool     `json:"manual_required"`
+	ExpirationState   string   `json:"expiration_state,omitempty"`
+	HealthStatus      string   `json:"health_status,omitempty"`
+}
+
+type DeploymentRef struct {
+	ID           string `json:"id"`
+	ResourceID   string `json:"resource_id"`
+	Kind         string `json:"kind"`
+	DeploymentID string `json:"deployment_id,omitempty"`
+	ExecutionID  string `json:"execution_id,omitempty"`
+	ReleaseID    string `json:"release_id,omitempty"`
+	Environment  string `json:"environment,omitempty"`
+	Mode         string `json:"mode,omitempty"`
+	Status       string `json:"status"`
+	Decision     string `json:"decision"`
+	RecordedAt   string `json:"recorded_at"`
 }
 
 type HealthScanOptions struct {
@@ -146,6 +173,131 @@ func List(rootDir string) ([]Resource, error) {
 		return nil, err
 	}
 	return registry.Resources, nil
+}
+
+func AssessDeploymentReadiness(resource Resource, targetEnvironment string) DeploymentReadiness {
+	targetEnvironment = normalizeToken(targetEnvironment)
+	expiration := expirationState(resource.ExpiresAt, time.Now())
+	healthStatus := normalizeToken(resource.Healthcheck.LastStatus)
+	if healthStatus == "" {
+		healthStatus = "unknown"
+	}
+	readiness := DeploymentReadiness{
+		ResourceID:        resource.ID,
+		Environment:       resource.Environment,
+		TargetEnvironment: targetEnvironment,
+		Status:            "ready",
+		Decision:          "DEPLOY_RESOURCE_READY",
+		Reasons:           []string{},
+		ExpirationState:   expiration,
+		HealthStatus:      healthStatus,
+	}
+	block := func(reason string) {
+		readiness.Status = "blocked"
+		readiness.Decision = "DEPLOY_RESOURCE_BLOCKED"
+		readiness.Reasons = append(readiness.Reasons, reason+":"+resource.ID)
+	}
+	manual := func(reason string) {
+		if readiness.Status != "blocked" {
+			readiness.Status = "manual_required"
+			readiness.Decision = "DEPLOY_RESOURCE_MANUAL_REQUIRED"
+		}
+		readiness.ManualRequired = true
+		readiness.Reasons = append(readiness.Reasons, reason+":"+resource.ID)
+	}
+	if resource.Status != "active" {
+		block("server_resource_not_active")
+	}
+	if targetEnvironment != "" && resource.Environment != targetEnvironment {
+		block("server_resource_environment_mismatch")
+	}
+	if expiration == "expired" {
+		block("server_resource_expired")
+	}
+	if resource.Environment == "production" {
+		if expiration == "unknown" {
+			block("server_resource_expiration_unknown")
+		}
+		if expiration == "critical" {
+			block("server_resource_expiration_critical")
+		}
+		if expiration == "warning" {
+			manual("server_resource_expiration_warning")
+		}
+		switch healthStatus {
+		case "failed", "blocked", "unhealthy":
+			block("server_resource_unhealthy")
+		case "unknown", "manual", "":
+			block("server_resource_health_unknown")
+		}
+		return readiness
+	}
+	if healthStatus == "failed" || healthStatus == "blocked" || healthStatus == "unhealthy" {
+		block("server_resource_unhealthy")
+	}
+	return readiness
+}
+
+func RecordDeploymentReference(rootDir string, ref DeploymentRef) error {
+	registry, err := Load(rootDir)
+	if err != nil {
+		return err
+	}
+	ref = normalizeDeploymentRef(ref)
+	if ref.ResourceID == "" {
+		return errors.New("resource_id_required")
+	}
+	changed := false
+	for idx, resource := range registry.Resources {
+		if resource.ID != ref.ResourceID {
+			continue
+		}
+		registry.Resources[idx].LastDeployment = &ref
+		registry.Resources[idx].UpdatedAt = now()
+		changed = true
+		break
+	}
+	if !changed {
+		return nil
+	}
+	if err := save(rootDir, registry); err != nil {
+		return err
+	}
+	if err := fsutil.AppendJSONL(deploymentRefsPath(rootDir), ref); err != nil {
+		return err
+	}
+	if err := fsutil.AppendJSONL(eventsPath(rootDir), map[string]any{"event": "resource.deployment_ref.recorded", "resource_id": ref.ResourceID, "deployment_id": ref.DeploymentID, "execution_id": ref.ExecutionID, "ts": now()}); err != nil {
+		return err
+	}
+	_ = logging.Log(rootDir, "audit", "server_resource.deployment_ref.recorded", map[string]any{"resource_id": ref.ResourceID, "deployment_id": ref.DeploymentID, "execution_id": ref.ExecutionID, "kind": ref.Kind})
+	return nil
+}
+
+func ListDeploymentReferences(rootDir string, limit int) ([]DeploymentRef, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	lines, err := fsutil.TailLines(deploymentRefsPath(rootDir), limit)
+	if err != nil {
+		return nil, err
+	}
+	refs := []DeploymentRef{}
+	for _, line := range lines {
+		var ref DeploymentRef
+		if err := json.Unmarshal([]byte(line), &ref); err != nil {
+			return nil, err
+		}
+		if ref.ID != "" {
+			refs = append(refs, ref)
+		}
+	}
+	sort.SliceStable(refs, func(i, j int) bool {
+		return refs[i].RecordedAt > refs[j].RecordedAt
+	})
+	return refs, nil
 }
 
 func Load(rootDir string) (Registry, error) {
@@ -662,6 +814,10 @@ func eventsPath(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "events.jsonl")
 }
 
+func deploymentRefsPath(rootDir string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "deployment-refs.jsonl")
+}
+
 func healthScanDir(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).ResourcesDir, "checks")
 }
@@ -902,6 +1058,35 @@ func sortMaintenance(records []MaintenanceRecord) {
 	sort.SliceStable(records, func(i, j int) bool {
 		return records[i].CreatedAt > records[j].CreatedAt
 	})
+}
+
+func normalizeDeploymentRef(ref DeploymentRef) DeploymentRef {
+	ref.ResourceID = normalizeID(ref.ResourceID)
+	ref.Kind = normalizeToken(ref.Kind)
+	ref.DeploymentID = strings.TrimSpace(ref.DeploymentID)
+	ref.ExecutionID = strings.TrimSpace(ref.ExecutionID)
+	ref.ReleaseID = strings.TrimSpace(ref.ReleaseID)
+	ref.Environment = normalizeToken(ref.Environment)
+	ref.Mode = normalizeToken(ref.Mode)
+	ref.Status = normalizeToken(ref.Status)
+	ref.Decision = strings.TrimSpace(ref.Decision)
+	ref.RecordedAt = strings.TrimSpace(ref.RecordedAt)
+	if ref.Kind == "" {
+		ref.Kind = "deployment_reference"
+	}
+	if ref.Status == "" {
+		ref.Status = "recorded"
+	}
+	if ref.Decision == "" {
+		ref.Decision = "DEPLOYMENT_RESOURCE_REFERENCED"
+	}
+	if ref.RecordedAt == "" {
+		ref.RecordedAt = now()
+	}
+	if ref.ID == "" {
+		ref.ID = "deployment-ref-" + ref.ResourceID + "-" + ref.Kind + "-" + timeID(time.Now().UTC())
+	}
+	return ref
 }
 
 func allowedEnvironment(value string) bool {

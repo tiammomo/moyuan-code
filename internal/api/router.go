@@ -2290,6 +2290,23 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, payload)
 	})
+	router.GET("/v1/projects/:project_id/resources/deployment-refs", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		refs, err := serverresources.ListDeploymentReferences(rootDir, queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"resource_deployment_refs": refs})
+	})
 	router.GET("/v1/projects/:project_id/resources/:resource_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

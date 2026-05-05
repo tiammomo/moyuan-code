@@ -52,6 +52,46 @@ func TestCreatePlanUsesDefaultDeploymentCheckTemplates(t *testing.T) {
 	if plan.MonitorPlan.TemplateID != "deploy-monitor-test_dev-v1" || plan.MonitorPlan.Severity != "medium" || plan.MonitorPlan.Window != "30m" || !containsString(plan.MonitorPlan.FailureClasses, "monitor_failed") {
 		t.Fatalf("expected monitor template policy, got %+v", plan.MonitorPlan)
 	}
+	resource, found, err := serverresources.Show(root, "template-host")
+	if err != nil || !found || resource.LastDeployment == nil || resource.LastDeployment.DeploymentID != plan.ID {
+		t.Fatalf("expected deployment reference on resource, found=%v err=%v resource=%+v", found, err, resource)
+	}
+	refs, err := serverresources.ListDeploymentReferences(root, 5)
+	if err != nil || len(refs) == 0 || refs[0].DeploymentID != plan.ID {
+		t.Fatalf("expected deployment refs, refs=%+v err=%v", refs, err)
+	}
+}
+
+func TestCreatePlanBlocksUnsafeProductionResourceLifecycle(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	releasePlan := release.Plan{ID: "release-prod-lifecycle", Status: "ready", Decision: "RELEASE_SUGGESTED", Version: "v1.2.4"}
+	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(root).ReleasesDir, releasePlan.ID+".json"), releasePlan); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "prod-unknown-health",
+		Environment: "production",
+		Host:        "prod.internal",
+		Provider:    "aliyun",
+		Owner:       "ops",
+		AuthRef:     "secret:PROD_SSH",
+		ExpiresAt:   "2099-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := CreatePlan(root, PlanOptions{ReleaseID: releasePlan.ID, Environment: "production", ResourceIDs: []string{"prod-unknown-health"}, Approved: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Decision != "DEPLOY_BLOCKED" || !containsString(plan.Reasons, "server_resource_health_unknown:prod-unknown-health") {
+		t.Fatalf("expected production unknown health to block deployment plan, got %+v", plan)
+	}
+	if len(plan.Resources) != 1 || plan.Resources[0].ReadinessDecision != "DEPLOY_RESOURCE_BLOCKED" || plan.Resources[0].HealthStatus != "unknown" {
+		t.Fatalf("expected resource readiness summary, got %+v", plan.Resources)
+	}
 }
 
 func TestCreatePlanFromCandidateUsesReleaseCandidateAndResources(t *testing.T) {

@@ -48,10 +48,15 @@ type Plan struct {
 }
 
 type ResourceSummary struct {
-	ID          string `json:"id"`
-	Environment string `json:"environment"`
-	Host        string `json:"host"`
-	Status      string `json:"status"`
+	ID                string   `json:"id"`
+	Environment       string   `json:"environment"`
+	Host              string   `json:"host"`
+	Status            string   `json:"status"`
+	ExpirationState   string   `json:"expiration_state,omitempty"`
+	HealthStatus      string   `json:"health_status,omitempty"`
+	ReadinessStatus   string   `json:"readiness_status,omitempty"`
+	ReadinessDecision string   `json:"readiness_decision,omitempty"`
+	ReadinessReasons  []string `json:"readiness_reasons,omitempty"`
 }
 
 type StepPlan struct {
@@ -261,18 +266,7 @@ func CreatePlan(rootDir string, options PlanOptions) (Plan, error) {
 		plan.Reasons = append(plan.Reasons, "server_resource_missing:"+options.Environment)
 		return finish(rootDir, plan)
 	}
-	for _, resource := range resources {
-		plan.Resources = append(plan.Resources, ResourceSummary{ID: resource.ID, Environment: resource.Environment, Host: resource.Host, Status: resource.Status})
-		if resource.Status != "active" {
-			plan.Reasons = append(plan.Reasons, "server_resource_not_active:"+resource.ID)
-		}
-		if resource.Environment != options.Environment {
-			plan.Reasons = append(plan.Reasons, "server_resource_environment_mismatch:"+resource.ID)
-		}
-		if resource.Healthcheck.LastStatus == "failed" || resource.Healthcheck.LastStatus == "unhealthy" {
-			plan.Reasons = append(plan.Reasons, "server_resource_unhealthy:"+resource.ID)
-		}
-	}
+	appendPlanResourceReadiness(&plan, resources)
 	if len(plan.Reasons) > 0 {
 		return finish(rootDir, plan)
 	}
@@ -673,6 +667,73 @@ func ListPostDeploymentHistories(rootDir string, limit int) ([]PostDeploymentHis
 	return histories, nil
 }
 
+func appendPlanResourceReadiness(plan *Plan, resources []serverresources.Resource) {
+	for _, resource := range resources {
+		readiness := serverresources.AssessDeploymentReadiness(resource, plan.Environment)
+		plan.Resources = append(plan.Resources, ResourceSummary{
+			ID:                resource.ID,
+			Environment:       resource.Environment,
+			Host:              resource.Host,
+			Status:            resource.Status,
+			ExpirationState:   readiness.ExpirationState,
+			HealthStatus:      readiness.HealthStatus,
+			ReadinessStatus:   readiness.Status,
+			ReadinessDecision: readiness.Decision,
+			ReadinessReasons:  append([]string{}, readiness.Reasons...),
+		})
+		if readiness.ManualRequired {
+			plan.ManualRequired = true
+		}
+		if readiness.Status != "ready" {
+			plan.Reasons = appendUnique(plan.Reasons, readiness.Reasons...)
+		}
+	}
+}
+
+func recordPlanResourceRefs(rootDir string, plan Plan) error {
+	for _, resource := range plan.Resources {
+		if resource.ID == "" {
+			continue
+		}
+		if err := serverresources.RecordDeploymentReference(rootDir, serverresources.DeploymentRef{
+			ResourceID:   resource.ID,
+			Kind:         "deployment_plan",
+			DeploymentID: plan.ID,
+			ReleaseID:    plan.ReleaseID,
+			Environment:  plan.Environment,
+			Status:       plan.Status,
+			Decision:     plan.Decision,
+			RecordedAt:   plan.CreatedAt,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func recordExecutionResourceRefs(rootDir string, execution Execution) error {
+	for _, resource := range execution.Resources {
+		if resource.ID == "" {
+			continue
+		}
+		if err := serverresources.RecordDeploymentReference(rootDir, serverresources.DeploymentRef{
+			ResourceID:   resource.ID,
+			Kind:         "deployment_execution",
+			DeploymentID: execution.DeploymentID,
+			ExecutionID:  execution.ID,
+			ReleaseID:    execution.ReleaseID,
+			Environment:  execution.Environment,
+			Mode:         execution.Mode,
+			Status:       execution.Status,
+			Decision:     execution.Decision,
+			RecordedAt:   firstNonEmpty(execution.FinishedAt, execution.StartedAt),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func finish(rootDir string, plan Plan) (Plan, error) {
 	if err := fsutil.WriteJSON(planPath(rootDir, plan.ID), plan); err != nil {
 		return Plan{}, err
@@ -681,6 +742,9 @@ func finish(rootDir string, plan Plan) (Plan, error) {
 		return Plan{}, err
 	}
 	_ = logging.Log(rootDir, "release", "deployment.plan.created", map[string]any{"deployment_id": plan.ID, "release_id": plan.ReleaseID, "decision": plan.Decision, "status": plan.Status, "environment": plan.Environment})
+	if err := recordPlanResourceRefs(rootDir, plan); err != nil {
+		return Plan{}, err
+	}
 	return plan, nil
 }
 
@@ -700,6 +764,9 @@ func finishExecution(rootDir string, execution Execution) (Execution, error) {
 		"environment":   execution.Environment,
 		"mode":          execution.Mode,
 	})
+	if err := recordExecutionResourceRefs(rootDir, execution); err != nil {
+		return Execution{}, err
+	}
 	if _, err := evidence.Add(rootDir, evidence.AddOptions{
 		ParentType:  "deployment_execution",
 		ParentID:    execution.ID,

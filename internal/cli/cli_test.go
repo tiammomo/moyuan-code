@@ -631,6 +631,13 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	assertContains(t, deployDryRun.stdout, `"no_remote_or_local_commands_executed"`)
 	dryRunExecutionID := decodeStringField(t, deployDryRun.stdout, "id")
 	assertFileExists(t, root, ".moyuan/lifecycle/deployments/executions/"+dryRunExecutionID+".json")
+	resourceAfterDeployment := runCLI(t, root, "resources", "show", "deploy-dev")
+	assertContains(t, resourceAfterDeployment.stdout, `"last_deployment"`)
+	assertContains(t, resourceAfterDeployment.stdout, dryRunExecutionID)
+	deploymentRefs := runCLI(t, root, "resources", "deployment-refs")
+	assertContains(t, deploymentRefs.stdout, `"resource_deployment_refs"`)
+	assertContains(t, deploymentRefs.stdout, dryRunExecutionID)
+	assertContains(t, deploymentRefs.stdout, `"deployment_execution"`)
 	missingRollback := runCLIAllowFailure(t, root, "deploy", "rollback", "missing-execution")
 	if missingRollback.code == 0 {
 		t.Fatalf("expected missing rollback execution to fail: %s", missingRollback.stdout)
@@ -729,6 +736,7 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 		"--owner", "ops-owner",
 		"--auth-ref", "secret:prod_ssh_key",
 		"--expires-at", "2099-01-01",
+		"--health-status", "healthy",
 	)
 	assertContains(t, prodResource.stdout, `"deploy-prod"`)
 	prodBlocked := runCLIAllowFailure(t, root, "deploy", "plan", releaseID, "--environment", "production", "--resource", "deploy-prod")

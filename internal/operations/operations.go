@@ -498,11 +498,42 @@ func Timeline(rootDir string, options TimelineOptions) ([]TimelineItem, error) {
 		})
 	}
 
+	deploymentRefs, err := serverresources.ListDeploymentReferences(rootDir, sourceLimit)
+	if err != nil {
+		return nil, err
+	}
+	for _, ref := range deploymentRefs {
+		add(TimelineItem{
+			ID:           ref.ID,
+			Type:         "resource_deployment_ref",
+			Operation:    "server_resource.deployment_ref." + ref.Kind,
+			Status:       ref.Status,
+			Decision:     ref.Decision,
+			PrimaryRef:   ref.ResourceID,
+			SecondaryRef: firstNonEmpty(ref.ExecutionID, ref.DeploymentID),
+			Environment:  ref.Environment,
+			Timestamp:    ref.RecordedAt,
+			Metadata: map[string]any{
+				"kind":          ref.Kind,
+				"deployment_id": ref.DeploymentID,
+				"execution_id":  ref.ExecutionID,
+				"release_id":    ref.ReleaseID,
+				"mode":          ref.Mode,
+			},
+		})
+	}
+
 	resources, err := serverresources.List(rootDir)
 	if err != nil {
 		return nil, err
 	}
 	for _, resource := range resources {
+		lastDeploymentID := ""
+		lastDeploymentDecision := ""
+		if resource.LastDeployment != nil {
+			lastDeploymentID = firstNonEmpty(resource.LastDeployment.ExecutionID, resource.LastDeployment.DeploymentID)
+			lastDeploymentDecision = resource.LastDeployment.Decision
+		}
 		add(TimelineItem{
 			ID:          resource.ID,
 			Type:        "server_resource",
@@ -518,6 +549,8 @@ func Timeline(rootDir string, options TimelineOptions) ([]TimelineItem, error) {
 				"expires_at":       resource.ExpiresAt,
 				"expiration_state": resource.ExpirationState,
 				"health_status":    resource.Healthcheck.LastStatus,
+				"last_deployment":  lastDeploymentID,
+				"last_decision":    lastDeploymentDecision,
 			},
 		})
 	}

@@ -28,6 +28,7 @@ Release note、发版批次、覆盖率门禁、禁止发版条件和回退后 f
 - 每次 deployment execution 完成后会生成 post-deployment history，位置为 `.moyuan/lifecycle/deployments/post-deployment-history/<execution-id>.json`；其中固定包含 smoke/monitor 检查摘要、检查模板、severity、失败分类、rollback runbook 状态、evidence ids 和 artifact references。
 - 已接入门禁：dirty worktree、remote 缺失、无 accepted issue、存在 unresolved issue 时阻断。
 - production deployment plan 缺少 approval 时阻断；test_dev 可生成演练计划。
+- Deployment plan 会读取 server resource readiness，生产资源过期、临期 critical、健康 unknown/failed/blocked/unhealthy 或非 active 时会阻断，并把资源 readiness 原因写入 plan resource summary。
 
 ## 2. 输入与输出
 

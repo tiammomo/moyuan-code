@@ -2,12 +2,14 @@
 
 当前 Beta 实现已落地服务器资源 registry 最小闭环：
 
-- CLI：`moyuan resources add/list/show/disable`、`moyuan resources expiration scan`、`moyuan resources maintenance scan|list`、`moyuan resources renew`、`moyuan resources retire`。
-- API：`GET/POST /v1/projects/:project_id/resources`、`GET /v1/projects/:project_id/resources/:resource_id`、`POST /v1/projects/:project_id/resources/:resource_id/disable`、`GET /v1/projects/:project_id/resources/expiration-scan`、`GET /resources/lifecycle-alerts`、`POST /resources/lifecycle/scan`、`GET /resources/maintenance`、`POST /resources/maintenance/scan`、`POST /resources/:id/renew`、`POST /resources/:id/retire`。
-- 输出位置：`.moyuan/resources/inventory.json`、`.moyuan/resources/events.jsonl`、`.moyuan/resources/lifecycle-alerts.jsonl`、`.moyuan/resources/lifecycle-scans/`、`.moyuan/resources/maintenance/` 和 `.moyuan/resources/maintenance.jsonl`。
-- 当前只做登记、查询、禁用、到期扫描、生命周期提醒、维护记录、续费记录和退役记录，不连接 SSH、不部署、不修改云资源。
+- CLI：`moyuan resources add/list/show/disable`、`moyuan resources expiration scan`、`moyuan resources maintenance scan|list`、`moyuan resources deployment-refs`、`moyuan resources renew`、`moyuan resources retire`。
+- API：`GET/POST /v1/projects/:project_id/resources`、`GET /v1/projects/:project_id/resources/:resource_id`、`POST /v1/projects/:project_id/resources/:resource_id/disable`、`GET /v1/projects/:project_id/resources/expiration-scan`、`GET /resources/lifecycle-alerts`、`GET /resources/deployment-refs`、`POST /resources/lifecycle/scan`、`GET /resources/maintenance`、`POST /resources/maintenance/scan`、`POST /resources/:id/renew`、`POST /resources/:id/retire`。
+- 输出位置：`.moyuan/resources/inventory.json`、`.moyuan/resources/events.jsonl`、`.moyuan/resources/deployment-refs.jsonl`、`.moyuan/resources/lifecycle-alerts.jsonl`、`.moyuan/resources/lifecycle-scans/`、`.moyuan/resources/maintenance/` 和 `.moyuan/resources/maintenance.jsonl`。
+- 当前只做登记、查询、禁用、到期扫描、生命周期提醒、部署引用记录、维护记录、续费记录和退役记录，不连接 SSH、不部署、不修改云资源。
 - Phase 4 已支持维护记录、续费记录和退役记录；真实云厂商续费和远程操作仍留给后续受控 adapter。
 - 生产机必须显式声明 `environment=production`，并填写 owner、auth_ref 和 expires_at。
+- Deployment plan 会读取 resource readiness；生产机过期、临期 critical、健康 unknown/failed/blocked/unhealthy 或 retired/disabled 时会阻断部署计划。
+- 每次 deployment plan/execution 会回写 resource `last_deployment` 并追加 deployment refs，便于长期追踪机器被哪些发布使用。
 
 ## 1. 目标
 
@@ -32,6 +34,7 @@
 - resource groups。
 - resource check report。
 - expiration alerts。
+- deployment refs and last deployment summary。
 - maintenance issues。
 - resource change events。
 
@@ -78,6 +81,7 @@ scheduled maintenance
   -> cloud expiration scan
   -> lifecycle alert scan
   -> cost snapshot
+  -> update deployment refs when release/deploy references resource
   -> create maintenance issue when needed
 ```
 
@@ -96,6 +100,7 @@ scheduled maintenance
 - 是否缺少 owner、到期时间、健康检查或备份。
 - 到期提醒是否生成维护 issue。
 - 巡检失败是否阻断投产。
+- 最近部署引用是否需要进入运维 timeline。
 - 生产机远程操作是否必须走审批。
 
 ## 6. 配置入口
@@ -110,8 +115,9 @@ scheduled maintenance
 
 ```text
 .moyuan/resources/
-  inventory.yaml
+  inventory.json
   events.jsonl
+  deployment-refs.jsonl
   checks/
   maintenance/
 ```
@@ -129,6 +135,7 @@ scheduled maintenance
 - backup status。
 - cloud expiration scan。
 - production remote command approval。
+- deployment resource reference recorded。
 
 日志流：
 
@@ -143,5 +150,7 @@ scheduled maintenance
 - 每台服务器有唯一 host id。
 - 云服务器有到期时间和续费负责人。
 - 生产机缺失备份、健康检查或 owner 时不能投产。
+- 生产机健康 unknown、过期、临期 critical 或 retired/disabled 时不能投产。
+- 最近部署引用可以从 resource show/list、deployment-refs 和 operations timeline 查询。
 - 资源组可以被环境配置引用。
 - 巡检失败能生成维护 issue。

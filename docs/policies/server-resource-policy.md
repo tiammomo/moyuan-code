@@ -4,7 +4,7 @@
 
 决定服务器能否添加到系统、能否进入资源组、是否可以用于投产、是否需要生成维护 issue，以及生产机远程操作是否需要审批。
 
-当前 Beta 实现只做 `HOST_ACCEPTED` / `HOST_REJECTED` 的登记层判断，以及到期状态扫描；不执行 SSH、云 API 操作或部署。
+当前 Beta 实现已覆盖 `HOST_ACCEPTED` / `HOST_REJECTED` 登记层判断、到期状态扫描、维护记录、deployment readiness 判断和部署引用记录；不执行云 API 续费，不直接修改云资源。
 
 ## 2. 输入事实
 
@@ -57,6 +57,12 @@ else:
 if category == production:
   if approval policy missing:
     DEPLOY_RESOURCE_BLOCKED
+  else if resource status is not active:
+    DEPLOY_RESOURCE_BLOCKED
+  else if expires_at expired or within critical window:
+    DEPLOY_RESOURCE_BLOCKED
+  else if latest healthcheck unknown:
+    DEPLOY_RESOURCE_BLOCKED
   else if backup required and backup unavailable:
     DEPLOY_RESOURCE_BLOCKED
   else if latest healthcheck failed:
@@ -102,8 +108,9 @@ else:
 
 产物：
 
-- `.moyuan/resources/inventory.yaml`
+- `.moyuan/resources/inventory.json`
 - `.moyuan/resources/events.jsonl`
+- `.moyuan/resources/deployment-refs.jsonl`
 - `.moyuan/resources/checks/`
 - `.moyuan/resources/maintenance/`
 
@@ -126,5 +133,6 @@ else:
 - 生产机无 owner 时不能登记。
 - 生产机无到期时间时不能登记。
 - 生产机健康检查失败时不能投产。
+- 生产机健康状态 unknown 时不能投产。
 - 生产机到期 7 天内生成 critical 维护 issue。
 - 测试开发机不能访问生产数据。

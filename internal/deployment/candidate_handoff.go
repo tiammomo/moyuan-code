@@ -62,18 +62,7 @@ func CreatePlanFromCandidate(rootDir string, options CandidatePlanOptions) (Plan
 		plan.Reasons = append(plan.Reasons, "server_resource_missing:"+options.Environment)
 		return finish(rootDir, plan)
 	}
-	for _, resource := range resources {
-		plan.Resources = append(plan.Resources, ResourceSummary{ID: resource.ID, Environment: resource.Environment, Host: resource.Host, Status: resource.Status})
-		if resource.Status != "active" {
-			plan.Reasons = append(plan.Reasons, "server_resource_not_active:"+resource.ID)
-		}
-		if resource.Environment != options.Environment {
-			plan.Reasons = append(plan.Reasons, "server_resource_environment_mismatch:"+resource.ID)
-		}
-		if resource.Healthcheck.LastStatus == "failed" || resource.Healthcheck.LastStatus == "unhealthy" {
-			plan.Reasons = append(plan.Reasons, "server_resource_unhealthy:"+resource.ID)
-		}
-	}
+	appendPlanResourceReadiness(&plan, resources)
 	if len(plan.Reasons) > 0 {
 		return finish(rootDir, plan)
 	}

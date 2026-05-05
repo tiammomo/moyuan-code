@@ -118,6 +118,17 @@ func TestTimelineAggregatesOperationsAndFilters(t *testing.T) {
 	if _, err := serverresources.MaintenanceScan(root); err != nil {
 		t.Fatal(err)
 	}
+	if err := serverresources.RecordDeploymentReference(root, serverresources.DeploymentRef{
+		ResourceID:   "dev-api",
+		Kind:         "deployment_plan",
+		DeploymentID: "deployment-resource-ref",
+		ReleaseID:    plan.ID,
+		Environment:  "test_dev",
+		Status:       "planned",
+		Decision:     "DEPLOY_PLAN_READY",
+	}); err != nil {
+		t.Fatal(err)
+	}
 	execution, err := deployment.Execute(context.Background(), root, deployment.ExecuteOptions{DeploymentID: "missing-deployment", Mode: "dry_run"})
 	if err != nil {
 		t.Fatal(err)
@@ -190,6 +201,7 @@ func TestTimelineAggregatesOperationsAndFilters(t *testing.T) {
 		"resource_health_scan",
 		"resource_maintenance",
 		"resource_lifecycle_alert",
+		"resource_deployment_ref",
 		"server_resource",
 	} {
 		if !timelineContainsType(items, typ) {
