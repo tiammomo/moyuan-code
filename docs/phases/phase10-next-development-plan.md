@@ -20,7 +20,7 @@ Phase 9 已完成并通过 release readiness：
 
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase10-001` | `background-control-loop-scheduler` | planned | 控制循环调度底座 | 一次 run 可触发多个受控 step，并写入状态、日志和审计 |
+| P0 | `phase10-001` | `background-control-loop-scheduler` | completed | 控制循环调度底座 | 一次 run 可触发多个受控 step，并写入状态、日志和审计 |
 | P0 | `phase10-002` | `operation-repair-candidate-review-flow` | planned | 修复候选复核流转 | approve/reject 后可生成 issue 或受控 repair attempt |
 | P1 | `phase10-003` | `release-provider-branch-tag-workflow-preview` | planned | release provider 扩展预览 | branch/tag/workflow 有 preview plan 和 guardrail |
 | P1 | `phase10-004` | `deployment-check-template-policy` | planned | 部署检查模板策略 | smoke/monitor 失败分级可配置、可追踪 |
@@ -28,7 +28,7 @@ Phase 9 已完成并通过 release readiness：
 
 ## 3. 执行规划：`phase10-001 background-control-loop-scheduler`
 
-实现状态：planned。
+实现状态：completed。
 
 范围：
 
@@ -52,6 +52,14 @@ Phase 9 已完成并通过 release readiness：
 - run 中每个 step 都有 status、started_at、finished_at、summary 和 evidence/artifact references。
 - 资源 lifecycle scan 可以作为 control loop step 被调用。
 - `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
+
+落地结果：
+
+- 新增 `internal/controlloop`，默认安全 step 为 `resource_lifecycle_scan`、`provider_ops_refresh` 和 `project_comprehension_refresh`。
+- 新增 API：`POST /v1/projects/:project_id/control-loop/run`、`GET /v1/projects/:project_id/control-loop/runs`、`GET /v1/projects/:project_id/control-loop/runs/:run_id`。
+- 每个 step 都写入 `control_loop` evidence，并记录 artifact references；run 写入 `.moyuan/control-loop/runs/` 和 `.moyuan/control-loop/runs.jsonl`。
+- `provider_ops_refresh` 默认不 probe 外部服务；如果启用 probe 且未审批，会沿用 provider approval guard。
+- 第一批只提供手动 bounded run，不启动后台常驻定时器，不新增生产真实写入。
 
 ## 4. 验证要求
 

@@ -9,6 +9,7 @@ import (
 
 	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/auth"
+	"moyuan-code/internal/controlloop"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/evidence"
@@ -61,6 +62,20 @@ type providerOpsRefreshRequest struct {
 	Probe           bool   `json:"probe"`
 	ProbeTimeoutMS  int    `json:"probe_timeout_ms"`
 	Approved        bool   `json:"approved"`
+}
+
+type controlLoopRunRequest struct {
+	Trigger            string   `json:"trigger"`
+	RequestedBy        string   `json:"requested_by"`
+	Steps              []string `json:"steps"`
+	MaxSteps           int      `json:"max_steps"`
+	StepTimeoutMS      int      `json:"step_timeout_ms"`
+	ProviderID         string   `json:"provider_id"`
+	IncludeDisabled    bool     `json:"include_disabled"`
+	Probe              bool     `json:"probe"`
+	ProbeApproved      bool     `json:"probe_approved"`
+	ProbeTimeoutMS     int      `json:"probe_timeout_ms"`
+	ComprehensionSince string   `json:"comprehension_since"`
 }
 
 type gitProviderCreateRequest struct {
@@ -1724,6 +1739,82 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(status, gin.H{"operation_repair_candidate": candidate})
 	})
+	router.POST("/v1/projects/:project_id/control-loop/run", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req controlLoopRunRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		run, err := controlloop.Run(c.Request.Context(), rootDir, controlloop.RunOptions{
+			Trigger:            req.Trigger,
+			RequestedBy:        req.RequestedBy,
+			Steps:              req.Steps,
+			MaxSteps:           req.MaxSteps,
+			StepTimeoutMS:      req.StepTimeoutMS,
+			ProviderID:         req.ProviderID,
+			IncludeDisabled:    req.IncludeDisabled,
+			Probe:              req.Probe,
+			ProbeApproved:      req.ProbeApproved,
+			ProbeTimeoutMS:     req.ProbeTimeoutMS,
+			ComprehensionSince: req.ComprehensionSince,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if run.Status == "failed" || run.Decision == "CONTROL_LOOP_COMPLETED_WITH_ATTENTION" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"control_loop_run": run})
+	})
+	router.GET("/v1/projects/:project_id/control-loop/runs", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		runs, err := controlloop.List(rootDir, queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"control_loop_runs": runs})
+	})
+	router.GET("/v1/projects/:project_id/control-loop/runs/:run_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		run, found, err := controlloop.Load(rootDir, c.Param("run_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "control loop run not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"control_loop_run": run})
+	})
 	router.POST("/v1/projects/:project_id/requirements/plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -2344,6 +2435,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 	switch path {
 	case "/v1/projects/:project_id/providers/ops/refresh":
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
+	case "/v1/projects/:project_id/control-loop/run":
+		return authzRule{Action: "control_loop.run", Risk: "high", Scopes: []string{"control:write"}}, true
 	case "/v1/projects/:project_id/approvals/:approval_id/decide":
 		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
 	case "/v1/projects/:project_id/auth/sessions":
@@ -2382,6 +2475,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 	switch {
 	case strings.Contains(rawPath, "/providers/ops/refresh"):
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
+	case strings.Contains(rawPath, "/control-loop/run"):
+		return authzRule{Action: "control_loop.run", Risk: "high", Scopes: []string{"control:write"}}, true
 	case strings.Contains(rawPath, "/approvals/") && strings.HasSuffix(rawPath, "/decide"):
 		return authzRule{Action: "approval.decide", Risk: "high", Scopes: []string{"approval:decide"}}, true
 	case strings.HasSuffix(rawPath, "/auth/sessions"):

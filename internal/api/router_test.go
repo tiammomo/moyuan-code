@@ -13,6 +13,7 @@ import (
 
 	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/auth"
+	"moyuan-code/internal/controlloop"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
@@ -322,6 +323,12 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"model_strategy":"low-cost-memory","includes_project_memory":true}`, http.StatusOK, `"route"`, `"low_cost_memory"`, `"glm-api"`)
 	t.Setenv("GLM_API_KEY", "")
 	assertPostContains(t, router, "/v1/projects/managed/providers/ops/refresh", `{"provider_id":"glm-api"}`, http.StatusOK, `"provider_ops_refresh"`, `"updated":1`, `"auth_ref_env_missing:GLM_API_KEY"`)
+	controlLoopRun := assertPostControlLoop(t, router, "/v1/projects/managed/control-loop/run", `{}`, http.StatusAccepted)
+	if len(controlLoopRun.Steps) != 3 {
+		t.Fatalf("expected 3 control loop steps, got %+v", controlLoopRun.Steps)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/control-loop/runs?limit=5", http.StatusOK, `"control_loop_runs"`, controlLoopRun.ID, `"resource_lifecycle_scan"`)
+	assertGETContains(t, router, "/v1/projects/managed/control-loop/runs/"+controlLoopRun.ID, http.StatusOK, `"control_loop_run"`, `"project_comprehension_refresh"`)
 	assertPostContains(t, router, "/v1/projects/managed/providers/glm-api/ops", `{"quota":{"status":"exhausted"}}`, http.StatusOK, `"quota"`, `"exhausted"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"memory_curator","task_type":"memory_extraction","includes_project_memory":true}`, http.StatusOK, `"route"`, `"codex_cli"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"backend","requires_repo_edit":true,"includes_secrets":true}`, http.StatusAccepted, `"ROUTE_BLOCKED"`, `"contains_secret_context"`)
@@ -498,6 +505,27 @@ func assertPostAPIToken(t *testing.T, router http.Handler, path string, body str
 		t.Fatalf("api token response leaked token hash: %s", recorder.Body.String())
 	}
 	return payload.APIToken
+}
+
+func assertPostControlLoop(t *testing.T, router http.Handler, path string, body string, status int) controlloop.RunRecord {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != status {
+		t.Fatalf("POST %s status = %d body=%s", path, recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		Run controlloop.RunRecord `json:"control_loop_run"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode control loop response failed: %v body=%s", err, recorder.Body.String())
+	}
+	if payload.Run.ID == "" {
+		t.Fatalf("control loop response missing id: %s", recorder.Body.String())
+	}
+	return payload.Run
 }
 
 func initGitRepo(t *testing.T, root string) {
