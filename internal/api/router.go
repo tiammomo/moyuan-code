@@ -130,6 +130,7 @@ type deploymentExecuteRequest struct {
 	Environment  string   `json:"environment"`
 	Mode         string   `json:"mode"`
 	Approved     bool     `json:"approved"`
+	ApprovalID   string   `json:"approval_id"`
 	Commands     []string `json:"commands"`
 }
 
@@ -1033,6 +1034,7 @@ func NewRouter(options Options) *gin.Engine {
 			Environment:  req.Environment,
 			Mode:         req.Mode,
 			Approved:     req.Approved,
+			ApprovalID:   req.ApprovalID,
 			Commands:     req.Commands,
 		})
 		if err != nil {
@@ -2394,6 +2396,7 @@ func NewRouter(options Options) *gin.Engine {
 			DeploymentID: c.Param("deployment_id"),
 			Mode:         req.Mode,
 			Approved:     req.Approved,
+			ApprovalID:   req.ApprovalID,
 			Commands:     req.Commands,
 		})
 		if err != nil {

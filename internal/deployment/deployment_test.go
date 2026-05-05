@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/release"
@@ -110,6 +111,7 @@ func TestCreatePlanFromCandidateUsesReleaseCandidateAndResources(t *testing.T) {
 		Environment:  "test_dev",
 		Mode:         "local_shell",
 		Approved:     true,
+		ApprovalID:   approveDeploymentExecution(t, root, plan.ID, "local_shell"),
 		Commands:     []string{"printf candidate-deploy-ok"},
 		DeploymentID: plan.ID,
 	})
@@ -174,6 +176,7 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 		DeploymentID: okPlan.ID,
 		Mode:         "local_shell",
 		Approved:     true,
+		ApprovalID:   approveDeploymentExecution(t, root, okPlan.ID, "local_shell"),
 		Commands:     []string{"printf deploy-ok"},
 	})
 	if err != nil {
@@ -218,6 +221,7 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 		DeploymentID: failPlan.ID,
 		Mode:         "local_shell",
 		Approved:     true,
+		ApprovalID:   approveDeploymentExecution(t, root, failPlan.ID, "local_shell"),
 		Commands:     []string{"printf deploy-fail"},
 	})
 	if err != nil {
@@ -326,6 +330,7 @@ func TestExecuteBlocksRealSSHExecution(t *testing.T) {
 		DeploymentID: plan.ID,
 		Mode:         "ssh_execute",
 		Approved:     true,
+		ApprovalID:   approveDeploymentExecution(t, root, plan.ID, "ssh_execute"),
 		Commands:     []string{"deploy api"},
 	})
 	if err != nil {
@@ -363,6 +368,7 @@ func TestExecuteSSHRunnerExecutesAllowedCommands(t *testing.T) {
 		DeploymentID: plan.ID,
 		Mode:         "ssh_execute",
 		Approved:     true,
+		ApprovalID:   approveDeploymentExecution(t, root, plan.ID, "ssh_execute"),
 		Commands:     []string{"printf deploy-ok"},
 	})
 	if err != nil {
@@ -406,6 +412,7 @@ func TestExecuteSSHRunnerFailsAndSuggestsRollback(t *testing.T) {
 		DeploymentID: plan.ID,
 		Mode:         "ssh_execute",
 		Approved:     true,
+		ApprovalID:   approveDeploymentExecution(t, root, plan.ID, "ssh_execute"),
 		Commands:     []string{"printf deploy-ok"},
 	})
 	if err != nil {
@@ -438,6 +445,7 @@ func TestExecuteSSHGuardedRunnerBlocksUnsafeCommand(t *testing.T) {
 		DeploymentID: plan.ID,
 		Mode:         "ssh_execute",
 		Approved:     true,
+		ApprovalID:   approveDeploymentExecution(t, root, plan.ID, "ssh_execute"),
 		Commands:     []string{"rm -rf /"},
 	})
 	if err != nil {
@@ -454,6 +462,117 @@ func TestExecuteSSHGuardedRunnerBlocksUnsafeCommand(t *testing.T) {
 	}
 	if !hasStep(execution.Steps, "ssh_execute", "blocked") {
 		t.Fatalf("expected blocked SSH execute step, got %+v", execution.Steps)
+	}
+}
+
+func TestExecuteRequiresAndConsumesApprovalProof(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+	plan := createDeploymentPlanWithHealthTarget(t, root, "approval-proof", server.URL)
+
+	blocked, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "local_shell",
+		Commands:     []string{"printf gated"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blocked.Status != "blocked" || blocked.ApprovalID == "" || !containsReason(blocked.Reasons, "execution_approval_required") {
+		t.Fatalf("expected approval request before real execution, got %+v", blocked)
+	}
+	approval, found, err := approvals.Load(root, blocked.ApprovalID)
+	if err != nil || !found {
+		t.Fatalf("expected approval record, found=%v err=%v", found, err)
+	}
+	if approval.TargetType != "deployment_execution" || approval.TargetID != plan.ID || approval.Action != "deploy.execute.local.shell" {
+		t.Fatalf("expected stable deployment execution approval scope, got %+v", approval)
+	}
+
+	missingProof, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "local_shell",
+		Approved:     true,
+		Commands:     []string{"printf gated"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missingProof.Status != "blocked" || !containsReason(missingProof.Reasons, "approval_id_required_before_deployment_execution") {
+		t.Fatalf("expected approval id proof requirement, got %+v", missingProof)
+	}
+	if _, _, err := approvals.Decide(root, blocked.ApprovalID, approvals.DecisionOptions{Decision: "approved", DecidedBy: "reviewer", Reason: "deployment approved"}); err != nil {
+		t.Fatal(err)
+	}
+	completed, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "local_shell",
+		Approved:     true,
+		ApprovalID:   blocked.ApprovalID,
+		Commands:     []string{"printf gated"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Decision != "DEPLOY_EXECUTION_COMPLETED" || !completed.ApprovalConsumed || !containsReason(completed.Reasons, "approval_consumed_before_deployment_execution") {
+		t.Fatalf("expected approval consumption before deployment execution, got %+v", completed)
+	}
+	consumed, found, err := approvals.Load(root, blocked.ApprovalID)
+	if err != nil || !found {
+		t.Fatalf("expected consumed approval record, found=%v err=%v", found, err)
+	}
+	if consumed.Status != "consumed" || consumed.ConsumedBy != "deployment-executor" {
+		t.Fatalf("expected consumed deployment approval, got %+v", consumed)
+	}
+	replay, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "local_shell",
+		Approved:     true,
+		ApprovalID:   blocked.ApprovalID,
+		Commands:     []string{"printf gated"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay.Status != "blocked" || !containsReason(replay.Reasons, "approval_not_approved") {
+		t.Fatalf("expected consumed approval replay to be blocked, got %+v", replay)
+	}
+}
+
+func TestExecuteDoesNotConsumeApprovalForUnsafeLocalShellCommand(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	plan := createDeploymentPlanWithHealthTarget(t, root, "approval-unsafe", "http://127.0.0.1/healthz")
+	approvalID := approveDeploymentExecution(t, root, plan.ID, "local_shell")
+	blocked, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "local_shell",
+		Approved:     true,
+		ApprovalID:   approvalID,
+		Commands:     []string{"rm -rf /tmp/nope"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blocked.Status != "blocked" || blocked.ApprovalConsumed || !containsReason(blocked.Reasons, "command_not_allowed") {
+		t.Fatalf("expected unsafe local shell command blocked before approval consumption, got %+v", blocked)
+	}
+	approval, found, err := approvals.Load(root, approvalID)
+	if err != nil || !found {
+		t.Fatalf("expected approval record, found=%v err=%v", found, err)
+	}
+	if approval.Status != "approved" {
+		t.Fatalf("expected unsafe command not to consume approval, got %+v", approval)
 	}
 }
 
@@ -493,6 +612,26 @@ func createDeploymentPlanWithHealthTarget(t *testing.T, root string, id string, 
 		t.Fatal(err)
 	}
 	return plan
+}
+
+func approveDeploymentExecution(t *testing.T, root string, deploymentID string, mode string) string {
+	t.Helper()
+	approval, err := approvals.Request(root, approvals.RequestOptions{
+		TargetType:  "deployment_execution",
+		TargetID:    deploymentID,
+		Action:      "deploy.execute." + mode,
+		RiskLevel:   "high",
+		RequestedBy: "test",
+		Reason:      "test deployment execution approval",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decided, found, err := approvals.Decide(root, approval.ID, approvals.DecisionOptions{Decision: "approved", DecidedBy: "reviewer", Reason: "test approved"})
+	if err != nil || !found {
+		t.Fatalf("expected approval decision, found=%v err=%v", found, err)
+	}
+	return decided.ID
 }
 
 func hasStep(steps []ExecutionStep, name string, status string) bool {

@@ -79,6 +79,7 @@ type ExecuteOptions struct {
 	DeploymentID string   `json:"deployment_id"`
 	Mode         string   `json:"mode"`
 	Approved     bool     `json:"approved"`
+	ApprovalID   string   `json:"approval_id,omitempty"`
 	Commands     []string `json:"commands"`
 }
 
@@ -98,6 +99,7 @@ type Execution struct {
 	MonitorReport      CheckReport        `json:"monitor_report,omitempty"`
 	RollbackSuggestion RollbackSuggestion `json:"rollback_suggestion,omitempty"`
 	ApprovalID         string             `json:"approval_id,omitempty"`
+	ApprovalConsumed   bool               `json:"approval_consumed"`
 	RemoteExecEnabled  bool               `json:"remote_exec_enabled"`
 	StartedAt          string             `json:"started_at"`
 	FinishedAt         string             `json:"finished_at,omitempty"`
@@ -348,6 +350,7 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 	}
 	options.DeploymentID = strings.TrimSpace(options.DeploymentID)
 	options.Mode = normalizeToken(options.Mode)
+	options.ApprovalID = strings.TrimSpace(options.ApprovalID)
 	options.Commands = normalizeCommands(options.Commands)
 	if options.DeploymentID == "" {
 		return Execution{}, errors.New("deployment_id_required")
@@ -385,27 +388,33 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 		execution.Reasons = append(execution.Reasons, "deployment_resources_missing")
 		return finishExecution(rootDir, execution)
 	}
+	approvalID := ""
 	if requiresExecutionApproval(options.Mode) && !options.Approved {
 		execution.Reasons = append(execution.Reasons, "execution_approval_required")
-		approval, err := approvals.Request(rootDir, approvals.RequestOptions{
-			TargetType:  "deployment_execution",
-			TargetID:    execution.ID,
-			Action:      "deploy.execute." + options.Mode,
-			RiskLevel:   riskForExecution(plan.Environment),
-			RequestedBy: "system",
-			Reason:      "non dry-run deployment execution requires approval",
-			Metadata: map[string]any{
-				"deployment_id": execution.DeploymentID,
-				"release_id":    execution.ReleaseID,
-				"environment":   execution.Environment,
-				"mode":          execution.Mode,
-			},
-		})
+		approval, err := requestExecutionApproval(rootDir, plan, options.Mode)
 		if err != nil {
 			return Execution{}, err
 		}
 		execution.ApprovalID = approval.ID
 		return finishExecution(rootDir, execution)
+	}
+	if requiresExecutionApproval(options.Mode) {
+		if options.ApprovalID == "" {
+			execution.Reasons = append(execution.Reasons, "approval_id_required_before_deployment_execution")
+			return finishExecution(rootDir, execution)
+		}
+		approval, found, err := approvals.VerifyApproved(rootDir, options.ApprovalID, executionApprovalScope(plan, options.Mode))
+		execution.ApprovalID = options.ApprovalID
+		if err != nil {
+			execution.Reasons = append(execution.Reasons, err.Error())
+			return finishExecution(rootDir, execution)
+		}
+		if !found {
+			execution.Reasons = append(execution.Reasons, "approval_not_found")
+			return finishExecution(rootDir, execution)
+		}
+		approvalID = approval.ID
+		execution.ApprovalID = approval.ID
 	}
 	if plan.Environment == "production" && isRealExecutionMode(options.Mode) {
 		execution.ManualBlock("production_real_execution_not_enabled")
@@ -436,6 +445,17 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 	case "local_shell":
 		if len(options.Commands) == 0 {
 			execution.Reasons = append(execution.Reasons, "commands_required")
+			return finishExecution(rootDir, execution)
+		}
+		if !allSafeShellCommands(options.Commands) {
+			steps, _, reasons := runLocalShell(ctx, rootDir, options.Commands)
+			execution.Steps = steps
+			execution.Reasons = append(execution.Reasons, reasons...)
+			execution.Status = "blocked"
+			execution.Decision = "DEPLOY_EXECUTION_BLOCKED"
+			return finishExecution(rootDir, execution)
+		}
+		if !consumeExecutionApproval(rootDir, plan, options.Mode, approvalID, &execution) {
 			return finishExecution(rootDir, execution)
 		}
 		steps, ok, reasons := runLocalShell(ctx, rootDir, options.Commands)
@@ -474,6 +494,9 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 		case !execution.RemoteExecEnabled:
 			execution.Decision = "DEPLOY_EXECUTION_BLOCKED"
 		case ok:
+			if !consumeExecutionApproval(rootDir, plan, options.Mode, approvalID, &execution) {
+				return finishExecution(rootDir, execution)
+			}
 			runSteps, runOK, runReasons := runSSHCommands(ctx, rootDir, plan, remotePlan, options.Commands)
 			execution.Steps = append(execution.Steps, runSteps...)
 			execution.Reasons = append(execution.Reasons, runReasons...)
@@ -507,6 +530,57 @@ func Execute(ctx context.Context, rootDir string, options ExecuteOptions) (Execu
 		execution.Reasons = append(execution.Reasons, "execution_mode_not_allowed:"+options.Mode)
 	}
 	return finishExecution(rootDir, execution)
+}
+
+func requestExecutionApproval(rootDir string, plan Plan, mode string) (approvals.Record, error) {
+	return approvals.Request(rootDir, approvals.RequestOptions{
+		TargetType:  "deployment_execution",
+		TargetID:    plan.ID,
+		Action:      "deploy.execute." + mode,
+		RiskLevel:   riskForExecution(plan.Environment),
+		RequestedBy: "system",
+		Reason:      "non dry-run deployment execution requires approval",
+		Metadata: map[string]any{
+			"deployment_id": plan.ID,
+			"release_id":    plan.ReleaseID,
+			"environment":   plan.Environment,
+			"mode":          mode,
+		},
+	})
+}
+
+func executionApprovalScope(plan Plan, mode string) approvals.RequestOptions {
+	return approvals.RequestOptions{
+		TargetType: "deployment_execution",
+		TargetID:   plan.ID,
+		Action:     "deploy.execute." + mode,
+	}
+}
+
+func consumeExecutionApproval(rootDir string, plan Plan, mode string, approvalID string, execution *Execution) bool {
+	consumed, found, err := approvals.ConsumeApproved(rootDir, approvalID, approvals.ConsumeOptions{
+		TargetType: "deployment_execution",
+		TargetID:   plan.ID,
+		Action:     "deploy.execute." + mode,
+		ConsumedBy: "deployment-executor",
+		Reason:     "deployment execution " + mode,
+	})
+	if err != nil {
+		execution.Status = "blocked"
+		execution.Decision = "DEPLOY_EXECUTION_BLOCKED"
+		execution.Reasons = append(execution.Reasons, err.Error())
+		return false
+	}
+	if !found {
+		execution.Status = "blocked"
+		execution.Decision = "DEPLOY_EXECUTION_BLOCKED"
+		execution.Reasons = append(execution.Reasons, "approval_not_found")
+		return false
+	}
+	execution.ApprovalID = consumed.ID
+	execution.ApprovalConsumed = true
+	execution.Reasons = append(execution.Reasons, "approval_consumed_before_deployment_execution")
+	return true
 }
 
 func LoadExecution(rootDir string, id string) (Execution, bool, error) {
@@ -1753,6 +1827,15 @@ func isSafeShellCommand(command string) bool {
 		}
 	}
 	return false
+}
+
+func allSafeShellCommands(commands []string) bool {
+	for _, command := range commands {
+		if !isSafeShellCommand(command) {
+			return false
+		}
+	}
+	return true
 }
 
 func isSafeSSHCommand(command string) bool {

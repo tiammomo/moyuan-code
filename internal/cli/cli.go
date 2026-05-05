@@ -222,7 +222,7 @@ func usage() string {
 		"moyuan resources retire <resource-id>",
 		"moyuan resources health scan [--environment test_dev] [--resource <resource-id>] [--approved]",
 		"moyuan deploy plan <release-id> --environment test_dev [--resource <resource-id>]",
-		"moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell] [--approved] [--command <safe-command>]",
+		"moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell] [--approved] [--approval-id <approval-id>] [--command <safe-command>]",
 		"moyuan deploy show <deployment-id>",
 		"moyuan deploy execution <execution-id>",
 		"moyuan evidence list [--parent-type <type>] [--parent-id <id>] [--limit 20]",
@@ -1523,6 +1523,7 @@ func handleDeploy(ctx context.Context, args []string, cwd string) (string, any, 
 			DeploymentID: args[1],
 			Mode:         flagValue(args, "--mode", "dry_run"),
 			Approved:     hasFlag(args, "--approved"),
+			ApprovalID:   flagValue(args, "--approval-id", ""),
 			Commands:     flagValues(args, "--command"),
 		})
 		code := 0

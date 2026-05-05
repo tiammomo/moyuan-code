@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"moyuan-code/internal/approvals"
 )
 
 func TestPhase1E2ESmokeCoversLocalAndRemoteProjectLifecycle(t *testing.T) {
@@ -605,9 +607,20 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	dryRunExecutionID := decodeStringField(t, deployDryRun.stdout, "id")
 	assertFileExists(t, root, ".moyuan/lifecycle/deployments/executions/"+dryRunExecutionID+".json")
 
-	deployExecution := runCLI(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--approved", "--command", "printf deployment-ok")
+	deployApprovalRequired := runCLIAllowFailure(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--command", "printf deployment-ok")
+	if deployApprovalRequired.code == 0 {
+		t.Fatalf("expected deployment execution to require approval: %s", deployApprovalRequired.stdout)
+	}
+	assertContains(t, deployApprovalRequired.stdout, `"execution_approval_required"`)
+	deployApprovalID := decodeStringField(t, deployApprovalRequired.stdout, "approval_id")
+	if _, _, err := approvals.Decide(root, deployApprovalID, approvals.DecisionOptions{Decision: "approved", DecidedBy: "reviewer", Reason: "deployment ready"}); err != nil {
+		t.Fatal(err)
+	}
+
+	deployExecution := runCLI(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--approved", "--approval-id", deployApprovalID, "--command", "printf deployment-ok")
 	assertContains(t, deployExecution.stdout, `"status": "completed"`)
 	assertContains(t, deployExecution.stdout, `"decision": "DEPLOY_EXECUTION_COMPLETED"`)
+	assertContains(t, deployExecution.stdout, `"approval_consumed": true`)
 	assertContains(t, deployExecution.stdout, `"deployment-ok"`)
 	executionID := decodeStringField(t, deployExecution.stdout, "id")
 	executionShown := runCLI(t, root, "deploy", "execution", executionID)
@@ -618,7 +631,8 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	assertFileContains(t, root, ".moyuan/lifecycle/deployments/executions.jsonl", executionID)
 	assertFileContains(t, root, ".moyuan/logs/release.jsonl", "deployment.execution.created")
 
-	unsafeExecution := runCLIAllowFailure(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--approved", "--command", "rm -rf /tmp/nope")
+	unsafeApprovalID := approveCLIDeploymentExecution(t, root, deploymentID, "local_shell")
+	unsafeExecution := runCLIAllowFailure(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--approved", "--approval-id", unsafeApprovalID, "--command", "rm -rf /tmp/nope")
 	if unsafeExecution.code == 0 {
 		t.Fatalf("expected unsafe deployment command to fail: %s", unsafeExecution.stdout)
 	}
@@ -747,6 +761,26 @@ func TestServerResourcesCLIRegistersListsAndValidatesProductionHosts(t *testing.
 	assertFileContains(t, root, ".moyuan/logs/audit.jsonl", "server_resource.added")
 	assertFileContains(t, root, ".moyuan/resources/maintenance.jsonl", "RESOURCE_RETIRED")
 	assertFileContains(t, root, ".moyuan/logs/audit.jsonl", "server_resource.renewed")
+}
+
+func approveCLIDeploymentExecution(t *testing.T, root string, deploymentID string, mode string) string {
+	t.Helper()
+	approval, err := approvals.Request(root, approvals.RequestOptions{
+		TargetType:  "deployment_execution",
+		TargetID:    deploymentID,
+		Action:      "deploy.execute." + mode,
+		RiskLevel:   "high",
+		RequestedBy: "test",
+		Reason:      "test deployment execution approval",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decided, found, err := approvals.Decide(root, approval.ID, approvals.DecisionOptions{Decision: "approved", DecidedBy: "reviewer", Reason: "test approved"})
+	if err != nil || !found {
+		t.Fatalf("expected deployment approval decision, found=%v err=%v", found, err)
+	}
+	return decided.ID
 }
 
 func TestQualityReviewHardeningFindingsDriveNeedsRework(t *testing.T) {

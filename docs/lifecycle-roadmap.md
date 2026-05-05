@@ -266,7 +266,7 @@ moyuan release suggest [--version <version>] [--min-issues <n>]
 moyuan release provider preview <release-id>
 moyuan release provider publish <release-id> [--approved] [--approval-id <approval-id>]
 moyuan deploy plan <release-id> --environment <env> [--resource <resource-id>]
-moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell]
+moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell] [--approved] [--approval-id <approval-id>]
 moyuan evidence list [--parent-type <type>] [--parent-id <id>]
 moyuan bug list
 moyuan bug show <bug-id>

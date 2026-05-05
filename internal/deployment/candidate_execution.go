@@ -17,6 +17,7 @@ type CandidateExecuteOptions struct {
 	Environment  string   `json:"environment,omitempty"`
 	Mode         string   `json:"mode,omitempty"`
 	Approved     bool     `json:"approved,omitempty"`
+	ApprovalID   string   `json:"approval_id,omitempty"`
 	Commands     []string `json:"commands,omitempty"`
 }
 
@@ -28,6 +29,7 @@ func ExecuteFromCandidate(ctx context.Context, rootDir string, options Candidate
 	options.DeploymentID = strings.TrimSpace(options.DeploymentID)
 	options.Environment = normalizeToken(options.Environment)
 	options.Mode = normalizeToken(options.Mode)
+	options.ApprovalID = strings.TrimSpace(options.ApprovalID)
 	options.Commands = normalizeCommands(options.Commands)
 	if options.CandidateID == "" {
 		return Execution{}, errors.New("candidate_id_required")
@@ -71,6 +73,7 @@ func ExecuteFromCandidate(ctx context.Context, rootDir string, options Candidate
 		DeploymentID: deploymentID,
 		Mode:         options.Mode,
 		Approved:     options.Approved,
+		ApprovalID:   options.ApprovalID,
 		Commands:     options.Commands,
 	})
 }
