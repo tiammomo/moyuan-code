@@ -569,9 +569,9 @@ Phase 1 的执行结果：
 
 ## 10. 当前阶段状态
 
-Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力、Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力、Phase 6 approval consumption/adapter telemetry/Console schema forms 能力、Phase 7 受控真实外部执行准备、Phase 8 受控外部执行 Beta 和 Phase 9 生产运维控制面增强已完成。
+Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力、Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力、Phase 6 approval consumption/adapter telemetry/Console schema forms 能力、Phase 7 受控真实外部执行准备、Phase 8 受控外部执行 Beta、Phase 9 生产运维控制面增强和 Phase 10 控制面自动化闭环增强已完成。
 
-当前进入 Phase 10，执行入口见 [Phase 10 实现 Issue Graph](./phases/phase10-issue-graph.md) 和 [Phase 10 实施记录](./phases/phase10-next-development-plan.md)。Phase 10 先推进 background control loop scheduler、operation repair candidate review flow、release provider branch/tag/workflow preview、deployment check template policy 和 Console 操作面增强。Phase 9 收口验证见 [Phase 9 Release Readiness](./phases/phase9-release-readiness.md)。
+当前进入 Phase 11，执行入口见 [Phase 11 实现 Issue Graph](./phases/phase11-issue-graph.md) 和 [Phase 11 实施记录](./phases/phase11-next-development-plan.md)。Phase 11 先推进 Issue Graph batch dispatch preview、bounded issue batch run、parallel worktree isolation、quality/review merge queue 和 Console batch execution surface。Phase 10 收口验证见 [Phase 10 Release Readiness](./phases/phase10-release-readiness.md)。
 
 Phase 1 第一批实现模块：
 
