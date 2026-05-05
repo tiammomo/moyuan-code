@@ -562,6 +562,96 @@ func TestBuildWriteAdmissionsEvaluatesWriteProofGates(t *testing.T) {
 	}
 }
 
+func TestRunRemoteExecutionRehearsalsValidatesRemotePlanWithoutWriting(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	releasePlan := release.Plan{ID: "release-remote-rehearsal", Status: "ready", Decision: "RELEASE_SUGGESTED", Version: "v0.6.0"}
+	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(root).ReleasesDir, releasePlan.ID+".json"), releasePlan); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "remote-rehearsal-host",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "devops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := deployment.CreatePlan(root, deployment.PlanOptions{ReleaseID: releasePlan.ID, Environment: "test_dev", ResourceIDs: []string{"remote-rehearsal-host"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	execution, err := deployment.Execute(context.Background(), root, deployment.ExecuteOptions{
+		DeploymentID: plan.ID,
+		Mode:         "ssh_preview",
+		Commands:     []string{"deploy api"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := RunRemoteExecutionRehearsals(root, RemoteExecutionRehearsalOptions{ExecutionID: execution.ID, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.RehearsalCount != 1 || report.Summary.CompletedCount != 1 {
+		t.Fatalf("expected completed remote rehearsal report, got %+v", report.Summary)
+	}
+	rehearsal := report.Rehearsals[0]
+	if rehearsal.Status != "completed" || rehearsal.Decision != "REMOTE_EXECUTION_REHEARSAL_READY" || rehearsal.Provider != "ssh" || rehearsal.SourceAdmissionID == "" {
+		t.Fatalf("unexpected remote rehearsal: %+v", rehearsal)
+	}
+	if len(rehearsal.TargetChecks) != 1 || rehearsal.TargetChecks[0].Status != "ready" {
+		t.Fatalf("expected ready target check, got %+v", rehearsal.TargetChecks)
+	}
+	if len(rehearsal.AuthRefChecks) != 1 || rehearsal.AuthRefChecks[0].Status != "ready" {
+		t.Fatalf("expected ready auth ref check, got %+v", rehearsal.AuthRefChecks)
+	}
+	if len(rehearsal.CommandChecks) != 1 || !rehearsal.CommandChecks[0].PreviewOnly || !rehearsal.CommandChecks[0].NoRemoteWrite {
+		t.Fatalf("expected preview-only command check, got %+v", rehearsal.CommandChecks)
+	}
+	loaded, found, err := LoadRemoteExecutionRehearsal(root, rehearsal.ID)
+	if err != nil || !found || loaded.ID != rehearsal.ID {
+		t.Fatalf("expected persisted remote rehearsal, found=%v err=%v loaded=%+v", found, err, loaded)
+	}
+	listed, err := ListRemoteExecutionRehearsals(root, RemoteExecutionRehearsalOptions{Provider: "ssh", Limit: 5})
+	if err != nil || len(listed.Rehearsals) != 1 || listed.Rehearsals[0].ID != rehearsal.ID {
+		t.Fatalf("expected listed remote rehearsal, got %+v err=%v", listed, err)
+	}
+	timeline, err := Timeline(root, TimelineOptions{Type: "remote_execution_rehearsal", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !timelineContainsID(timeline, rehearsal.ID) {
+		t.Fatalf("expected remote rehearsal in timeline, got %+v", timeline)
+	}
+}
+
+func TestRunRemoteExecutionRehearsalsBlocksMissingRemoteTargets(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	execution, err := deployment.Execute(context.Background(), root, deployment.ExecuteOptions{DeploymentID: "missing-deployment", Mode: "dry_run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := RunRemoteExecutionRehearsals(root, RemoteExecutionRehearsalOptions{ExecutionID: execution.ID, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.RehearsalCount != 1 || report.Summary.BlockedCount != 1 {
+		t.Fatalf("expected blocked remote rehearsal report, got %+v", report.Summary)
+	}
+	if report.Rehearsals[0].Decision != "REMOTE_EXECUTION_REHEARSAL_TARGET_MISSING" && report.Rehearsals[0].Decision != "REMOTE_EXECUTION_REHEARSAL_REMOTE_PLAN_MISSING" {
+		t.Fatalf("expected missing target or plan block, got %+v", report.Rehearsals[0])
+	}
+}
+
 func timelineContainsType(items []TimelineItem, typ string) bool {
 	for _, item := range items {
 		if item.Type == typ {

@@ -313,6 +313,42 @@ func Timeline(rootDir string, options TimelineOptions) ([]TimelineItem, error) {
 		})
 	}
 
+	remoteRehearsalReport, err := ListRemoteExecutionRehearsals(rootDir, RemoteExecutionRehearsalOptions{Limit: sourceLimit})
+	if err != nil {
+		return nil, err
+	}
+	for _, rehearsal := range remoteRehearsalReport.Rehearsals {
+		refs, err := evidenceRefs(rootDir, "remote_execution_rehearsal", rehearsal.ID, rehearsal.EvidenceRefs)
+		if err != nil {
+			return nil, err
+		}
+		add(TimelineItem{
+			ID:           rehearsal.ID,
+			Type:         "remote_execution_rehearsal",
+			Operation:    "operations.remote_execution.rehearsal",
+			Status:       rehearsal.Status,
+			Decision:     rehearsal.Decision,
+			Reasons:      append([]string{}, rehearsal.Reasons...),
+			PrimaryRef:   rehearsal.OperationID,
+			SecondaryRef: rehearsal.ProviderRequirementID,
+			Environment:  rehearsal.Environment,
+			EvidenceRefs: refs,
+			Timestamp:    firstNonEmpty(rehearsal.FinishedAt, rehearsal.CreatedAt),
+			Metadata: map[string]any{
+				"provider":                    rehearsal.Provider,
+				"mode":                        rehearsal.Mode,
+				"source_admission_id":         rehearsal.SourceAdmissionID,
+				"provider_requirement_id":     rehearsal.ProviderRequirementID,
+				"target_check_count":          len(rehearsal.TargetChecks),
+				"command_check_count":         len(rehearsal.CommandChecks),
+				"auth_ref_check_count":        len(rehearsal.AuthRefChecks),
+				"rollback_required":           rehearsal.RollbackCheck.Required,
+				"rollback_decision":           rehearsal.RollbackCheck.Decision,
+				"remote_write_never_executed": true,
+			},
+		})
+	}
+
 	admissions, err := deployment.ListReleaseAdmissions(rootDir, sourceLimit)
 	if err != nil {
 		return nil, err

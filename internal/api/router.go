@@ -3208,6 +3208,72 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"provider_proof_requirements": report})
 	})
+	router.GET("/v1/projects/:project_id/operations/remote-execution-rehearsals", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		report, err := operations.ListRemoteExecutionRehearsals(rootDir, operations.RemoteExecutionRehearsalOptions{
+			AdmissionID: c.Query("admission_id"),
+			ExecutionID: c.Query("execution_id"),
+			Provider:    c.Query("provider"),
+			Environment: c.Query("environment"),
+			Status:      c.Query("status"),
+			Decision:    c.Query("decision"),
+			Limit:       queryLimit(c, 20),
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"remote_execution_rehearsals": report})
+	})
+	router.POST("/v1/projects/:project_id/operations/remote-execution-rehearsals", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req struct {
+			AdmissionID string `json:"admission_id"`
+			ExecutionID string `json:"execution_id"`
+			Provider    string `json:"provider"`
+			Environment string `json:"environment"`
+			Status      string `json:"status"`
+			Decision    string `json:"decision"`
+			Limit       int    `json:"limit"`
+		}
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		if req.Limit <= 0 {
+			req.Limit = 20
+		}
+		report, err := operations.RunRemoteExecutionRehearsals(rootDir, operations.RemoteExecutionRehearsalOptions{
+			AdmissionID: req.AdmissionID,
+			ExecutionID: req.ExecutionID,
+			Provider:    req.Provider,
+			Environment: req.Environment,
+			Status:      req.Status,
+			Decision:    req.Decision,
+			Limit:       req.Limit,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"remote_execution_rehearsals": report})
+	})
 	router.GET("/v1/projects/:project_id/operations/:operation_type/:operation_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

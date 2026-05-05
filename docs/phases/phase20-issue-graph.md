@@ -20,8 +20,8 @@ Phase 20 的目标是把 Phase 19 的 write proof、decision ledger、durable co
 | --- | --- | --- | --- | --- | --- | --- |
 | `phase20-001` | `write-proof-admission-policy` | completed | 将 write proof 转为 write admission report，输出 ready/blocked/manual/rehearsal 结论 | Phase 19 readiness | `security_owner` + `backend_owner` | 不执行写入，准入规则可解释、可测试、可审计 |
 | `phase20-002` | `provider-specific-proof-pack` | completed | 为 GitHub/Gitee/SSH/cloud 维护 provider-specific proof requirements | `phase20-001` | `release_owner` + `devops_owner` | 最小权限、secret ref、evidence 和 replay guard 按 provider 可配置 |
-| `phase20-003` | `remote-execution-rehearsal-runner` | next | 新增 remote execution rehearsal，验证目标、命令 allowlist、auth ref 和回滚准备 | `phase20-002` | `devops_owner` + `backend_owner` | rehearsal 不执行生产写入，失败有 evidence 和 handoff |
-| `phase20-004` | `control-runner-queue-window` | planned | durable control runner 增加任务队列、维护窗口、retry/handoff 和幂等调度 | `phase20-003` | `orchestrator_owner` + `devops_owner` | 长期任务不无限重试，不绕过维护窗口和审批 |
+| `phase20-003` | `remote-execution-rehearsal-runner` | completed | 新增 remote execution rehearsal，验证目标、命令 allowlist、auth ref 和回滚准备 | `phase20-002` | `devops_owner` + `backend_owner` | rehearsal 不执行生产写入，失败有 evidence 和 handoff |
+| `phase20-004` | `control-runner-queue-window` | next | durable control runner 增加任务队列、维护窗口、retry/handoff 和幂等调度 | `phase20-003` | `orchestrator_owner` + `devops_owner` | 长期任务不无限重试，不绕过维护窗口和审批 |
 | `phase20-005` | `console-proof-admission-drilldown` | planned | Console 展示单条 proof、admission、runner step 和导出入口 | `phase20-001`,`phase20-004` | `frontend_owner` | 前端只展示事实源，不重新决策 |
 | `phase20-006` | `phase20-readiness` | planned | 收口验证、文档回写、剩余风险和 Phase 21 入口 | `phase20-005` | `release_owner` + `security_owner` | 全量门禁通过，生产写入边界清晰 |
 

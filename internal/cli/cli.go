@@ -264,6 +264,8 @@ func usage() string {
 		"moyuan operations write-proofs [--provider <provider>] [--operation-type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
 		"moyuan operations write-admissions [--provider <provider>] [--operation-type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--target real_write] [--limit 20]",
 		"moyuan operations provider-proof-requirements [--provider <provider>] [--operation-type <type>] [--limit 20]",
+		"moyuan operations remote-execution-rehearsals run [--admission-id <id>] [--execution-id <id>] [--provider <provider>] [--environment <env>] [--limit 20]",
+		"moyuan operations remote-execution-rehearsals list [--execution-id <id>] [--provider <provider>] [--environment <env>] [--status <status>] [--decision <decision>] [--limit 20]",
 		"moyuan control-loop run [--step <type>] [--idempotency-key <key>] [--retry-budget 0] [--environment <env>] [--deployment-execution-id <id>]",
 		"moyuan control-loop list [--limit 20]",
 		"moyuan control-loop show <run-id>",
@@ -1952,6 +1954,31 @@ func handleOperations(args []string, cwd string) (string, any, int, error) {
 			Limit:         flagInt(args, "--limit", 20),
 		})
 		return "", map[string]any{"provider_proof_requirements": report}, 0, err
+	case "remote-execution-rehearsals":
+		action := "run"
+		subargs := args[1:]
+		if len(subargs) > 0 && !strings.HasPrefix(subargs[0], "--") {
+			action = subargs[0]
+			subargs = subargs[1:]
+		}
+		options := operations.RemoteExecutionRehearsalOptions{
+			AdmissionID: flagValue(subargs, "--admission-id", ""),
+			ExecutionID: flagValue(subargs, "--execution-id", ""),
+			Provider:    flagValue(subargs, "--provider", ""),
+			Environment: flagValue(subargs, "--environment", ""),
+			Status:      flagValue(subargs, "--status", ""),
+			Decision:    flagValue(subargs, "--decision", ""),
+			Limit:       flagInt(subargs, "--limit", 20),
+		}
+		if action == "list" {
+			report, err := operations.ListRemoteExecutionRehearsals(rootDir, options)
+			return "", map[string]any{"remote_execution_rehearsals": report}, 0, err
+		}
+		if action != "run" {
+			return "unknown operations remote-execution-rehearsals command\n", nil, 1, nil
+		}
+		report, err := operations.RunRemoteExecutionRehearsals(rootDir, options)
+		return "", map[string]any{"remote_execution_rehearsals": report}, 0, err
 	}
 	return "unknown operations command\n", nil, 1, nil
 }

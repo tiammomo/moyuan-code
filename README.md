@@ -20,7 +20,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - 前端控制台：Next.js 16，默认端口 `3000`。
 - 图像生成辅助脚本：Node.js，仅保留在 `scripts/`。
 - Phase 1 已实现最小 CLI 骨架：workspace、auth、logging、git、project comprehension、issue graph、runtime adapter、orchestrator、scheduler、memory、repair、quality gate。
-- Beta 到 Phase 20 已推进控制面 API、Issue Graph、批量并发执行、Provider Registry、runtime routing、Git Provider、release candidate、deployment execution、rollback execution、monitor summary、deployment rehearsal、release admission、deployment risk handoff、operations timeline、maintenance policy、post-deployment verification、server resource lifecycle、Console operations dashboard、operations audit export、decision ledger、durable control runner、provider write proof contract、Console observability drill-down、write admission policy 和 provider-specific proof pack。
+- Beta 到 Phase 20 已推进控制面 API、Issue Graph、批量并发执行、Provider Registry、runtime routing、Git Provider、release candidate、deployment execution、rollback execution、monitor summary、deployment rehearsal、release admission、deployment risk handoff、operations timeline、maintenance policy、post-deployment verification、server resource lifecycle、Console operations dashboard、operations audit export、decision ledger、durable control runner、provider write proof contract、Console observability drill-down、write admission policy、provider-specific proof pack 和 remote execution rehearsal runner。
 - Runtime 已捕获 before/after git snapshot、changed files、diff summary，并能阻断脏工作区和保护路径变更。
 - Claude CLI / Codex CLI 已具备 prompt file、cwd、env allowlist、provider env profile、stdout/stderr、result contract 和失败分类的最小调用契约。
 - Orchestrator 已持久化 issue/run 状态机，并支持查询 accepted、needs_rework、runtime 和 quality 状态。
@@ -30,7 +30,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - Repair 已具备受控 attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
 - Batch Execution 已具备 dry-run plan、受控 run、隔离 worktree、质量复核、合入队列和 Console 操作面。
 - Release/Deployment 已具备 release candidate、provider preview/publish gate、PR/MR plan、deployment execution、approval proof、rollback preview、monitor summary、deployment rehearsal、release admission 和风险修复 handoff。
-- 当前实现重点：Phase 20，write admission policy 和 provider-specific proof pack 已完成，下一步进入 remote execution rehearsal runner。
+- 当前实现重点：Phase 20，write admission policy、provider-specific proof pack 和 remote execution rehearsal runner 已完成，下一步进入 control runner queue/window。
 
 ## 本地运行
 

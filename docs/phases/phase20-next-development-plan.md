@@ -24,8 +24,8 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 | --- | --- | --- | --- | --- | --- |
 | P0 | `phase20-001` | `write-proof-admission-policy` | completed | 写入准入报告 | proof -> admission 可解释且不执行写入 |
 | P0 | `phase20-002` | `provider-specific-proof-pack` | completed | provider 最小权限要求 | GitHub/Gitee/SSH/cloud 要求可配置 |
-| P1 | `phase20-003` | `remote-execution-rehearsal-runner` | next | 远程执行演练 | rehearsal 不执行生产变更 |
-| P1 | `phase20-004` | `control-runner-queue-window` | planned | 长期任务队列与窗口 | 维护窗口、retry、handoff 可审计 |
+| P1 | `phase20-003` | `remote-execution-rehearsal-runner` | completed | 远程执行演练 | rehearsal 不执行生产变更 |
+| P1 | `phase20-004` | `control-runner-queue-window` | next | 长期任务队列与窗口 | 维护窗口、retry、handoff 可审计 |
 | P1 | `phase20-005` | `console-proof-admission-drilldown` | planned | Console 单条钻取 | 展示 proof/admission/runner step |
 | P2 | `phase20-006` | `phase20-readiness` | planned | Phase 20 收口 | 全量门禁和生产边界完成 |
 
@@ -87,7 +87,7 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 
 ## 5. 执行规划：`phase20-003 remote-execution-rehearsal-runner`
 
-实现状态：next。
+实现状态：completed。
 
 范围：
 
@@ -101,7 +101,31 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 - blocked/manual/ready rehearsal 都有 reasons、rule refs、evidence refs 和 source admission。
 - API、CLI 和单测覆盖 dry-run、缺 provider requirement、缺 auth ref 和生产边界。
 
-## 6. 验证要求
+完成记录：
+
+- `internal/operations` 新增 remote execution rehearsal runner，读取 deployment write admission 并验证 remote target、auth ref、command allowlist、rollback readiness。
+- 每次 run 都持久化 `.moyuan/lifecycle/deployments/remote-execution-rehearsals/*.json`，追加 JSONL，写入 evidence，并进入 operations timeline。
+- API 增加 `POST/GET /v1/projects/:project_id/operations/remote-execution-rehearsals`。
+- CLI 增加 `moyuan operations remote-execution-rehearsals run|list ...`。
+- 单测覆盖 ssh preview 演练通过、missing target/remote plan 阻断、API、CLI 和 timeline 聚合。
+
+## 6. 执行规划：`phase20-004 control-runner-queue-window`
+
+实现状态：next。
+
+范围：
+
+- Durable control runner 增加轻量任务队列和维护窗口校验。
+- 队列任务需要记录 trigger、step、environment、requested_by、window、attempt、status、decision 和 handoff reason。
+- Runner 执行前必须判断维护窗口、retry budget、idempotency key 和 write/rehearsal admission 相关事实。
+
+验收：
+
+- 可创建/list control runner queue item，并能执行 due item。
+- 不在维护窗口内的任务必须进入 waiting 或 manual handoff，不能直接执行。
+- API、CLI 和单测覆盖队列、窗口、retry/handoff 和幂等 replay。
+
+## 7. 验证要求
 
 每完成一个 Phase 20 issue，至少运行：
 
