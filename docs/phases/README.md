@@ -4,6 +4,9 @@
 
 ## 当前阶段
 
+- [Phase 24 实现 Issue Graph](./phase24-issue-graph.md)：Phase 24 Server Resource Registry Apply Receipt 的依赖图。
+- [Phase 24 实施记录](./phase24-next-development-plan.md)：Phase 24 当前任务、执行范围和验收记录。
+- [Phase 24 Release Readiness](./phase24-release-readiness.md)：Phase 24 Server Resource Registry Apply Receipt 的收口验证。
 - [Phase 23 实现 Issue Graph](./phase23-issue-graph.md)：Phase 23 Write Adapter Dispatch Scaffold 的依赖图。
 - [Phase 23 实施记录](./phase23-next-development-plan.md)：Phase 23 当前任务、执行范围和验收记录。
 - [Phase 23 Release Readiness](./phase23-release-readiness.md)：Phase 23 Write Adapter Dispatch Scaffold 的收口验证。

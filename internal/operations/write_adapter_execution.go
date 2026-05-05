@@ -253,8 +253,17 @@ func writeAdapterExecutionFromPlan(rootDir string, options WriteAdapterExecution
 			block("WRITE_ADAPTER_SWITCH_DISABLED", "write_adapter_switch_disabled", "write_adapter_requires_explicit_switch")
 		}
 		if execution.Status == "completed" {
-			addGuard("adapter_implementation", "manual_required", "WRITE_ADAPTER_IMPLEMENTATION_REQUIRED", execution.AdapterID)
-			manual("WRITE_ADAPTER_IMPLEMENTATION_REQUIRED", "real_write_adapter_not_implemented:"+execution.AdapterID, "real_adapter_implementation_required")
+			if execution.AdapterID == "server_resource_registry_adapter" {
+				addGuard("resource_registry_receipt", "ready", "WRITE_ADAPTER_RESOURCE_REGISTRY_RECEIPT_READY", "local_registry_receipt")
+				execution.ApplyAllowed = true
+				execution.Decision = "WRITE_ADAPTER_RESOURCE_REGISTRY_APPLIED"
+				execution.Reasons = appendUnique(execution.Reasons, "server_resource_registry_apply_receipt_recorded")
+				execution.RuleRefs = appendUnique(execution.RuleRefs, "server_resource_registry_local_receipt_only")
+				execution.Metadata["adapter_mutation_scope"] = "local_registry_receipt"
+			} else {
+				addGuard("adapter_implementation", "manual_required", "WRITE_ADAPTER_IMPLEMENTATION_REQUIRED", execution.AdapterID)
+				manual("WRITE_ADAPTER_IMPLEMENTATION_REQUIRED", "real_write_adapter_not_implemented:"+execution.AdapterID, "real_adapter_implementation_required")
+			}
 		}
 	}
 	execution.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)

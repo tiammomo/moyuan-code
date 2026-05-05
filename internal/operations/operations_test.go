@@ -834,12 +834,12 @@ func TestCreateWriteAdapterExecutionsDispatchesWithoutExternalWrite(t *testing.T
 		t.Fatal(err)
 	}
 	t.Setenv("MOYUAN_ENABLE_WRITE_ADAPTERS", "1")
-	manual, err := CreateWriteAdapterExecutions(root, WriteAdapterExecutionOptions{ExecutionPlanID: applyPlanReport.Plans[0].ID, Mode: "apply", Limit: 5})
+	applied, err := CreateWriteAdapterExecutions(root, WriteAdapterExecutionOptions{ExecutionPlanID: applyPlanReport.Plans[0].ID, Mode: "apply", Limit: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if manual.Executions[0].Status != "manual_required" || manual.Executions[0].Decision != "WRITE_ADAPTER_IMPLEMENTATION_REQUIRED" || manual.Executions[0].ExternalWriteAttempted || manual.Executions[0].ExternalWritePerformed {
-		t.Fatalf("expected apply adapter handoff without external write, got %+v", manual.Executions[0])
+	if applied.Executions[0].Status != "completed" || applied.Executions[0].Decision != "WRITE_ADAPTER_RESOURCE_REGISTRY_APPLIED" || !applied.Executions[0].ApplyAllowed || applied.Executions[0].ExternalWriteAttempted || applied.Executions[0].ExternalWritePerformed {
+		t.Fatalf("expected resource registry apply receipt without external write, got %+v", applied.Executions[0])
 	}
 }
 
