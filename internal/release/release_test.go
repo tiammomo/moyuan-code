@@ -12,8 +12,86 @@ import (
 	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
+	"moyuan-code/internal/review"
 	"moyuan-code/internal/workspace"
 )
+
+func TestPlanBatchSuggestsReleaseWhenIntegrationApplyThresholdMet(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	writeIntegrationPreviewForRelease(t, root, review.IntegrationPreview{
+		ID:           "integration-preview-release",
+		MergeQueueID: "merge-queue-release",
+		BatchID:      "batch-release",
+		EpicID:       "epic-release",
+		Status:       "ready",
+		Decision:     "INTEGRATION_PREVIEW_READY",
+		Items: []review.IntegrationPreviewItem{
+			{IssueID: "issue-1", Status: "ready", Decision: "INTEGRATION_ITEM_READY"},
+			{IssueID: "issue-2", Status: "ready", Decision: "INTEGRATION_ITEM_READY"},
+		},
+	})
+	writeIntegrationApplyForRelease(t, root, review.IntegrationApply{
+		ID:           "integration-apply-release",
+		PreviewID:    "integration-preview-release",
+		MergeQueueID: "merge-queue-release",
+		BatchID:      "batch-release",
+		EpicID:       "epic-release",
+		Status:       "applied",
+		Decision:     "INTEGRATION_APPLY_COMPLETED",
+		TargetBranch: "moyuan/integration/release",
+	})
+
+	plan, err := PlanBatch(root, BatchOptions{IntegrationApplyID: "integration-apply-release", Version: "v0.2.0", MinItems: 2, RequestedBy: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Decision != "RELEASE_BATCH_SUGGESTED" || plan.ReadyItemCount != 2 || plan.SourceBranch != "moyuan/integration/release" {
+		t.Fatalf("expected suggested release batch, got %+v", plan)
+	}
+	loaded, found, err := LoadBatchPlan(root, plan.ID)
+	if err != nil || !found || loaded.ID != plan.ID {
+		t.Fatalf("expected persisted release batch, found=%v loaded=%+v err=%v", found, loaded, err)
+	}
+	plans, err := ListBatchPlans(root, "integration-apply-release", 10)
+	if err != nil || len(plans) != 1 || plans[0].ID != plan.ID {
+		t.Fatalf("expected listed release batch, plans=%+v err=%v", plans, err)
+	}
+}
+
+func TestPlanBatchWaitsWhenIntegrationApplyBelowThreshold(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	writeIntegrationPreviewForRelease(t, root, review.IntegrationPreview{
+		ID:           "integration-preview-small",
+		MergeQueueID: "merge-queue-small",
+		Status:       "ready",
+		Decision:     "INTEGRATION_PREVIEW_READY",
+		Items: []review.IntegrationPreviewItem{
+			{IssueID: "issue-1", Status: "ready", Decision: "INTEGRATION_ITEM_READY"},
+		},
+	})
+	writeIntegrationApplyForRelease(t, root, review.IntegrationApply{
+		ID:           "integration-apply-small",
+		PreviewID:    "integration-preview-small",
+		MergeQueueID: "merge-queue-small",
+		Status:       "applied",
+		Decision:     "INTEGRATION_APPLY_COMPLETED",
+		TargetBranch: "moyuan/integration/small",
+	})
+
+	plan, err := PlanBatch(root, BatchOptions{IntegrationApplyID: "integration-apply-small", Version: "v0.2.1", MinItems: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Decision != "RELEASE_BATCH_NOT_READY" || plan.ReadyItemCount != 1 {
+		t.Fatalf("expected not ready release batch, got %+v", plan)
+	}
+}
 
 func TestProviderPreviewAndPublishApprovalFlow(t *testing.T) {
 	root := t.TempDir()
@@ -356,6 +434,20 @@ secrets:
       - release.provider.publish
 `)+"\n")
 	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeIntegrationPreviewForRelease(t *testing.T, root string, preview review.IntegrationPreview) {
+	t.Helper()
+	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(root).MergeReportsDir, "integration-previews", preview.ID+".json"), preview); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeIntegrationApplyForRelease(t *testing.T, root string, apply review.IntegrationApply) {
+	t.Helper()
+	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(root).MergeReportsDir, "integration-applies", apply.ID+".json"), apply); err != nil {
 		t.Fatal(err)
 	}
 }

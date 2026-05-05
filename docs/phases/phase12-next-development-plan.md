@@ -23,7 +23,7 @@ Phase 11 已完成并通过 readiness：
 | P0 | `phase12-001` | `parallel-batch-worker-executor` | completed | 真实受控并发执行 | batch run 可按安全并发度执行多个 issue，并记录 worker slot 和 fail-fast |
 | P0 | `phase12-002` | `integration-merge-preview` | completed | 集成合入预览 | ready merge queue 可生成 merge dry-run 和冲突报告 |
 | P1 | `phase12-003` | `controlled-merge-apply` | completed | 受控真实合入 | 审批和开关满足后可合入 integration branch |
-| P1 | `phase12-004` | `release-batch-readiness` | planned | 发版批次建议 | 根据合入量、风险和版本策略生成 release batch plan |
+| P1 | `phase12-004` | `release-batch-readiness` | completed | 发版批次建议 | 根据合入量、风险和版本策略生成 release batch plan |
 | P2 | `phase12-005` | `console-parallel-merge-surface` | planned | Console 并发与合入面 | Console 可见 worker slot、merge preview 和 release batch readiness |
 
 ## 3. 执行规划：`phase12-001 parallel-batch-worker-executor`
@@ -126,7 +126,38 @@ Phase 11 已完成并通过 readiness：
 - API 新增 `POST /v1/projects/:project_id/integration-previews/:preview_id/apply`、`GET /v1/projects/:project_id/integration-applies`、`GET /v1/projects/:project_id/integration-applies/:apply_id`。
 - integration apply 是本地 Git ref 层的受控动作，远程发布仍留给后续 release/provider 流水线。
 
-## 6. 验证要求
+## 6. 执行规划：`phase12-004 release-batch-readiness`
+
+实现状态：completed。
+
+范围：
+
+- 新增 release batch plan 事实源，基于 completed integration apply 生成。
+- 根据 ready integration items 数量和 `min_items` 阈值判断 `suggested` 或 `not_ready`。
+- 记录 source integration branch、release branch、version、commands 和 readiness reason。
+- release batch 写入 `.moyuan/lifecycle/releases/batches/` 和 `release-batches.jsonl`。
+- API 支持生成、列表和详情查询 release batch。
+
+非目标：
+
+- 不创建 release branch。
+- 不 tag、不 push、不 PR/MR、不 publish。
+- 不替代已有 release provider preview/publish 流程。
+
+验收：
+
+- completed integration apply + ready item count 达标时生成 `RELEASE_BATCH_SUGGESTED`。
+- ready item count 未达标时生成 `RELEASE_BATCH_NOT_READY`。
+- integration apply 未完成时 blocked。
+- 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- 新增 `release.PlanBatch`、`LoadBatchPlan`、`ListBatchPlans`。
+- API 新增 `POST /v1/projects/:project_id/integration-applies/:apply_id/release-batch`、`GET /v1/projects/:project_id/release-batches`、`GET /v1/projects/:project_id/release-batches/:batch_id`。
+- release batch 仍是建议层，不执行 Git 或远程发布写入。
+
+## 7. 验证要求
 
 每完成一个 Phase 12 issue，至少运行：
 
