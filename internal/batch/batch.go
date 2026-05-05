@@ -1,8 +1,11 @@
 package batch
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -11,6 +14,7 @@ import (
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
+	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/providers"
 	"moyuan-code/internal/scheduler"
 	"moyuan-code/internal/textutil"
@@ -22,6 +26,16 @@ type PlanOptions struct {
 	Mode        string `json:"mode,omitempty"`
 	MaxParallel int    `json:"max_parallel,omitempty"`
 	RequestedBy string `json:"requested_by,omitempty"`
+}
+
+type RunOptions struct {
+	BatchID           string `json:"batch_id"`
+	Mode              string `json:"mode,omitempty"`
+	Approved          bool   `json:"approved,omitempty"`
+	MaxIssues         int    `json:"max_issues,omitempty"`
+	RequestedBy       string `json:"requested_by,omitempty"`
+	Prompt            string `json:"prompt,omitempty"`
+	ContinueOnFailure bool   `json:"continue_on_failure,omitempty"`
 }
 
 type Plan struct {
@@ -40,6 +54,38 @@ type Plan struct {
 	Reasons                 []string    `json:"reasons"`
 	Items                   []IssueItem `json:"items"`
 	CreatedAt               string      `json:"created_at"`
+}
+
+type RunRecord struct {
+	ID                string    `json:"id"`
+	BatchID           string    `json:"batch_id"`
+	EpicID            string    `json:"epic_id,omitempty"`
+	Mode              string    `json:"mode"`
+	Status            string    `json:"status"`
+	Decision          string    `json:"decision"`
+	RequestedBy       string    `json:"requested_by,omitempty"`
+	Approved          bool      `json:"approved"`
+	MaxIssues         int       `json:"max_issues"`
+	ContinueOnFailure bool      `json:"continue_on_failure"`
+	Items             []RunItem `json:"items"`
+	Reasons           []string  `json:"reasons"`
+	StartedAt         string    `json:"started_at"`
+	FinishedAt        string    `json:"finished_at,omitempty"`
+}
+
+type RunItem struct {
+	IssueID         string `json:"issue_id"`
+	Status          string `json:"status"`
+	Decision        string `json:"decision"`
+	Reason          string `json:"reason,omitempty"`
+	RuntimeID       string `json:"runtime_id,omitempty"`
+	ProviderID      string `json:"provider_id,omitempty"`
+	ModelID         string `json:"model_id,omitempty"`
+	RunID           string `json:"run_id,omitempty"`
+	SubagentID      string `json:"subagent_id,omitempty"`
+	QualityReportID string `json:"quality_report_id,omitempty"`
+	StartedAt       string `json:"started_at,omitempty"`
+	FinishedAt      string `json:"finished_at,omitempty"`
 }
 
 type IssueItem struct {
@@ -150,6 +196,84 @@ func CreatePlan(rootDir string, options PlanOptions) (Plan, error) {
 	return finish(rootDir, plan)
 }
 
+func Run(ctx context.Context, rootDir string, options RunOptions) (RunRecord, error) {
+	if err := workspace.EnsureDirs(workspace.ForRoot(rootDir)); err != nil {
+		return RunRecord{}, err
+	}
+	options = normalizeRunOptions(options)
+	if options.BatchID == "" {
+		return RunRecord{}, errors.New("batch_id_required")
+	}
+	start := time.Now().UTC()
+	run := RunRecord{
+		ID:                "batch-run-" + textutil.Slugify(options.BatchID) + "-" + start.Format("20060102150405") + "-" + fmt.Sprintf("%09d", start.Nanosecond()),
+		BatchID:           options.BatchID,
+		Mode:              options.Mode,
+		Status:            "blocked",
+		Decision:          "BATCH_RUN_BLOCKED",
+		RequestedBy:       options.RequestedBy,
+		Approved:          options.Approved,
+		MaxIssues:         options.MaxIssues,
+		ContinueOnFailure: options.ContinueOnFailure,
+		Items:             []RunItem{},
+		Reasons:           []string{},
+		StartedAt:         start.Format(time.RFC3339Nano),
+	}
+	plan, found, err := Load(rootDir, options.BatchID)
+	if err != nil {
+		return RunRecord{}, err
+	}
+	if !found {
+		run.Reasons = append(run.Reasons, "batch_plan_not_found")
+		return finishRun(rootDir, run)
+	}
+	run.EpicID = plan.EpicID
+	options.MaxIssues = effectiveMaxIssues(options, plan)
+	run.MaxIssues = options.MaxIssues
+	if plan.Status != "planned" || plan.Decision != "BATCH_PLAN_READY" {
+		run.Reasons = append(run.Reasons, "batch_plan_not_ready:"+plan.Decision)
+		return finishRun(rootDir, run)
+	}
+	if options.Mode == "local_shell" && options.MaxIssues > 1 {
+		options.MaxIssues = 1
+		run.MaxIssues = 1
+		run.Reasons = append(run.Reasons, "shared_worktree_serial_limit")
+	}
+	items := dispatchItems(plan, options.MaxIssues)
+	if len(items) == 0 {
+		run.Status = "empty"
+		run.Decision = "BATCH_RUN_EMPTY"
+		run.Reasons = append(run.Reasons, "no_dispatch_items")
+		return finishRun(rootDir, run)
+	}
+	switch options.Mode {
+	case "dry_run":
+		for _, item := range items {
+			run.Items = append(run.Items, dryRunItem(item))
+		}
+		run.Status = "completed"
+		run.Decision = "BATCH_RUN_DRY_RUN"
+		run.Reasons = append(run.Reasons, "no_runtime_executed")
+	case "local_shell":
+		if !options.Approved {
+			run.Reasons = append(run.Reasons, "batch_run_approval_required")
+			return finishRun(rootDir, run)
+		}
+		if !batchRunEnabled() {
+			run.Reasons = append(run.Reasons, "batch_run_not_enabled")
+			return finishRun(rootDir, run)
+		}
+		if !safeBatchPrompt(options.Prompt) {
+			run.Reasons = append(run.Reasons, "batch_prompt_not_allowed")
+			return finishRun(rootDir, run)
+		}
+		run = runLocalShellBatch(ctx, rootDir, run, items, options)
+	default:
+		run.Reasons = append(run.Reasons, "unsupported_batch_run_mode:"+options.Mode)
+	}
+	return finishRun(rootDir, run)
+}
+
 func Load(rootDir string, id string) (Plan, bool, error) {
 	if !validID(id) {
 		return Plan{}, false, nil
@@ -190,6 +314,46 @@ func List(rootDir string, epicID string, limit int) ([]Plan, error) {
 	return plans, nil
 }
 
+func LoadRun(rootDir string, id string) (RunRecord, bool, error) {
+	if !validID(id) {
+		return RunRecord{}, false, nil
+	}
+	var run RunRecord
+	found, err := fsutil.ReadJSON(filepath.Join(batchRunsDir(rootDir), id+".json"), &run)
+	return run, found, err
+}
+
+func ListRuns(rootDir string, batchID string, limit int) ([]RunRecord, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	lines, err := fsutil.TailLines(batchRunsJSONLPath(rootDir), limit*4)
+	if err != nil {
+		return nil, err
+	}
+	runs := []RunRecord{}
+	for _, line := range lines {
+		var run RunRecord
+		if err := json.Unmarshal([]byte(line), &run); err != nil {
+			return nil, err
+		}
+		if run.ID == "" {
+			continue
+		}
+		if batchID != "" && run.BatchID != batchID {
+			continue
+		}
+		runs = append(runs, run)
+	}
+	sort.SliceStable(runs, func(i, j int) bool {
+		return runs[i].StartedAt > runs[j].StartedAt
+	})
+	if len(runs) > limit {
+		return runs[:limit], nil
+	}
+	return runs, nil
+}
+
 func normalizeOptions(options PlanOptions) PlanOptions {
 	options.EpicID = strings.TrimSpace(options.EpicID)
 	options.Mode = strings.TrimSpace(strings.ToLower(options.Mode))
@@ -203,6 +367,34 @@ func normalizeOptions(options PlanOptions) PlanOptions {
 		options.RequestedBy = "system"
 	}
 	return options
+}
+
+func normalizeRunOptions(options RunOptions) RunOptions {
+	options.BatchID = strings.TrimSpace(options.BatchID)
+	options.Mode = strings.TrimSpace(strings.ToLower(options.Mode))
+	if options.Mode == "" {
+		options.Mode = "dry_run"
+	}
+	if options.MaxIssues <= 0 {
+		options.MaxIssues = 0
+	}
+	if options.RequestedBy == "" {
+		options.RequestedBy = "system"
+	}
+	return options
+}
+
+func effectiveMaxIssues(options RunOptions, plan Plan) int {
+	if options.MaxIssues > 0 {
+		return options.MaxIssues
+	}
+	if options.Mode == "dry_run" {
+		if plan.DispatchCount > 0 {
+			return plan.DispatchCount
+		}
+		return len(plan.Items)
+	}
+	return 1
 }
 
 func itemFromDecision(registry providers.Registry, decision scheduler.DispatchDecision) IssueItem {
@@ -238,6 +430,94 @@ func itemFromDecision(registry providers.Registry, decision scheduler.DispatchDe
 	return item
 }
 
+func dispatchItems(plan Plan, maxIssues int) []IssueItem {
+	items := []IssueItem{}
+	for _, item := range plan.Items {
+		if item.Decision != "dispatch" {
+			continue
+		}
+		items = append(items, item)
+		if maxIssues > 0 && len(items) >= maxIssues {
+			break
+		}
+	}
+	return items
+}
+
+func dryRunItem(item IssueItem) RunItem {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	return RunItem{
+		IssueID:    item.IssueID,
+		Status:     "dry_run",
+		Decision:   "BATCH_ITEM_DRY_RUN",
+		Reason:     "no_runtime_executed",
+		RuntimeID:  item.RuntimeID,
+		ProviderID: item.ProviderID,
+		ModelID:    item.ModelID,
+		StartedAt:  now,
+		FinishedAt: now,
+	}
+}
+
+func runLocalShellBatch(ctx context.Context, rootDir string, run RunRecord, items []IssueItem, options RunOptions) RunRecord {
+	run.Status = "completed"
+	run.Decision = "BATCH_RUN_COMPLETED"
+	for _, item := range items {
+		start := time.Now().UTC().Format(time.RFC3339Nano)
+		result, err := orchestrator.RunIssueWithOptions(ctx, rootDir, item.IssueID, orchestrator.RunOptions{
+			RuntimeID:  "local_shell",
+			ProviderID: item.ProviderID,
+			ModelID:    item.ModelID,
+			EpicID:     run.EpicID,
+			Role:       item.Role,
+			Prompt:     options.Prompt,
+		})
+		runItem := RunItem{
+			IssueID:    item.IssueID,
+			Status:     "failed",
+			Decision:   "BATCH_ITEM_FAILED",
+			RuntimeID:  "local_shell",
+			ProviderID: item.ProviderID,
+			ModelID:    item.ModelID,
+			StartedAt:  start,
+			FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		}
+		if err != nil {
+			runItem.Reason = err.Error()
+			run.Status = "failed"
+			run.Decision = "BATCH_RUN_FAILED"
+			run.Reasons = append(run.Reasons, "issue_failed:"+item.IssueID)
+			run.Items = append(run.Items, runItem)
+			if !options.ContinueOnFailure {
+				break
+			}
+			continue
+		}
+		runItem.RunID = result.RunID
+		runItem.SubagentID = result.SubagentID
+		runItem.QualityReportID = result.QualityReport.ID
+		if result.Status == "accepted" {
+			runItem.Status = "completed"
+			runItem.Decision = "BATCH_ITEM_ACCEPTED"
+		} else {
+			runItem.Status = "failed"
+			runItem.Decision = "BATCH_ITEM_NEEDS_REWORK"
+			runItem.Reason = result.Status
+			run.Status = "failed"
+			run.Decision = "BATCH_RUN_FAILED"
+			run.Reasons = append(run.Reasons, "issue_needs_rework:"+item.IssueID)
+		}
+		run.Items = append(run.Items, runItem)
+		if runItem.Status == "failed" && !options.ContinueOnFailure {
+			break
+		}
+	}
+	if run.Status == "completed" {
+		run.Reasons = append(run.Reasons, "batch_items_completed")
+	}
+	return run
+}
+
 func nodesByID(graph issues.Graph) map[string]issues.Node {
 	nodes := map[string]issues.Node{}
 	for _, node := range graph.Nodes {
@@ -268,12 +548,70 @@ func finish(rootDir string, plan Plan) (Plan, error) {
 	return plan, nil
 }
 
+func finishRun(rootDir string, run RunRecord) (RunRecord, error) {
+	run.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	if err := fsutil.EnsureDir(batchRunsDir(rootDir)); err != nil {
+		return RunRecord{}, err
+	}
+	if err := fsutil.WriteJSON(filepath.Join(batchRunsDir(rootDir), run.ID+".json"), run); err != nil {
+		return RunRecord{}, err
+	}
+	if err := fsutil.AppendJSONL(batchRunsJSONLPath(rootDir), run); err != nil {
+		return RunRecord{}, err
+	}
+	_ = logging.Log(rootDir, "run", "batch.run.created", map[string]any{
+		"batch_run_id": run.ID,
+		"batch_id":     run.BatchID,
+		"epic_id":      run.EpicID,
+		"decision":     run.Decision,
+		"status":       run.Status,
+		"items":        len(run.Items),
+	})
+	return run, nil
+}
+
 func batchesDir(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).OrchestratorDir, "batches")
 }
 
+func batchRunsDir(rootDir string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).OrchestratorDir, "batch-runs")
+}
+
 func batchesJSONLPath(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).OrchestratorDir, "batches.jsonl")
+}
+
+func batchRunsJSONLPath(rootDir string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).OrchestratorDir, "batch-runs.jsonl")
+}
+
+func batchRunEnabled() bool {
+	return os.Getenv("MOYUAN_ALLOW_BATCH_RUN") == "1"
+}
+
+func safeBatchPrompt(prompt string) bool {
+	prompt = strings.TrimSpace(prompt)
+	if strings.ContainsAny(prompt, "\n\r") {
+		return false
+	}
+	for _, token := range []string{";", "&&", "||", "`", "$(", ">", "<", "|"} {
+		if strings.Contains(prompt, token) {
+			return false
+		}
+	}
+	for _, prefix := range []string{"true", "echo ", "printf "} {
+		if strings.HasSuffix(prefix, " ") {
+			if strings.HasPrefix(prompt, prefix) {
+				return true
+			}
+			continue
+		}
+		if prompt == prefix {
+			return true
+		}
+	}
+	return false
 }
 
 func validID(id string) bool {

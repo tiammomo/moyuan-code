@@ -34,6 +34,7 @@ type RunOptions struct {
 	RuntimeID  string `json:"runtime_id"`
 	ProviderID string `json:"provider_id,omitempty"`
 	ModelID    string `json:"model_id,omitempty"`
+	EpicID     string `json:"epic_id,omitempty"`
 	Role       string `json:"role"`
 	Prompt     string `json:"prompt"`
 }
@@ -56,6 +57,9 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	if options.Role == "" {
 		options.Role = "backend"
 	}
+	if options.EpicID == "" {
+		options.EpicID = "phase1-epic"
+	}
 	if options.ProviderID == "" && options.RuntimeID != "local_shell" {
 		decision, err := providers.Route(rootDir, providers.RouteRequest{
 			Role:                  options.Role,
@@ -75,7 +79,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	if err != nil {
 		return Result{}, err
 	}
-	graph, _, _ := issues.LoadGraph(rootDir, "phase1-epic")
+	graph, _, _ := issues.LoadGraph(rootDir, options.EpicID)
 	_ = graph
 	run, err := runrecord.Create(rootDir, issueID, map[string]any{
 		"issue_id":     issueID,
@@ -107,7 +111,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	if err != nil {
 		return Result{}, err
 	}
-	if _, err := transitionIssue(rootDir, "phase1-epic", issueID, "running", "", run.ID, nil); err != nil {
+	if _, err := transitionIssue(rootDir, options.EpicID, issueID, "running", "", run.ID, nil); err != nil {
 		return Result{}, err
 	}
 	if _, err := transitionRun(rootDir, issueID, run.ID, "running", "", func(state *RunState) {
@@ -130,7 +134,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		ProtectedPaths: protectedPaths(rootDir),
 	})
 	if err != nil {
-		_, _ = transitionIssue(rootDir, "phase1-epic", issueID, "failed", "runtime_error", run.ID, nil)
+		_, _ = transitionIssue(rootDir, options.EpicID, issueID, "failed", "runtime_error", run.ID, nil)
 		_, _ = transitionRun(rootDir, issueID, run.ID, "failed", "runtime_error", nil)
 		_, _, _ = subagent.Finish(rootDir, instance.ID, "failed")
 		return Result{}, err
@@ -143,7 +147,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 	}); err != nil {
 		return Result{}, err
 	}
-	if _, err := transitionIssue(rootDir, "phase1-epic", issueID, "quality_checking", "", run.ID, nil); err != nil {
+	if _, err := transitionIssue(rootDir, options.EpicID, issueID, "quality_checking", "", run.ID, nil); err != nil {
 		return Result{}, err
 	}
 	report, err := quality.RunWithReview(ctx, rootDir, issueID, quality.ReviewInput{
@@ -153,7 +157,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		RuntimeRisks:    rt.Risks,
 	})
 	if err != nil {
-		_, _ = transitionIssue(rootDir, "phase1-epic", issueID, "failed", "quality_error", run.ID, nil)
+		_, _ = transitionIssue(rootDir, options.EpicID, issueID, "failed", "quality_error", run.ID, nil)
 		_, _ = transitionRun(rootDir, issueID, run.ID, "failed", "quality_error", nil)
 		_, _, _ = subagent.Finish(rootDir, instance.ID, "failed")
 		return Result{}, err
@@ -208,7 +212,7 @@ func RunIssueWithOptions(ctx context.Context, rootDir string, issueID string, op
 		}
 	}
 	_, _, _ = subagent.FinishWithOptions(rootDir, instance.ID, finishOptions)
-	issueState, err := transitionIssue(rootDir, "phase1-epic", issueID, status, statusReason(status, rt.Status, report.Status), run.ID, func(state *IssueState) {
+	issueState, err := transitionIssue(rootDir, options.EpicID, issueID, status, statusReason(status, rt.Status, report.Status), run.ID, func(state *IssueState) {
 		state.QualityReportID = report.ID
 	})
 	if err != nil {

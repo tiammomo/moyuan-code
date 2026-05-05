@@ -85,6 +85,15 @@ type batchPlanRequest struct {
 	RequestedBy string `json:"requested_by"`
 }
 
+type batchRunRequest struct {
+	Mode              string `json:"mode"`
+	Approved          bool   `json:"approved"`
+	MaxIssues         int    `json:"max_issues"`
+	RequestedBy       string `json:"requested_by"`
+	Prompt            string `json:"prompt"`
+	ContinueOnFailure bool   `json:"continue_on_failure"`
+}
+
 type operationRepairReviewRequest struct {
 	Decision   string `json:"decision"`
 	ReviewerID string `json:"reviewer_id"`
@@ -354,6 +363,85 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"batch_plan": plan})
+	})
+	router.POST("/v1/projects/:project_id/batches/:batch_id/run", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		if _, found, err := batch.Load(rootDir, c.Param("batch_id")); err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		} else if !found {
+			writeError(c, http.StatusNotFound, "batch plan not found")
+			return
+		}
+		var req batchRunRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		run, err := batch.Run(c.Request.Context(), rootDir, batch.RunOptions{
+			BatchID:           c.Param("batch_id"),
+			Mode:              req.Mode,
+			Approved:          req.Approved,
+			MaxIssues:         req.MaxIssues,
+			RequestedBy:       req.RequestedBy,
+			Prompt:            req.Prompt,
+			ContinueOnFailure: req.ContinueOnFailure,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusAccepted
+		if run.Status == "completed" {
+			status = http.StatusOK
+		}
+		c.JSON(status, gin.H{"batch_run": run})
+	})
+	router.GET("/v1/projects/:project_id/batch-runs", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		runs, err := batch.ListRuns(rootDir, c.Query("batch_id"), queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"batch_runs": runs})
+	})
+	router.GET("/v1/projects/:project_id/batch-runs/:run_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		run, found, err := batch.LoadRun(rootDir, c.Param("run_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "batch run not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"batch_run": run})
 	})
 	router.GET("/v1/projects/:project_id/runs", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
@@ -2559,6 +2647,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 	switch path {
 	case "/v1/projects/:project_id/epics/:epic_id/batches/plan":
 		return authzRule{Action: "batch.plan", Risk: "normal", Scopes: []string{"project:read"}}, true
+	case "/v1/projects/:project_id/batches/:batch_id/run":
+		return authzRule{Action: "batch.run", Risk: "high", Scopes: []string{"run:write"}}, true
 	case "/v1/projects/:project_id/providers/ops/refresh":
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case "/v1/projects/:project_id/control-loop/run":
@@ -2603,6 +2693,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 	switch {
 	case strings.Contains(rawPath, "/epics/") && strings.HasSuffix(rawPath, "/batches/plan"):
 		return authzRule{Action: "batch.plan", Risk: "normal", Scopes: []string{"project:read"}}, true
+	case strings.Contains(rawPath, "/batches/") && strings.HasSuffix(rawPath, "/run"):
+		return authzRule{Action: "batch.run", Risk: "high", Scopes: []string{"run:write"}}, true
 	case strings.Contains(rawPath, "/providers/ops/refresh"):
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case strings.Contains(rawPath, "/control-loop/run"):

@@ -13,6 +13,7 @@ import (
 
 	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/auth"
+	"moyuan-code/internal/batch"
 	"moyuan-code/internal/controlloop"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/evidence"
@@ -218,6 +219,17 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/epics/phase1-epic/schedule", http.StatusOK, `"schedule"`, `"ready_queue"`, `"blocked_reason"`, `"dispatch_queue"`)
 	assertPostContains(t, router, "/v1/projects/managed/epics/"+reqPlan.EpicID+"/batches/plan", `{"max_parallel":2,"requested_by":"api-test"}`, http.StatusCreated, `"batch_plan"`, `"BATCH_PLAN_READY"`, `"route_decision"`)
 	assertGETContains(t, router, "/v1/projects/managed/epics/"+reqPlan.EpicID+"/batches?limit=3", http.StatusOK, `"batch_plans"`, `"BATCH_PLAN_READY"`)
+	batchPlans, err := batch.List(root, reqPlan.EpicID, 1)
+	if err != nil || len(batchPlans) != 1 {
+		t.Fatalf("expected API batch plan, plans=%+v err=%v", batchPlans, err)
+	}
+	assertPostContains(t, router, "/v1/projects/managed/batches/"+batchPlans[0].ID+"/run", `{"mode":"dry_run","requested_by":"api-test"}`, http.StatusOK, `"batch_run"`, `"BATCH_RUN_DRY_RUN"`)
+	batchRuns, err := batch.ListRuns(root, batchPlans[0].ID, 1)
+	if err != nil || len(batchRuns) != 1 {
+		t.Fatalf("expected API batch run, runs=%+v err=%v", batchRuns, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/batch-runs?limit=3", http.StatusOK, `"batch_runs"`, `"BATCH_RUN_DRY_RUN"`)
+	assertGETContains(t, router, "/v1/projects/managed/batch-runs/"+batchRuns[0].ID, http.StatusOK, `"batch_run"`, batchPlans[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)
 	assertGETContains(t, router, "/v1/projects/managed/runs?limit=1", http.StatusOK, `"runs"`, result.RunID)
 	assertGETContains(t, router, "/v1/projects/managed/runs/"+result.RunID, http.StatusOK, `"run"`, `"completed"`)
