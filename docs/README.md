@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 1 本地 CLI MVP、Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力和 Phase 4 团队协作/审计/审批/生产维护能力已完成，进入 Phase 5 鉴权强制门禁、Secret resolver 和真实外部 adapter preview/dry-run。
+当前阶段：Phase 11 Issue Graph 批量执行控制器已完成并通过 readiness。下一步进入 Phase 12，聚焦真实并发 worker、受控集成合入和 release batching 准备。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
@@ -63,31 +63,10 @@
 
 ## 当前实施入口
 
-Phase 1 本地 CLI MVP、Beta 第一批控制面能力、Phase 2、Phase 3、Phase 4、Phase 5、Phase 6 和 Phase 7 第一批能力已完成主要闭环。当前验收和状态入口：
+Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 11 已完成主要闭环。当前验收和状态入口：
 
-- [Phase 8 实现 Issue Graph](./phases/phase8-issue-graph.md)：Phase 8 受控外部执行 Beta 的依赖图。
-- [Phase 8 实施记录](./phases/phase8-next-development-plan.md)：Phase 8 当前任务范围、验收标准和执行入口。
-- [Phase 7 Release Readiness](./phases/phase7-release-readiness.md)：Phase 7 受控真实外部执行准备的收口验证。
-- [Phase 7 实现 Issue Graph](./phases/phase7-issue-graph.md)：Phase 7 受控真实外部执行准备的依赖图。
-- [Phase 7 实施记录](./phases/phase7-next-development-plan.md)：Phase 7 当前任务范围、验收标准和执行入口。
-- [Phase 6 Release Readiness](./phases/phase6-release-readiness.md)：Phase 6 approval、adapter、telemetry 和 Console schema forms 的收口验证。
-- [Phase 6 实现 Issue Graph](./phases/phase6-issue-graph.md)：Phase 6 approval consumption、部署 adapter、CI/CD provider、Provider telemetry 和 Console schema forms 的完成记录。
-- [Phase 6 实施记录](./phases/phase6-next-development-plan.md)：Phase 6 任务范围、验收标准和完成记录。
-- [Phase 5 Release Readiness](./phases/phase5-release-readiness.md)：Phase 5 鉴权、Secret、PR/MR、部署检查和 Console 受控表单的收口验证。
-- [Phase 5 实现 Issue Graph](./phases/phase5-issue-graph.md)：Phase 5 鉴权强制门禁、Secret resolver、真实外部 adapter preview/dry-run 和 Console 表单的依赖图。
-- [Phase 5 实施记录](./phases/phase5-next-development-plan.md)：Phase 5 任务范围、验收标准和完成记录。
-- [Phase 4 Release Readiness](./phases/phase4-release-readiness.md)：Phase 4 团队协作、审计、审批、Git PR/MR plan 和服务器维护的验证命令、产物、边界和剩余风险。
-- [Phase 4 实现 Issue Graph](./phases/phase4-issue-graph.md)：Phase 4 团队协作、审计查询、审批记录、Git 协同和服务器维护的依赖图。
-- [Phase 4 实施记录](./phases/phase4-next-development-plan.md)：Phase 4 当前任务范围、验收标准和执行入口。
-- [Phase 3 Release Readiness](./phases/phase3-release-readiness.md)：Phase 3 第一批能力的验证命令、产物、边界和剩余风险。
-- [Phase 3 实现 Issue Graph](./phases/phase3-issue-graph.md)：Phase 3 配置可执行化、Console 操作流、Provider 探测和发布部署控制的依赖图。
-- [Phase 3 实施记录](./phases/phase3-next-development-plan.md)：Phase 3 已完成任务范围、验收标准和完成记录。
-- [Phase 2 Release Readiness](./phases/phase2-release-readiness.md)：Phase 2 第一批能力的验证命令、产物、边界和剩余风险。
-- [Phase 2 实现 Issue Graph](./phases/phase2-issue-graph.md)：Phase 2 已完成 issue graph 和依赖关系。
-- [Phase 2 实施记录](./phases/phase2-next-development-plan.md)：Phase 2 完成任务、验收标准和收口规则。
-- [Phase 1 Release Readiness](./phases/phase1-release-readiness.md)：本地 CLI MVP 的验证命令、产物、边界和剩余风险。
-- [Phase 1 实现 Issue Graph](./phases/phase1-issue-graph.md)：已完成骨架、依赖图和阶段边界。
-- [Phase 1 实施收口记录](./phases/phase1-next-development-plan.md)：完成任务、验收标准、并发策略和 git 同步规则。
-- [Beta 实现 Issue Graph](./phases/beta-issue-graph.md)：Beta 第一批 issue、依赖、并发顺序和当前执行入口。
-- [Beta 实施记录](./phases/beta-next-development-plan.md)：Beta 当前任务范围、验收标准和完成记录。
+- [Phase 11 Release Readiness](./phases/phase11-release-readiness.md)：Issue Graph 批量执行控制器的收口验证。
+- [Phase 11 实现 Issue Graph](./phases/phase11-issue-graph.md)：batch plan、batch run、worktree isolation、merge queue 和 Console 操作面的依赖图。
+- [Phase 11 实施记录](./phases/phase11-next-development-plan.md)：Phase 11 完成任务、验收标准和边界。
+- [Phase 规划与执行记录](./phases/README.md)：历史 Phase、release readiness 和执行记录总入口。
 - [设计就绪门禁](./design-readiness-checklist.md)：设计风险仍按 `READY_WITH_RISKS` 跟踪，不能绕过实现门禁。

@@ -1,6 +1,6 @@
 # Moyuan Code
 
-Moyuan Code 是面向代码开发全生命周期的多 Agent 编排框架。当前 `Phase 1` 本地 CLI MVP、Beta 控制面能力、Phase 2 多模型/Skills/Native Runtime/Subagent、Phase 3 Console 操作流、Phase 4 团队协作基线和 Phase 5 鉴权强制门禁/Secret resolver/真实 adapter preview/Console 受控表单已完成。
+Moyuan Code 是面向代码开发全生命周期的多 Agent 编排框架。当前已完成 Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 11 的主要闭环；最新收口为 Issue Graph 批量执行控制器，覆盖 batch plan、batch run、issue worktree isolation、merge queue 和 Console batch execution surface。
 
 核心设计入口见 [docs/README.md](./docs/README.md)。
 Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
@@ -20,7 +20,8 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - API/State Store 已建立 Gin router 和 GORM SQLite 基线，项目注册会同步 `.moyuan/state.db`。
 - Memory 已具备 record gate、staging、dedup、敏感信息阻断和 compact 自动摘要。
 - Repair 已具备受控 attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
-- 下一批实现重点：按 Phase 6 issue graph 推进 approval consumption、真实部署 adapter、CI/CD provider、Console 多页面化和 provider 成本/健康治理。
+- Batch Execution 已具备 dry-run plan、受控 run、隔离 worktree、质量复核合入队列和 Console 操作面。
+- 下一批实现重点：进入 Phase 12，推进真实并发 worker、受控集成分支合入、冲突返工回流和 release batching 准备。
 
 ## 本地运行
 

@@ -4,6 +4,7 @@
 
 ## 当前阶段
 
+- [Phase 11 Release Readiness](./phase11-release-readiness.md)：Phase 11 Issue Graph 批量执行控制器的收口验证。
 - [Phase 11 实现 Issue Graph](./phase11-issue-graph.md)：Phase 11 Issue Graph 批量执行控制器的依赖图。
 - [Phase 11 实施记录](./phase11-next-development-plan.md)：Phase 11 当前任务、执行范围和验收记录。
 - [Phase 10 Release Readiness](./phase10-release-readiness.md)：Phase 10 控制面自动化闭环增强的收口验证。
