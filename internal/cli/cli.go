@@ -182,6 +182,9 @@ func usage() string {
 		"moyuan memory compact",
 		"moyuan repair signal --type <type> --summary <text>",
 		"moyuan repair deployment-risk create [--admission-id <id>] [--monitor-summary-id <id>]",
+		"moyuan repair deployment-risk review <handoff-id> --decision approved|rejected|deferred [--reviewer-id <id>] [--reason <text>] [--next-step <step>]",
+		"moyuan repair deployment-risk queue [--status pending|reviewed|all]",
+		"moyuan repair deployment-risk reviews",
 		"moyuan repair deployment-risk <handoff-id>",
 		"moyuan repair deployment-risks",
 		"moyuan repair run <plan-id> [--runtime local_shell] [--prompt <command>]",
@@ -929,6 +932,32 @@ func handleRepair(args []string, cwd string) (string, any, int, error) {
 				code = 1
 			}
 			return "", handoff, code, err
+		}
+		if args[1] == "review" {
+			if len(args) < 3 {
+				return "missing deployment risk handoff id\n", nil, 1, nil
+			}
+			review, handoff, found, err := repair.ReviewDeploymentRiskHandoff(rootDir, args[2], repair.DeploymentRiskReviewOptions{
+				Decision:   flagValue(args, "--decision", ""),
+				ReviewerID: flagValue(args, "--reviewer-id", ""),
+				Reason:     flagValue(args, "--reason", ""),
+				NextStep:   flagValue(args, "--next-step", ""),
+			})
+			if err != nil {
+				return "", nil, 1, err
+			}
+			if !found {
+				return "", map[string]any{}, 1, nil
+			}
+			return "", map[string]any{"deployment_risk_review": review, "deployment_risk_handoff": handoff}, 0, nil
+		}
+		if args[1] == "queue" {
+			items, err := repair.ListDeploymentRiskReviewQueue(rootDir, flagValue(args, "--status", "pending"), flagInt(args, "--limit", 20))
+			return "", map[string]any{"deployment_risk_review_queue": items}, 0, err
+		}
+		if args[1] == "reviews" {
+			reviews, err := repair.ListDeploymentRiskReviews(rootDir, flagInt(args, "--limit", 20))
+			return "", map[string]any{"deployment_risk_reviews": reviews}, 0, err
 		}
 		handoff, ok, err := repair.LoadDeploymentRiskHandoff(rootDir, args[1])
 		if err != nil {

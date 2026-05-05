@@ -650,6 +650,8 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	riskHandoff := runCLI(t, root, "repair", "deployment-risk", "create", "--admission-id", admissionID)
 	assertContains(t, riskHandoff.stdout, `"decision": "DEPLOYMENT_RISK_HANDOFF_NOT_REQUIRED"`)
 	riskHandoffID := decodeStringField(t, riskHandoff.stdout, "id")
+	riskQueue := runCLI(t, root, "repair", "deployment-risk", "queue")
+	assertContains(t, riskQueue.stdout, `"deployment_risk_review_queue"`)
 	riskHandoffShown := runCLI(t, root, "repair", "deployment-risk", riskHandoffID)
 	assertContains(t, riskHandoffShown.stdout, riskHandoffID)
 	riskHandoffs := runCLI(t, root, "repair", "deployment-risks")

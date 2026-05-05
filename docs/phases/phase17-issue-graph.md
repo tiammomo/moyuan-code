@@ -20,7 +20,7 @@ Phase 17 的目标是把 Phase 16 的 rehearsal、release admission 和 deployme
 | --- | --- | --- | --- | --- | --- | --- |
 | `phase17-001` | `release-admission-policy-pack` | completed | admission 规则从固定判断抽成 policy pack，支持环境级阈值和 signal 规则 | Phase 16 readiness | `release_owner` + `backend_owner` | policy 决策可解释、可测试、可审计 |
 | `phase17-002` | `bounded-rehearsal-scheduler` | completed | bounded scheduler 可按 release candidate 或 deployment 自动创建 rehearsal/admission | `phase17-001` | `devops_owner` | 不常驻、不真实执行生产命令、可重复运行 |
-| `phase17-003` | `risk-review-queue` | planned | deployment risk handoff 进入 review queue，支持 approved/rejected/defer | `phase16-003` | `qa_owner` | 风险处理有人工决策和审计记录 |
+| `phase17-003` | `risk-review-queue` | completed | deployment risk handoff 进入 review queue，支持 approved/rejected/defer | `phase16-003` | `qa_owner` | 风险处理有人工决策和审计记录 |
 | `phase17-004` | `console-policy-risk-drilldown` | planned | Console 展示 policy rules、scheduler run、risk handoff drill-down | `phase17-001`,`phase17-003` | `frontend_owner` | 前端只展示后端事实源和受控动作 |
 | `phase17-005` | `phase17-readiness` | planned | 收口验证、文档回写、剩余风险和下一阶段入口 | `phase17-004` | `release_owner` + `security_owner` | 全量门禁通过，自动化边界清晰 |
 

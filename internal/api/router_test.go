@@ -412,6 +412,14 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	if err != nil || len(riskHandoffs) != 1 {
 		t.Fatalf("expected deployment risk handoff, handoffs=%+v err=%v", riskHandoffs, err)
 	}
+	assertGETContains(t, router, "/v1/projects/managed/repair/deployment-risk-review-queue?status=pending", http.StatusOK, `"deployment_risk_review_queue"`, riskHandoffs[0].ID)
+	assertPostContains(t, router, "/v1/projects/managed/repair/deployment-risk-handoffs/"+riskHandoffs[0].ID+"/review", `{"decision":"approved","reviewer_id":"qa","reason":"risk accepted","next_step":"repair_plan"}`, http.StatusOK, `"deployment_risk_review"`, `"DEPLOYMENT_RISK_REVIEW_APPROVED"`)
+	riskReviews, err := repair.ListDeploymentRiskReviews(root, 1)
+	if err != nil || len(riskReviews) != 1 {
+		t.Fatalf("expected deployment risk review, reviews=%+v err=%v", riskReviews, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/repair/deployment-risk-reviews?limit=5", http.StatusOK, `"deployment_risk_reviews"`, riskReviews[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/repair/deployment-risk-reviews/"+riskReviews[0].ID, http.StatusOK, `"deployment_risk_review"`, `"approved"`)
 	assertGETContains(t, router, "/v1/projects/managed/repair/deployment-risk-handoffs?limit=5", http.StatusOK, `"deployment_risk_handoffs"`, riskHandoffs[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/repair/deployment-risk-handoffs/"+riskHandoffs[0].ID, http.StatusOK, `"deployment_risk_handoff"`, `"release_admission_blocked"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/"+evidenceRecords[0].ParentID+"/post-deployment-history", http.StatusOK, `"post_deployment_history"`, `"execution_blocked"`)

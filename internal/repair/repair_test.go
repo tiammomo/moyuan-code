@@ -108,6 +108,59 @@ func TestDeploymentRiskHandoffCreatesReviewRepairPlan(t *testing.T) {
 	if handoff.SignalID == "" || handoff.BugCandidateID == "" || handoff.RepairPlanID == "" {
 		t.Fatalf("expected repair artifacts, got %+v", handoff)
 	}
+	queue, err := ListDeploymentRiskReviewQueue(root, "pending", 10)
+	if err != nil || len(queue) != 1 || queue[0].HandoffID != handoff.ID {
+		t.Fatalf("expected pending risk review queue item, queue=%+v err=%v", queue, err)
+	}
+	deferredReview, deferredHandoff, found, err := ReviewDeploymentRiskHandoff(root, handoff.ID, DeploymentRiskReviewOptions{
+		Decision:   "deferred",
+		ReviewerID: "qa-owner",
+		Reason:     "need more monitor evidence",
+	})
+	if err != nil || !found {
+		t.Fatalf("expected deferred review, found=%v review=%+v err=%v", found, deferredReview, err)
+	}
+	if deferredHandoff.Status != "review_deferred" || deferredHandoff.Decision != "DEPLOYMENT_RISK_REVIEW_DEFERRED" || !deferredHandoff.ReviewRequired {
+		t.Fatalf("expected deferred handoff to stay reviewable, got %+v", deferredHandoff)
+	}
+	queue, err = ListDeploymentRiskReviewQueue(root, "pending", 10)
+	if err != nil || len(queue) != 1 || queue[0].ReviewDecision != "deferred" {
+		t.Fatalf("expected deferred handoff to remain in pending queue, queue=%+v err=%v", queue, err)
+	}
+	approvedReview, approvedHandoff, found, err := ReviewDeploymentRiskHandoff(root, handoff.ID, DeploymentRiskReviewOptions{
+		Decision:   "approved",
+		ReviewerID: "release-owner",
+		Reason:     "risk accepted for controlled repair planning",
+		NextStep:   "repair_plan",
+	})
+	if err != nil || !found {
+		t.Fatalf("expected approved review, found=%v review=%+v err=%v", found, approvedReview, err)
+	}
+	if approvedHandoff.Status != "review_approved" || approvedHandoff.Decision != "DEPLOYMENT_RISK_REVIEW_APPROVED" || approvedHandoff.ReviewRequired {
+		t.Fatalf("expected approved handoff, got %+v", approvedHandoff)
+	}
+	if approvedReview.EvidenceRefs == nil || len(approvedReview.EvidenceRefs) == 0 || approvedHandoff.ReviewID != approvedReview.ID {
+		t.Fatalf("expected review evidence and handoff link, review=%+v handoff=%+v", approvedReview, approvedHandoff)
+	}
+	if _, _, _, err := ReviewDeploymentRiskHandoff(root, handoff.ID, DeploymentRiskReviewOptions{Decision: "approved"}); err == nil {
+		t.Fatalf("expected approved handoff to reject duplicate review")
+	}
+	queue, err = ListDeploymentRiskReviewQueue(root, "pending", 10)
+	if err != nil || len(queue) != 0 {
+		t.Fatalf("expected no pending queue items after approval, queue=%+v err=%v", queue, err)
+	}
+	reviewed, err := ListDeploymentRiskReviewQueue(root, "reviewed", 10)
+	if err != nil || len(reviewed) != 1 || reviewed[0].ReviewID != approvedReview.ID {
+		t.Fatalf("expected reviewed queue item, reviewed=%+v err=%v", reviewed, err)
+	}
+	reviews, err := ListDeploymentRiskReviews(root, 10)
+	if err != nil || len(reviews) != 2 {
+		t.Fatalf("expected two risk review records, reviews=%+v err=%v", reviews, err)
+	}
+	loadedReview, found, err := LoadDeploymentRiskReview(root, approvedReview.ID)
+	if err != nil || !found || loadedReview.ID != approvedReview.ID {
+		t.Fatalf("expected approved review to load, found=%v review=%+v err=%v", found, loadedReview, err)
+	}
 	loaded, found, err := LoadDeploymentRiskHandoff(root, handoff.ID)
 	if err != nil || !found || loaded.ID != handoff.ID {
 		t.Fatalf("expected handoff to load, found=%v loaded=%+v err=%v", found, loaded, err)

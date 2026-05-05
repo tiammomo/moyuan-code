@@ -32,6 +32,12 @@ type DeploymentRiskHandoff struct {
 	EvidenceRefs   []string   `json:"evidence_refs,omitempty"`
 	Reasons        []string   `json:"reasons"`
 	ReviewRequired bool       `json:"review_required"`
+	ReviewID       string     `json:"review_id,omitempty"`
+	ReviewedAt     string     `json:"reviewed_at,omitempty"`
+	ReviewedBy     string     `json:"reviewed_by,omitempty"`
+	ReviewDecision string     `json:"review_decision,omitempty"`
+	ReviewReason   string     `json:"review_reason,omitempty"`
+	ReviewNextStep string     `json:"review_next_step,omitempty"`
 	CreatedAt      string     `json:"created_at"`
 	Signal         *Signal    `json:"signal,omitempty"`
 	Candidate      *Candidate `json:"candidate,omitempty"`
