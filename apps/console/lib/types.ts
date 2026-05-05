@@ -385,9 +385,11 @@ export type BatchRunItemSummary = {
   worktree_id?: string;
   worktree_path?: string;
   branch?: string;
+  worker_slot?: number;
   run_id?: string;
   subagent_id?: string;
   quality_report_id?: string;
+  canceled_reason?: string;
 };
 
 export type BatchRunSummary = {
@@ -399,6 +401,7 @@ export type BatchRunSummary = {
   decision: string;
   requested_by?: string;
   max_issues: number;
+  parallelism: number;
   item_count: number;
   accepted_count: number;
   blocked_count: number;

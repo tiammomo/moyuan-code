@@ -868,9 +868,11 @@ function normalizeBatchRuns(rawRuns: unknown[]): BatchRunSummary[] {
       worktree_id: readString(item, "worktree_id", ""),
       worktree_path: readString(item, "worktree_path", ""),
       branch: readString(item, "branch", ""),
+      worker_slot: readNumber(item, "worker_slot"),
       run_id: readString(item, "run_id", ""),
       subagent_id: readString(item, "subagent_id", ""),
       quality_report_id: readString(item, "quality_report_id", ""),
+      canceled_reason: readString(item, "canceled_reason", ""),
     }));
     return {
       id: readString(raw, "id", `batch-run-${index + 1}`),
@@ -881,6 +883,7 @@ function normalizeBatchRuns(rawRuns: unknown[]): BatchRunSummary[] {
       decision: readString(raw, "decision", "unknown"),
       requested_by: readString(raw, "requested_by", ""),
       max_issues: readNumber(raw, "max_issues"),
+      parallelism: readNumber(raw, "parallelism"),
       item_count: items.length,
       accepted_count: items.filter((item) => item.decision === "BATCH_ITEM_ACCEPTED").length,
       blocked_count: items.filter((item) => item.status === "blocked" || item.decision.includes("BLOCKED")).length,

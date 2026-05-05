@@ -1228,7 +1228,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       <StatusPill tone={toneForStatus(run.status)} label={run.decision} />
                     </div>
                     <span>
-                      {run.mode} / {run.item_count} items / accepted {run.accepted_count}
+                      {run.mode} / {run.item_count} items / parallel {run.parallelism || 1} / accepted {run.accepted_count}
                     </span>
                     <div className="signalMeta">
                       <code>{compactID(run.batch_id)}</code>
@@ -1242,9 +1242,11 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                           <strong>{compactID(item.issue_id)}</strong>
                           <span>{item.decision}</span>
                           <div className="signalMeta">
+                            {item.worker_slot ? <code>slot {item.worker_slot}</code> : null}
                             {item.runtime_id ? <code>{item.runtime_id}</code> : null}
                             {item.worktree_id ? <code>{compactID(item.worktree_id)}</code> : null}
                             {item.quality_report_id ? <code>{compactID(item.quality_report_id)}</code> : null}
+                            {item.canceled_reason ? <code>{item.canceled_reason}</code> : null}
                           </div>
                         </div>
                       ))}

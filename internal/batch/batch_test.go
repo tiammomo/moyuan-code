@@ -172,6 +172,59 @@ func TestRunLocalShellExecutesOneIssueWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestRunLocalShellExecutesParallelIssuesWhenEnabled(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	initBatchGitRepo(t, root)
+	t.Setenv("MOYUAN_ALLOW_BATCH_RUN", "1")
+	graph := issues.Graph{
+		Epic: issues.Epic{ID: "phase12-parallel-run", Title: "parallel batch run", Status: "planned"},
+		Nodes: []issues.Node{
+			{ID: "backend-api", Title: "backend api", Status: "ready"},
+			{ID: "frontend-ui", Title: "frontend ui", Status: "ready"},
+		},
+	}
+	if err := issues.SaveGraph(root, graph); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := CreatePlan(root, PlanOptions{EpicID: graph.Epic.ID, MaxParallel: 2, RequestedBy: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.DispatchCount != 2 {
+		t.Fatalf("expected two dispatch items, got %+v", plan)
+	}
+
+	run, err := Run(context.Background(), root, RunOptions{
+		BatchID:           plan.ID,
+		Mode:              "local_shell",
+		Approved:          true,
+		MaxIssues:         2,
+		Prompt:            "printf batch-ok",
+		RequestedBy:       "test",
+		ContinueOnFailure: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Decision != "BATCH_RUN_COMPLETED" || run.Status != "completed" || run.Parallelism != 2 || len(run.Items) != 2 {
+		t.Fatalf("expected completed parallel local shell run, got %+v", run)
+	}
+	for index, item := range run.Items {
+		if item.Decision != "BATCH_ITEM_ACCEPTED" || item.WorktreeID == "" || item.WorktreePath == "" || item.Branch == "" || item.RunID == "" {
+			t.Fatalf("expected accepted parallel item with artifacts, got %+v", item)
+		}
+		if item.WorkerSlot != index+1 {
+			t.Fatalf("expected stable worker slot %d, got %+v", index+1, item)
+		}
+	}
+	if !hasReason(run.Reasons, "parallel_worktree_execution:2") {
+		t.Fatalf("expected parallel execution reason, got %+v", run.Reasons)
+	}
+}
+
 func findItem(items []IssueItem, issueID string) IssueItem {
 	for _, item := range items {
 		if item.IssueID == issueID {

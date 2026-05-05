@@ -20,7 +20,7 @@ Phase 11 已完成并通过 readiness：
 
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase12-001` | `parallel-batch-worker-executor` | planned | 真实受控并发执行 | batch run 可按安全并发度执行多个 issue，并记录 worker slot 和 fail-fast |
+| P0 | `phase12-001` | `parallel-batch-worker-executor` | completed | 真实受控并发执行 | batch run 可按安全并发度执行多个 issue，并记录 worker slot 和 fail-fast |
 | P0 | `phase12-002` | `integration-merge-preview` | planned | 集成合入预览 | ready merge queue 可生成 merge dry-run 和冲突报告 |
 | P1 | `phase12-003` | `controlled-merge-apply` | planned | 受控真实合入 | 审批和开关满足后可合入 integration branch |
 | P1 | `phase12-004` | `release-batch-readiness` | planned | 发版批次建议 | 根据合入量、风险和版本策略生成 release batch plan |
@@ -28,16 +28,17 @@ Phase 11 已完成并通过 readiness：
 
 ## 3. 执行规划：`phase12-001 parallel-batch-worker-executor`
 
-实现状态：planned。
+实现状态：completed。
 
 范围：
 
 - 为 `batch.Run(local_shell)` 增加 bounded worker pool。
 - 并发度取 `min(batch_plan.runtime_slots, requested max_issues, system cap)`。
-- 每个 issue worker 独立调用 worktree manager 和 orchestrator。
-- `RunItem` 增加 worker slot、cancellation reason 或 parallel execution metadata。
+- 每个 issue worker 独立调用 worktree manager 和 orchestrator；worktree 创建保持受控顺序，runtime/orchestrator 执行进入 worker pool。
+- `RunRecord` 增加 `parallelism`，`RunItem` 增加 `worker_slot` 和 `canceled_reason`。
 - `continue_on_failure=false` 时，首个失败取消未开始任务，已开始任务允许自然收口。
 - run items 按 batch plan issue 顺序稳定输出，避免前端和审计抖动。
+- orchestrator issue graph 状态回写增加串行保护，避免并发 issue 同时写 graph 时互相覆盖。
 
 非目标：
 
@@ -52,6 +53,12 @@ Phase 11 已完成并通过 readiness：
 - fail-fast 会阻止后续未开始 issue 并记录 blocked/canceled item。
 - `continue_on_failure=true` 时失败不阻断其他 issue。
 - 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- `batch.Run(local_shell)` 在 `max_issues > 1` 时会按安全并发度执行多个 issue。
+- batch run artifact 记录 `parallelism`、每个 item 的 `worker_slot`、`canceled_reason`、worktree 和 quality report。
+- Console 的 Batch Runs 面板可展示 parallelism 和 worker slot。
 
 ## 4. 验证要求
 

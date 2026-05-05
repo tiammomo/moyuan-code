@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"moyuan-code/internal/fsutil"
@@ -12,6 +13,8 @@ import (
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/workspace"
 )
+
+var issueStateMu sync.Mutex
 
 type IssueState struct {
 	IssueID         string            `json:"issue_id"`
@@ -95,6 +98,9 @@ func ListRunStates(rootDir string, limit int) ([]RunState, error) {
 }
 
 func transitionIssue(rootDir string, epicID string, issueID string, status string, reason string, runID string, mutate func(*IssueState)) (IssueState, error) {
+	issueStateMu.Lock()
+	defer issueStateMu.Unlock()
+
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	state, found, err := LoadIssueState(rootDir, issueID)
 	if err != nil {

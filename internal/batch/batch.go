@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"moyuan-code/internal/fsutil"
@@ -21,6 +22,8 @@ import (
 	"moyuan-code/internal/workspace"
 	"moyuan-code/internal/worktree"
 )
+
+const maxLocalShellParallelism = 4
 
 type PlanOptions struct {
 	EpicID      string `json:"epic_id"`
@@ -67,6 +70,7 @@ type RunRecord struct {
 	RequestedBy       string    `json:"requested_by,omitempty"`
 	Approved          bool      `json:"approved"`
 	MaxIssues         int       `json:"max_issues"`
+	Parallelism       int       `json:"parallelism,omitempty"`
 	ContinueOnFailure bool      `json:"continue_on_failure"`
 	Items             []RunItem `json:"items"`
 	Reasons           []string  `json:"reasons"`
@@ -85,9 +89,11 @@ type RunItem struct {
 	WorktreeID      string `json:"worktree_id,omitempty"`
 	WorktreePath    string `json:"worktree_path,omitempty"`
 	Branch          string `json:"branch,omitempty"`
+	WorkerSlot      int    `json:"worker_slot,omitempty"`
 	RunID           string `json:"run_id,omitempty"`
 	SubagentID      string `json:"subagent_id,omitempty"`
 	QualityReportID string `json:"quality_report_id,omitempty"`
+	CanceledReason  string `json:"canceled_reason,omitempty"`
 	StartedAt       string `json:"started_at,omitempty"`
 	FinishedAt      string `json:"finished_at,omitempty"`
 }
@@ -238,10 +244,8 @@ func Run(ctx context.Context, rootDir string, options RunOptions) (RunRecord, er
 		run.Reasons = append(run.Reasons, "batch_plan_not_ready:"+plan.Decision)
 		return finishRun(rootDir, run)
 	}
-	if options.Mode == "local_shell" && options.MaxIssues > 1 {
-		run.Reasons = append(run.Reasons, "isolated_worktree_serial_execution")
-	}
 	items := dispatchItems(plan, options.MaxIssues)
+	run.Parallelism = effectiveParallelism(options, plan, len(items))
 	if len(items) == 0 {
 		run.Status = "empty"
 		run.Decision = "BATCH_RUN_EMPTY"
@@ -269,7 +273,7 @@ func Run(ctx context.Context, rootDir string, options RunOptions) (RunRecord, er
 			run.Reasons = append(run.Reasons, "batch_prompt_not_allowed")
 			return finishRun(rootDir, run)
 		}
-		run = runLocalShellBatch(ctx, rootDir, run, items, options)
+		run = runLocalShellBatch(ctx, rootDir, run, items, options, run.Parallelism)
 	default:
 		run.Reasons = append(run.Reasons, "unsupported_batch_run_mode:"+options.Mode)
 	}
@@ -399,6 +403,29 @@ func effectiveMaxIssues(options RunOptions, plan Plan) int {
 	return 1
 }
 
+func effectiveParallelism(options RunOptions, plan Plan, itemCount int) int {
+	if itemCount <= 0 {
+		return 0
+	}
+	parallelism := itemCount
+	if plan.RuntimeSlots > 0 && parallelism > plan.RuntimeSlots {
+		parallelism = plan.RuntimeSlots
+	}
+	if plan.MaxParallel > 0 && parallelism > plan.MaxParallel {
+		parallelism = plan.MaxParallel
+	}
+	if options.MaxIssues > 0 && parallelism > options.MaxIssues {
+		parallelism = options.MaxIssues
+	}
+	if parallelism > maxLocalShellParallelism {
+		parallelism = maxLocalShellParallelism
+	}
+	if parallelism < 1 {
+		return 1
+	}
+	return parallelism
+}
+
 func itemFromDecision(registry providers.Registry, decision scheduler.DispatchDecision) IssueItem {
 	route := providers.Decide(registry, providers.RouteRequest{
 		Role:                  decision.Role,
@@ -461,21 +488,54 @@ func dryRunItem(item IssueItem) RunItem {
 	}
 }
 
-func runLocalShellBatch(ctx context.Context, rootDir string, run RunRecord, items []IssueItem, options RunOptions) RunRecord {
+func runLocalShellBatch(ctx context.Context, rootDir string, run RunRecord, items []IssueItem, options RunOptions, parallelism int) RunRecord {
 	run.Status = "completed"
 	run.Decision = "BATCH_RUN_COMPLETED"
-	for _, item := range items {
-		start := time.Now().UTC().Format(time.RFC3339Nano)
-		runItem := RunItem{
-			IssueID:    item.IssueID,
-			Status:     "failed",
-			Decision:   "BATCH_ITEM_FAILED",
-			RuntimeID:  "local_shell",
-			ProviderID: item.ProviderID,
-			ModelID:    item.ModelID,
-			StartedAt:  start,
-			FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
+	if parallelism <= 1 {
+		run.Reasons = append(run.Reasons, "isolated_worktree_serial_execution")
+	} else {
+		run.Reasons = append(run.Reasons, fmt.Sprintf("parallel_worktree_execution:%d", parallelism))
+	}
+	for start := 0; start < len(items); start += parallelism {
+		end := start + parallelism
+		if end > len(items) {
+			end = len(items)
 		}
+		results := runLocalShellChunk(ctx, rootDir, run, items[start:end], options)
+		chunkFailed := false
+		for _, runItem := range results {
+			run.Items = append(run.Items, runItem)
+			if failedRunItem(runItem) {
+				chunkFailed = true
+				run.Status = "failed"
+				run.Decision = "BATCH_RUN_FAILED"
+				run.Reasons = append(run.Reasons, runFailureReason(runItem))
+			}
+		}
+		if chunkFailed && !options.ContinueOnFailure {
+			for _, item := range items[end:] {
+				run.Items = append(run.Items, canceledRunItem(item, "canceled_after_failure"))
+			}
+			break
+		}
+	}
+	if run.Status == "completed" {
+		run.Reasons = append(run.Reasons, "batch_items_completed")
+	}
+	return run
+}
+
+type preparedRunItem struct {
+	Index int
+	Item  IssueItem
+	Run   RunItem
+}
+
+func runLocalShellChunk(ctx context.Context, rootDir string, run RunRecord, items []IssueItem, options RunOptions) []RunItem {
+	results := make([]RunItem, len(items))
+	prepared := []preparedRunItem{}
+	for index, item := range items {
+		runItem := newRunItem(item, index+1)
 		wt, err := worktree.Prepare(ctx, rootDir, worktree.PrepareOptions{
 			EpicID:      run.EpicID,
 			BatchID:     run.BatchID,
@@ -487,72 +547,109 @@ func runLocalShellBatch(ctx context.Context, rootDir string, run RunRecord, item
 		runItem.Branch = wt.Branch
 		if err != nil {
 			runItem.Reason = err.Error()
-			run.Status = "failed"
-			run.Decision = "BATCH_RUN_FAILED"
-			run.Reasons = append(run.Reasons, "worktree_error:"+item.IssueID)
-			run.Items = append(run.Items, runItem)
-			if !options.ContinueOnFailure {
-				break
-			}
+			runItem.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
+			results[index] = runItem
 			continue
 		}
 		if wt.Decision != "WORKTREE_READY" {
 			runItem.Decision = "BATCH_ITEM_WORKTREE_BLOCKED"
 			runItem.Reason = strings.Join(wt.Reasons, ",")
-			run.Status = "failed"
-			run.Decision = "BATCH_RUN_FAILED"
-			run.Reasons = append(run.Reasons, "worktree_blocked:"+item.IssueID)
-			run.Items = append(run.Items, runItem)
-			if !options.ContinueOnFailure {
-				break
-			}
+			runItem.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
+			results[index] = runItem
 			continue
 		}
-		result, err := orchestrator.RunIssueWithOptions(ctx, rootDir, item.IssueID, orchestrator.RunOptions{
-			RuntimeID:    "local_shell",
-			ProviderID:   item.ProviderID,
-			ModelID:      item.ModelID,
-			EpicID:       run.EpicID,
-			Role:         item.Role,
-			Prompt:       options.Prompt,
-			WorktreePath: wt.WorktreePath,
-			Branch:       wt.Branch,
-		})
-		runItem.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
-		if err != nil {
-			runItem.Reason = err.Error()
-			run.Status = "failed"
-			run.Decision = "BATCH_RUN_FAILED"
-			run.Reasons = append(run.Reasons, "issue_failed:"+item.IssueID)
-			run.Items = append(run.Items, runItem)
-			if !options.ContinueOnFailure {
-				break
-			}
-			continue
-		}
-		runItem.RunID = result.RunID
-		runItem.SubagentID = result.SubagentID
-		runItem.QualityReportID = result.QualityReport.ID
-		if result.Status == "accepted" {
-			runItem.Status = "completed"
-			runItem.Decision = "BATCH_ITEM_ACCEPTED"
-		} else {
-			runItem.Status = "failed"
-			runItem.Decision = "BATCH_ITEM_NEEDS_REWORK"
-			runItem.Reason = result.Status
-			run.Status = "failed"
-			run.Decision = "BATCH_RUN_FAILED"
-			run.Reasons = append(run.Reasons, "issue_needs_rework:"+item.IssueID)
-		}
-		run.Items = append(run.Items, runItem)
-		if runItem.Status == "failed" && !options.ContinueOnFailure {
-			break
-		}
+		prepared = append(prepared, preparedRunItem{Index: index, Item: item, Run: runItem})
 	}
-	if run.Status == "completed" {
-		run.Reasons = append(run.Reasons, "batch_items_completed")
+
+	var wg sync.WaitGroup
+	for _, ready := range prepared {
+		wg.Add(1)
+		go func(ready preparedRunItem) {
+			defer wg.Done()
+			results[ready.Index] = executePreparedLocalShellIssue(ctx, rootDir, run, ready.Item, ready.Run, options)
+		}(ready)
 	}
-	return run
+	wg.Wait()
+	return results
+}
+
+func newRunItem(item IssueItem, workerSlot int) RunItem {
+	start := time.Now().UTC().Format(time.RFC3339Nano)
+	return RunItem{
+		IssueID:    item.IssueID,
+		Status:     "failed",
+		Decision:   "BATCH_ITEM_FAILED",
+		RuntimeID:  "local_shell",
+		ProviderID: item.ProviderID,
+		ModelID:    item.ModelID,
+		WorkerSlot: workerSlot,
+		StartedAt:  start,
+		FinishedAt: start,
+	}
+}
+
+func executePreparedLocalShellIssue(ctx context.Context, rootDir string, run RunRecord, item IssueItem, runItem RunItem, options RunOptions) RunItem {
+	result, err := orchestrator.RunIssueWithOptions(ctx, rootDir, item.IssueID, orchestrator.RunOptions{
+		RuntimeID:    "local_shell",
+		ProviderID:   item.ProviderID,
+		ModelID:      item.ModelID,
+		EpicID:       run.EpicID,
+		Role:         item.Role,
+		Prompt:       options.Prompt,
+		WorktreePath: runItem.WorktreePath,
+		Branch:       runItem.Branch,
+	})
+	runItem.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	if err != nil {
+		runItem.Reason = err.Error()
+		return runItem
+	}
+	runItem.RunID = result.RunID
+	runItem.SubagentID = result.SubagentID
+	runItem.QualityReportID = result.QualityReport.ID
+	if result.Status == "accepted" {
+		runItem.Status = "completed"
+		runItem.Decision = "BATCH_ITEM_ACCEPTED"
+		return runItem
+	}
+	runItem.Status = "failed"
+	runItem.Decision = "BATCH_ITEM_NEEDS_REWORK"
+	runItem.Reason = result.Status
+	return runItem
+}
+
+func canceledRunItem(item IssueItem, reason string) RunItem {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	return RunItem{
+		IssueID:        item.IssueID,
+		Status:         "blocked",
+		Decision:       "BATCH_ITEM_CANCELED",
+		Reason:         reason,
+		RuntimeID:      "local_shell",
+		ProviderID:     item.ProviderID,
+		ModelID:        item.ModelID,
+		CanceledReason: reason,
+		StartedAt:      now,
+		FinishedAt:     now,
+	}
+}
+
+func failedRunItem(item RunItem) bool {
+	return item.Status == "failed" || strings.Contains(item.Decision, "FAILED") || strings.Contains(item.Decision, "BLOCKED")
+}
+
+func runFailureReason(item RunItem) string {
+	switch item.Decision {
+	case "BATCH_ITEM_WORKTREE_BLOCKED":
+		return "worktree_blocked:" + item.IssueID
+	case "BATCH_ITEM_NEEDS_REWORK":
+		return "issue_needs_rework:" + item.IssueID
+	default:
+		if item.WorktreeID == "" {
+			return "worktree_error:" + item.IssueID
+		}
+		return "issue_failed:" + item.IssueID
+	}
 }
 
 func nodesByID(graph issues.Graph) map[string]issues.Node {
