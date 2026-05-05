@@ -156,6 +156,8 @@ export type DeploymentExecutionSummary = {
   smoke_status?: string;
   monitor_status?: string;
   rollback_required?: boolean;
+  approval_id?: string;
+  approval_consumed?: boolean;
   started_at?: string;
   finished_at?: string;
 };
@@ -200,6 +202,56 @@ export type RollbackHistorySummary = {
   runbook_path?: string;
   step_count: number;
   actions: string[];
+};
+
+export type RollbackExecutionSummary = {
+  id: string;
+  execution_id: string;
+  deployment_id?: string;
+  release_id?: string;
+  environment?: string;
+  mode: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  step_count: number;
+  approval_id?: string;
+  approval_consumed: boolean;
+  execution_enabled: boolean;
+  started_at?: string;
+  finished_at?: string;
+};
+
+export type DeploymentMonitorHistorySummary = {
+  id: string;
+  execution_id: string;
+  deployment_id: string;
+  release_id?: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  failure_class?: string;
+  severity?: string;
+  rollback: boolean;
+  created_at?: string;
+};
+
+export type DeploymentMonitorSummary = {
+  id: string;
+  environment?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  window_size: number;
+  history_count: number;
+  failed_count: number;
+  blocked_count: number;
+  manual_count: number;
+  rollback_count: number;
+  failure_classes: Record<string, number>;
+  latest: DeploymentMonitorHistorySummary[];
+  evidence_ids: string[];
+  created_at?: string;
 };
 
 export type ReleaseProviderExecutionSummary = {
@@ -854,6 +906,8 @@ export type ConsoleSnapshot = {
   deployments: DeploymentSummary[];
   executions: DeploymentExecutionSummary[];
   post_deployment_histories: PostDeploymentHistorySummary[];
+  rollback_executions: RollbackExecutionSummary[];
+  monitor_summaries: DeploymentMonitorSummary[];
   release_provider_executions: ReleaseProviderExecutionSummary[];
   evidence: EvidenceSummary[];
   operation_history: OperationHistoryItem[];

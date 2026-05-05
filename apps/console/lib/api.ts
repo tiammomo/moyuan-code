@@ -11,6 +11,7 @@ import type {
   BatchRunSummary,
   ControlLoopRunSummary,
   DeploymentExecutionSummary,
+  DeploymentMonitorSummary,
   DeploymentSummary,
   EvidenceSummary,
   GitProviderPlanSummary,
@@ -29,6 +30,7 @@ import type {
   QualityExplanation,
   QualitySignal,
   ReleaseProviderExecutionSummary,
+  RollbackExecutionSummary,
   ReleaseBatchSummary,
   ReleaseCandidateApplySummary,
   ReleaseCandidateProviderPreviewSummary,
@@ -91,6 +93,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     deploymentsResponse,
     executionsResponse,
     postDeploymentHistoriesResponse,
+    rollbackExecutionsResponse,
+    monitorSummariesResponse,
     releaseProviderExecutionsResponse,
     evidenceResponse,
     runsResponse,
@@ -131,6 +135,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
     apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
     apiGet<ApiEnvelope<{ post_deployment_histories: unknown[] }>>(`/projects/${project.id}/deployment-monitor-history?limit=5`),
+    apiGet<ApiEnvelope<{ rollback_executions: unknown[] }>>(`/projects/${project.id}/deployment-rollback-executions?limit=5`),
+    apiGet<ApiEnvelope<{ monitor_summaries: unknown[] }>>(`/projects/${project.id}/deployment-monitor-summaries?limit=5`),
     apiGet<ApiEnvelope<{ release_provider_executions: unknown[] }>>(`/projects/${project.id}/release-provider-executions?limit=6`),
     apiGet<ApiEnvelope<{ evidence: unknown[] }>>(`/projects/${project.id}/evidence?limit=30`),
     apiGet<ApiEnvelope<{ runs: unknown[] }>>(`/projects/${project.id}/runs?limit=12`),
@@ -173,6 +179,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
   const executions = normalizeExecutions(executionsResponse?.executions ?? []);
   const postDeploymentHistories = normalizePostDeploymentHistories(postDeploymentHistoriesResponse?.post_deployment_histories ?? []);
+  const rollbackExecutions = normalizeRollbackExecutions(rollbackExecutionsResponse?.rollback_executions ?? []);
+  const monitorSummaries = normalizeMonitorSummaries(monitorSummariesResponse?.monitor_summaries ?? []);
   const releaseProviderExecutions = normalizeReleaseProviderExecutions(releaseProviderExecutionsResponse?.release_provider_executions ?? []);
   const evidence = normalizeEvidence(evidenceResponse?.evidence ?? []);
   const runs = normalizeRuns(runsResponse?.runs ?? []);
@@ -247,6 +255,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     deployments,
     executions,
     post_deployment_histories: postDeploymentHistories,
+    rollback_executions: rollbackExecutions,
+    monitor_summaries: monitorSummaries,
     release_provider_executions: releaseProviderExecutions,
     evidence,
     operation_history: operationHistory,
@@ -489,6 +499,8 @@ function normalizeExecutions(rawExecutions: unknown[]): DeploymentExecutionSumma
       smoke_status: readString(smokeReport, "status", ""),
       monitor_status: readString(monitorReport, "status", ""),
       rollback_required: readBoolean(rollbackSuggestion, "required"),
+      approval_id: readString(raw, "approval_id", ""),
+      approval_consumed: readBoolean(raw, "approval_consumed"),
       started_at: readString(raw, "started_at", ""),
       finished_at: readString(raw, "finished_at", ""),
     };
@@ -536,6 +548,58 @@ function normalizePostDeploymentHistories(rawHistories: unknown[]): PostDeployme
       created_at: readString(raw, "created_at", ""),
     };
   });
+}
+
+function normalizeRollbackExecutions(rawExecutions: unknown[]): RollbackExecutionSummary[] {
+  return rawExecutions.map((raw, index) => ({
+    id: readString(raw, "id", `rollback-execution-${index + 1}`),
+    execution_id: readString(raw, "execution_id", ""),
+    deployment_id: readString(raw, "deployment_id", ""),
+    release_id: readString(raw, "release_id", ""),
+    environment: readString(raw, "environment", ""),
+    mode: readString(raw, "mode", "preview"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    step_count: readObjectArray(raw, "steps").length,
+    approval_id: readString(raw, "approval_id", ""),
+    approval_consumed: readBoolean(raw, "approval_consumed"),
+    execution_enabled: readBoolean(raw, "execution_enabled"),
+    started_at: readString(raw, "started_at", ""),
+    finished_at: readString(raw, "finished_at", ""),
+  }));
+}
+
+function normalizeMonitorSummaries(rawSummaries: unknown[]): DeploymentMonitorSummary[] {
+  return rawSummaries.map((raw, index) => ({
+    id: readString(raw, "id", `monitor-summary-${index + 1}`),
+    environment: readString(raw, "environment", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    window_size: readNumber(raw, "window_size"),
+    history_count: readNumber(raw, "history_count"),
+    failed_count: readNumber(raw, "failed_count"),
+    blocked_count: readNumber(raw, "blocked_count"),
+    manual_count: readNumber(raw, "manual_count"),
+    rollback_count: readNumber(raw, "rollback_count"),
+    failure_classes: readNumberMap(raw, "failure_classes"),
+    latest: readObjectArray(raw, "latest").map((history, historyIndex) => ({
+      id: readString(history, "id", `monitor-history-${historyIndex + 1}`),
+      execution_id: readString(history, "execution_id", ""),
+      deployment_id: readString(history, "deployment_id", ""),
+      release_id: readString(history, "release_id", ""),
+      environment: readString(history, "environment", ""),
+      status: readString(history, "status", "unknown"),
+      decision: readString(history, "decision", "unknown"),
+      failure_class: readString(history, "failure_class", ""),
+      severity: readString(history, "severity", ""),
+      rollback: readBoolean(history, "rollback"),
+      created_at: readString(history, "created_at", ""),
+    })),
+    evidence_ids: readArray(raw, "evidence_ids"),
+    created_at: readString(raw, "created_at", ""),
+  }));
 }
 
 function normalizeReleaseProviderExecutions(rawExecutions: unknown[]): ReleaseProviderExecutionSummary[] {
@@ -1427,6 +1491,14 @@ function readObjectArray(value: unknown, key: string): Record<string, unknown>[]
 function readNumber(value: unknown, key: string): number {
   const field = readUnknown(value, key);
   return typeof field === "number" && Number.isFinite(field) ? field : 0;
+}
+
+function readNumberMap(value: unknown, key: string): Record<string, number> {
+  const field = readUnknown(value, key);
+  if (!field || typeof field !== "object" || Array.isArray(field)) return {};
+  return Object.fromEntries(
+    Object.entries(field as Record<string, unknown>).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])),
+  );
 }
 
 function readBoolean(value: unknown, key: string): boolean {

@@ -109,6 +109,8 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   );
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
   const latestDeployment = snapshot.deployments[0];
+  const latestRollbackCandidate = snapshot.executions.find((execution) => execution.rollback_required);
+  const latestMonitorSummary = snapshot.monitor_summaries[0];
   const activeSessions = snapshot.auth_sessions.filter((session) => session.status === "active");
   const activeTokens = snapshot.api_tokens.filter((token) => token.status === "active");
   const activeServiceAccounts = snapshot.service_accounts.filter((account) => account.status === "active");
@@ -328,6 +330,51 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
       });
     } catch (error) {
       setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Resource health scan failed." });
+    }
+  }
+
+  async function previewRollbackExecution(executionID?: string) {
+    if (!executionID) {
+      setDeploymentActionState({ status: "error", message: "No rollback candidate available." });
+      return;
+    }
+    setDeploymentActionState({ status: "running", message: "Creating rollback preview..." });
+    try {
+      const payload = await postJSON<RollbackExecutionEnvelope>(
+        `/api/projects/${snapshot.project.id}/deployment-executions/${encodeURIComponent(executionID)}/rollback`,
+        { mode: "preview" },
+      );
+      const rollback = payload.rollback_execution;
+      if (!rollback) {
+        throw new Error(payload.error ?? "Rollback preview returned no execution.");
+      }
+      setDeploymentActionState({
+        status: rollback.status === "completed" ? "completed" : "blocked",
+        id: rollback.id,
+        message: rollback.decision ?? rollback.status ?? "rollback preview recorded",
+      });
+      router.refresh();
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Rollback preview failed." });
+    }
+  }
+
+  async function summarizeDeploymentMonitor() {
+    setDeploymentActionState({ status: "running", message: "Creating monitor summary..." });
+    try {
+      const payload = await postJSON<MonitorSummaryEnvelope>(`/api/projects/${snapshot.project.id}/deployment-monitor-summary`, { limit: 10 });
+      const summary = payload.monitor_summary;
+      if (!summary) {
+        throw new Error(payload.error ?? "Monitor summary returned no result.");
+      }
+      setDeploymentActionState({
+        status: summary.status === "healthy" || summary.status === "completed" ? "completed" : "blocked",
+        id: summary.id,
+        message: summary.decision ?? summary.status ?? "monitor summary recorded",
+      });
+      router.refresh();
+    } catch (error) {
+      setDeploymentActionState({ status: "error", message: error instanceof Error ? error.message : "Monitor summary failed." });
     }
   }
 
@@ -1086,6 +1133,24 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <Server size={13} />
                 <span>Health Scan</span>
               </button>
+              <button
+                className="inlineActionButton"
+                disabled={deploymentActionState.status === "running" || !latestRollbackCandidate}
+                onClick={() => void previewRollbackExecution(latestRollbackCandidate?.id)}
+                type="button"
+              >
+                <AlertTriangle size={13} />
+                <span>Rollback Preview</span>
+              </button>
+              <button
+                className="inlineActionButton"
+                disabled={deploymentActionState.status === "running"}
+                onClick={() => void summarizeDeploymentMonitor()}
+                type="button"
+              >
+                <Activity size={13} />
+                <span>Monitor Summary</span>
+              </button>
               {deploymentActionState.message ? (
                 <small className={`actionMessage ${deploymentActionState.status}`}>
                   {deploymentActionState.id ? `${compactID(deploymentActionState.id)} / ` : ""}
@@ -1105,6 +1170,8 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                           execution.smoke_status ? `smoke ${execution.smoke_status}` : "",
                           execution.monitor_status ? `monitor ${execution.monitor_status}` : "",
                           execution.rollback_required ? "rollback suggested" : "",
+                          execution.approval_id ? `approval ${compactID(execution.approval_id)}` : "",
+                          execution.approval_consumed ? "approval consumed" : "",
                         ]
                           .filter(Boolean)
                           .join(" / ")}
@@ -1128,6 +1195,26 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
               )}
             </div>
             <div className="maintenanceList">
+              {latestMonitorSummary ? (
+                <div className="maintenanceItem">
+                  <div>
+                    <strong>{latestMonitorSummary.environment || "all environments"}</strong>
+                    <span>{`${latestMonitorSummary.decision} / ${latestMonitorSummary.history_count} histories / ${latestMonitorSummary.failed_count} failed`}</span>
+                    <span>{`${latestMonitorSummary.rollback_count} rollback / window ${latestMonitorSummary.window_size}`}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(latestMonitorSummary.status)} label={latestMonitorSummary.status} />
+                </div>
+              ) : null}
+              {snapshot.rollback_executions.slice(0, 2).map((rollback) => (
+                <div className="maintenanceItem" key={rollback.id}>
+                  <div>
+                    <strong>{compactID(rollback.execution_id)}</strong>
+                    <span>{`${rollback.decision} / ${rollback.mode} / ${rollback.step_count} steps`}</span>
+                    <span>{rollback.approval_id ? `approval ${compactID(rollback.approval_id)}` : "approval not consumed"}</span>
+                  </div>
+                  <StatusPill tone={toneForStatus(rollback.status)} label={rollback.status} />
+                </div>
+              ))}
               {snapshot.post_deployment_histories.length > 0 ? (
                 snapshot.post_deployment_histories.slice(0, 3).map((history) => (
                   <div className="maintenanceItem" key={history.id}>
@@ -1142,7 +1229,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   </div>
                 ))
               ) : (
-                <div className="emptyState compact">No post deployment history</div>
+                <div className="emptyState compact">{latestMonitorSummary || snapshot.rollback_executions.length > 0 ? "No post deployment history" : "No deployment ops history"}</div>
               )}
             </div>
           </div>
@@ -2821,6 +2908,24 @@ type DeploymentExecutionEnvelope = {
     status?: string;
     decision?: string;
     reasons?: string[];
+  };
+};
+
+type RollbackExecutionEnvelope = {
+  error?: string;
+  rollback_execution?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
+type MonitorSummaryEnvelope = {
+  error?: string;
+  monitor_summary?: {
+    id?: string;
+    status?: string;
+    decision?: string;
   };
 };
 
