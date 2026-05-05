@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+- [Phase 15 实现 Issue Graph](./phase15-issue-graph.md)：Phase 15 部署审批加固、回退执行与生产可观测性的依赖图。
+- [Phase 15 实施记录](./phase15-next-development-plan.md)：Phase 15 当前任务、执行范围和验收记录。
 - [Phase 14 Release Readiness](./phase14-release-readiness.md)：Phase 14 受控远程发布与部署执行的收口验证。
 - [Phase 14 实现 Issue Graph](./phase14-issue-graph.md)：Phase 14 受控远程发布与部署执行的依赖图。
 - [Phase 14 实施记录](./phase14-next-development-plan.md)：Phase 14 完成任务、执行范围和验收记录。
