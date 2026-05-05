@@ -392,6 +392,13 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	}
 	assertGETContains(t, router, "/v1/projects/managed/deployment-rehearsals?limit=5", http.StatusOK, `"deployment_rehearsals"`, rehearsals[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-rehearsals/"+rehearsals[0].ID, http.StatusOK, `"deployment_rehearsal"`, `"deployment_execution"`)
+	assertPostContains(t, router, "/v1/projects/managed/release-admissions", `{"rehearsal_id":"`+rehearsals[0].ID+`"}`, http.StatusAccepted, `"release_admission"`, `"RELEASE_ADMISSION_BLOCKED"`)
+	admissions, err := deployment.ListReleaseAdmissions(root, 1)
+	if err != nil || len(admissions) != 1 {
+		t.Fatalf("expected release admission, admissions=%+v err=%v", admissions, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/release-admissions?limit=5", http.StatusOK, `"release_admissions"`, admissions[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/release-admissions/"+admissions[0].ID, http.StatusOK, `"release_admission"`, `"deployment_rehearsal"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/"+evidenceRecords[0].ParentID+"/post-deployment-history", http.StatusOK, `"post_deployment_history"`, `"execution_blocked"`)
 	assertGETContains(t, router, "/v1/projects/managed/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"evidence"`, evidenceRecords[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/operations/deployment/"+evidenceRecords[0].ParentID, http.StatusOK, `"operation_detail"`, `"deployment.execute.dry_run"`, `"artifact_count":1`)

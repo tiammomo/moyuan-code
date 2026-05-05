@@ -154,6 +154,15 @@ type deploymentRehearsalRequest struct {
 	MonitorLimit int    `json:"monitor_limit"`
 }
 
+type releaseAdmissionRequest struct {
+	RehearsalID  string `json:"rehearsal_id"`
+	CandidateID  string `json:"candidate_id"`
+	DeploymentID string `json:"deployment_id"`
+	ExecutionID  string `json:"execution_id"`
+	Environment  string `json:"environment"`
+	MonitorLimit int    `json:"monitor_limit"`
+}
+
 type resourceHealthScanRequest struct {
 	Environment string   `json:"environment"`
 	ResourceIDs []string `json:"resource_ids"`
@@ -2576,6 +2585,77 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"deployment_rehearsal": rehearsal})
 	})
+	router.POST("/v1/projects/:project_id/release-admissions", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req releaseAdmissionRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		admission, err := deployment.BuildReleaseAdmission(c.Request.Context(), rootDir, deployment.ReleaseAdmissionOptions{
+			RehearsalID:  req.RehearsalID,
+			CandidateID:  req.CandidateID,
+			DeploymentID: req.DeploymentID,
+			ExecutionID:  req.ExecutionID,
+			Environment:  req.Environment,
+			MonitorLimit: req.MonitorLimit,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusCreated
+		if admission.Status == "blocked" || admission.Status == "manual_required" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"release_admission": admission})
+	})
+	router.GET("/v1/projects/:project_id/release-admissions", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		admissions, err := deployment.ListReleaseAdmissions(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"release_admissions": admissions})
+	})
+	router.GET("/v1/projects/:project_id/release-admissions/:admission_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		admission, found, err := deployment.LoadReleaseAdmission(rootDir, c.Param("admission_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "release admission not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"release_admission": admission})
+	})
 	router.GET("/v1/projects/:project_id/deployment-executions/:execution_id/post-deployment-history", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3564,6 +3644,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "deployment.monitor.summary", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case "/v1/projects/:project_id/deployment-rehearsals":
 		return authzRule{Action: "deployment.rehearsal", Risk: "normal", Scopes: []string{"deploy:write"}}, true
+	case "/v1/projects/:project_id/release-admissions":
+		return authzRule{Action: "release.admission", Risk: "normal", Scopes: []string{"release:write", "deploy:write"}}, true
 	case "/v1/projects/:project_id/visuals/assets/:asset_id/render":
 		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
 	case "/v1/projects/:project_id/resources/:resource_id/renew":
@@ -3638,6 +3720,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "deployment.monitor.summary", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case strings.HasSuffix(rawPath, "/deployment-rehearsals"):
 		return authzRule{Action: "deployment.rehearsal", Risk: "normal", Scopes: []string{"deploy:write"}}, true
+	case strings.HasSuffix(rawPath, "/release-admissions"):
+		return authzRule{Action: "release.admission", Risk: "normal", Scopes: []string{"release:write", "deploy:write"}}, true
 	case strings.Contains(rawPath, "/visuals/assets/") && strings.HasSuffix(rawPath, "/render"):
 		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
 	case strings.Contains(rawPath, "/resources/") && strings.HasSuffix(rawPath, "/renew"):

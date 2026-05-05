@@ -764,6 +764,32 @@ func TestBuildRehearsalLinksExecutionRollbackMonitorAndEvidence(t *testing.T) {
 	if err != nil || len(records) != 1 || records[0].Decision != "DEPLOYMENT_REHEARSAL_ATTENTION_REQUIRED" {
 		t.Fatalf("expected rehearsal evidence, records=%+v err=%v", records, err)
 	}
+
+	admission, err := BuildReleaseAdmission(context.Background(), root, ReleaseAdmissionOptions{RehearsalID: rehearsal.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if admission.Status != "blocked" || admission.Decision != "RELEASE_ADMISSION_BLOCKED" {
+		t.Fatalf("expected blocked admission from risky rehearsal, got %+v", admission)
+	}
+	if !hasAdmissionSignal(admission.Signals, "deployment_rehearsal") || !hasAdmissionSignal(admission.Signals, "monitor_summary") || !hasAdmissionSignal(admission.Signals, "rollback_preview") {
+		t.Fatalf("expected admission signals, got %+v", admission.Signals)
+	}
+	loadedAdmission, found, err := LoadReleaseAdmission(root, admission.ID)
+	if err != nil || !found {
+		t.Fatalf("expected admission to load, found=%v err=%v", found, err)
+	}
+	if loadedAdmission.ID != admission.ID || loadedAdmission.RehearsalID != rehearsal.ID {
+		t.Fatalf("expected loaded admission, got %+v", loadedAdmission)
+	}
+	admissions, err := ListReleaseAdmissions(root, 5)
+	if err != nil || len(admissions) != 1 || admissions[0].ID != admission.ID {
+		t.Fatalf("expected admission list, admissions=%+v err=%v", admissions, err)
+	}
+	admissionRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "release_admission", ParentID: admission.ID, Limit: 5})
+	if err != nil || len(admissionRecords) != 1 || admissionRecords[0].Decision != "RELEASE_ADMISSION_BLOCKED" {
+		t.Fatalf("expected admission evidence, records=%+v err=%v", admissionRecords, err)
+	}
 }
 
 func createDeploymentPlanWithHealthTarget(t *testing.T, root string, id string, target string) Plan {
@@ -857,6 +883,15 @@ func hasStep(steps []ExecutionStep, name string, status string) bool {
 }
 
 func hasRehearsalTimeline(items []RehearsalTimelineItem, itemType string) bool {
+	for _, item := range items {
+		if item.Type == itemType {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAdmissionSignal(items []AdmissionSignal, itemType string) bool {
 	for _, item := range items {
 		if item.Type == itemType {
 			return true

@@ -212,6 +212,9 @@ func usage() string {
 		"moyuan release provider preview <release-id>",
 		"moyuan release provider publish <release-id> [--approved] [--approval-id <approval-id>]",
 		"moyuan release provider execution <execution-id>",
+		"moyuan release admission create [--rehearsal-id <id>] [--candidate-id <id>] [--deployment-id <id>] [--execution-id <id>]",
+		"moyuan release admission <admission-id>",
+		"moyuan release admissions",
 		"moyuan resources add --id <id> --environment test_dev --host <host>",
 		"moyuan resources list",
 		"moyuan resources show <resource-id>",
@@ -1359,6 +1362,38 @@ func handleRelease(ctx context.Context, args []string, cwd string) (string, any,
 			}
 			return "", execution, 0, nil
 		}
+	case "admission":
+		if len(args) < 2 {
+			return "missing release admission command\n", nil, 1, nil
+		}
+		if args[1] == "create" {
+			limit, _ := strconv.Atoi(flagValue(args, "--monitor-limit", "10"))
+			admission, err := deployment.BuildReleaseAdmission(ctx, rootDir, deployment.ReleaseAdmissionOptions{
+				RehearsalID:  flagValue(args, "--rehearsal-id", ""),
+				CandidateID:  flagValue(args, "--candidate-id", ""),
+				DeploymentID: flagValue(args, "--deployment-id", ""),
+				ExecutionID:  flagValue(args, "--execution-id", ""),
+				Environment:  flagValue(args, "--environment", ""),
+				MonitorLimit: limit,
+			})
+			code := 0
+			if admission.Status == "blocked" {
+				code = 1
+			}
+			return "", admission, code, err
+		}
+		admission, ok, err := deployment.LoadReleaseAdmission(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", admission, 0, nil
+	case "admissions":
+		limit, _ := strconv.Atoi(flagValue(args, "--limit", "20"))
+		admissions, err := deployment.ListReleaseAdmissions(rootDir, limit)
+		return "", map[string]any{"release_admissions": admissions}, 0, err
 	}
 	return "unknown release command\n", nil, 1, nil
 }
