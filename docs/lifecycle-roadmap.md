@@ -569,9 +569,9 @@ Phase 1 的执行结果：
 
 ## 10. 当前阶段状态
 
-Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力、Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力、Phase 6 approval consumption/adapter telemetry/Console schema forms 能力和 Phase 7 受控真实外部执行准备已完成。
+Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力、Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力、Phase 6 approval consumption/adapter telemetry/Console schema forms 能力、Phase 7 受控真实外部执行准备和 Phase 8 受控外部执行 Beta 已完成。
 
-当前进入 Phase 8，执行入口见 [Phase 8 实现 Issue Graph](./phases/phase8-issue-graph.md) 和 [Phase 8 实施记录](./phases/phase8-next-development-plan.md)。Phase 8 先推进 release provider real adapter beta、SSH controlled execution、post-deploy smoke/monitor evidence、rollback runbook、Console operation drill-down 和 provider real quota/cost feedback。
+当前进入 Phase 9，执行入口见 [Phase 9 实现 Issue Graph](./phases/phase9-issue-graph.md) 和 [Phase 9 实施记录](./phases/phase9-next-development-plan.md)。Phase 9 先推进 operation detail 聚合 API、服务器资源生命周期提醒、部署监控历史、provider route explanation v2 和 self-repair candidate。
 
 Phase 1 第一批实现模块：
 

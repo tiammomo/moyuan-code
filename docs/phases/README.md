@@ -4,6 +4,9 @@
 
 ## 当前阶段
 
+- [Phase 9 实现 Issue Graph](./phase9-issue-graph.md)：Phase 9 生产运维控制面增强的依赖图。
+- [Phase 9 实施记录](./phase9-next-development-plan.md)：Phase 9 当前任务、执行范围和验收记录。
+- [Phase 8 Release Readiness](./phase8-release-readiness.md)：Phase 8 受控外部执行 Beta 的收口验证。
 - [Phase 8 实现 Issue Graph](./phase8-issue-graph.md)：Phase 8 受控外部执行 Beta 的依赖图。
 - [Phase 8 实施记录](./phase8-next-development-plan.md)：Phase 8 当前任务、执行范围和验收记录。
 - [Phase 7 Release Readiness](./phase7-release-readiness.md)：Phase 7 受控真实外部执行准备的收口验证。
