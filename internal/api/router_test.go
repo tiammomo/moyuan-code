@@ -466,12 +466,16 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"model_strategy":"low-cost-memory","includes_project_memory":true}`, http.StatusOK, `"route"`, `"low_cost_memory"`, `"glm-api"`)
 	t.Setenv("GLM_API_KEY", "")
 	assertPostContains(t, router, "/v1/projects/managed/providers/ops/refresh", `{"provider_id":"glm-api"}`, http.StatusOK, `"provider_ops_refresh"`, `"updated":1`, `"auth_ref_env_missing:GLM_API_KEY"`)
-	controlLoopRun := assertPostControlLoop(t, router, "/v1/projects/managed/control-loop/run", `{}`, http.StatusAccepted)
+	controlLoopRun := assertPostControlLoop(t, router, "/v1/projects/managed/control-loop/run", `{"idempotency_key":"api-phase19","steps":["resource_health_scan","operations_audit_export","decision_ledger_refresh"],"environment":"test_dev","retry_budget":1}`, http.StatusAccepted)
 	if len(controlLoopRun.Steps) != 3 {
 		t.Fatalf("expected 3 control loop steps, got %+v", controlLoopRun.Steps)
 	}
-	assertGETContains(t, router, "/v1/projects/managed/control-loop/runs?limit=5", http.StatusOK, `"control_loop_runs"`, controlLoopRun.ID, `"resource_lifecycle_scan"`)
-	assertGETContains(t, router, "/v1/projects/managed/control-loop/runs/"+controlLoopRun.ID, http.StatusOK, `"control_loop_run"`, `"project_comprehension_refresh"`)
+	replayedControlLoopRun := assertPostControlLoop(t, router, "/v1/projects/managed/control-loop/run", `{"idempotency_key":"api-phase19","steps":["resource_health_scan"],"environment":"test_dev"}`, http.StatusAccepted)
+	if replayedControlLoopRun.ID != controlLoopRun.ID || !replayedControlLoopRun.IdempotentReplay {
+		t.Fatalf("expected idempotent control loop replay, got %+v original=%+v", replayedControlLoopRun, controlLoopRun)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/control-loop/runs?limit=5", http.StatusOK, `"control_loop_runs"`, controlLoopRun.ID, `"resource_health_scan"`)
+	assertGETContains(t, router, "/v1/projects/managed/control-loop/runs/"+controlLoopRun.ID, http.StatusOK, `"control_loop_run"`, `"decision_ledger_refresh"`)
 	assertPostContains(t, router, "/v1/projects/managed/providers/glm-api/ops", `{"quota":{"status":"exhausted"}}`, http.StatusOK, `"quota"`, `"exhausted"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"memory_curator","task_type":"memory_extraction","includes_project_memory":true}`, http.StatusOK, `"route"`, `"codex_cli"`)
 	assertPostContains(t, router, "/v1/projects/managed/provider-route", `{"role":"backend","requires_repo_edit":true,"includes_secrets":true}`, http.StatusAccepted, `"ROUTE_BLOCKED"`, `"contains_secret_context"`)

@@ -13,6 +13,7 @@ import (
 	"moyuan-code/internal/api"
 	"moyuan-code/internal/auth"
 	"moyuan-code/internal/comprehension"
+	"moyuan-code/internal/controlloop"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/evidence"
@@ -108,6 +109,8 @@ func Run(ctx context.Context, argv []string, stdout io.Writer, stderr io.Writer)
 		text, result, exitCode, err = handleEvidence(argv[1:], cwd)
 	case "operations":
 		text, result, exitCode, err = handleOperations(argv[1:], cwd)
+	case "control-loop":
+		text, result, exitCode, err = handleControlLoop(ctx, argv[1:], cwd)
 	case "visuals":
 		text, result, exitCode, err = handleVisuals(ctx, argv[1:], cwd)
 	case "logs":
@@ -258,6 +261,9 @@ func usage() string {
 		"moyuan operations timeline [--type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
 		"moyuan operations audit-export [--format json|markdown] [--type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
 		"moyuan operations decision-ledger [--source-type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
+		"moyuan control-loop run [--step <type>] [--idempotency-key <key>] [--retry-budget 0] [--environment <env>] [--deployment-execution-id <id>]",
+		"moyuan control-loop list [--limit 20]",
+		"moyuan control-loop show <run-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -1905,6 +1911,54 @@ func handleOperations(args []string, cwd string) (string, any, int, error) {
 		return "", map[string]any{"decision_ledger": ledger}, 0, err
 	}
 	return "unknown operations command\n", nil, 1, nil
+}
+
+func handleControlLoop(ctx context.Context, args []string, cwd string) (string, any, int, error) {
+	rootDir := mustRoot(cwd)
+	if len(args) == 0 {
+		return "unknown control-loop command\n", nil, 1, nil
+	}
+	switch args[0] {
+	case "run":
+		run, err := controlloop.Run(ctx, rootDir, controlloop.RunOptions{
+			Trigger:               flagValue(args, "--trigger", "manual"),
+			RequestedBy:           flagValue(args, "--requested-by", ""),
+			IdempotencyKey:        flagValue(args, "--idempotency-key", ""),
+			RetryBudget:           flagInt(args, "--retry-budget", 0),
+			RetryAttempt:          flagInt(args, "--retry-attempt", 0),
+			Steps:                 flagValues(args, "--step"),
+			MaxSteps:              flagInt(args, "--max-steps", 10),
+			StepTimeoutMS:         flagInt(args, "--step-timeout-ms", 30000),
+			Environment:           flagValue(args, "--environment", ""),
+			ResourceIDs:           flagValues(args, "--resource-id"),
+			DeploymentExecutionID: flagValue(args, "--deployment-execution-id", ""),
+			MonitorLimit:          flagInt(args, "--monitor-limit", 20),
+			AuditFormat:           flagValue(args, "--audit-format", "json"),
+			ProviderID:            flagValue(args, "--provider", ""),
+			IncludeDisabled:       hasFlag(args, "--include-disabled"),
+			Probe:                 hasFlag(args, "--probe"),
+			ProbeApproved:         hasFlag(args, "--probe-approved"),
+			ProbeTimeoutMS:        flagInt(args, "--probe-timeout-ms", 0),
+			ComprehensionSince:    flagValue(args, "--comprehension-since", ""),
+		})
+		return "", map[string]any{"control_loop_run": run}, 0, err
+	case "list":
+		runs, err := controlloop.List(rootDir, flagInt(args, "--limit", 20))
+		return "", map[string]any{"control_loop_runs": runs}, 0, err
+	case "show":
+		if len(args) < 2 {
+			return "missing control loop run id\n", nil, 1, nil
+		}
+		run, found, err := controlloop.Load(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !found {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", map[string]any{"control_loop_run": run}, 0, nil
+	}
+	return "unknown control-loop command\n", nil, 1, nil
 }
 
 func modelsFromCLI(args []string) []providers.Model {

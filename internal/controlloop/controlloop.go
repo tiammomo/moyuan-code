@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"moyuan-code/internal/comprehension"
+	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
+	"moyuan-code/internal/operations"
 	"moyuan-code/internal/providers"
 	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/workspace"
@@ -22,36 +24,52 @@ import (
 
 const (
 	StepResourceLifecycleScan       = "resource_lifecycle_scan"
+	StepResourceHealthScan          = "resource_health_scan"
 	StepProviderOpsRefresh          = "provider_ops_refresh"
 	StepProjectComprehensionRefresh = "project_comprehension_refresh"
+	StepOperationsAuditExport       = "operations_audit_export"
+	StepDecisionLedgerRefresh       = "decision_ledger_refresh"
+	StepPostDeploymentVerification  = "post_deployment_verification"
 )
 
 type RunOptions struct {
-	Trigger            string   `json:"trigger,omitempty"`
-	RequestedBy        string   `json:"requested_by,omitempty"`
-	Steps              []string `json:"steps,omitempty"`
-	MaxSteps           int      `json:"max_steps,omitempty"`
-	StepTimeoutMS      int      `json:"step_timeout_ms,omitempty"`
-	ProviderID         string   `json:"provider_id,omitempty"`
-	IncludeDisabled    bool     `json:"include_disabled,omitempty"`
-	Probe              bool     `json:"probe,omitempty"`
-	ProbeApproved      bool     `json:"probe_approved,omitempty"`
-	ProbeTimeoutMS     int      `json:"probe_timeout_ms,omitempty"`
-	ComprehensionSince string   `json:"comprehension_since,omitempty"`
+	Trigger               string   `json:"trigger,omitempty"`
+	RequestedBy           string   `json:"requested_by,omitempty"`
+	IdempotencyKey        string   `json:"idempotency_key,omitempty"`
+	RetryBudget           int      `json:"retry_budget,omitempty"`
+	RetryAttempt          int      `json:"retry_attempt,omitempty"`
+	Steps                 []string `json:"steps,omitempty"`
+	MaxSteps              int      `json:"max_steps,omitempty"`
+	StepTimeoutMS         int      `json:"step_timeout_ms,omitempty"`
+	Environment           string   `json:"environment,omitempty"`
+	ResourceIDs           []string `json:"resource_ids,omitempty"`
+	DeploymentExecutionID string   `json:"deployment_execution_id,omitempty"`
+	MonitorLimit          int      `json:"monitor_limit,omitempty"`
+	AuditFormat           string   `json:"audit_format,omitempty"`
+	ProviderID            string   `json:"provider_id,omitempty"`
+	IncludeDisabled       bool     `json:"include_disabled,omitempty"`
+	Probe                 bool     `json:"probe,omitempty"`
+	ProbeApproved         bool     `json:"probe_approved,omitempty"`
+	ProbeTimeoutMS        int      `json:"probe_timeout_ms,omitempty"`
+	ComprehensionSince    string   `json:"comprehension_since,omitempty"`
 }
 
 type RunRecord struct {
-	ID            string       `json:"id"`
-	Status        string       `json:"status"`
-	Decision      string       `json:"decision"`
-	Trigger       string       `json:"trigger"`
-	RequestedBy   string       `json:"requested_by,omitempty"`
-	MaxSteps      int          `json:"max_steps"`
-	StepTimeoutMS int          `json:"step_timeout_ms"`
-	Steps         []StepRecord `json:"steps"`
-	Reasons       []string     `json:"reasons,omitempty"`
-	StartedAt     string       `json:"started_at"`
-	FinishedAt    string       `json:"finished_at"`
+	ID               string       `json:"id"`
+	Status           string       `json:"status"`
+	Decision         string       `json:"decision"`
+	Trigger          string       `json:"trigger"`
+	RequestedBy      string       `json:"requested_by,omitempty"`
+	IdempotencyKey   string       `json:"idempotency_key,omitempty"`
+	IdempotentReplay bool         `json:"idempotent_replay,omitempty"`
+	RetryBudget      int          `json:"retry_budget"`
+	RetryAttempt     int          `json:"retry_attempt"`
+	MaxSteps         int          `json:"max_steps"`
+	StepTimeoutMS    int          `json:"step_timeout_ms"`
+	Steps            []StepRecord `json:"steps"`
+	Reasons          []string     `json:"reasons,omitempty"`
+	StartedAt        string       `json:"started_at"`
+	FinishedAt       string       `json:"finished_at"`
 }
 
 type StepRecord struct {
@@ -69,6 +87,12 @@ type StepRecord struct {
 	DurationMS  int64                  `json:"duration_ms"`
 }
 
+type idempotencyRecord struct {
+	Key       string `json:"key"`
+	RunID     string `json:"run_id"`
+	CreatedAt string `json:"created_at"`
+}
+
 func Run(ctx context.Context, rootDir string, options RunOptions) (RunRecord, error) {
 	if err := workspace.EnsureDirs(workspace.ForRoot(rootDir)); err != nil {
 		return RunRecord{}, err
@@ -77,18 +101,39 @@ func Run(ctx context.Context, rootDir string, options RunOptions) (RunRecord, er
 	if len(options.Steps) > options.MaxSteps {
 		return RunRecord{}, errors.New("control_loop_steps_exceed_max")
 	}
+	if options.IdempotencyKey != "" {
+		existing, found, err := loadIdempotentRun(rootDir, options.IdempotencyKey)
+		if err != nil {
+			return RunRecord{}, err
+		}
+		if found {
+			existing.IdempotentReplay = true
+			return existing, nil
+		}
+	}
 	start := time.Now().UTC()
 	run := RunRecord{
-		ID:            "control-loop-" + timeID(start),
-		Status:        "running",
-		Decision:      "CONTROL_LOOP_RUNNING",
-		Trigger:       options.Trigger,
-		RequestedBy:   options.RequestedBy,
-		MaxSteps:      options.MaxSteps,
-		StepTimeoutMS: options.StepTimeoutMS,
-		Steps:         []StepRecord{},
-		Reasons:       []string{},
-		StartedAt:     start.Format(time.RFC3339Nano),
+		ID:             "control-loop-" + timeID(start),
+		Status:         "running",
+		Decision:       "CONTROL_LOOP_RUNNING",
+		Trigger:        options.Trigger,
+		RequestedBy:    options.RequestedBy,
+		IdempotencyKey: options.IdempotencyKey,
+		RetryBudget:    options.RetryBudget,
+		RetryAttempt:   options.RetryAttempt,
+		MaxSteps:       options.MaxSteps,
+		StepTimeoutMS:  options.StepTimeoutMS,
+		Steps:          []StepRecord{},
+		Reasons:        []string{},
+		StartedAt:      start.Format(time.RFC3339Nano),
+	}
+	if err := writeRunFile(rootDir, run); err != nil {
+		return RunRecord{}, err
+	}
+	if options.IdempotencyKey != "" {
+		if err := saveIdempotency(rootDir, options.IdempotencyKey, run.ID, run.StartedAt); err != nil {
+			return RunRecord{}, err
+		}
 	}
 	for idx, stepType := range options.Steps {
 		step := runStep(ctx, rootDir, run.ID, idx+1, stepType, options)
@@ -104,7 +149,11 @@ func Run(ctx context.Context, rootDir string, options RunOptions) (RunRecord, er
 	}
 	finished := time.Now().UTC()
 	run.FinishedAt = finished.Format(time.RFC3339Nano)
-	if run.Status != "failed" {
+	if run.Status == "failed" && retryBudgetExhausted(run) {
+		run.Status = "manual_required"
+		run.Decision = "CONTROL_RUNNER_RETRY_BUDGET_EXHAUSTED"
+		run.Reasons = append(run.Reasons, "retry_budget_exhausted")
+	} else if run.Status != "failed" {
 		run.Status = "completed"
 		run.Decision = "CONTROL_LOOP_COMPLETED"
 		if hasAttention(run.Steps) {
@@ -172,15 +221,24 @@ func runStep(ctx context.Context, rootDir string, runID string, ordinal int, ste
 	switch stepType {
 	case StepResourceLifecycleScan:
 		step = runResourceLifecycle(rootDir, step)
+	case StepResourceHealthScan:
+		step = runResourceHealthScan(ctx, rootDir, step, options)
 	case StepProviderOpsRefresh:
 		step = runProviderOps(rootDir, step, options)
 	case StepProjectComprehensionRefresh:
 		step = runComprehension(ctx, rootDir, step, options)
+	case StepOperationsAuditExport:
+		step = runOperationsAuditExport(rootDir, step, options)
+	case StepDecisionLedgerRefresh:
+		step = runDecisionLedger(rootDir, step, options)
+	case StepPostDeploymentVerification:
+		step = runPostDeploymentVerification(rootDir, step, options)
 	default:
-		step.Status = "skipped"
-		step.Decision = "CONTROL_LOOP_STEP_SKIPPED"
-		step.Summary = "unsupported control loop step"
+		step.Status = "failed"
+		step.Decision = "CONTROL_LOOP_STEP_FAILED"
+		step.Summary = "unsupported control runner step"
 		step.Reasons = append(step.Reasons, "unsupported_step:"+stepType)
+		step.Error = "unsupported_step:" + stepType
 	}
 	finishStep(rootDir, runID, &step)
 	return step
@@ -202,6 +260,29 @@ func runResourceLifecycle(rootDir string, step StepRecord) StepRecord {
 		Kind: "resource_lifecycle_scan",
 		ID:   report.ID,
 		Path: ".moyuan/resources/lifecycle-scans/" + report.ID + ".json",
+	})
+	return step
+}
+
+func runResourceHealthScan(ctx context.Context, rootDir string, step StepRecord, options RunOptions) StepRecord {
+	report, err := serverresources.HealthScan(ctx, rootDir, serverresources.HealthScanOptions{
+		Environment: options.Environment,
+		ResourceIDs: append([]string{}, options.ResourceIDs...),
+	})
+	if err != nil {
+		return failStep(step, err)
+	}
+	step.Status = "completed"
+	if report.Status == "attention_required" || report.Status == "blocked" {
+		step.Status = report.Status
+	}
+	step.Decision = report.Decision
+	step.Summary = plural(len(report.Results), "resource health result")
+	step.Reasons = append(step.Reasons, report.Reasons...)
+	step.Artifacts = append(step.Artifacts, evidence.ArtifactRef{
+		Kind: "resource_health_scan",
+		ID:   report.ID,
+		Path: ".moyuan/resources/checks/" + report.ID + ".json",
 	})
 	return step
 }
@@ -237,6 +318,74 @@ func runProviderOps(rootDir string, step StepRecord, options RunOptions) StepRec
 	step.Artifacts = append(step.Artifacts, evidence.ArtifactRef{
 		Kind: "provider_telemetry",
 		Path: ".moyuan/models/provider-telemetry.jsonl",
+	})
+	return step
+}
+
+func runOperationsAuditExport(rootDir string, step StepRecord, options RunOptions) StepRecord {
+	report, err := operations.ExportAudit(rootDir, operations.AuditExportOptions{
+		Environment: options.Environment,
+		Limit:       options.MaxSteps * 10,
+		Format:      options.AuditFormat,
+	})
+	if err != nil {
+		return failStep(step, err)
+	}
+	step.Status = "completed"
+	if report.Summary.AttentionItemCount > 0 {
+		step.Status = "attention_required"
+	}
+	step.Decision = "OPERATIONS_AUDIT_EXPORT_READY"
+	step.Summary = plural(report.Summary.TimelineItemCount, "audit timeline item")
+	step.Reasons = append(step.Reasons, "evidence_refs:"+strconv.Itoa(report.Summary.EvidenceRefCount))
+	return step
+}
+
+func runDecisionLedger(rootDir string, step StepRecord, options RunOptions) StepRecord {
+	ledger, err := operations.BuildDecisionLedger(rootDir, operations.DecisionLedgerOptions{
+		Environment: options.Environment,
+		Limit:       options.MaxSteps * 10,
+	})
+	if err != nil {
+		return failStep(step, err)
+	}
+	step.Status = "completed"
+	if ledger.Summary.AttentionCount > 0 {
+		step.Status = "attention_required"
+	}
+	step.Decision = "DECISION_LEDGER_REFRESHED"
+	step.Summary = plural(ledger.Summary.EntryCount, "decision ledger entry")
+	step.Reasons = append(step.Reasons, "evidence_refs:"+strconv.Itoa(ledger.Summary.EvidenceRefCount))
+	return step
+}
+
+func runPostDeploymentVerification(rootDir string, step StepRecord, options RunOptions) StepRecord {
+	if strings.TrimSpace(options.DeploymentExecutionID) == "" {
+		step.Status = "skipped"
+		step.Decision = "POST_DEPLOYMENT_VERIFICATION_SKIPPED"
+		step.Summary = "deployment execution id required"
+		step.Reasons = append(step.Reasons, "deployment_execution_id_required")
+		return step
+	}
+	verification, err := deployment.BuildPostDeploymentVerification(rootDir, deployment.PostDeploymentVerificationOptions{
+		ExecutionID:  options.DeploymentExecutionID,
+		Environment:  options.Environment,
+		MonitorLimit: options.MonitorLimit,
+	})
+	if err != nil {
+		return failStep(step, err)
+	}
+	step.Status = "completed"
+	if verification.Status == "attention_required" || verification.Status == "blocked" || verification.Status == "failed" {
+		step.Status = verification.Status
+	}
+	step.Decision = verification.Decision
+	step.Summary = "post-deployment verification " + verification.Status
+	step.Reasons = append(step.Reasons, verification.Reasons...)
+	step.Artifacts = append(step.Artifacts, evidence.ArtifactRef{
+		Kind: "post_deployment_verification",
+		ID:   verification.ID,
+		Path: ".moyuan/lifecycle/deployments/post-deployment-verifications/" + verification.ID + ".json",
 	})
 	return step
 }
@@ -305,8 +454,21 @@ func normalizeOptions(options RunOptions) RunOptions {
 		options.Trigger = "manual"
 	}
 	options.RequestedBy = strings.TrimSpace(options.RequestedBy)
+	options.IdempotencyKey = strings.TrimSpace(options.IdempotencyKey)
+	options.Environment = normalizeToken(options.Environment)
+	options.DeploymentExecutionID = strings.TrimSpace(options.DeploymentExecutionID)
+	options.AuditFormat = normalizeToken(options.AuditFormat)
 	options.ProviderID = strings.TrimSpace(options.ProviderID)
 	options.ComprehensionSince = strings.TrimSpace(options.ComprehensionSince)
+	if options.RetryBudget < 0 {
+		options.RetryBudget = 0
+	}
+	if options.RetryAttempt < 0 {
+		options.RetryAttempt = 0
+	}
+	if options.MonitorLimit <= 0 {
+		options.MonitorLimit = 20
+	}
 	if options.MaxSteps <= 0 {
 		options.MaxSteps = 10
 	}
@@ -320,6 +482,7 @@ func normalizeOptions(options RunOptions) RunOptions {
 	if len(options.Steps) == 0 {
 		options.Steps = []string{StepResourceLifecycleScan, StepProviderOpsRefresh, StepProjectComprehensionRefresh}
 	}
+	options.ResourceIDs = compactOptionStrings(options.ResourceIDs)
 	return options
 }
 
@@ -341,10 +504,45 @@ func save(rootDir string, run RunRecord) error {
 	if err := fsutil.EnsureDir(runsDir(rootDir)); err != nil {
 		return err
 	}
-	if err := fsutil.WriteJSON(filepath.Join(runsDir(rootDir), run.ID+".json"), run); err != nil {
+	if err := writeRunFile(rootDir, run); err != nil {
 		return err
 	}
 	return fsutil.AppendJSONL(runsJSONLPath(rootDir), run)
+}
+
+func writeRunFile(rootDir string, run RunRecord) error {
+	if err := fsutil.EnsureDir(runsDir(rootDir)); err != nil {
+		return err
+	}
+	return fsutil.WriteJSON(filepath.Join(runsDir(rootDir), run.ID+".json"), run)
+}
+
+func retryBudgetExhausted(run RunRecord) bool {
+	if run.RetryBudget <= 0 {
+		return true
+	}
+	return run.RetryAttempt >= run.RetryBudget
+}
+
+func saveIdempotency(rootDir string, key string, runID string, createdAt string) error {
+	if key == "" {
+		return nil
+	}
+	if err := fsutil.EnsureDir(idempotencyDir(rootDir)); err != nil {
+		return err
+	}
+	record := idempotencyRecord{Key: key, RunID: runID, CreatedAt: createdAt}
+	return fsutil.WriteJSON(idempotencyPath(rootDir, key), record)
+}
+
+func loadIdempotentRun(rootDir string, key string) (RunRecord, bool, error) {
+	var record idempotencyRecord
+	found, err := fsutil.ReadJSON(idempotencyPath(rootDir, key), &record)
+	if err != nil || !found || record.RunID == "" {
+		return RunRecord{}, false, err
+	}
+	run, runFound, err := Load(rootDir, record.RunID)
+	return run, runFound, err
 }
 
 func hasAttention(steps []StepRecord) bool {
@@ -382,6 +580,39 @@ func runsJSONLPath(rootDir string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).ControlLoopDir, "runs.jsonl")
 }
 
+func idempotencyDir(rootDir string) string {
+	return filepath.Join(workspace.ForRoot(rootDir).ControlLoopDir, "idempotency")
+}
+
+func idempotencyPath(rootDir string, key string) string {
+	return filepath.Join(idempotencyDir(rootDir), safeKey(key)+".json")
+}
+
+func safeKey(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	var b strings.Builder
+	lastDash := false
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	key := strings.Trim(b.String(), "-")
+	if key == "" {
+		return "run"
+	}
+	if len(key) > 120 {
+		return strings.Trim(key[:120], "-")
+	}
+	return key
+}
+
 func cleanID(id string) (string, bool) {
 	id = strings.TrimSpace(id)
 	if id == "" || strings.Contains(id, "/") || strings.Contains(id, "\\") || strings.Contains(id, "..") {
@@ -402,6 +633,20 @@ func sanitizeReason(value string) string {
 		return value[:240]
 	}
 	return value
+}
+
+func compactOptionStrings(values []string) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func timeID(t time.Time) string {

@@ -218,6 +218,25 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	assertContains(t, ledger.stdout, `"POST_DEPLOYMENT_VERIFICATION_ATTENTION_REQUIRED"`)
 }
 
+func TestControlLoopCLIRunsDurableIdempotentSteps(t *testing.T) {
+	root := createTempRepo(t)
+	runCLI(t, root, "project", "add", "--local", root)
+	runCLI(t, root, "resources", "add", "--id", "dev-loop", "--environment", "test_dev", "--host", "10.0.0.20", "--provider", "local_vm", "--owner", "ops", "--auth-ref", "env:DEV_SERVER_SSH_KEY", "--expires-at", "2099-01-01")
+
+	first := runCLI(t, root, "control-loop", "run", "--idempotency-key", "cli-phase19", "--retry-budget", "1", "--environment", "test_dev", "--step", "resource_health_scan", "--step", "operations_audit_export", "--step", "decision_ledger_refresh")
+	assertContains(t, first.stdout, `"control_loop_run"`)
+	assertContains(t, first.stdout, `"idempotency_key": "cli-phase19"`)
+	runID := decodeControlLoopRunID(t, first.stdout)
+	replayed := runCLI(t, root, "control-loop", "run", "--idempotency-key", "cli-phase19", "--step", "resource_health_scan")
+	assertContains(t, replayed.stdout, runID)
+	assertContains(t, replayed.stdout, `"idempotent_replay": true`)
+	list := runCLI(t, root, "control-loop", "list")
+	assertContains(t, list.stdout, `"control_loop_runs"`)
+	assertContains(t, list.stdout, runID)
+	shown := runCLI(t, root, "control-loop", "show", runID)
+	assertContains(t, shown.stdout, `"decision_ledger_refresh"`)
+}
+
 func TestMaintenancePolicyCLIExplainsProductionGate(t *testing.T) {
 	root := createTempRepo(t)
 	runCLI(t, root, "project", "add", "--local", root)
@@ -1145,6 +1164,22 @@ func decodeVisualAssetID(t *testing.T, raw string) string {
 		t.Fatalf("missing asset.id in output: %s", raw)
 	}
 	return payload.Asset.ID
+}
+
+func decodeControlLoopRunID(t *testing.T, raw string) string {
+	t.Helper()
+	var payload struct {
+		Run struct {
+			ID string `json:"id"`
+		} `json:"control_loop_run"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode control loop run id: %v\n%s", err, raw)
+	}
+	if payload.Run.ID == "" {
+		t.Fatalf("missing control_loop_run.id in output: %s", raw)
+	}
+	return payload.Run.ID
 }
 
 func decodeStringField(t *testing.T, raw string, field string) string {

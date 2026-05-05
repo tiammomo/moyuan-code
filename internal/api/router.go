@@ -67,17 +67,25 @@ type providerOpsRefreshRequest struct {
 }
 
 type controlLoopRunRequest struct {
-	Trigger            string   `json:"trigger"`
-	RequestedBy        string   `json:"requested_by"`
-	Steps              []string `json:"steps"`
-	MaxSteps           int      `json:"max_steps"`
-	StepTimeoutMS      int      `json:"step_timeout_ms"`
-	ProviderID         string   `json:"provider_id"`
-	IncludeDisabled    bool     `json:"include_disabled"`
-	Probe              bool     `json:"probe"`
-	ProbeApproved      bool     `json:"probe_approved"`
-	ProbeTimeoutMS     int      `json:"probe_timeout_ms"`
-	ComprehensionSince string   `json:"comprehension_since"`
+	Trigger               string   `json:"trigger"`
+	RequestedBy           string   `json:"requested_by"`
+	IdempotencyKey        string   `json:"idempotency_key"`
+	RetryBudget           int      `json:"retry_budget"`
+	RetryAttempt          int      `json:"retry_attempt"`
+	Steps                 []string `json:"steps"`
+	MaxSteps              int      `json:"max_steps"`
+	StepTimeoutMS         int      `json:"step_timeout_ms"`
+	Environment           string   `json:"environment"`
+	ResourceIDs           []string `json:"resource_ids"`
+	DeploymentExecutionID string   `json:"deployment_execution_id"`
+	MonitorLimit          int      `json:"monitor_limit"`
+	AuditFormat           string   `json:"audit_format"`
+	ProviderID            string   `json:"provider_id"`
+	IncludeDisabled       bool     `json:"include_disabled"`
+	Probe                 bool     `json:"probe"`
+	ProbeApproved         bool     `json:"probe_approved"`
+	ProbeTimeoutMS        int      `json:"probe_timeout_ms"`
+	ComprehensionSince    string   `json:"comprehension_since"`
 }
 
 type batchPlanRequest struct {
@@ -3180,24 +3188,32 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		run, err := controlloop.Run(c.Request.Context(), rootDir, controlloop.RunOptions{
-			Trigger:            req.Trigger,
-			RequestedBy:        req.RequestedBy,
-			Steps:              req.Steps,
-			MaxSteps:           req.MaxSteps,
-			StepTimeoutMS:      req.StepTimeoutMS,
-			ProviderID:         req.ProviderID,
-			IncludeDisabled:    req.IncludeDisabled,
-			Probe:              req.Probe,
-			ProbeApproved:      req.ProbeApproved,
-			ProbeTimeoutMS:     req.ProbeTimeoutMS,
-			ComprehensionSince: req.ComprehensionSince,
+			Trigger:               req.Trigger,
+			RequestedBy:           req.RequestedBy,
+			IdempotencyKey:        req.IdempotencyKey,
+			RetryBudget:           req.RetryBudget,
+			RetryAttempt:          req.RetryAttempt,
+			Steps:                 req.Steps,
+			MaxSteps:              req.MaxSteps,
+			StepTimeoutMS:         req.StepTimeoutMS,
+			Environment:           req.Environment,
+			ResourceIDs:           req.ResourceIDs,
+			DeploymentExecutionID: req.DeploymentExecutionID,
+			MonitorLimit:          req.MonitorLimit,
+			AuditFormat:           req.AuditFormat,
+			ProviderID:            req.ProviderID,
+			IncludeDisabled:       req.IncludeDisabled,
+			Probe:                 req.Probe,
+			ProbeApproved:         req.ProbeApproved,
+			ProbeTimeoutMS:        req.ProbeTimeoutMS,
+			ComprehensionSince:    req.ComprehensionSince,
 		})
 		if err != nil {
 			writeError(c, http.StatusInternalServerError, err.Error())
 			return
 		}
 		status := http.StatusOK
-		if run.Status == "failed" || run.Decision == "CONTROL_LOOP_COMPLETED_WITH_ATTENTION" {
+		if run.Status == "failed" || run.Status == "manual_required" || run.Decision == "CONTROL_LOOP_COMPLETED_WITH_ATTENTION" {
 			status = http.StatusAccepted
 		}
 		c.JSON(status, gin.H{"control_loop_run": run})
