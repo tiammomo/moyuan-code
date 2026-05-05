@@ -31,6 +31,7 @@ import (
 type Plan struct {
 	ID             string               `json:"id"`
 	IssueID        string               `json:"issue_id"`
+	CandidateID    string               `json:"candidate_id,omitempty"`
 	Status         string               `json:"status"`
 	Decision       string               `json:"decision"`
 	Reasons        []string             `json:"reasons"`
@@ -81,6 +82,17 @@ type PRMRPlan struct {
 type CreateOptions struct {
 	Approved   bool   `json:"approved,omitempty"`
 	ApprovalID string `json:"approval_id,omitempty"`
+}
+
+type ReleaseCandidatePlanOptions struct {
+	CandidateID    string   `json:"candidate_id"`
+	CandidateReady bool     `json:"candidate_ready"`
+	Version        string   `json:"version,omitempty"`
+	Provider       string   `json:"provider,omitempty"`
+	RemoteName     string   `json:"remote_name,omitempty"`
+	RemoteURL      string   `json:"remote_url,omitempty"`
+	ReleaseBranch  string   `json:"release_branch,omitempty"`
+	Reasons        []string `json:"reasons,omitempty"`
 }
 
 type providerAPIConfig struct {
@@ -199,6 +211,81 @@ func CreatePlan(ctx context.Context, rootDir string, issueID string) (Plan, erro
 	return finish(rootDir, plan)
 }
 
+func PlanReleaseCandidate(rootDir string, options ReleaseCandidatePlanOptions) (Plan, error) {
+	options.CandidateID = strings.TrimSpace(options.CandidateID)
+	options.Provider = normalize(options.Provider)
+	options.RemoteName = strings.TrimSpace(options.RemoteName)
+	options.RemoteURL = strings.TrimSpace(options.RemoteURL)
+	options.ReleaseBranch = strings.TrimSpace(options.ReleaseBranch)
+	if options.CandidateID == "" {
+		return Plan{}, errors.New("candidate_id_required")
+	}
+	_ = workspace.EnsureDirs(workspace.ForRoot(rootDir))
+	now := time.Now().UTC()
+	plan := Plan{
+		ID:           "git-provider-plan-release-candidate-" + textutil.Slugify(options.CandidateID),
+		IssueID:      options.CandidateID,
+		CandidateID:  options.CandidateID,
+		Status:       "blocked",
+		Decision:     "GIT_PROVIDER_BLOCKED",
+		Reasons:      append([]string{}, options.Reasons...),
+		Provider:     options.Provider,
+		RemoteName:   defaultString(options.RemoteName, "origin"),
+		RemoteURL:    options.RemoteURL,
+		TargetBranch: options.ReleaseBranch,
+		CreatedAt:    now.Format(time.RFC3339Nano),
+	}
+	if !options.CandidateReady {
+		if len(plan.Reasons) == 0 {
+			plan.Reasons = append(plan.Reasons, "release_candidate_not_ready")
+		}
+		return finish(rootDir, plan)
+	}
+	if plan.TargetBranch == "" {
+		plan.Reasons = append(plan.Reasons, "release_branch_missing")
+		return finish(rootDir, plan)
+	}
+	if plan.RemoteURL == "" {
+		plan.Reasons = append(plan.Reasons, "remote_url_missing")
+		return finish(rootDir, plan)
+	}
+	if plan.Provider == "" {
+		plan.Provider = detectProvider("", plan.RemoteURL)
+	}
+	ws, err := workspace.Load(rootDir)
+	if err != nil {
+		return Plan{}, err
+	}
+	plan.BaseBranch = baseBranch(ws, "")
+	plan.Capabilities = capabilitiesFor(plan.Provider)
+	if !plan.Capabilities.Push {
+		plan.Reasons = append(plan.Reasons, "provider_push_unsupported:"+plan.Provider)
+		return finish(rootDir, plan)
+	}
+	plan.PushCommand = "git push " + plan.RemoteName + " " + plan.TargetBranch
+	plan.PRMR = prmrPlan(rootDir, plan.Provider, options.CandidateID, plan.BaseBranch, plan.TargetBranch, plan.RemoteURL)
+	plan.PRMR.Title = "Release " + defaultString(options.Version, options.CandidateID)
+	plan.PRMR.Body = "Release candidate " + options.CandidateID + " from " + plan.TargetBranch + " to " + plan.BaseBranch + "."
+	if !plan.Capabilities.PullRequest && !plan.Capabilities.MergeRequest {
+		plan.Status = "push_plan_ready"
+		plan.Decision = "PUSH_ALLOWED_PR_MR_UNSUPPORTED"
+		plan.ManualRequired = true
+		plan.Reasons = append(plan.Reasons, "provider_pr_mr_unsupported")
+		return finish(rootDir, plan)
+	}
+	if !apiAuthAvailable(rootDir, plan.Provider, plan.RemoteURL) {
+		plan.Status = "push_plan_ready"
+		plan.Decision = "PUSH_ALLOWED_PR_MR_MANUAL"
+		plan.ManualRequired = true
+		plan.Reasons = append(plan.Reasons, "api_auth_missing_for_pr_mr")
+		return finish(rootDir, plan)
+	}
+	plan.Status = "pr_mr_plan_ready"
+	plan.Decision = "PR_MR_ALLOWED"
+	plan.Reasons = append(plan.Reasons, "release_candidate_ready_remote_ready")
+	return finish(rootDir, plan)
+}
+
 func Load(rootDir string, id string) (Plan, bool, error) {
 	var plan Plan
 	found, err := fsutil.ReadJSON(planPath(rootDir, id), &plan)
@@ -303,6 +390,16 @@ func Create(ctx context.Context, rootDir string, id string, options CreateOption
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if !options.Approved {
+		metadata := map[string]any{
+			"plan_id":       plan.ID,
+			"issue_id":      plan.IssueID,
+			"provider":      plan.Provider,
+			"base_branch":   plan.BaseBranch,
+			"target_branch": plan.TargetBranch,
+		}
+		if plan.CandidateID != "" {
+			metadata["candidate_id"] = plan.CandidateID
+		}
 		approval, err := approvals.Request(rootDir, approvals.RequestOptions{
 			TargetType:  "git_provider_pr_mr",
 			TargetID:    plan.ID,
@@ -310,13 +407,7 @@ func Create(ctx context.Context, rootDir string, id string, options CreateOption
 			RiskLevel:   "high",
 			RequestedBy: "system",
 			Reason:      "PR/MR creation writes to the remote Git provider",
-			Metadata: map[string]any{
-				"plan_id":       plan.ID,
-				"issue_id":      plan.IssueID,
-				"provider":      plan.Provider,
-				"base_branch":   plan.BaseBranch,
-				"target_branch": plan.TargetBranch,
-			},
+			Metadata:    metadata,
 		})
 		if err != nil {
 			return Plan{}, true, err

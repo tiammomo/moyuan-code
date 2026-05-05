@@ -131,6 +131,55 @@ func TestPRMRPreviewApprovalAndGitHubCreate(t *testing.T) {
 	assertFileDoesNotContain(t, filepath.Join(workspace.ForRoot(root).PullRequestsDir, "plans.jsonl"), "github-secret-token")
 }
 
+func TestPlanReleaseCandidatePRMRAndCreateApprovalFlow(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_PROVIDER_TOKEN_TEST", "github-secret-token")
+	writeGitProviderSecretPolicy(t, root)
+	writeGitProviderRepositoryConfig(t, root, "https://api.github.test")
+
+	plan, err := PlanReleaseCandidate(root, ReleaseCandidatePlanOptions{
+		CandidateID:    "release-candidate-v0.2.0",
+		CandidateReady: true,
+		Version:        "v0.2.0",
+		Provider:       "github",
+		RemoteName:     "origin",
+		RemoteURL:      "https://github.com/moyuan/example.git",
+		ReleaseBranch:  "release/v0.2.0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.ID != "git-provider-plan-release-candidate-release-candidate-v0-2-0" || plan.CandidateID != "release-candidate-v0.2.0" {
+		t.Fatalf("expected stable candidate plan id, got %+v", plan)
+	}
+	if plan.Status != "pr_mr_plan_ready" || plan.Decision != "PR_MR_ALLOWED" || plan.TargetBranch != "release/v0.2.0" || plan.PRMR.CreateMode != "api" {
+		t.Fatalf("expected candidate PR/MR plan ready, got %+v", plan)
+	}
+	approvalRequired, ok, err := Create(context.Background(), root, plan.ID, CreateOptions{})
+	if err != nil || !ok {
+		t.Fatalf("expected create approval requirement, ok=%v err=%v", ok, err)
+	}
+	if approvalRequired.PRMR.CreateDecision != "PR_MR_CREATE_APPROVAL_REQUIRED" || approvalRequired.PRMR.ApprovalID == "" {
+		t.Fatalf("expected PR/MR approval requirement, got %+v", approvalRequired.PRMR)
+	}
+	if _, _, err := approvals.Decide(root, approvalRequired.PRMR.ApprovalID, approvals.DecisionOptions{Decision: "approved", DecidedBy: "release-manager", Reason: "candidate pr ready"}); err != nil {
+		t.Fatal(err)
+	}
+	previewOnly, ok, err := Create(context.Background(), root, plan.ID, CreateOptions{Approved: true, ApprovalID: approvalRequired.PRMR.ApprovalID})
+	if err != nil || !ok {
+		t.Fatalf("expected preview-only create, ok=%v err=%v", ok, err)
+	}
+	if previewOnly.PRMR.CreateDecision != "PR_MR_CREATE_PREVIEW_ONLY" || previewOnly.CandidateID != plan.CandidateID {
+		t.Fatalf("expected candidate PR/MR create preview-only, got %+v", previewOnly)
+	}
+	if _, found, err := approvals.VerifyApproved(root, approvalRequired.PRMR.ApprovalID, approvals.RequestOptions{TargetType: "git_provider_pr_mr", TargetID: plan.ID, Action: "git.pr_mr.create"}); err != nil || !found {
+		t.Fatalf("expected preview-only PR/MR create to keep approval reusable, found=%v err=%v", found, err)
+	}
+}
+
 func writeGitProviderSecretPolicy(t *testing.T, root string) {
 	t.Helper()
 	path := filepath.Join(workspace.ForRoot(root).MoyuanDir, "policies", "secrets.yaml")

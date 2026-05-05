@@ -136,6 +136,10 @@ func candidateReleaseBranchApplied(rootDir string, candidateID string) bool {
 	return false
 }
 
+func CandidateReleaseBranchApplied(rootDir string, candidateID string) bool {
+	return candidateReleaseBranchApplied(rootDir, candidateID)
+}
+
 func buildCandidatePRMRPreview(rootDir string, candidate Candidate) CandidatePRMRPreview {
 	ws, _ := workspace.Load(rootDir)
 	base := "main"

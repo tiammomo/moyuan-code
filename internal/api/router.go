@@ -936,6 +936,53 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(status, gin.H{"release_provider_execution": execution})
 	})
+	router.POST("/v1/projects/:project_id/release-candidates/:candidate_id/pr-mr-plan", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		candidate, found, err := release.LoadCandidate(rootDir, c.Param("candidate_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "release candidate not found")
+			return
+		}
+		candidateReady := candidate.Status == "ready" && candidate.Decision == "RELEASE_CANDIDATE_READY"
+		reasons := []string{}
+		if !candidateReady {
+			reasons = append(reasons, "release_candidate_not_ready:"+candidate.Decision)
+		} else if !release.CandidateReleaseBranchApplied(rootDir, candidate.ID) {
+			candidateReady = false
+			reasons = append(reasons, "release_branch_apply_missing")
+		}
+		plan, err := gitprovider.PlanReleaseCandidate(rootDir, gitprovider.ReleaseCandidatePlanOptions{
+			CandidateID:    candidate.ID,
+			CandidateReady: candidateReady,
+			Version:        candidate.Version,
+			Provider:       candidate.Provider,
+			RemoteName:     candidate.RemoteName,
+			RemoteURL:      candidate.RemoteURL,
+			ReleaseBranch:  candidate.ReleaseBranch,
+			Reasons:        reasons,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if plan.Status != "pr_mr_plan_ready" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"git_provider_plan": plan})
+	})
 	router.POST("/v1/projects/:project_id/release-candidates/:candidate_id/deployment-plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3223,6 +3270,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "release.candidate.provider_preview", Risk: "normal", Scopes: []string{"release:write"}}, true
 	case "/v1/projects/:project_id/release-candidates/:candidate_id/provider-publish":
 		return authzRule{Action: "release.candidate.provider_publish", Risk: "high", Scopes: []string{"release:write"}}, true
+	case "/v1/projects/:project_id/release-candidates/:candidate_id/pr-mr-plan":
+		return authzRule{Action: "release.candidate.pr_mr_plan", Risk: "normal", Scopes: []string{"release:write", "git:read"}}, true
 	case "/v1/projects/:project_id/release-candidates/:candidate_id/deployment-plan":
 		return authzRule{Action: "release.candidate.deployment_plan", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case "/v1/projects/:project_id/providers/ops/refresh":
@@ -3287,6 +3336,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "release.candidate.provider_preview", Risk: "normal", Scopes: []string{"release:write"}}, true
 	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/provider-publish"):
 		return authzRule{Action: "release.candidate.provider_publish", Risk: "high", Scopes: []string{"release:write"}}, true
+	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/pr-mr-plan"):
+		return authzRule{Action: "release.candidate.pr_mr_plan", Risk: "normal", Scopes: []string{"release:write", "git:read"}}, true
 	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/deployment-plan"):
 		return authzRule{Action: "release.candidate.deployment_plan", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case strings.Contains(rawPath, "/providers/ops/refresh"):
