@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 15 已完成并通过 readiness，已具备部署审批加固、回退执行与生产可观测性增强的第一批闭环。下一步将进入 Phase 16，聚焦部署演练、运行风险闭环与发布准入增强。
+当前阶段：Phase 16 已启动，聚焦部署演练、运行风险闭环与发布准入增强。Phase 15 部署审批加固、回退执行与生产可观测性增强已完成并通过 readiness。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
@@ -63,8 +63,10 @@
 
 ## 当前实施入口
 
-Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 15 已完成主要闭环。下一阶段将打开 Phase 16。当前验收和状态入口：
+Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 15 已完成主要闭环。Phase 16 已进入执行。当前验收和状态入口：
 
+- [Phase 16 实现 Issue Graph](./phases/phase16-issue-graph.md)：部署演练、运行风险闭环与发布准入增强的依赖图。
+- [Phase 16 实施记录](./phases/phase16-next-development-plan.md)：Phase 16 当前任务、验收标准和执行入口。
 - [Phase 15 Release Readiness](./phases/phase15-release-readiness.md)：部署审批加固、回退执行与生产可观测性增强的收口验证。
 - [Phase 15 实现 Issue Graph](./phases/phase15-issue-graph.md)：部署审批加固、回退执行与生产可观测性的依赖图。
 - [Phase 15 实施记录](./phases/phase15-next-development-plan.md)：Phase 15 完成任务、验收标准和执行入口。

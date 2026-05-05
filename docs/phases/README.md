@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+- [Phase 16 实现 Issue Graph](./phase16-issue-graph.md)：Phase 16 部署演练、运行风险闭环与发布准入增强的依赖图。
+- [Phase 16 实施记录](./phase16-next-development-plan.md)：Phase 16 当前任务、执行范围和验收记录。
 - [Phase 15 Release Readiness](./phase15-release-readiness.md)：Phase 15 部署审批加固、回退执行与生产可观测性增强的收口验证。
 - [Phase 15 实现 Issue Graph](./phase15-issue-graph.md)：Phase 15 部署审批加固、回退执行与生产可观测性的依赖图。
 - [Phase 15 实施记录](./phase15-next-development-plan.md)：Phase 15 完成任务、执行范围和验收记录。

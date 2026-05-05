@@ -573,7 +573,7 @@ Phase 1 的执行结果：
 
 Beta 第一批控制面能力、Phase 2 第一批多模型/Skills/Native Runtime/Subagent 能力、Phase 3 第一批配置可执行化/Console 操作流能力、Phase 4 团队协作/审计/审批/生产维护能力、Phase 5 鉴权强制门禁/Secret/adapter preview/Console 受控表单能力、Phase 6 approval consumption/adapter telemetry/Console schema forms 能力、Phase 7 受控真实外部执行准备、Phase 8 受控外部执行 Beta、Phase 9 生产运维控制面增强、Phase 10 控制面自动化闭环增强、Phase 11 Issue Graph 批量执行控制器、Phase 12 真实并发执行与集成合入准备、Phase 13 Release Candidate 远程发布与部署交接、Phase 14 受控远程发布与部署执行和 Phase 15 部署审批加固、回退执行与生产可观测性增强已完成。
 
-Phase 15 验收入口见 [Phase 15 Release Readiness](./phases/phase15-release-readiness.md)。下一阶段建议进入 Phase 16，聚焦部署演练、运行风险闭环与发布准入增强，把 deployment rehearsal、monitor risk、repair candidate 和 release readiness 进一步串成闭环。
+当前已启动 Phase 16，阶段入口见 [Phase 16 实现 Issue Graph](./phases/phase16-issue-graph.md) 和 [Phase 16 实施记录](./phases/phase16-next-development-plan.md)。Phase 16 聚焦部署演练、运行风险闭环与发布准入增强，把 deployment rehearsal、monitor risk、repair candidate 和 release readiness 进一步串成闭环。
 
 Phase 1 第一批实现模块：
 
