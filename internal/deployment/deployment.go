@@ -55,10 +55,24 @@ type ResourceSummary struct {
 }
 
 type StepPlan struct {
-	Status   string   `json:"status"`
-	Actions  []string `json:"actions"`
-	Window   string   `json:"window,omitempty"`
-	Required bool     `json:"required"`
+	Status         string   `json:"status"`
+	TemplateID     string   `json:"template_id,omitempty"`
+	Severity       string   `json:"severity,omitempty"`
+	Actions        []string `json:"actions"`
+	Window         string   `json:"window,omitempty"`
+	Required       bool     `json:"required"`
+	FailureClasses []string `json:"failure_classes,omitempty"`
+}
+
+type CheckTemplate struct {
+	ID             string   `json:"id"`
+	Type           string   `json:"type"`
+	Environment    string   `json:"environment"`
+	Severity       string   `json:"severity"`
+	Window         string   `json:"window,omitempty"`
+	Required       bool     `json:"required"`
+	Actions        []string `json:"actions"`
+	FailureClasses []string `json:"failure_classes,omitempty"`
 }
 
 type ExecuteOptions struct {
@@ -119,10 +133,13 @@ type RemoteTarget struct {
 }
 
 type CheckReport struct {
-	Status    string        `json:"status,omitempty"`
-	Decision  string        `json:"decision,omitempty"`
-	Results   []CheckResult `json:"results,omitempty"`
-	CheckedAt string        `json:"checked_at,omitempty"`
+	Status       string        `json:"status,omitempty"`
+	Decision     string        `json:"decision,omitempty"`
+	TemplateID   string        `json:"template_id,omitempty"`
+	Severity     string        `json:"severity,omitempty"`
+	FailureClass string        `json:"failure_class,omitempty"`
+	Results      []CheckResult `json:"results,omitempty"`
+	CheckedAt    string        `json:"checked_at,omitempty"`
 }
 
 type CheckResult struct {
@@ -166,6 +183,7 @@ type PostDeploymentHistory struct {
 	Status       string                 `json:"status"`
 	Decision     string                 `json:"decision"`
 	FailureClass string                 `json:"failure_class"`
+	Severity     string                 `json:"severity,omitempty"`
 	Checks       []PostDeploymentCheck  `json:"checks"`
 	Rollback     RollbackHistory        `json:"rollback"`
 	EvidenceIDs  []string               `json:"evidence_ids"`
@@ -175,12 +193,15 @@ type PostDeploymentHistory struct {
 }
 
 type PostDeploymentCheck struct {
-	Type      string        `json:"type"`
-	Status    string        `json:"status"`
-	Decision  string        `json:"decision"`
-	Results   []CheckResult `json:"results"`
-	Reasons   []string      `json:"reasons"`
-	CheckedAt string        `json:"checked_at,omitempty"`
+	Type         string        `json:"type"`
+	Status       string        `json:"status"`
+	Decision     string        `json:"decision"`
+	TemplateID   string        `json:"template_id,omitempty"`
+	Severity     string        `json:"severity,omitempty"`
+	FailureClass string        `json:"failure_class,omitempty"`
+	Results      []CheckResult `json:"results"`
+	Reasons      []string      `json:"reasons"`
+	CheckedAt    string        `json:"checked_at,omitempty"`
 }
 
 type RollbackHistory struct {
@@ -278,8 +299,8 @@ func CreatePlan(rootDir string, options PlanOptions) (Plan, error) {
 	plan.Decision = "DEPLOY_PLAN_READY"
 	plan.ManualRequired = true
 	plan.Reasons = append(plan.Reasons, "release_and_resources_ready")
-	plan.SmokePlan = StepPlan{Status: "planned", Required: true, Actions: []string{"run configured smoke tests", "record smoke result"}}
-	plan.MonitorPlan = StepPlan{Status: "planned", Required: true, Window: "30m", Actions: []string{"watch configured monitor signals", "record monitor window result"}}
+	plan.SmokePlan = stepPlanFromCheckTemplate(defaultCheckTemplate("smoke", plan.Environment))
+	plan.MonitorPlan = stepPlanFromCheckTemplate(defaultCheckTemplate("monitor", plan.Environment))
 	plan.RollbackPlan = StepPlan{Status: "planned", Required: true, Actions: []string{"rollback to previous release if smoke or monitor fails"}}
 	return finish(rootDir, plan)
 }
@@ -786,6 +807,7 @@ func buildPostDeploymentHistory(rootDir string, execution Execution) (PostDeploy
 		CreatedAt:    createdAt,
 	}
 	history.Status, history.Decision, history.FailureClass = classifyPostDeploymentHistory(execution, history.Checks)
+	history.Severity = historySeverity(history.FailureClass, history.Checks)
 	for _, check := range history.Checks {
 		history.Reasons = append(history.Reasons, check.Reasons...)
 	}
@@ -796,22 +818,28 @@ func postDeploymentChecks(execution Execution) []PostDeploymentCheck {
 	checks := []PostDeploymentCheck{}
 	if execution.SmokeReport.Status != "" {
 		checks = append(checks, PostDeploymentCheck{
-			Type:      "smoke",
-			Status:    execution.SmokeReport.Status,
-			Decision:  execution.SmokeReport.Decision,
-			Results:   append([]CheckResult{}, execution.SmokeReport.Results...),
-			Reasons:   checkReportReasons(execution.SmokeReport),
-			CheckedAt: execution.SmokeReport.CheckedAt,
+			Type:         "smoke",
+			Status:       execution.SmokeReport.Status,
+			Decision:     execution.SmokeReport.Decision,
+			TemplateID:   execution.SmokeReport.TemplateID,
+			Severity:     execution.SmokeReport.Severity,
+			FailureClass: execution.SmokeReport.FailureClass,
+			Results:      append([]CheckResult{}, execution.SmokeReport.Results...),
+			Reasons:      checkReportReasons(execution.SmokeReport),
+			CheckedAt:    execution.SmokeReport.CheckedAt,
 		})
 	}
 	if execution.MonitorReport.Status != "" {
 		checks = append(checks, PostDeploymentCheck{
-			Type:      "monitor",
-			Status:    execution.MonitorReport.Status,
-			Decision:  execution.MonitorReport.Decision,
-			Results:   append([]CheckResult{}, execution.MonitorReport.Results...),
-			Reasons:   checkReportReasons(execution.MonitorReport),
-			CheckedAt: execution.MonitorReport.CheckedAt,
+			Type:         "monitor",
+			Status:       execution.MonitorReport.Status,
+			Decision:     execution.MonitorReport.Decision,
+			TemplateID:   execution.MonitorReport.TemplateID,
+			Severity:     execution.MonitorReport.Severity,
+			FailureClass: execution.MonitorReport.FailureClass,
+			Results:      append([]CheckResult{}, execution.MonitorReport.Results...),
+			Reasons:      checkReportReasons(execution.MonitorReport),
+			CheckedAt:    execution.MonitorReport.CheckedAt,
 		})
 	}
 	return checks
@@ -879,8 +907,34 @@ func classifyPostDeploymentHistory(execution Execution, checks []PostDeploymentC
 	return "passed", "POST_DEPLOYMENT_CHECKS_PASSED", "none"
 }
 
+func historySeverity(failureClass string, checks []PostDeploymentCheck) string {
+	if failureClass == "" || failureClass == "none" {
+		return ""
+	}
+	for _, check := range checks {
+		if check.FailureClass == failureClass && check.Severity != "" {
+			return check.Severity
+		}
+	}
+	for _, check := range checks {
+		if (check.Status == "failed" || check.Status == "manual_required" || check.Status == "blocked") && check.Severity != "" {
+			return check.Severity
+		}
+	}
+	return ""
+}
+
 func checkReportReasons(report CheckReport) []string {
 	reasons := []string{}
+	if report.TemplateID != "" {
+		reasons = append(reasons, "template:"+report.TemplateID)
+	}
+	if report.Severity != "" {
+		reasons = append(reasons, "severity:"+report.Severity)
+	}
+	if report.FailureClass != "" && report.FailureClass != "none" {
+		reasons = append(reasons, "failure_class:"+report.FailureClass)
+	}
 	for _, result := range report.Results {
 		parts := []string{result.ResourceID, result.Status}
 		if result.Reason != "" {
@@ -1312,6 +1366,92 @@ func isReference(value string) bool {
 	return (strings.HasPrefix(value, "env:") && len(value) > len("env:")) || (strings.HasPrefix(value, "secret:") && len(value) > len("secret:"))
 }
 
+func defaultCheckTemplate(checkType string, environment string) CheckTemplate {
+	checkType = normalizeToken(checkType)
+	environment = normalizeToken(environment)
+	switch checkType {
+	case "smoke":
+		return CheckTemplate{
+			ID:             "deploy-smoke-" + environment + "-v1",
+			Type:           "smoke",
+			Environment:    environment,
+			Severity:       checkSeverity("smoke", environment),
+			Required:       true,
+			Actions:        []string{"run configured smoke tests", "record smoke result"},
+			FailureClasses: []string{"smoke_failed"},
+		}
+	case "monitor":
+		return CheckTemplate{
+			ID:             "deploy-monitor-" + environment + "-v1",
+			Type:           "monitor",
+			Environment:    environment,
+			Severity:       checkSeverity("monitor", environment),
+			Window:         "30m",
+			Required:       true,
+			Actions:        []string{"watch configured monitor signals", "record monitor window result"},
+			FailureClasses: []string{"monitor_failed", "manual_check_required"},
+		}
+	default:
+		return CheckTemplate{
+			ID:          "deploy-check-" + checkType + "-" + environment + "-v1",
+			Type:        checkType,
+			Environment: environment,
+			Severity:    "medium",
+			Required:    true,
+		}
+	}
+}
+
+func stepPlanFromCheckTemplate(template CheckTemplate) StepPlan {
+	return StepPlan{
+		Status:         "planned",
+		TemplateID:     template.ID,
+		Severity:       template.Severity,
+		Actions:        append([]string{}, template.Actions...),
+		Window:         template.Window,
+		Required:       template.Required,
+		FailureClasses: append([]string{}, template.FailureClasses...),
+	}
+}
+
+func checkTemplateFromPlan(plan Plan, checkType string) CheckTemplate {
+	checkType = normalizeToken(checkType)
+	template := defaultCheckTemplate(checkType, plan.Environment)
+	step := plan.SmokePlan
+	if checkType == "monitor" {
+		step = plan.MonitorPlan
+	}
+	if step.TemplateID != "" {
+		template.ID = step.TemplateID
+	}
+	if step.Severity != "" {
+		template.Severity = step.Severity
+	}
+	if step.Window != "" {
+		template.Window = step.Window
+	}
+	if len(step.Actions) > 0 {
+		template.Actions = append([]string{}, step.Actions...)
+	}
+	if len(step.FailureClasses) > 0 {
+		template.FailureClasses = append([]string{}, step.FailureClasses...)
+	}
+	if step.Required {
+		template.Required = true
+	}
+	return template
+}
+
+func checkSeverity(checkType string, environment string) string {
+	if environment == "production" {
+		return "critical"
+	}
+	if checkType == "smoke" {
+		return "high"
+	}
+	return "medium"
+}
+
 func runPostDeploymentChecks(ctx context.Context, rootDir string, plan Plan) (CheckReport, CheckReport, RollbackSuggestion, []ExecutionStep, bool, []string) {
 	smoke := runCheckReport(ctx, rootDir, plan, "smoke")
 	steps := []ExecutionStep{stepFromReport("smoke", smoke)}
@@ -1342,11 +1482,14 @@ func runPostDeploymentChecks(ctx context.Context, rootDir string, plan Plan) (Ch
 }
 
 func runCheckReport(ctx context.Context, rootDir string, plan Plan, checkType string) CheckReport {
+	template := checkTemplateFromPlan(plan, checkType)
 	report := CheckReport{
-		Status:    "passed",
-		Decision:  strings.ToUpper(checkType) + "_PASSED",
-		Results:   []CheckResult{},
-		CheckedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		Status:     "passed",
+		Decision:   strings.ToUpper(checkType) + "_PASSED",
+		TemplateID: template.ID,
+		Severity:   template.Severity,
+		Results:    []CheckResult{},
+		CheckedAt:  time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	for _, summary := range plan.Resources {
 		resource, found, err := serverresources.Show(rootDir, summary.ID)
@@ -1372,7 +1515,25 @@ func runCheckReport(ctx context.Context, rootDir string, plan Plan, checkType st
 		report.Status = "manual_required"
 		report.Decision = strings.ToUpper(checkType) + "_MANUAL_REQUIRED"
 	}
+	report.FailureClass = checkFailureClass(checkType, report.Status)
 	return report
+}
+
+func checkFailureClass(checkType string, status string) string {
+	switch status {
+	case "failed":
+		if checkType == "smoke" {
+			return "smoke_failed"
+		}
+		if checkType == "monitor" {
+			return "monitor_failed"
+		}
+		return "check_failed"
+	case "manual_required", "blocked":
+		return "manual_check_required"
+	default:
+		return "none"
+	}
 }
 
 func runResourceCheck(ctx context.Context, resource serverresources.Resource) CheckResult {
@@ -1440,6 +1601,12 @@ func runResourceCheck(ctx context.Context, resource serverresources.Resource) Ch
 
 func stepFromReport(name string, report CheckReport) ExecutionStep {
 	outputs := []string{}
+	if report.TemplateID != "" {
+		outputs = append(outputs, "template:"+report.TemplateID)
+	}
+	if report.Severity != "" {
+		outputs = append(outputs, "severity:"+report.Severity)
+	}
 	for _, result := range report.Results {
 		output := result.ResourceID + ":" + result.Status
 		if result.Reason != "" {
@@ -1521,10 +1688,10 @@ func allManualOrSkipped(results []CheckResult) bool {
 
 func logPostDeploymentChecks(rootDir string, plan Plan, smoke CheckReport, monitor CheckReport, rollback RollbackSuggestion) {
 	if smoke.Status != "" {
-		_ = logging.Log(rootDir, "release", "deployment.smoke.completed", map[string]any{"deployment_id": plan.ID, "release_id": plan.ReleaseID, "status": smoke.Status, "decision": smoke.Decision})
+		_ = logging.Log(rootDir, "release", "deployment.smoke.completed", map[string]any{"deployment_id": plan.ID, "release_id": plan.ReleaseID, "status": smoke.Status, "decision": smoke.Decision, "template_id": smoke.TemplateID, "severity": smoke.Severity, "failure_class": smoke.FailureClass})
 	}
 	if monitor.Status != "" {
-		_ = logging.Log(rootDir, "release", "deployment.monitor.completed", map[string]any{"deployment_id": plan.ID, "release_id": plan.ReleaseID, "status": monitor.Status, "decision": monitor.Decision})
+		_ = logging.Log(rootDir, "release", "deployment.monitor.completed", map[string]any{"deployment_id": plan.ID, "release_id": plan.ReleaseID, "status": monitor.Status, "decision": monitor.Decision, "template_id": monitor.TemplateID, "severity": monitor.Severity, "failure_class": monitor.FailureClass})
 	}
 	if rollback.Required {
 		_ = logging.Log(rootDir, "release", "deployment.rollback.suggested", map[string]any{"deployment_id": plan.ID, "release_id": plan.ReleaseID, "reason": rollback.Reason, "decision": rollback.Decision})

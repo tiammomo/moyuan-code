@@ -23,7 +23,7 @@ Phase 9 已完成并通过 release readiness：
 | P0 | `phase10-001` | `background-control-loop-scheduler` | completed | 控制循环调度底座 | 一次 run 可触发多个受控 step，并写入状态、日志和审计 |
 | P0 | `phase10-002` | `operation-repair-candidate-review-flow` | completed | 修复候选复核流转 | approve/reject 后可生成 issue 或受控 repair attempt |
 | P1 | `phase10-003` | `release-provider-branch-tag-workflow-preview` | completed | release provider 扩展预览 | branch/tag/workflow 有 preview plan 和 guardrail |
-| P1 | `phase10-004` | `deployment-check-template-policy` | planned | 部署检查模板策略 | smoke/monitor 失败分级可配置、可追踪 |
+| P1 | `phase10-004` | `deployment-check-template-policy` | completed | 部署检查模板策略 | smoke/monitor 失败分级可配置、可追踪 |
 | P2 | `phase10-005` | `console-route-repair-operator-surfaces` | planned | Console 操作面增强 | route candidates、repair review、control loop history 可见 |
 
 ## 3. 执行规划：`phase10-001 background-control-loop-scheduler`
@@ -108,7 +108,30 @@ Phase 9 已完成并通过 release readiness：
 - `ProviderActionResult` 增加 `guardrails`。
 - branch/tag/workflow 预览固定包含 approval、write switch、replay guard、secret ref 和动作特定检查项。
 
-## 6. 验证要求
+## 6. 执行规划：`phase10-004 deployment-check-template-policy`
+
+实现状态：completed。
+
+范围：
+
+- Deployment plan 的 smoke/monitor step 引用默认检查模板，包含 `template_id`、`severity`、`window` 和 `failure_classes`。
+- Deployment execution 的 smoke/monitor report 继承模板信息，并在失败时写入 `failure_class`。
+- Post-deployment history 保留每个检查项的模板、severity 和 failure class；失败 history 会汇总失败 severity。
+- release 日志和 evidence reasons 能追踪检查模板、严重度和失败归类。
+
+非目标：
+
+- 不引入外部监控系统适配器。
+- 不自动执行生产 rollback。
+- 不改变 SSH execute、local shell 和 healthcheck 的执行安全边界。
+
+落地结果：
+
+- 新增 `CheckTemplate`，默认模板为 `deploy-smoke-<env>-v1` 和 `deploy-monitor-<env>-v1`。
+- 非生产 smoke severity 为 `high`，monitor severity 为 `medium`；production 默认为 `critical`。
+- `smoke_failed`、`monitor_failed` 和 `manual_check_required` 可在 report/history 中被审计。
+
+## 7. 验证要求
 
 每完成一个 Phase 10 issue，至少运行：
 

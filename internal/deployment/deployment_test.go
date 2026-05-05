@@ -12,9 +12,46 @@ import (
 
 	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
+	"moyuan-code/internal/release"
 	"moyuan-code/internal/serverresources"
 	"moyuan-code/internal/workspace"
 )
+
+func TestCreatePlanUsesDefaultDeploymentCheckTemplates(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	releasePlan := release.Plan{ID: "release-template", Status: "ready", Decision: "RELEASE_SUGGESTED", Version: "v1.2.3"}
+	if err := fsutil.WriteJSON(filepath.Join(workspace.ForRoot(root).ReleasesDir, releasePlan.ID+".json"), releasePlan); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "template-host",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "devops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		Healthcheck: serverresources.Healthcheck{Type: "http", Target: "http://127.0.0.1/healthz"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := CreatePlan(root, PlanOptions{ReleaseID: releasePlan.ID, Environment: "test_dev"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Decision != "DEPLOY_PLAN_READY" {
+		t.Fatalf("expected deployment plan ready, got %+v", plan)
+	}
+	if plan.SmokePlan.TemplateID != "deploy-smoke-test_dev-v1" || plan.SmokePlan.Severity != "high" || !containsString(plan.SmokePlan.FailureClasses, "smoke_failed") {
+		t.Fatalf("expected smoke template policy, got %+v", plan.SmokePlan)
+	}
+	if plan.MonitorPlan.TemplateID != "deploy-monitor-test_dev-v1" || plan.MonitorPlan.Severity != "medium" || plan.MonitorPlan.Window != "30m" || !containsString(plan.MonitorPlan.FailureClasses, "monitor_failed") {
+		t.Fatalf("expected monitor template policy, got %+v", plan.MonitorPlan)
+	}
+}
 
 func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	root := t.TempDir()
@@ -39,6 +76,12 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	if okExecution.Decision != "DEPLOY_EXECUTION_COMPLETED" || okExecution.SmokeReport.Status != "passed" || okExecution.MonitorReport.Status != "passed" || okExecution.RollbackSuggestion.Required {
 		t.Fatalf("expected successful smoke and monitor, got %+v", okExecution)
 	}
+	if okExecution.SmokeReport.TemplateID != "deploy-smoke-test_dev-v1" || okExecution.SmokeReport.Severity != "high" || okExecution.SmokeReport.FailureClass != "none" {
+		t.Fatalf("expected smoke report template policy, got %+v", okExecution.SmokeReport)
+	}
+	if okExecution.MonitorReport.TemplateID != "deploy-monitor-test_dev-v1" || okExecution.MonitorReport.Severity != "medium" || okExecution.MonitorReport.FailureClass != "none" {
+		t.Fatalf("expected monitor report template policy, got %+v", okExecution.MonitorReport)
+	}
 	evidenceRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "deployment_execution", ParentID: okExecution.ID, Limit: 10})
 	if err != nil || len(evidenceRecords) != 4 {
 		t.Fatalf("expected deployment execution evidence, records=%+v err=%v", evidenceRecords, err)
@@ -55,6 +98,9 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	}
 	if okHistory.Status != "passed" || okHistory.FailureClass != "none" || okHistory.Rollback.Status != "not_required" || len(okHistory.Checks) != 2 || len(okHistory.EvidenceIDs) != 4 {
 		t.Fatalf("expected passed post deployment history, got %+v", okHistory)
+	}
+	if okHistory.Checks[0].TemplateID != "deploy-smoke-test_dev-v1" || okHistory.Checks[0].Severity != "high" || okHistory.Checks[0].FailureClass != "none" {
+		t.Fatalf("expected smoke history template policy, got %+v", okHistory.Checks[0])
 	}
 
 	failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +119,9 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	}
 	if failedExecution.Decision != "DEPLOY_SMOKE_FAILED" || failedExecution.SmokeReport.Status != "failed" || !failedExecution.RollbackSuggestion.Required {
 		t.Fatalf("expected smoke failure rollback suggestion, got %+v", failedExecution)
+	}
+	if failedExecution.SmokeReport.TemplateID != "deploy-smoke-test_dev-v1" || failedExecution.SmokeReport.Severity != "high" || failedExecution.SmokeReport.FailureClass != "smoke_failed" {
+		t.Fatalf("expected failed smoke report template policy, got %+v", failedExecution.SmokeReport)
 	}
 	if failedExecution.RollbackSuggestion.Runbook == nil || failedExecution.RollbackSuggestion.Runbook.Decision != "ROLLBACK_RUNBOOK_READY" || len(failedExecution.RollbackSuggestion.Runbook.Steps) < 3 {
 		t.Fatalf("expected structured rollback runbook, got %+v", failedExecution.RollbackSuggestion.Runbook)
@@ -97,6 +146,9 @@ func TestExecuteRunsSmokeMonitorAndSuggestsRollback(t *testing.T) {
 	}
 	if failedHistory.Status != "failed" || failedHistory.FailureClass != "smoke_failed" || failedHistory.Rollback.Status != "suggested" || failedHistory.Rollback.RunbookPath == "" || failedHistory.Rollback.StepCount < 3 {
 		t.Fatalf("expected failed smoke history with rollback runbook, got %+v", failedHistory)
+	}
+	if failedHistory.Severity != "high" || failedHistory.Checks[0].TemplateID != "deploy-smoke-test_dev-v1" || failedHistory.Checks[0].FailureClass != "smoke_failed" {
+		t.Fatalf("expected failed history severity and template policy, got %+v", failedHistory)
 	}
 	histories, err := ListPostDeploymentHistories(root, 10)
 	if err != nil {
@@ -372,6 +424,15 @@ func hasEvidenceArtifact(records []evidence.Record, operation string, kind strin
 func containsReason(reasons []string, expected string) bool {
 	for _, reason := range reasons {
 		if reason == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
 			return true
 		}
 	}
