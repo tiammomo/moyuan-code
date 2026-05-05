@@ -20,7 +20,7 @@ Phase 10 已完成并通过 readiness：
 
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase11-001` | `issue-batch-dispatch-preview` | planned | 批量执行预览 | 可生成 batch plan，解释 dispatch/wait/block、并发槽和 write scope 冲突 |
+| P0 | `phase11-001` | `issue-batch-dispatch-preview` | completed | 批量执行预览 | 可生成 batch plan，解释 dispatch/wait/block、并发槽和 write scope 冲突 |
 | P0 | `phase11-002` | `bounded-issue-batch-run` | planned | 受控批量执行 | 审批/安全模式下可执行一批 issue，并记录每个 issue 结果 |
 | P1 | `phase11-003` | `parallel-worktree-isolation` | planned | 并发隔离 | 并发 issue 使用独立 worktree/branch，不共享写入目录 |
 | P1 | `phase11-004` | `quality-review-merge-queue` | planned | 质量复核合入队列 | issue 通过 quality + review 后进入 merge ready |
@@ -28,7 +28,7 @@ Phase 10 已完成并通过 readiness：
 
 ## 3. 执行规划：`phase11-001 issue-batch-dispatch-preview`
 
-实现状态：planned。
+实现状态：completed。
 
 范围：
 
@@ -52,6 +52,13 @@ Phase 10 已完成并通过 readiness：
 - `GET /v1/projects/:project_id/batches/:batch_id` 可查看详情。
 - plan 能解释 ready issue 的 dispatch/waiting 原因和 write scope 冲突。
 - 门禁通过：`go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check`。
+
+落地结果：
+
+- 新增 `internal/batch`，生成 dry-run `batch_plan`。
+- 新增 API：`POST /v1/projects/:project_id/epics/:epic_id/batches/plan`、`GET /v1/projects/:project_id/epics/:epic_id/batches`、`GET /v1/projects/:project_id/batches/:batch_id`。
+- batch plan 写入 `.moyuan/orchestrator/batches/` 和 `.moyuan/orchestrator/batches.jsonl`。
+- 每个 ready/waiting issue 会附带 provider route preview；blocked issue 保留 dependency reason。
 
 ## 4. 验证要求
 

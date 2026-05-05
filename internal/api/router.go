@@ -9,6 +9,7 @@ import (
 
 	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/auth"
+	"moyuan-code/internal/batch"
 	"moyuan-code/internal/controlloop"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/deployment"
@@ -76,6 +77,12 @@ type controlLoopRunRequest struct {
 	ProbeApproved      bool     `json:"probe_approved"`
 	ProbeTimeoutMS     int      `json:"probe_timeout_ms"`
 	ComprehensionSince string   `json:"comprehension_since"`
+}
+
+type batchPlanRequest struct {
+	Mode        string `json:"mode"`
+	MaxParallel int    `json:"max_parallel"`
+	RequestedBy string `json:"requested_by"`
 }
 
 type operationRepairReviewRequest struct {
@@ -278,6 +285,75 @@ func NewRouter(options Options) *gin.Engine {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"schedule": plan})
+	})
+	router.POST("/v1/projects/:project_id/epics/:epic_id/batches/plan", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req batchPlanRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		plan, err := batch.CreatePlan(rootDir, batch.PlanOptions{
+			EpicID:      c.Param("epic_id"),
+			Mode:        req.Mode,
+			MaxParallel: req.MaxParallel,
+			RequestedBy: req.RequestedBy,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusCreated
+		if plan.Status != "planned" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"batch_plan": plan})
+	})
+	router.GET("/v1/projects/:project_id/epics/:epic_id/batches", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plans, err := batch.List(rootDir, c.Param("epic_id"), queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"batch_plans": plans})
+	})
+	router.GET("/v1/projects/:project_id/batches/:batch_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plan, found, err := batch.Load(rootDir, c.Param("batch_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "batch plan not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"batch_plan": plan})
 	})
 	router.GET("/v1/projects/:project_id/runs", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
@@ -2481,6 +2557,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		path = rawPath
 	}
 	switch path {
+	case "/v1/projects/:project_id/epics/:epic_id/batches/plan":
+		return authzRule{Action: "batch.plan", Risk: "normal", Scopes: []string{"project:read"}}, true
 	case "/v1/projects/:project_id/providers/ops/refresh":
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case "/v1/projects/:project_id/control-loop/run":
@@ -2523,6 +2601,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{}, false
 	}
 	switch {
+	case strings.Contains(rawPath, "/epics/") && strings.HasSuffix(rawPath, "/batches/plan"):
+		return authzRule{Action: "batch.plan", Risk: "normal", Scopes: []string{"project:read"}}, true
 	case strings.Contains(rawPath, "/providers/ops/refresh"):
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case strings.Contains(rawPath, "/control-loop/run"):

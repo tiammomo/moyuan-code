@@ -216,6 +216,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed", http.StatusOK, `"project"`, `"managed"`)
 	assertGETContains(t, router, "/v1/projects/managed/epics/phase1-epic/issue-graph", http.StatusOK, `"issue_graph"`, `"phase1-013"`)
 	assertGETContains(t, router, "/v1/projects/managed/epics/phase1-epic/schedule", http.StatusOK, `"schedule"`, `"ready_queue"`, `"blocked_reason"`, `"dispatch_queue"`)
+	assertPostContains(t, router, "/v1/projects/managed/epics/"+reqPlan.EpicID+"/batches/plan", `{"max_parallel":2,"requested_by":"api-test"}`, http.StatusCreated, `"batch_plan"`, `"BATCH_PLAN_READY"`, `"route_decision"`)
+	assertGETContains(t, router, "/v1/projects/managed/epics/"+reqPlan.EpicID+"/batches?limit=3", http.StatusOK, `"batch_plans"`, `"BATCH_PLAN_READY"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)
 	assertGETContains(t, router, "/v1/projects/managed/runs?limit=1", http.StatusOK, `"runs"`, result.RunID)
 	assertGETContains(t, router, "/v1/projects/managed/runs/"+result.RunID, http.StatusOK, `"run"`, `"completed"`)
