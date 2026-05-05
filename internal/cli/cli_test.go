@@ -242,6 +242,14 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	remoteRehearsals := runCLI(t, root, "operations", "remote-execution-rehearsals", "list", "--execution-id", executionID, "--limit", "5")
 	assertContains(t, remoteRehearsals.stdout, `"remote_execution_rehearsals"`)
 	assertContains(t, remoteRehearsals.stdout, executionID)
+
+	reviewPackets := runCLI(t, root, "operations", "write-review-packets", "create", "--operation-id", executionID, "--limit", "5")
+	assertContains(t, reviewPackets.stdout, `"write_review_packets"`)
+	assertContains(t, reviewPackets.stdout, executionID)
+	assertContains(t, reviewPackets.stdout, `"markdown"`)
+	reviewPacketList := runCLI(t, root, "operations", "write-review-packets", "list", "--operation-id", executionID, "--limit", "5")
+	assertContains(t, reviewPacketList.stdout, `"write_review_packets"`)
+	assertContains(t, reviewPacketList.stdout, executionID)
 }
 
 func TestControlLoopCLIRunsDurableIdempotentSteps(t *testing.T) {

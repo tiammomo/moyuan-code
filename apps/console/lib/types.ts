@@ -1232,6 +1232,44 @@ export type RemoteExecutionRehearsalReportSummary = {
   rehearsals: RemoteExecutionRehearsalSummary[];
 };
 
+export type WriteReviewPacketSummary = {
+  id: string;
+  admission_id?: string;
+  proof_id?: string;
+  operation_type: string;
+  operation_id: string;
+  provider?: string;
+  environment?: string;
+  mode?: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  rule_refs: string[];
+  evidence_refs: string[];
+  provider_requirement_id?: string;
+  remote_rehearsal_id?: string;
+  remote_rehearsal_status?: string;
+  remote_rehearsal_decision?: string;
+  queue_item_ids: string[];
+  queue_decisions: string[];
+  markdown?: string;
+  created_at?: string;
+};
+
+export type WriteReviewPacketReportSummary = {
+  id: string;
+  generated_at?: string;
+  packet_count: number;
+  ready_count: number;
+  blocked_count: number;
+  manual_required_count: number;
+  by_operation_type: Record<string, number>;
+  by_provider: Record<string, number>;
+  by_status: Record<string, number>;
+  by_decision: Record<string, number>;
+  packets: WriteReviewPacketSummary[];
+};
+
 export type ControlLoopQueueItemSummary = {
   id: string;
   status: string;
@@ -1244,6 +1282,9 @@ export type ControlLoopQueueItemSummary = {
   environment?: string;
   maintenance_window?: string;
   due_at?: string;
+  admission_id?: string;
+  remote_rehearsal_id?: string;
+  review_packet_id?: string;
   run_id?: string;
   reasons: string[];
   created_at?: string;
@@ -1395,6 +1436,7 @@ export type ConsoleSnapshot = {
   write_admissions?: WriteAdmissionReportSummary;
   provider_proof_requirements?: ProviderProofRequirementReportSummary;
   remote_execution_rehearsals?: RemoteExecutionRehearsalReportSummary;
+  write_review_packets?: WriteReviewPacketReportSummary;
   control_loop_queue?: ControlLoopQueueItemSummary[];
   git_provider_plans: GitProviderPlanSummary[];
   auth_sessions: AuthSessionSummary[];

@@ -4,6 +4,11 @@
 
 ## 当前阶段
 
+- [Phase 22 实现 Issue Graph](./phase22-issue-graph.md)：Phase 22 受保护真实写入执行计划契约的依赖图。
+- [Phase 22 实施记录](./phase22-next-development-plan.md)：Phase 22 当前任务、执行范围和验收记录。
+- [Phase 21 实现 Issue Graph](./phase21-issue-graph.md)：Phase 21 写入前 Review Packet 与队列准入绑定的依赖图。
+- [Phase 21 实施记录](./phase21-next-development-plan.md)：Phase 21 当前任务、执行范围和验收记录。
+- [Phase 21 Release Readiness](./phase21-release-readiness.md)：Phase 21 写入前 Review Packet 与队列准入绑定的收口验证。
 - [Phase 20 实现 Issue Graph](./phase20-issue-graph.md)：Phase 20 受控生产写入演练与远程运维执行增强的依赖图。
 - [Phase 20 实施记录](./phase20-next-development-plan.md)：Phase 20 当前任务、执行范围和验收记录。
 - [Phase 20 Release Readiness](./phase20-release-readiness.md)：Phase 20 受控生产写入演练与远程运维执行增强的收口验证。

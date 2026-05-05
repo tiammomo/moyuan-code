@@ -100,6 +100,9 @@ type controlLoopQueueRequest struct {
 	MaintenanceWindow     string   `json:"maintenance_window"`
 	DueAt                 string   `json:"due_at"`
 	Priority              int      `json:"priority"`
+	AdmissionID           string   `json:"admission_id"`
+	RemoteRehearsalID     string   `json:"remote_rehearsal_id"`
+	ReviewPacketID        string   `json:"review_packet_id"`
 }
 
 type controlLoopQueueRunRequest struct {
@@ -3294,6 +3297,79 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusAccepted, gin.H{"remote_execution_rehearsals": report})
 	})
+	router.GET("/v1/projects/:project_id/operations/write-review-packets", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		operationType := c.Query("operation_type")
+		if operationType == "" {
+			operationType = c.Query("type")
+		}
+		report, err := operations.ListWriteReviewPackets(rootDir, operations.WriteReviewPacketOptions{
+			AdmissionID:   c.Query("admission_id"),
+			OperationType: operationType,
+			OperationID:   c.Query("operation_id"),
+			Provider:      c.Query("provider"),
+			Environment:   c.Query("environment"),
+			Status:        c.Query("status"),
+			Decision:      c.Query("decision"),
+			Limit:         queryLimit(c, 20),
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"write_review_packets": report})
+	})
+	router.POST("/v1/projects/:project_id/operations/write-review-packets", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req struct {
+			AdmissionID   string `json:"admission_id"`
+			OperationType string `json:"operation_type"`
+			OperationID   string `json:"operation_id"`
+			Provider      string `json:"provider"`
+			Environment   string `json:"environment"`
+			Status        string `json:"status"`
+			Decision      string `json:"decision"`
+			Limit         int    `json:"limit"`
+		}
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		if req.Limit <= 0 {
+			req.Limit = 20
+		}
+		report, err := operations.CreateWriteReviewPackets(rootDir, operations.WriteReviewPacketOptions{
+			AdmissionID:   req.AdmissionID,
+			OperationType: req.OperationType,
+			OperationID:   req.OperationID,
+			Provider:      req.Provider,
+			Environment:   req.Environment,
+			Status:        req.Status,
+			Decision:      req.Decision,
+			Limit:         req.Limit,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"write_review_packets": report})
+	})
 	router.GET("/v1/projects/:project_id/operations/:operation_type/:operation_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3413,6 +3489,9 @@ func NewRouter(options Options) *gin.Engine {
 			MaintenanceWindow:     req.MaintenanceWindow,
 			DueAt:                 req.DueAt,
 			Priority:              req.Priority,
+			AdmissionID:           req.AdmissionID,
+			RemoteRehearsalID:     req.RemoteRehearsalID,
+			ReviewPacketID:        req.ReviewPacketID,
 		})
 		if err != nil {
 			writeError(c, http.StatusInternalServerError, err.Error())

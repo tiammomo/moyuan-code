@@ -349,6 +349,42 @@ func Timeline(rootDir string, options TimelineOptions) ([]TimelineItem, error) {
 		})
 	}
 
+	reviewPacketReport, err := ListWriteReviewPackets(rootDir, WriteReviewPacketOptions{Limit: sourceLimit})
+	if err != nil {
+		return nil, err
+	}
+	for _, packet := range reviewPacketReport.Packets {
+		refs, err := evidenceRefs(rootDir, "write_review_packet", packet.ID, packet.EvidenceRefs)
+		if err != nil {
+			return nil, err
+		}
+		add(TimelineItem{
+			ID:           packet.ID,
+			Type:         "write_review_packet",
+			Operation:    "operations.write_review_packet.create",
+			Status:       packet.Status,
+			Decision:     packet.Decision,
+			Reasons:      append([]string{}, packet.Reasons...),
+			PrimaryRef:   packet.OperationID,
+			SecondaryRef: packet.AdmissionID,
+			Environment:  packet.Environment,
+			EvidenceRefs: refs,
+			Timestamp:    packet.CreatedAt,
+			Metadata: map[string]any{
+				"provider":                    packet.Provider,
+				"mode":                        packet.Mode,
+				"provider_requirement_id":     packet.ProviderRequirementID,
+				"remote_rehearsal_id":         packet.RemoteRehearsalID,
+				"remote_rehearsal_decision":   packet.RemoteRehearsalDecision,
+				"queue_item_count":            len(packet.QueueItems),
+				"write_enabled":               packet.WriteEnabled,
+				"approval_required":           packet.ApprovalRequired,
+				"approval_satisfied":          packet.ApprovalSatisfied,
+				"external_write_not_executed": true,
+			},
+		})
+	}
+
 	admissions, err := deployment.ListReleaseAdmissions(rootDir, sourceLimit)
 	if err != nil {
 		return nil, err

@@ -652,6 +652,58 @@ func TestRunRemoteExecutionRehearsalsBlocksMissingRemoteTargets(t *testing.T) {
 	}
 }
 
+func TestCreateWriteReviewPacketsAggregatesAdmissionAndEvidence(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "review-resource",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2099-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, renewal, found, err := serverresources.Renew(root, serverresources.RenewalOptions{ResourceID: "review-resource", ExpiresAt: "2099-02-01", ActorID: "ops", Reason: "review packet test"})
+	if err != nil || !found {
+		t.Fatalf("expected renewal, found=%v err=%v", found, err)
+	}
+
+	report, err := CreateWriteReviewPackets(root, WriteReviewPacketOptions{OperationID: renewal.ID, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.PacketCount != 1 || report.Summary.ReadyCount != 1 {
+		t.Fatalf("expected ready review packet summary, got %+v", report.Summary)
+	}
+	packet := report.Packets[0]
+	if packet.Status != "ready" || packet.Decision != "WRITE_REVIEW_PACKET_READY" || packet.AdmissionID == "" || packet.Markdown == "" {
+		t.Fatalf("unexpected ready review packet: %+v", packet)
+	}
+	loaded, found, err := LoadWriteReviewPacket(root, packet.ID)
+	if err != nil || !found || loaded.ID != packet.ID {
+		t.Fatalf("expected persisted review packet, found=%v err=%v loaded=%+v", found, err, loaded)
+	}
+	listed, err := ListWriteReviewPackets(root, WriteReviewPacketOptions{Status: "ready", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed.Packets) != 1 || listed.Packets[0].ID != packet.ID {
+		t.Fatalf("expected listed review packet, got %+v", listed.Packets)
+	}
+	timeline, err := Timeline(root, TimelineOptions{Type: "write_review_packet", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(timeline) != 1 || timeline[0].ID != packet.ID || len(timeline[0].EvidenceRefs) == 0 {
+		t.Fatalf("expected review packet on timeline with evidence, got %+v", timeline)
+	}
+}
+
 func timelineContainsType(items []TimelineItem, typ string) bool {
 	for _, item := range items {
 		if item.Type == typ {

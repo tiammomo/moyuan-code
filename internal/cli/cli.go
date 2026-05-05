@@ -266,8 +266,10 @@ func usage() string {
 		"moyuan operations provider-proof-requirements [--provider <provider>] [--operation-type <type>] [--limit 20]",
 		"moyuan operations remote-execution-rehearsals run [--admission-id <id>] [--execution-id <id>] [--provider <provider>] [--environment <env>] [--limit 20]",
 		"moyuan operations remote-execution-rehearsals list [--execution-id <id>] [--provider <provider>] [--environment <env>] [--status <status>] [--decision <decision>] [--limit 20]",
+		"moyuan operations write-review-packets create [--admission-id <id>] [--operation-id <id>] [--operation-type <type>] [--provider <provider>] [--environment <env>] [--limit 20]",
+		"moyuan operations write-review-packets list [--admission-id <id>] [--operation-id <id>] [--status <status>] [--decision <decision>] [--limit 20]",
 		"moyuan control-loop run [--step <type>] [--idempotency-key <key>] [--retry-budget 0] [--environment <env>] [--deployment-execution-id <id>]",
-		"moyuan control-loop queue add [--step <type>] [--environment <env>] [--maintenance-window always|due:YYYY-MM-DD|after:RFC3339|between:HH:MM-HH:MM] [--due-at RFC3339] [--retry-budget 0]",
+		"moyuan control-loop queue add [--step <type>] [--environment <env>] [--maintenance-window always|due:YYYY-MM-DD|after:RFC3339|between:HH:MM-HH:MM] [--due-at RFC3339] [--retry-budget 0] [--admission-id <id>] [--remote-rehearsal-id <id>] [--review-packet-id <id>]",
 		"moyuan control-loop queue list [--status <status>] [--environment <env>] [--limit 20]",
 		"moyuan control-loop queue run [--environment <env>] [--max-items 5]",
 		"moyuan control-loop list [--limit 20]",
@@ -1982,6 +1984,36 @@ func handleOperations(args []string, cwd string) (string, any, int, error) {
 		}
 		report, err := operations.RunRemoteExecutionRehearsals(rootDir, options)
 		return "", map[string]any{"remote_execution_rehearsals": report}, 0, err
+	case "write-review-packets":
+		action := "create"
+		subargs := args[1:]
+		if len(subargs) > 0 && !strings.HasPrefix(subargs[0], "--") {
+			action = subargs[0]
+			subargs = subargs[1:]
+		}
+		operationType := flagValue(subargs, "--operation-type", "")
+		if operationType == "" {
+			operationType = flagValue(subargs, "--type", "")
+		}
+		options := operations.WriteReviewPacketOptions{
+			AdmissionID:   flagValue(subargs, "--admission-id", ""),
+			OperationType: operationType,
+			OperationID:   flagValue(subargs, "--operation-id", ""),
+			Provider:      flagValue(subargs, "--provider", ""),
+			Environment:   flagValue(subargs, "--environment", ""),
+			Status:        flagValue(subargs, "--status", ""),
+			Decision:      flagValue(subargs, "--decision", ""),
+			Limit:         flagInt(subargs, "--limit", 20),
+		}
+		if action == "list" {
+			report, err := operations.ListWriteReviewPackets(rootDir, options)
+			return "", map[string]any{"write_review_packets": report}, 0, err
+		}
+		if action != "create" {
+			return "unknown operations write-review-packets command\n", nil, 1, nil
+		}
+		report, err := operations.CreateWriteReviewPackets(rootDir, options)
+		return "", map[string]any{"write_review_packets": report}, 0, err
 	}
 	return "unknown operations command\n", nil, 1, nil
 }
@@ -2037,6 +2069,9 @@ func handleControlLoop(ctx context.Context, args []string, cwd string) (string, 
 				MaintenanceWindow:     flagValue(subargs, "--maintenance-window", ""),
 				DueAt:                 flagValue(subargs, "--due-at", ""),
 				Priority:              flagInt(subargs, "--priority", 0),
+				AdmissionID:           flagValue(subargs, "--admission-id", ""),
+				RemoteRehearsalID:     flagValue(subargs, "--remote-rehearsal-id", ""),
+				ReviewPacketID:        flagValue(subargs, "--review-packet-id", ""),
 			})
 			return "", map[string]any{"control_loop_queue_item": item}, 0, err
 		case "list":

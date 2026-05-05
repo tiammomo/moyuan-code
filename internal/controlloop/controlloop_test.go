@@ -233,6 +233,32 @@ func TestQueueInvalidMaintenanceWindowRequiresManualHandoff(t *testing.T) {
 	}
 }
 
+func TestQueueRequiresBoundReviewPacketBeforeExecution(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	item, err := Enqueue(root, QueueOptions{
+		Steps:             []string{StepResourceLifecycleScan},
+		MaintenanceWindow: "always",
+		ReviewPacketID:    "missing-review-packet",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := RunQueue(context.Background(), root, QueueRunOptions{MaxItems: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := queueItemByID(report.QueueItems, item.ID)
+	if updated.Status != "manual_required" || updated.Decision != "CONTROL_QUEUE_REVIEW_GATE_MANUAL_REQUIRED" {
+		t.Fatalf("expected review gate manual handoff, got %+v", updated)
+	}
+	if len(updated.Reasons) == 0 || updated.Reasons[len(updated.Reasons)-1] != "write_review_packet_missing:missing-review-packet" {
+		t.Fatalf("expected missing review packet reason, got %+v", updated.Reasons)
+	}
+}
+
 func assertStep(t *testing.T, run RunRecord, stepType string) {
 	t.Helper()
 	for _, step := range run.Steps {

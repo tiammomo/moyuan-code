@@ -67,6 +67,8 @@ import type {
   MergeQueueSummary,
   WriteAdmissionReportSummary,
   WriteAdmissionSummary,
+  WriteReviewPacketReportSummary,
+  WriteReviewPacketSummary,
 } from "./types";
 
 const apiBase = process.env.MOYUAN_API_BASE_URL ?? "http://127.0.0.1:8080/v1";
@@ -159,6 +161,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     writeAdmissionsResponse,
     providerProofRequirementsResponse,
     remoteExecutionRehearsalsResponse,
+    writeReviewPacketsResponse,
     controlLoopQueueResponse,
   ] = await Promise.all([
     apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
@@ -218,6 +221,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ write_admissions: unknown }>>(`/projects/${project.id}/operations/write-admissions?limit=20`),
     apiGet<ApiEnvelope<{ provider_proof_requirements: unknown }>>(`/projects/${project.id}/operations/provider-proof-requirements?limit=20`),
     apiGet<ApiEnvelope<{ remote_execution_rehearsals: unknown }>>(`/projects/${project.id}/operations/remote-execution-rehearsals?limit=20`),
+    apiGet<ApiEnvelope<{ write_review_packets: unknown }>>(`/projects/${project.id}/operations/write-review-packets?limit=20`),
     apiGet<ApiEnvelope<{ control_loop_queue: unknown[] }>>(`/projects/${project.id}/control-loop/queue?limit=20`),
   ]);
 
@@ -280,6 +284,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const writeAdmissions = normalizeWriteAdmissionReport(writeAdmissionsResponse?.write_admissions);
   const providerProofRequirements = normalizeProviderProofRequirementReport(providerProofRequirementsResponse?.provider_proof_requirements);
   const remoteExecutionRehearsals = normalizeRemoteExecutionRehearsalReport(remoteExecutionRehearsalsResponse?.remote_execution_rehearsals);
+  const writeReviewPackets = normalizeWriteReviewPacketReport(writeReviewPacketsResponse?.write_review_packets);
   const controlLoopQueue = normalizeControlLoopQueue(controlLoopQueueResponse?.control_loop_queue ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
@@ -369,6 +374,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     write_admissions: writeAdmissions,
     provider_proof_requirements: providerProofRequirements,
     remote_execution_rehearsals: remoteExecutionRehearsals,
+    write_review_packets: writeReviewPackets,
     control_loop_queue: controlLoopQueue,
     git_provider_plans: gitProviderPlans,
     auth_sessions: authSessions,
@@ -1475,6 +1481,52 @@ function normalizeRemoteExecutionRehearsal(raw: unknown, index: number): RemoteE
   };
 }
 
+function normalizeWriteReviewPacketReport(raw: unknown): WriteReviewPacketReportSummary | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const summary = readUnknown(raw, "summary");
+  return {
+    id: readString(raw, "id", "write-review-packets"),
+    generated_at: readString(raw, "generated_at", ""),
+    packet_count: readNumber(summary, "packet_count"),
+    ready_count: readNumber(summary, "ready_count"),
+    blocked_count: readNumber(summary, "blocked_count"),
+    manual_required_count: readNumber(summary, "manual_required_count"),
+    by_operation_type: readNumberMap(summary, "by_operation_type"),
+    by_provider: readNumberMap(summary, "by_provider"),
+    by_status: readNumberMap(summary, "by_status"),
+    by_decision: readNumberMap(summary, "by_decision"),
+    packets: readObjectArray(raw, "packets").map(normalizeWriteReviewPacket),
+  };
+}
+
+function normalizeWriteReviewPacket(raw: unknown, index: number): WriteReviewPacketSummary {
+  return {
+    id: readString(raw, "id", `write-review-packet-${index + 1}`),
+    admission_id: readString(raw, "admission_id", ""),
+    proof_id: readString(raw, "proof_id", ""),
+    operation_type: readString(raw, "operation_type", "unknown"),
+    operation_id: readString(raw, "operation_id", ""),
+    provider: readString(raw, "provider", ""),
+    environment: readString(raw, "environment", ""),
+    mode: readString(raw, "mode", ""),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    rule_refs: readArray(raw, "rule_refs"),
+    evidence_refs: readArray(raw, "evidence_refs"),
+    provider_requirement_id: readString(raw, "provider_requirement_id", ""),
+    remote_rehearsal_id: readString(raw, "remote_rehearsal_id", ""),
+    remote_rehearsal_status: readString(raw, "remote_rehearsal_status", ""),
+    remote_rehearsal_decision: readString(raw, "remote_rehearsal_decision", ""),
+    queue_item_ids: readArray(raw, "queue_item_ids"),
+    queue_decisions: readArray(raw, "queue_decisions"),
+    markdown: readString(raw, "markdown", ""),
+    created_at: readString(raw, "created_at", ""),
+  };
+}
+
 function normalizeControlLoopQueue(rawItems: unknown[]): ControlLoopQueueItemSummary[] {
   return rawItems.map((raw, index) => ({
     id: readString(raw, "id", `control-queue-${index + 1}`),
@@ -1488,6 +1540,9 @@ function normalizeControlLoopQueue(rawItems: unknown[]): ControlLoopQueueItemSum
     environment: readString(raw, "environment", ""),
     maintenance_window: readString(raw, "maintenance_window", ""),
     due_at: readString(raw, "due_at", ""),
+    admission_id: readString(raw, "admission_id", ""),
+    remote_rehearsal_id: readString(raw, "remote_rehearsal_id", ""),
+    review_packet_id: readString(raw, "review_packet_id", ""),
     run_id: readString(raw, "run_id", ""),
     reasons: readArray(raw, "reasons"),
     created_at: readString(raw, "created_at", ""),

@@ -141,6 +141,8 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const providerProofRequirements = providerProofRequirementReport?.requirements ?? [];
   const remoteRehearsalReport = snapshot.remote_execution_rehearsals;
   const remoteRehearsals = remoteRehearsalReport?.rehearsals ?? [];
+  const writeReviewPacketReport = snapshot.write_review_packets;
+  const writeReviewPackets = writeReviewPacketReport?.packets ?? [];
   const controlLoopQueue = snapshot.control_loop_queue ?? [];
   const decisionEntries = decisionLedger?.entries ?? [];
   const latestControlLoopRun = snapshot.control_loop_runs[0];
@@ -1928,6 +1930,59 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
           </div>
 
           <div className="panel">
+            <PanelTitle
+              icon={<ScrollText size={18} />}
+              title="Write Review Packet"
+              meta={writeReviewPacketReport ? `${writeReviewPacketReport.packet_count} packets` : "not generated"}
+            />
+            <div className="signalList">
+              {writeReviewPacketReport ? (
+                <>
+                  <div className="signalItem">
+                    <div className="signalHeader">
+                      <strong>{compactID(writeReviewPacketReport.id)}</strong>
+                      <StatusPill tone={writeReviewPacketReport.blocked_count > 0 ? "blocked" : writeReviewPacketReport.manual_required_count > 0 ? "warning" : "ok"} label={`${writeReviewPacketReport.ready_count} ready`} />
+                    </div>
+                    <span>
+                      blocked {writeReviewPacketReport.blocked_count} / manual {writeReviewPacketReport.manual_required_count}
+                    </span>
+                    <div className="signalMeta">
+                      {Object.entries(writeReviewPacketReport.by_status)
+                        .slice(0, 4)
+                        .map(([status, count]) => (
+                          <code key={status}>
+                            {status}:{count}
+                          </code>
+                        ))}
+                    </div>
+                  </div>
+                  {writeReviewPackets.slice(0, 4).map((packet) => (
+                    <div className="signalItem" key={packet.id}>
+                      <div className="signalHeader">
+                        <strong>{packet.operation_type}</strong>
+                        <StatusPill tone={toneForStatus(packet.status)} label={packet.decision} />
+                      </div>
+                      <span>
+                        {packet.provider || "provider"} / {packet.environment || "env"} / {compactID(packet.operation_id)}
+                      </span>
+                      <div className="signalMeta">
+                        {packet.remote_rehearsal_id ? <code>{compactID(packet.remote_rehearsal_id)}</code> : null}
+                        {packet.provider_requirement_id ? <code>{compactID(packet.provider_requirement_id)}</code> : null}
+                        {packet.queue_item_ids.length ? <code>{packet.queue_item_ids.length} queue</code> : null}
+                        {packet.evidence_refs.length ? <code>{packet.evidence_refs.length} evidence</code> : null}
+                        {packet.rule_refs.length ? <code>{packet.rule_refs.length} rules</code> : null}
+                      </div>
+                      {packet.reasons[0] ? <small>{packet.reasons[0]}</small> : null}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="emptyState">No write review packets</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
             <PanelTitle icon={<RefreshCw size={18} />} title="Control Runner" meta={latestControlLoopRun ? compactID(latestControlLoopRun.id) : "no runs"} />
             <div className="signalList">
               {latestControlLoopRun ? (
@@ -1974,6 +2029,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                     </span>
                     <div className="signalMeta">
                       <code>{item.maintenance_window || "window open"}</code>
+                      {item.review_packet_id ? <code>{compactID(item.review_packet_id)}</code> : null}
+                      {item.admission_id ? <code>{compactID(item.admission_id)}</code> : null}
+                      {item.remote_rehearsal_id ? <code>{compactID(item.remote_rehearsal_id)}</code> : null}
                       {item.due_at ? <code>{shortTimestamp(item.due_at)}</code> : null}
                       {item.run_id ? <code>{compactID(item.run_id)}</code> : null}
                     </div>

@@ -10,6 +10,7 @@ import (
 
 	"moyuan-code/internal/fsutil"
 	"moyuan-code/internal/logging"
+	"moyuan-code/internal/operations"
 	"moyuan-code/internal/workspace"
 )
 
@@ -25,6 +26,9 @@ type QueueOptions struct {
 	MaintenanceWindow     string   `json:"maintenance_window,omitempty"`
 	DueAt                 string   `json:"due_at,omitempty"`
 	Priority              int      `json:"priority,omitempty"`
+	AdmissionID           string   `json:"admission_id,omitempty"`
+	RemoteRehearsalID     string   `json:"remote_rehearsal_id,omitempty"`
+	ReviewPacketID        string   `json:"review_packet_id,omitempty"`
 }
 
 type QueueListOptions struct {
@@ -69,6 +73,9 @@ type QueueItem struct {
 	MaintenanceWindow     string   `json:"maintenance_window,omitempty"`
 	DueAt                 string   `json:"due_at,omitempty"`
 	Priority              int      `json:"priority,omitempty"`
+	AdmissionID           string   `json:"admission_id,omitempty"`
+	RemoteRehearsalID     string   `json:"remote_rehearsal_id,omitempty"`
+	ReviewPacketID        string   `json:"review_packet_id,omitempty"`
 	RunID                 string   `json:"run_id,omitempty"`
 	Reasons               []string `json:"reasons,omitempty"`
 	CreatedAt             string   `json:"created_at"`
@@ -97,6 +104,9 @@ func Enqueue(rootDir string, options QueueOptions) (QueueItem, error) {
 		MaintenanceWindow:     options.MaintenanceWindow,
 		DueAt:                 options.DueAt,
 		Priority:              options.Priority,
+		AdmissionID:           options.AdmissionID,
+		RemoteRehearsalID:     options.RemoteRehearsalID,
+		ReviewPacketID:        options.ReviewPacketID,
 		Reasons:               []string{"control_queue_item_created"},
 		CreatedAt:             now.Format(time.RFC3339Nano),
 		UpdatedAt:             now.Format(time.RFC3339Nano),
@@ -222,6 +232,19 @@ func executeQueueItem(ctx context.Context, rootDir string, item QueueItem) (Queu
 		item.UpdatedAt = now.Format(time.RFC3339Nano)
 		return item, RunRecord{}, saveQueueItem(rootDir, item)
 	}
+	ready, decision, reasons, err := queueReviewGateAllows(rootDir, item)
+	if err != nil {
+		return QueueItem{}, RunRecord{}, err
+	}
+	if !ready {
+		item.Status = "manual_required"
+		item.Decision = decision
+		for _, gateReason := range reasons {
+			item.Reasons = appendUniqueQueueReason(item.Reasons, gateReason)
+		}
+		item.UpdatedAt = now.Format(time.RFC3339Nano)
+		return item, RunRecord{}, saveQueueItem(rootDir, item)
+	}
 	item.AttemptCount++
 	run, err := Run(ctx, rootDir, RunOptions{
 		Trigger:               firstNonEmptyQueue(item.Trigger, "queue"),
@@ -264,6 +287,9 @@ func normalizeQueueOptions(options QueueOptions) QueueOptions {
 	options.DeploymentExecutionID = strings.TrimSpace(options.DeploymentExecutionID)
 	options.MaintenanceWindow = strings.TrimSpace(options.MaintenanceWindow)
 	options.DueAt = strings.TrimSpace(options.DueAt)
+	options.AdmissionID = strings.TrimSpace(options.AdmissionID)
+	options.RemoteRehearsalID = strings.TrimSpace(options.RemoteRehearsalID)
+	options.ReviewPacketID = strings.TrimSpace(options.ReviewPacketID)
 	if options.RetryBudget < 0 {
 		options.RetryBudget = 0
 	}
@@ -374,6 +400,63 @@ func maintenanceWindowAllows(window string, dueAt string, now time.Time) (bool, 
 		return true, "maintenance_window_open"
 	}
 	return false, "maintenance_window_invalid"
+}
+
+func queueReviewGateAllows(rootDir string, item QueueItem) (bool, string, []string, error) {
+	reasons := []string{}
+	if item.AdmissionID != "" {
+		admission, found, err := findQueueAdmission(rootDir, item.AdmissionID)
+		if err != nil {
+			return false, "", nil, err
+		}
+		if !found {
+			return false, "CONTROL_QUEUE_REVIEW_GATE_MANUAL_REQUIRED", []string{"write_admission_missing:" + item.AdmissionID}, nil
+		}
+		if admission.Status != "ready" {
+			return false, "CONTROL_QUEUE_REVIEW_GATE_MANUAL_REQUIRED", []string{"write_admission_not_ready:" + admission.Decision}, nil
+		}
+		reasons = appendUniqueQueueReason(reasons, "write_admission_ready:"+admission.ID)
+	}
+	if item.RemoteRehearsalID != "" {
+		rehearsal, found, err := operations.LoadRemoteExecutionRehearsal(rootDir, item.RemoteRehearsalID)
+		if err != nil {
+			return false, "", nil, err
+		}
+		if !found {
+			return false, "CONTROL_QUEUE_REVIEW_GATE_MANUAL_REQUIRED", []string{"remote_rehearsal_missing:" + item.RemoteRehearsalID}, nil
+		}
+		if rehearsal.Status != "completed" {
+			return false, "CONTROL_QUEUE_REVIEW_GATE_MANUAL_REQUIRED", []string{"remote_rehearsal_not_completed:" + rehearsal.Decision}, nil
+		}
+		reasons = appendUniqueQueueReason(reasons, "remote_rehearsal_completed:"+rehearsal.ID)
+	}
+	if item.ReviewPacketID != "" {
+		packet, found, err := operations.LoadWriteReviewPacket(rootDir, item.ReviewPacketID)
+		if err != nil {
+			return false, "", nil, err
+		}
+		if !found {
+			return false, "CONTROL_QUEUE_REVIEW_GATE_MANUAL_REQUIRED", []string{"write_review_packet_missing:" + item.ReviewPacketID}, nil
+		}
+		if packet.Status != "ready" {
+			return false, "CONTROL_QUEUE_REVIEW_GATE_MANUAL_REQUIRED", []string{"write_review_packet_not_ready:" + packet.Decision}, nil
+		}
+		reasons = appendUniqueQueueReason(reasons, "write_review_packet_ready:"+packet.ID)
+	}
+	return true, "CONTROL_QUEUE_REVIEW_GATE_READY", reasons, nil
+}
+
+func findQueueAdmission(rootDir string, admissionID string) (operations.WriteAdmissionEntry, bool, error) {
+	report, err := operations.BuildWriteAdmissions(rootDir, operations.WriteAdmissionOptions{Limit: 100})
+	if err != nil {
+		return operations.WriteAdmissionEntry{}, false, err
+	}
+	for _, admission := range report.Entries {
+		if admission.ID == admissionID {
+			return admission, true, nil
+		}
+	}
+	return operations.WriteAdmissionEntry{}, false, nil
 }
 
 func parseHHMM(value string) (int, error) {
