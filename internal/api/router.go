@@ -141,6 +141,11 @@ type rollbackExecuteRequest struct {
 	Commands   []string `json:"commands"`
 }
 
+type monitorSummaryRequest struct {
+	Environment string `json:"environment"`
+	Limit       int    `json:"limit"`
+}
+
 type resourceHealthScanRequest struct {
 	Environment string   `json:"environment"`
 	ResourceIDs []string `json:"resource_ids"`
@@ -2450,6 +2455,49 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"post_deployment_histories": histories})
 	})
+	router.POST("/v1/projects/:project_id/deployment-monitor-summary", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req monitorSummaryRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		summary, err := deployment.BuildMonitorSummary(rootDir, deployment.MonitorSummaryOptions{Environment: req.Environment, Limit: req.Limit})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if summary.Status == "critical" || summary.Status == "attention_required" || summary.Status == "unknown" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"monitor_summary": summary})
+	})
+	router.GET("/v1/projects/:project_id/deployment-monitor-summaries", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		summaries, err := deployment.ListMonitorSummaries(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"monitor_summaries": summaries})
+	})
 	router.GET("/v1/projects/:project_id/deployment-executions/:execution_id/post-deployment-history", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3434,6 +3482,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "deployment.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case "/v1/projects/:project_id/deployment-executions/:execution_id/rollback":
 		return authzRule{Action: "deployment.rollback.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
+	case "/v1/projects/:project_id/deployment-monitor-summary":
+		return authzRule{Action: "deployment.monitor.summary", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case "/v1/projects/:project_id/visuals/assets/:asset_id/render":
 		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
 	case "/v1/projects/:project_id/resources/:resource_id/renew":
@@ -3504,6 +3554,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "deployment.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case strings.Contains(rawPath, "/deployment-executions/") && strings.HasSuffix(rawPath, "/rollback"):
 		return authzRule{Action: "deployment.rollback.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
+	case strings.HasSuffix(rawPath, "/deployment-monitor-summary"):
+		return authzRule{Action: "deployment.monitor.summary", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case strings.Contains(rawPath, "/visuals/assets/") && strings.HasSuffix(rawPath, "/render"):
 		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
 	case strings.Contains(rawPath, "/resources/") && strings.HasSuffix(rawPath, "/renew"):

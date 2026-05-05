@@ -268,6 +268,7 @@ moyuan release provider publish <release-id> [--approved] [--approval-id <approv
 moyuan deploy plan <release-id> --environment <env> [--resource <resource-id>]
 moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell] [--approved] [--approval-id <approval-id>]
 moyuan deploy rollback <execution-id> [--mode preview|local_shell] [--approved] [--approval-id <approval-id>]
+moyuan deploy monitor summarize [--environment <env>] [--limit <n>]
 moyuan evidence list [--parent-type <type>] [--parent-id <id>]
 moyuan bug list
 moyuan bug show <bug-id>

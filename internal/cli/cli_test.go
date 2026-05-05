@@ -611,6 +611,11 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 		t.Fatalf("expected missing rollback execution to fail: %s", missingRollback.stdout)
 	}
 	assertContains(t, missingRollback.stdout, `"deployment_execution_not_found"`)
+	monitorSummary := runCLI(t, root, "deploy", "monitor", "summarize", "--environment", "test_dev")
+	assertContains(t, monitorSummary.stdout, `"decision": "DEPLOYMENT_MONITOR_HEALTHY"`)
+	monitorSummaryID := decodeStringField(t, monitorSummary.stdout, "id")
+	monitorSummaryShown := runCLI(t, root, "deploy", "monitor-summary", monitorSummaryID)
+	assertContains(t, monitorSummaryShown.stdout, monitorSummaryID)
 
 	deployApprovalRequired := runCLIAllowFailure(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--command", "printf deployment-ok")
 	if deployApprovalRequired.code == 0 {

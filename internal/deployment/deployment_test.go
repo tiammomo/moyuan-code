@@ -662,6 +662,66 @@ func TestExecuteRollbackPreviewsRequestsApprovalAndConsumesBeforeLocalShell(t *t
 	}
 }
 
+func TestBuildMonitorSummaryClassifiesWindowAndWritesEvidence(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	okServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer okServer.Close()
+	okPlan := createDeploymentPlanWithHealthTarget(t, root, "monitor-ok", okServer.URL)
+	okExecution, err := Execute(context.Background(), root, ExecuteOptions{
+		DeploymentID: okPlan.ID,
+		Mode:         "local_shell",
+		Approved:     true,
+		ApprovalID:   approveDeploymentExecution(t, root, okPlan.ID, "local_shell"),
+		Commands:     []string{"printf monitor-ok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if okExecution.Decision != "DEPLOY_EXECUTION_COMPLETED" {
+		t.Fatalf("expected monitor ok fixture, got %+v", okExecution)
+	}
+	failedExecution := createRollbackRequiredExecution(t, root, "monitor-fail")
+	if failedExecution.Decision != "DEPLOY_SMOKE_FAILED" {
+		t.Fatalf("expected monitor failed fixture, got %+v", failedExecution)
+	}
+
+	summary, err := BuildMonitorSummary(root, MonitorSummaryOptions{Environment: "test_dev", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Status != "attention_required" || summary.Decision != "DEPLOYMENT_MONITOR_ATTENTION_REQUIRED" {
+		t.Fatalf("expected attention required monitor summary, got %+v", summary)
+	}
+	if summary.HistoryCount != 2 || summary.FailedCount != 1 || summary.RollbackCount != 1 || summary.FailureClasses["smoke_failed"] != 1 || len(summary.Latest) != 2 {
+		t.Fatalf("expected monitor summary counts from two histories, got %+v", summary)
+	}
+	limited, err := BuildMonitorSummary(root, MonitorSummaryOptions{Environment: "test_dev", Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if limited.WindowSize != 1 || limited.HistoryCount != 1 || len(limited.Latest) != 1 {
+		t.Fatalf("expected monitor summary to count only the requested window, got %+v", limited)
+	}
+	assertDeploymentFileExists(t, monitorSummaryPath(root, summary.ID))
+	loaded, found, err := LoadMonitorSummary(root, summary.ID)
+	if err != nil || !found {
+		t.Fatalf("expected monitor summary to load, found=%v err=%v", found, err)
+	}
+	if loaded.ID != summary.ID || loaded.Decision != summary.Decision {
+		t.Fatalf("expected loaded monitor summary, got %+v", loaded)
+	}
+	records, err := evidence.List(root, evidence.ListOptions{ParentType: "deployment_monitor_summary", ParentID: summary.ID, Limit: 5})
+	if err != nil || len(records) != 1 || records[0].Decision != "DEPLOYMENT_MONITOR_ATTENTION_REQUIRED" {
+		t.Fatalf("expected monitor summary evidence, records=%+v err=%v", records, err)
+	}
+}
+
 func createDeploymentPlanWithHealthTarget(t *testing.T, root string, id string, target string) Plan {
 	t.Helper()
 	resource, err := serverresources.Add(root, serverresources.Resource{

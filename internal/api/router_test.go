@@ -382,6 +382,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 		t.Fatalf("expected deployment evidence record, records=%+v err=%v", evidenceRecords, err)
 	}
 	assertGETContains(t, router, "/v1/projects/managed/deployment-monitor-history?limit=5", http.StatusOK, `"post_deployment_histories"`, `"POST_DEPLOYMENT_NOT_STARTED"`, `"execution_blocked"`)
+	assertPostContains(t, router, "/v1/projects/managed/deployment-monitor-summary", `{"limit":5}`, http.StatusAccepted, `"monitor_summary"`, `"DEPLOYMENT_MONITOR_ATTENTION_REQUIRED"`)
+	assertGETContains(t, router, "/v1/projects/managed/deployment-monitor-summaries?limit=5", http.StatusOK, `"monitor_summaries"`, `"DEPLOYMENT_MONITOR_ATTENTION_REQUIRED"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/"+evidenceRecords[0].ParentID+"/post-deployment-history", http.StatusOK, `"post_deployment_history"`, `"execution_blocked"`)
 	assertGETContains(t, router, "/v1/projects/managed/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"evidence"`, evidenceRecords[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/operations/deployment/"+evidenceRecords[0].ParentID, http.StatusOK, `"operation_detail"`, `"deployment.execute.dry_run"`, `"artifact_count":1`)
