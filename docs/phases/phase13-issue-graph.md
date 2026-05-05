@@ -19,7 +19,7 @@ Phase 13 的目标是把 Phase 12 的 release batch readiness 推进到“Releas
 | ID | Issue | 状态 | 主要范围 | 依赖 | 建议角色 | 退出条件 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `phase13-001` | `release-candidate-plan-from-batch` | completed | release candidate 事实源、从 release batch plan 读取 source/release branch/version、provider/remote/deploy target 摘要 | Phase 12 readiness | `release_owner` + `backend_owner` | suggested release batch 可生成 release candidate plan，不执行 Git 或远程写入 |
-| `phase13-002` | `guarded-local-release-branch-apply` | planned | approval/env gated local release branch update、write evidence、blocked reason | `phase13-001` | `git_owner` + `security_owner` | 只有审批和开关满足时，才把 source integration branch 固化为本地 release branch |
+| `phase13-002` | `guarded-local-release-branch-apply` | completed | approval/env gated local release branch update、write evidence、blocked reason | `phase13-001` | `git_owner` + `security_owner` | 只有审批和开关满足时，才把 source integration branch 固化为本地 release branch |
 | `phase13-003` | `release-candidate-provider-preview` | planned | GitHub/Gitee provider preview、PR/MR plan、tag/release/workflow guarded actions | `phase13-001`,`phase13-002` | `git_owner` + `release_owner` | release candidate 可生成远程发布预览和 PR/MR handoff，不默认 push/tag/publish |
 | `phase13-004` | `deployment-handoff-from-release-candidate` | planned | 根据 release candidate 生成 deployment plan、环境/服务器资源引用、smoke/monitor 模板引用 | `phase13-001` | `devops_owner` | release candidate 可进入部署 dry-run 和后续线上检查链路 |
 | `phase13-005` | `console-release-candidate-surface` | planned | Console 展示 candidate、branch apply、provider preview、deployment handoff 和阻断原因 | `phase13-001`,`phase13-004` | `frontend_owner` | Console 可见 release candidate 全链路并只调用后端受控 API |

@@ -98,6 +98,91 @@ func TestPlanCandidateBlocksWhenReleaseBatchNotSuggested(t *testing.T) {
 	}
 }
 
+func TestApplyCandidateDryRunAndGuardedReleaseBranchApply(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	initReleaseGitRepo(t, root)
+	if err := fsutil.WriteText(filepath.Join(root, "README.md"), "# release candidate\n"); err != nil {
+		t.Fatal(err)
+	}
+	runReleaseGit(t, root, "add", ".")
+	runReleaseGit(t, root, "commit", "-m", "initial")
+	runReleaseGit(t, root, "branch", "moyuan/integration/release")
+	candidate, err := finishCandidate(root, Candidate{
+		ID:             "release-candidate-ready",
+		ReleaseBatchID: "release-batch-v0.2.0",
+		Status:         "ready",
+		Decision:       "RELEASE_CANDIDATE_READY",
+		Version:        "v0.2.0",
+		ReleaseBranch:  "release/v0.2.0",
+		SourceBranch:   "moyuan/integration/release",
+		Reasons:        []string{"test_fixture"},
+		CreatedAt:      "2026-05-05T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dryRun, err := ApplyCandidate(context.Background(), root, CandidateApplyOptions{CandidateID: candidate.ID, Mode: "dry_run", RequestedBy: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dryRun.Decision != "RELEASE_BRANCH_APPLY_DRY_RUN" || dryRun.WriteEnabled {
+		t.Fatalf("expected dry-run apply, got %+v", dryRun)
+	}
+	blocked, err := ApplyCandidate(context.Background(), root, CandidateApplyOptions{CandidateID: candidate.ID, Mode: "apply", Approved: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blocked.Decision != "RELEASE_BRANCH_APPLY_BLOCKED" || !containsReleaseReason(blocked.Reasons, "release_branch_apply_not_enabled") {
+		t.Fatalf("expected release branch apply write switch block, got %+v", blocked)
+	}
+	t.Setenv("MOYUAN_ALLOW_RELEASE_BRANCH_APPLY", "1")
+	applied, err := ApplyCandidate(context.Background(), root, CandidateApplyOptions{CandidateID: candidate.ID, Mode: "apply", Approved: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if applied.Decision != "RELEASE_BRANCH_APPLY_COMPLETED" || !applied.WriteEnabled || applied.ReleaseBranch != "release/v0.2.0" {
+		t.Fatalf("expected local release branch apply, got %+v", applied)
+	}
+	runReleaseGit(t, root, "rev-parse", "release/v0.2.0")
+	loaded, found, err := LoadCandidateApply(root, applied.ID)
+	if err != nil || !found || loaded.ID != applied.ID {
+		t.Fatalf("expected persisted candidate apply, found=%v loaded=%+v err=%v", found, loaded, err)
+	}
+	applies, err := ListCandidateApplies(root, candidate.ID, 10)
+	if err != nil || len(applies) < 3 || applies[0].ID != applied.ID {
+		t.Fatalf("expected listed candidate applies, applies=%+v err=%v", applies, err)
+	}
+}
+
+func TestApplyCandidateBlocksWhenCandidateNotReady(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := finishCandidate(root, Candidate{
+		ID:             "release-candidate-blocked",
+		ReleaseBatchID: "release-batch-blocked",
+		Status:         "blocked",
+		Decision:       "RELEASE_CANDIDATE_BLOCKED",
+		Version:        "v0.2.0",
+		CreatedAt:      "2026-05-05T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	apply, err := ApplyCandidate(context.Background(), root, CandidateApplyOptions{CandidateID: candidate.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if apply.Decision != "RELEASE_BRANCH_APPLY_BLOCKED" || !containsReleaseReason(apply.Reasons, "release_candidate_not_ready:RELEASE_CANDIDATE_BLOCKED") {
+		t.Fatalf("expected apply blocked by candidate readiness, got %+v", apply)
+	}
+}
+
 func TestPlanBatchSuggestsReleaseWhenIntegrationApplyThresholdMet(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {
