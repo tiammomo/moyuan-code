@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 11 Issue Graph 批量执行控制器已完成并通过 readiness。Phase 12 的真实并发 worker、受控集成合入、release batching 准备和 Console 可见性已完成实现，下一步进入 Phase 12 readiness 收口。
+当前阶段：Phase 12 真实并发执行与集成合入准备已完成并通过 readiness。下一步进入 Phase 13，聚焦 Release Candidate 远程发布与部署交接。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
@@ -63,11 +63,12 @@
 
 ## 当前实施入口
 
-Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 11 已完成主要闭环，Phase 12 第一批实现已完成。当前验收和状态入口：
+Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 12 已完成主要闭环。当前验收和状态入口：
 
-- [Phase 11 Release Readiness](./phases/phase11-release-readiness.md)：Issue Graph 批量执行控制器的收口验证。
+- [Phase 12 Release Readiness](./phases/phase12-release-readiness.md)：真实并发执行与集成合入准备的收口验证。
 - [Phase 12 实现 Issue Graph](./phases/phase12-issue-graph.md)：真实并发执行与集成合入准备的依赖图。
-- [Phase 12 实施记录](./phases/phase12-next-development-plan.md)：Phase 12 当前任务、验收标准和执行入口。
+- [Phase 12 实施记录](./phases/phase12-next-development-plan.md)：Phase 12 完成任务、验收标准和执行入口。
+- [Phase 11 Release Readiness](./phases/phase11-release-readiness.md)：Issue Graph 批量执行控制器的收口验证。
 - [Phase 11 实现 Issue Graph](./phases/phase11-issue-graph.md)：batch plan、batch run、worktree isolation、merge queue 和 Console 操作面的依赖图。
 - [Phase 11 实施记录](./phases/phase11-next-development-plan.md)：Phase 11 完成任务、验收标准和边界。
 - [Phase 规划与执行记录](./phases/README.md)：历史 Phase、release readiness 和执行记录总入口。
