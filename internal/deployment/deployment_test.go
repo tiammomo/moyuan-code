@@ -94,6 +94,13 @@ func TestCreatePlanFromCandidateUsesReleaseCandidateAndResources(t *testing.T) {
 	if !containsString(plan.Reasons, "release_candidate_and_resources_ready") || plan.SmokePlan.TemplateID == "" || plan.MonitorPlan.TemplateID == "" {
 		t.Fatalf("expected candidate deployment check plans, got %+v", plan)
 	}
+	execution, err := ExecuteFromCandidate(context.Background(), root, CandidateExecuteOptions{CandidateID: candidate.ID, Environment: "test_dev"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if execution.Decision != "DEPLOY_EXECUTION_DRY_RUN" || execution.DeploymentID != plan.ID || execution.ReleaseID != candidate.ID {
+		t.Fatalf("expected dry-run execution from candidate deployment plan, got %+v", execution)
+	}
 }
 
 func TestCreatePlanFromCandidateBlocksWhenCandidateNotReady(t *testing.T) {
@@ -117,6 +124,13 @@ func TestCreatePlanFromCandidateBlocksWhenCandidateNotReady(t *testing.T) {
 	}
 	if plan.Decision != "DEPLOY_BLOCKED" || !containsString(plan.Reasons, "release_candidate_not_ready:RELEASE_CANDIDATE_BLOCKED") {
 		t.Fatalf("expected deployment handoff blocked by candidate readiness, got %+v", plan)
+	}
+	execution, err := ExecuteFromCandidate(context.Background(), root, CandidateExecuteOptions{CandidateID: candidate.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if execution.Decision != "DEPLOY_EXECUTION_BLOCKED" || !containsString(execution.Reasons, "release_candidate_not_ready:RELEASE_CANDIDATE_BLOCKED") {
+		t.Fatalf("expected deployment execution blocked by candidate readiness, got %+v", execution)
 	}
 }
 

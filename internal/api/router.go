@@ -126,9 +126,11 @@ type deploymentPlanRequest struct {
 }
 
 type deploymentExecuteRequest struct {
-	Mode     string   `json:"mode"`
-	Approved bool     `json:"approved"`
-	Commands []string `json:"commands"`
+	DeploymentID string   `json:"deployment_id"`
+	Environment  string   `json:"environment"`
+	Mode         string   `json:"mode"`
+	Approved     bool     `json:"approved"`
+	Commands     []string `json:"commands"`
 }
 
 type resourceHealthScanRequest struct {
@@ -1009,6 +1011,39 @@ func NewRouter(options Options) *gin.Engine {
 			status = http.StatusAccepted
 		}
 		c.JSON(status, gin.H{"deployment": plan})
+	})
+	router.POST("/v1/projects/:project_id/release-candidates/:candidate_id/deployment-execution", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req deploymentExecuteRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		execution, err := deployment.ExecuteFromCandidate(c.Request.Context(), rootDir, deployment.CandidateExecuteOptions{
+			CandidateID:  c.Param("candidate_id"),
+			DeploymentID: req.DeploymentID,
+			Environment:  req.Environment,
+			Mode:         req.Mode,
+			Approved:     req.Approved,
+			Commands:     req.Commands,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusOK
+		if execution.Status == "blocked" || execution.Status == "failed" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"execution": execution})
 	})
 	router.GET("/v1/projects/:project_id/worktrees", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
@@ -3274,6 +3309,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "release.candidate.pr_mr_plan", Risk: "normal", Scopes: []string{"release:write", "git:read"}}, true
 	case "/v1/projects/:project_id/release-candidates/:candidate_id/deployment-plan":
 		return authzRule{Action: "release.candidate.deployment_plan", Risk: "normal", Scopes: []string{"deploy:write"}}, true
+	case "/v1/projects/:project_id/release-candidates/:candidate_id/deployment-execution":
+		return authzRule{Action: "release.candidate.deployment_execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case "/v1/projects/:project_id/providers/ops/refresh":
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case "/v1/projects/:project_id/control-loop/run":
@@ -3340,6 +3377,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "release.candidate.pr_mr_plan", Risk: "normal", Scopes: []string{"release:write", "git:read"}}, true
 	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/deployment-plan"):
 		return authzRule{Action: "release.candidate.deployment_plan", Risk: "normal", Scopes: []string{"deploy:write"}}, true
+	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/deployment-execution"):
+		return authzRule{Action: "release.candidate.deployment_execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case strings.Contains(rawPath, "/providers/ops/refresh"):
 		return authzRule{Action: "provider.refresh", Risk: "high", Scopes: []string{"provider:write"}}, true
 	case strings.Contains(rawPath, "/control-loop/run"):

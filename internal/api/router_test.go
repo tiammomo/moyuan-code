@@ -289,6 +289,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertPostContains(t, router, "/v1/projects/managed/release-candidates/"+releaseCandidates[0].ID+"/provider-publish", `{}`, http.StatusAccepted, `"release_provider_execution"`, `"RELEASE_CANDIDATE_PROVIDER_PUBLISH_BLOCKED"`, "release_candidate_not_ready:")
 	assertPostContains(t, router, "/v1/projects/managed/release-candidates/"+releaseCandidates[0].ID+"/pr-mr-plan", `{}`, http.StatusAccepted, `"git_provider_plan"`, `"GIT_PROVIDER_BLOCKED"`, "release_candidate_not_ready:")
 	assertPostContains(t, router, "/v1/projects/managed/release-candidates/"+releaseCandidates[0].ID+"/deployment-plan", `{"environment":"test_dev","resource_ids":["api-resource"],"approved":true}`, http.StatusAccepted, `"deployment"`, `"DEPLOY_BLOCKED"`, "release_candidate_not_ready:")
+	assertPostContains(t, router, "/v1/projects/managed/release-candidates/"+releaseCandidates[0].ID+"/deployment-execution", `{}`, http.StatusAccepted, `"execution"`, `"DEPLOY_EXECUTION_BLOCKED"`, "release_candidate_not_ready:")
 	assertGETContains(t, router, "/v1/projects/managed/worktrees?issue_id=api-worktree", http.StatusOK, `"worktrees"`, worktreeRecord.ID, `"WORKTREE_READY"`)
 	assertGETContains(t, router, "/v1/projects/managed/worktrees/"+worktreeRecord.ID, http.StatusOK, `"worktree"`, `"api-worktree"`)
 	assertGETContains(t, router, "/v1/projects/managed/issues/phase1-001", http.StatusOK, `"issue"`, `"accepted"`)
