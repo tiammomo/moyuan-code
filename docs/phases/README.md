@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+- [Phase 17 实现 Issue Graph](./phase17-issue-graph.md)：Phase 17 发布准入策略包、演练调度与风险修复 drill-down 的依赖图。
+- [Phase 17 实施记录](./phase17-next-development-plan.md)：Phase 17 当前任务、执行范围和验收记录。
 - [Phase 16 Release Readiness](./phase16-release-readiness.md)：Phase 16 部署演练、运行风险闭环与发布准入增强的收口验证。
 - [Phase 16 实现 Issue Graph](./phase16-issue-graph.md)：Phase 16 部署演练、运行风险闭环与发布准入增强的依赖图。
 - [Phase 16 实施记录](./phase16-next-development-plan.md)：Phase 16 完成任务、执行范围和验收记录。
