@@ -1,6 +1,6 @@
 # Phase 20 实施记录
 
-状态：in_progress
+状态：ready
 责任角色：orchestrator_owner + devops_owner + release_owner + backend_owner + frontend_owner + qa_owner + security_owner
 最后更新：2026-05-05
 
@@ -27,7 +27,7 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 | P1 | `phase20-003` | `remote-execution-rehearsal-runner` | completed | 远程执行演练 | rehearsal 不执行生产变更 |
 | P1 | `phase20-004` | `control-runner-queue-window` | completed | 长期任务队列与窗口 | 维护窗口、retry、handoff 可审计 |
 | P1 | `phase20-005` | `console-proof-admission-drilldown` | completed | Console 单条钻取 | 展示 proof/admission/runner step |
-| P2 | `phase20-006` | `phase20-readiness` | next | Phase 20 收口 | 全量门禁和生产边界完成 |
+| P2 | `phase20-006` | `phase20-readiness` | completed | Phase 20 收口 | 全量门禁和生产边界完成 |
 
 ## 3. 执行规划：`phase20-001 write-proof-admission-policy`
 
@@ -159,7 +159,7 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 
 ## 8. 执行规划：`phase20-006 phase20-readiness`
 
-实现状态：next。
+实现状态：completed。
 
 范围：
 
@@ -172,6 +172,12 @@ Phase 20 不改变生产真实写入默认关闭的原则，重点补 write admi
 - Go、Console typecheck/build 和 diff check 全部通过。
 - Phase 20 readiness 文档说明完成项、提交记录、保留边界和下一阶段入口。
 - 完成后停止，不进入 Phase 21。
+
+完成记录：
+
+- 新增 [Phase 20 Release Readiness](./phase20-release-readiness.md)，记录完成范围、门禁命令、提交记录、保留边界和 Phase 21 入口建议。
+- README、docs 入口、Phase 20 issue graph 和实施记录统一为 ready。
+- 收口结论明确：Phase 20 完成受控生产写入演练与远程运维执行增强，但不默认开启生产真实写入。
 
 ## 9. 验证要求
 
