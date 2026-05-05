@@ -146,6 +146,14 @@ type monitorSummaryRequest struct {
 	Limit       int    `json:"limit"`
 }
 
+type deploymentRehearsalRequest struct {
+	CandidateID  string `json:"candidate_id"`
+	DeploymentID string `json:"deployment_id"`
+	ExecutionID  string `json:"execution_id"`
+	Environment  string `json:"environment"`
+	MonitorLimit int    `json:"monitor_limit"`
+}
+
 type resourceHealthScanRequest struct {
 	Environment string   `json:"environment"`
 	ResourceIDs []string `json:"resource_ids"`
@@ -2498,6 +2506,76 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"monitor_summaries": summaries})
 	})
+	router.POST("/v1/projects/:project_id/deployment-rehearsals", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req deploymentRehearsalRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		rehearsal, err := deployment.BuildRehearsal(c.Request.Context(), rootDir, deployment.RehearsalOptions{
+			CandidateID:  req.CandidateID,
+			DeploymentID: req.DeploymentID,
+			ExecutionID:  req.ExecutionID,
+			Environment:  req.Environment,
+			MonitorLimit: req.MonitorLimit,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		status := http.StatusCreated
+		if rehearsal.Status == "blocked" || rehearsal.Status == "attention_required" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"deployment_rehearsal": rehearsal})
+	})
+	router.GET("/v1/projects/:project_id/deployment-rehearsals", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		rehearsals, err := deployment.ListRehearsals(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"deployment_rehearsals": rehearsals})
+	})
+	router.GET("/v1/projects/:project_id/deployment-rehearsals/:rehearsal_id", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		rehearsal, found, err := deployment.LoadRehearsal(rootDir, c.Param("rehearsal_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "deployment rehearsal not found")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"deployment_rehearsal": rehearsal})
+	})
 	router.GET("/v1/projects/:project_id/deployment-executions/:execution_id/post-deployment-history", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3484,6 +3562,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "deployment.rollback.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case "/v1/projects/:project_id/deployment-monitor-summary":
 		return authzRule{Action: "deployment.monitor.summary", Risk: "normal", Scopes: []string{"deploy:write"}}, true
+	case "/v1/projects/:project_id/deployment-rehearsals":
+		return authzRule{Action: "deployment.rehearsal", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case "/v1/projects/:project_id/visuals/assets/:asset_id/render":
 		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
 	case "/v1/projects/:project_id/resources/:resource_id/renew":
@@ -3556,6 +3636,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "deployment.rollback.execute", Risk: "critical", Scopes: []string{"deploy:execute"}}, true
 	case strings.HasSuffix(rawPath, "/deployment-monitor-summary"):
 		return authzRule{Action: "deployment.monitor.summary", Risk: "normal", Scopes: []string{"deploy:write"}}, true
+	case strings.HasSuffix(rawPath, "/deployment-rehearsals"):
+		return authzRule{Action: "deployment.rehearsal", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case strings.Contains(rawPath, "/visuals/assets/") && strings.HasSuffix(rawPath, "/render"):
 		return authzRule{Action: "visual.render", Risk: "high", Scopes: []string{"visual:render"}}, true
 	case strings.Contains(rawPath, "/resources/") && strings.HasSuffix(rawPath, "/renew"):

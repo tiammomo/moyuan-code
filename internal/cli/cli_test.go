@@ -616,6 +616,16 @@ func TestGitProviderPlanCLIRequiresReviewAndPlansRemotePush(t *testing.T) {
 	monitorSummaryID := decodeStringField(t, monitorSummary.stdout, "id")
 	monitorSummaryShown := runCLI(t, root, "deploy", "monitor-summary", monitorSummaryID)
 	assertContains(t, monitorSummaryShown.stdout, monitorSummaryID)
+	rehearsal := runCLI(t, root, "deploy", "rehearsal", "create", "--deployment-id", deploymentID, "--execution-id", dryRunExecutionID)
+	assertContains(t, rehearsal.stdout, `"decision": "DEPLOYMENT_REHEARSAL_READY"`)
+	assertContains(t, rehearsal.stdout, `"deployment_execution"`)
+	assertContains(t, rehearsal.stdout, `"monitor_summary_id"`)
+	rehearsalID := decodeStringField(t, rehearsal.stdout, "id")
+	rehearsalShown := runCLI(t, root, "deploy", "rehearsal", rehearsalID)
+	assertContains(t, rehearsalShown.stdout, rehearsalID)
+	rehearsals := runCLI(t, root, "deploy", "rehearsals")
+	assertContains(t, rehearsals.stdout, `"rehearsals"`)
+	assertContains(t, rehearsals.stdout, rehearsalID)
 
 	deployApprovalRequired := runCLIAllowFailure(t, root, "deploy", "execute", deploymentID, "--mode", "local_shell", "--command", "printf deployment-ok")
 	if deployApprovalRequired.code == 0 {

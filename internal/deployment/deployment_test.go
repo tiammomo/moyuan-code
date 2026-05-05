@@ -722,6 +722,50 @@ func TestBuildMonitorSummaryClassifiesWindowAndWritesEvidence(t *testing.T) {
 	}
 }
 
+func TestBuildRehearsalLinksExecutionRollbackMonitorAndEvidence(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	failedExecution := createRollbackRequiredExecution(t, root, "rehearsal-risk")
+
+	rehearsal, err := BuildRehearsal(context.Background(), root, RehearsalOptions{
+		ExecutionID:  failedExecution.ID,
+		MonitorLimit: 5,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rehearsal.Status != "attention_required" || rehearsal.Decision != "DEPLOYMENT_REHEARSAL_ATTENTION_REQUIRED" {
+		t.Fatalf("expected attention-required rehearsal, got %+v", rehearsal)
+	}
+	if rehearsal.ExecutionID != failedExecution.ID || rehearsal.DeploymentID != failedExecution.DeploymentID || rehearsal.MonitorSummaryID == "" || rehearsal.RollbackExecutionID == "" {
+		t.Fatalf("expected rehearsal links, got %+v", rehearsal)
+	}
+	if !hasRehearsalTimeline(rehearsal.Timeline, "deployment_execution") || !hasRehearsalTimeline(rehearsal.Timeline, "monitor_summary") || !hasRehearsalTimeline(rehearsal.Timeline, "rollback_preview") {
+		t.Fatalf("expected rehearsal timeline to include execution, monitor and rollback, got %+v", rehearsal.Timeline)
+	}
+	if len(rehearsal.EvidenceIDs) == 0 {
+		t.Fatalf("expected rehearsal to link evidence ids, got %+v", rehearsal)
+	}
+	assertDeploymentFileExists(t, rehearsalPath(root, rehearsal.ID))
+	loaded, found, err := LoadRehearsal(root, rehearsal.ID)
+	if err != nil || !found {
+		t.Fatalf("expected rehearsal to load, found=%v err=%v", found, err)
+	}
+	if loaded.ID != rehearsal.ID || loaded.RollbackExecutionID != rehearsal.RollbackExecutionID {
+		t.Fatalf("expected loaded rehearsal, got %+v", loaded)
+	}
+	listed, err := ListRehearsals(root, 5)
+	if err != nil || len(listed) != 1 || listed[0].ID != rehearsal.ID {
+		t.Fatalf("expected rehearsal list, listed=%+v err=%v", listed, err)
+	}
+	records, err := evidence.List(root, evidence.ListOptions{ParentType: "deployment_rehearsal", ParentID: rehearsal.ID, Limit: 5})
+	if err != nil || len(records) != 1 || records[0].Decision != "DEPLOYMENT_REHEARSAL_ATTENTION_REQUIRED" {
+		t.Fatalf("expected rehearsal evidence, records=%+v err=%v", records, err)
+	}
+}
+
 func createDeploymentPlanWithHealthTarget(t *testing.T, root string, id string, target string) Plan {
 	t.Helper()
 	resource, err := serverresources.Add(root, serverresources.Resource{
@@ -806,6 +850,15 @@ func approveDeploymentExecution(t *testing.T, root string, deploymentID string, 
 func hasStep(steps []ExecutionStep, name string, status string) bool {
 	for _, step := range steps {
 		if step.Name == name && step.Status == status {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRehearsalTimeline(items []RehearsalTimelineItem, itemType string) bool {
+	for _, item := range items {
+		if item.Type == itemType {
 			return true
 		}
 	}

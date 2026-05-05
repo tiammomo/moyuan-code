@@ -16,6 +16,7 @@ import (
 	"moyuan-code/internal/batch"
 	"moyuan-code/internal/controlloop"
 	"moyuan-code/internal/controlplane"
+	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/evidence"
 	"moyuan-code/internal/fsutil"
 	gitadapter "moyuan-code/internal/git"
@@ -384,6 +385,13 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/deployment-monitor-history?limit=5", http.StatusOK, `"post_deployment_histories"`, `"POST_DEPLOYMENT_NOT_STARTED"`, `"execution_blocked"`)
 	assertPostContains(t, router, "/v1/projects/managed/deployment-monitor-summary", `{"limit":5}`, http.StatusAccepted, `"monitor_summary"`, `"DEPLOYMENT_MONITOR_ATTENTION_REQUIRED"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-monitor-summaries?limit=5", http.StatusOK, `"monitor_summaries"`, `"DEPLOYMENT_MONITOR_ATTENTION_REQUIRED"`)
+	assertPostContains(t, router, "/v1/projects/managed/deployment-rehearsals", `{"execution_id":"`+evidenceRecords[0].ParentID+`","monitor_limit":5}`, http.StatusAccepted, `"deployment_rehearsal"`, `"DEPLOYMENT_REHEARSAL_BLOCKED"`)
+	rehearsals, err := deployment.ListRehearsals(root, 1)
+	if err != nil || len(rehearsals) != 1 {
+		t.Fatalf("expected deployment rehearsal, rehearsals=%+v err=%v", rehearsals, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/deployment-rehearsals?limit=5", http.StatusOK, `"deployment_rehearsals"`, rehearsals[0].ID)
+	assertGETContains(t, router, "/v1/projects/managed/deployment-rehearsals/"+rehearsals[0].ID, http.StatusOK, `"deployment_rehearsal"`, `"deployment_execution"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/"+evidenceRecords[0].ParentID+"/post-deployment-history", http.StatusOK, `"post_deployment_history"`, `"execution_blocked"`)
 	assertGETContains(t, router, "/v1/projects/managed/evidence/"+evidenceRecords[0].ID, http.StatusOK, `"evidence"`, evidenceRecords[0].ID)
 	assertGETContains(t, router, "/v1/projects/managed/operations/deployment/"+evidenceRecords[0].ParentID, http.StatusOK, `"operation_detail"`, `"deployment.execute.dry_run"`, `"artifact_count":1`)

@@ -225,10 +225,13 @@ func usage() string {
 		"moyuan deploy execute <deployment-id> [--mode dry_run|ssh_preview|ssh_execute|local_shell] [--approved] [--approval-id <approval-id>] [--command <safe-command>]",
 		"moyuan deploy rollback <execution-id> [--mode preview|local_shell] [--approved] [--approval-id <approval-id>] [--command <safe-command>]",
 		"moyuan deploy monitor summarize [--environment test_dev] [--limit 20]",
+		"moyuan deploy rehearsal create [--candidate-id <id>] [--deployment-id <id>] [--execution-id <id>] [--environment test_dev]",
 		"moyuan deploy show <deployment-id>",
 		"moyuan deploy execution <execution-id>",
 		"moyuan deploy rollback-execution <rollback-execution-id>",
 		"moyuan deploy monitor-summary <monitor-summary-id>",
+		"moyuan deploy rehearsal <rehearsal-id>",
+		"moyuan deploy rehearsals",
 		"moyuan evidence list [--parent-type <type>] [--parent-id <id>] [--limit 20]",
 		"moyuan evidence show <evidence-id>",
 		"moyuan logs tail [--stream run] [--limit 20]",
@@ -1601,6 +1604,37 @@ func handleDeploy(ctx context.Context, args []string, cwd string) (string, any, 
 			return "", map[string]any{}, 1, nil
 		}
 		return "", summary, 0, nil
+	case "rehearsal":
+		if len(args) < 2 {
+			return "missing rehearsal command\n", nil, 1, nil
+		}
+		if args[1] == "create" {
+			limit, _ := strconv.Atoi(flagValue(args, "--monitor-limit", "10"))
+			rehearsal, err := deployment.BuildRehearsal(ctx, rootDir, deployment.RehearsalOptions{
+				CandidateID:  flagValue(args, "--candidate-id", ""),
+				DeploymentID: flagValue(args, "--deployment-id", ""),
+				ExecutionID:  flagValue(args, "--execution-id", ""),
+				Environment:  flagValue(args, "--environment", ""),
+				MonitorLimit: limit,
+			})
+			code := 0
+			if rehearsal.Status == "blocked" {
+				code = 1
+			}
+			return "", rehearsal, code, err
+		}
+		rehearsal, ok, err := deployment.LoadRehearsal(rootDir, args[1])
+		if err != nil {
+			return "", nil, 1, err
+		}
+		if !ok {
+			return "", map[string]any{}, 1, nil
+		}
+		return "", rehearsal, 0, nil
+	case "rehearsals":
+		limit, _ := strconv.Atoi(flagValue(args, "--limit", "20"))
+		rehearsals, err := deployment.ListRehearsals(rootDir, limit)
+		return "", map[string]any{"rehearsals": rehearsals}, 0, err
 	}
 	return "unknown deploy command\n", nil, 1, nil
 }
