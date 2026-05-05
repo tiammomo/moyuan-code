@@ -216,6 +216,11 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	assertContains(t, ledger.stdout, `"decision_ledger"`)
 	assertContains(t, ledger.stdout, `"source_type": "post_deployment_verification"`)
 	assertContains(t, ledger.stdout, `"POST_DEPLOYMENT_VERIFICATION_ATTENTION_REQUIRED"`)
+
+	writeProofs := runCLI(t, root, "operations", "write-proofs", "--operation-type", "deployment_execution", "--limit", "5")
+	assertContains(t, writeProofs.stdout, `"write_proofs"`)
+	assertContains(t, writeProofs.stdout, `"operation_type": "deployment_execution"`)
+	assertContains(t, writeProofs.stdout, `"WRITE_PROOF_WRITE_DISABLED"`)
 }
 
 func TestControlLoopCLIRunsDurableIdempotentSteps(t *testing.T) {

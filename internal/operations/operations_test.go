@@ -406,6 +406,67 @@ func TestBuildDecisionLedgerAggregatesDecisionSources(t *testing.T) {
 	}
 }
 
+func TestBuildWriteProofsAggregatesProviderDeploymentAndResourceControls(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := release.Suggest(context.Background(), root, release.SuggestOptions{Version: "v0.4.0", MinIssues: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseExecution, found, err := release.ProviderPreview(root, plan.ID)
+	if err != nil || !found {
+		t.Fatalf("expected release provider preview, found=%v err=%v", found, err)
+	}
+	deploymentExecution, err := deployment.Execute(context.Background(), root, deployment.ExecuteOptions{DeploymentID: "missing-deployment", Mode: "dry_run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "dev-proof",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2099-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, found, err := serverresources.Renew(root, serverresources.RenewalOptions{ResourceID: "dev-proof", ExpiresAt: "2099-02-01", ActorID: "ops", Reason: "proof test"}); err != nil || !found {
+		t.Fatalf("expected resource renewal, found=%v err=%v", found, err)
+	}
+
+	report, err := BuildWriteProofs(root, WriteProofOptions{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, operationType := range []string{"release_provider_execution", "deployment_execution", "resource_maintenance"} {
+		if !writeProofContainsOperation(report.Proofs, operationType) {
+			t.Fatalf("expected write proof operation %s in %+v", operationType, report.Proofs)
+		}
+	}
+	if report.Summary.ProofCount != len(report.Proofs) || report.Summary.BlockedCount == 0 {
+		t.Fatalf("unexpected write proof summary: %+v", report.Summary)
+	}
+	releaseProof := writeProofForOperation(report.Proofs, "release_provider_execution", releaseExecution.ID)
+	if releaseProof.OperationID == "" || releaseProof.Decision != "WRITE_PROOF_WRITE_DISABLED" || len(releaseProof.ProviderEvidenceRefs) == 0 {
+		t.Fatalf("expected release provider proof with write switch block and evidence, got %+v", releaseProof)
+	}
+	deploymentProof := writeProofForOperation(report.Proofs, "deployment_execution", deploymentExecution.ID)
+	if deploymentProof.OperationID == "" || deploymentProof.Decision != "WRITE_PROOF_WRITE_DISABLED" || deploymentProof.SecretRefStatus != "not_required_for_dry_run" || len(deploymentProof.ProviderEvidenceRefs) == 0 {
+		t.Fatalf("expected dry-run deployment proof with evidence, got %+v", deploymentProof)
+	}
+	filtered, err := BuildWriteProofs(root, WriteProofOptions{OperationType: "release-provider-execution", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filtered.Proofs) != 1 || filtered.Proofs[0].OperationID != releaseExecution.ID {
+		t.Fatalf("expected filtered release provider proof, got %+v", filtered.Proofs)
+	}
+}
+
 func timelineContainsType(items []TimelineItem, typ string) bool {
 	for _, item := range items {
 		if item.Type == typ {
@@ -431,4 +492,22 @@ func decisionLedgerContainsSource(entries []DecisionEntry, sourceType string) bo
 		}
 	}
 	return false
+}
+
+func writeProofContainsOperation(proofs []WriteProof, operationType string) bool {
+	for _, proof := range proofs {
+		if proof.OperationType == operationType {
+			return true
+		}
+	}
+	return false
+}
+
+func writeProofForOperation(proofs []WriteProof, operationType string, operationID string) WriteProof {
+	for _, proof := range proofs {
+		if proof.OperationType == operationType && proof.OperationID == operationID {
+			return proof
+		}
+	}
+	return WriteProof{}
 }
