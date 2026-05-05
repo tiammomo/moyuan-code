@@ -1,7 +1,13 @@
 package release
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,8 +23,11 @@ import (
 	"moyuan-code/internal/logging"
 	"moyuan-code/internal/orchestrator"
 	"moyuan-code/internal/process"
+	"moyuan-code/internal/secrets"
 	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/workspace"
+
+	"gopkg.in/yaml.v3"
 )
 
 type SuggestOptions struct {
@@ -59,20 +68,22 @@ type ProviderOptions struct {
 }
 
 type ProviderExecution struct {
-	ID               string     `json:"id"`
-	ReleaseID        string     `json:"release_id"`
-	Version          string     `json:"version,omitempty"`
-	Provider         string     `json:"provider,omitempty"`
-	Mode             string     `json:"mode"`
-	Status           string     `json:"status"`
-	Decision         string     `json:"decision"`
-	Reasons          []string   `json:"reasons"`
-	RemotePlan       RemotePlan `json:"remote_plan"`
-	ApprovalID       string     `json:"approval_id,omitempty"`
-	ApprovalConsumed bool       `json:"approval_consumed"`
-	WriteEnabled     bool       `json:"write_enabled"`
-	StartedAt        string     `json:"started_at"`
-	FinishedAt       string     `json:"finished_at,omitempty"`
+	ID               string                 `json:"id"`
+	ReleaseID        string                 `json:"release_id"`
+	Version          string                 `json:"version,omitempty"`
+	Provider         string                 `json:"provider,omitempty"`
+	Mode             string                 `json:"mode"`
+	Status           string                 `json:"status"`
+	Decision         string                 `json:"decision"`
+	Reasons          []string               `json:"reasons"`
+	RemotePlan       RemotePlan             `json:"remote_plan"`
+	RemoteResults    []ProviderActionResult `json:"remote_results,omitempty"`
+	ApprovalID       string                 `json:"approval_id,omitempty"`
+	ApprovalConsumed bool                   `json:"approval_consumed"`
+	WriteEnabled     bool                   `json:"write_enabled"`
+	AdapterStatus    string                 `json:"adapter_status,omitempty"`
+	StartedAt        string                 `json:"started_at"`
+	FinishedAt       string                 `json:"finished_at,omitempty"`
 }
 
 type RemotePlan struct {
@@ -93,6 +104,40 @@ type ProviderAction struct {
 	Command  string `json:"command,omitempty"`
 	Endpoint string `json:"endpoint,omitempty"`
 	Reason   string `json:"reason,omitempty"`
+}
+
+type ProviderActionResult struct {
+	Type       string `json:"type"`
+	Status     string `json:"status"`
+	Decision   string `json:"decision"`
+	Endpoint   string `json:"endpoint,omitempty"`
+	HTTPStatus int    `json:"http_status,omitempty"`
+	RemoteID   string `json:"remote_id,omitempty"`
+	RemoteLink string `json:"remote_link,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+}
+
+type releaseProviderAPIConfig struct {
+	Provider   string
+	APIBaseURL string
+	WebBaseURL string
+	Owner      string
+	Repo       string
+	TokenRef   string
+}
+
+type releaseRepositoryProviderConfigFile struct {
+	Repository struct {
+		ProviderConfig struct {
+			Owner      string `yaml:"owner"`
+			Repo       string `yaml:"repo"`
+			APIBaseURL string `yaml:"api_base_url"`
+			WebBaseURL string `yaml:"web_base_url"`
+			Auth       struct {
+				TokenRef string `yaml:"token_ref"`
+			} `yaml:"auth"`
+		} `yaml:"provider_config"`
+	} `yaml:"repository"`
 }
 
 func Suggest(ctx context.Context, rootDir string, options SuggestOptions) (Plan, error) {
@@ -199,7 +244,7 @@ func ProviderPreview(rootDir string, releaseID string) (ProviderExecution, bool,
 		execution.Reasons = append(execution.Reasons, "release_not_suggested:"+plan.Decision)
 		return finishProviderExecution(rootDir, execution)
 	}
-	execution.RemotePlan = buildProviderRemotePlan(plan)
+	execution.RemotePlan = buildProviderRemotePlan(rootDir, plan)
 	execution.Status = "completed"
 	execution.Decision = "RELEASE_PROVIDER_PREVIEW_READY"
 	execution.Reasons = append(execution.Reasons, "no_remote_release_actions_executed")
@@ -224,7 +269,7 @@ func ProviderPublish(rootDir string, options ProviderOptions) (ProviderExecution
 		execution.Reasons = append(execution.Reasons, "release_not_suggested:"+plan.Decision)
 		return finishProviderExecution(rootDir, execution)
 	}
-	execution.RemotePlan = buildProviderRemotePlan(plan)
+	execution.RemotePlan = buildProviderRemotePlan(rootDir, plan)
 	if !options.Approved {
 		approval, err := approvals.Request(rootDir, approvals.RequestOptions{
 			TargetType:  "release_provider_publish",
@@ -280,6 +325,20 @@ func ProviderPublish(rootDir string, options ProviderOptions) (ProviderExecution
 		execution.Reasons = append(execution.Reasons, "release_provider_write_not_enabled")
 		return finishProviderExecution(rootDir, execution)
 	}
+	cfg := loadReleaseProviderAPIConfig(rootDir, plan)
+	if _, ok := releaseEndpoint(cfg); !ok {
+		execution.Status = "blocked"
+		execution.Decision = "RELEASE_PROVIDER_PUBLISH_UNSUPPORTED"
+		execution.Reasons = append(execution.Reasons, "release_provider_endpoint_unsupported:"+normalize(plan.Provider))
+		return finishProviderExecution(rootDir, execution)
+	}
+	token, err := resolveReleaseProviderToken(rootDir, cfg)
+	if err != nil {
+		execution.Status = "blocked"
+		execution.Decision = "RELEASE_PROVIDER_PUBLISH_AUTH_REQUIRED"
+		execution.Reasons = append(execution.Reasons, err.Error())
+		return finishProviderExecution(rootDir, execution)
+	}
 	consumed, consumedFound, err := approvals.ConsumeApproved(rootDir, approval.ID, approvals.ConsumeOptions{
 		TargetType: "release_provider_publish",
 		TargetID:   plan.ID,
@@ -302,9 +361,7 @@ func ProviderPublish(rootDir string, options ProviderOptions) (ProviderExecution
 	execution.ApprovalID = consumed.ID
 	execution.ApprovalConsumed = true
 	execution.Reasons = append(execution.Reasons, "approval_consumed_before_remote_release_write")
-	execution.Status = "blocked"
-	execution.Decision = "RELEASE_PROVIDER_PUBLISH_NOT_IMPLEMENTED"
-	execution.Reasons = append(execution.Reasons, "remote_release_write_adapter_not_enabled")
+	execution = executeReleaseProviderAdapter(context.Background(), execution, cfg, token)
 	return finishProviderExecution(rootDir, execution)
 }
 
@@ -434,7 +491,8 @@ func releaseReady(plan Plan) bool {
 	return plan.Status == "suggested" && plan.Decision == "RELEASE_SUGGESTED"
 }
 
-func buildProviderRemotePlan(plan Plan) RemotePlan {
+func buildProviderRemotePlan(rootDir string, plan Plan) RemotePlan {
+	cfg := loadReleaseProviderAPIConfig(rootDir, plan)
 	remotePlan := RemotePlan{
 		Status:        "planned",
 		Decision:      "RELEASE_PROVIDER_REMOTE_PLAN_READY",
@@ -451,13 +509,13 @@ func buildProviderRemotePlan(plan Plan) RemotePlan {
 		ProviderAction{Type: "create_tag", Status: "planned", Command: "git tag " + plan.Version},
 		ProviderAction{Type: "push_tag", Status: "planned", Command: "git push " + defaultString(plan.RemoteName, "origin") + " " + plan.Version},
 	)
-	releaseEndpoint, ok := releaseEndpoint(plan)
+	releaseEndpoint, ok := releaseEndpoint(cfg)
 	if ok {
 		remotePlan.Actions = append(remotePlan.Actions, ProviderAction{Type: "create_release", Status: "planned", Endpoint: releaseEndpoint})
 	} else {
 		remotePlan.Actions = append(remotePlan.Actions, ProviderAction{Type: "create_release", Status: "manual_required", Reason: "provider_release_api_unsupported:" + normalize(plan.Provider)})
 	}
-	workflowEndpoint, ok := workflowEndpoint(plan)
+	workflowEndpoint, ok := workflowEndpoint(cfg)
 	if ok {
 		remotePlan.Actions = append(remotePlan.Actions, ProviderAction{Type: "trigger_workflow", Status: "planned", Endpoint: workflowEndpoint})
 	} else {
@@ -466,34 +524,220 @@ func buildProviderRemotePlan(plan Plan) RemotePlan {
 	return remotePlan
 }
 
-func releaseEndpoint(plan Plan) (string, bool) {
-	owner, repo := repoCoordinates(plan.RemoteURL)
-	if owner == "" || repo == "" {
+func releaseEndpoint(cfg releaseProviderAPIConfig) (string, bool) {
+	if cfg.Owner == "" || cfg.Repo == "" || cfg.APIBaseURL == "" {
 		return "", false
 	}
-	switch normalize(plan.Provider) {
+	switch normalize(cfg.Provider) {
 	case "github":
-		return "https://api.github.com/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) + "/releases", true
+		return strings.TrimRight(cfg.APIBaseURL, "/") + "/repos/" + url.PathEscape(cfg.Owner) + "/" + url.PathEscape(cfg.Repo) + "/releases", true
 	case "gitee":
-		return "https://gitee.com/api/v5/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) + "/releases", true
+		return strings.TrimRight(cfg.APIBaseURL, "/") + "/repos/" + url.PathEscape(cfg.Owner) + "/" + url.PathEscape(cfg.Repo) + "/releases", true
 	default:
 		return "", false
 	}
 }
 
-func workflowEndpoint(plan Plan) (string, bool) {
-	owner, repo := repoCoordinates(plan.RemoteURL)
-	if owner == "" || repo == "" {
+func workflowEndpoint(cfg releaseProviderAPIConfig) (string, bool) {
+	if cfg.Owner == "" || cfg.Repo == "" || cfg.APIBaseURL == "" {
 		return "", false
 	}
-	switch normalize(plan.Provider) {
+	switch normalize(cfg.Provider) {
 	case "github":
-		return "https://api.github.com/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) + "/actions/workflows/release.yml/dispatches", true
+		return strings.TrimRight(cfg.APIBaseURL, "/") + "/repos/" + url.PathEscape(cfg.Owner) + "/" + url.PathEscape(cfg.Repo) + "/actions/workflows/release.yml/dispatches", true
 	case "gitee":
-		return "https://gitee.com/api/v5/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) + "/actions/workflows/release.yml/dispatches", true
+		return strings.TrimRight(cfg.APIBaseURL, "/") + "/repos/" + url.PathEscape(cfg.Owner) + "/" + url.PathEscape(cfg.Repo) + "/actions/workflows/release.yml/dispatches", true
 	default:
 		return "", false
 	}
+}
+
+func loadReleaseProviderAPIConfig(rootDir string, plan Plan) releaseProviderAPIConfig {
+	provider := normalize(plan.Provider)
+	cfg := releaseProviderAPIConfig{Provider: provider, TokenRef: "secret:git_provider_token"}
+	switch provider {
+	case "github":
+		cfg.APIBaseURL = "https://api.github.com"
+		cfg.WebBaseURL = "https://github.com"
+	case "gitee":
+		cfg.APIBaseURL = "https://gitee.com/api/v5"
+		cfg.WebBaseURL = "https://gitee.com"
+	}
+	if owner, repo := repoCoordinates(plan.RemoteURL); owner != "" && repo != "" {
+		cfg.Owner = owner
+		cfg.Repo = repo
+	}
+	raw, found, err := readReleaseRepositoryProviderConfig(rootDir)
+	if err == nil && found {
+		providerConfig := raw.Repository.ProviderConfig
+		if strings.TrimSpace(providerConfig.Owner) != "" {
+			cfg.Owner = strings.TrimSpace(providerConfig.Owner)
+		}
+		if strings.TrimSpace(providerConfig.Repo) != "" {
+			cfg.Repo = strings.TrimSpace(providerConfig.Repo)
+		}
+		if strings.TrimSpace(providerConfig.APIBaseURL) != "" {
+			cfg.APIBaseURL = strings.TrimRight(strings.TrimSpace(providerConfig.APIBaseURL), "/")
+		}
+		if strings.TrimSpace(providerConfig.WebBaseURL) != "" {
+			cfg.WebBaseURL = strings.TrimRight(strings.TrimSpace(providerConfig.WebBaseURL), "/")
+		}
+		if strings.TrimSpace(providerConfig.Auth.TokenRef) != "" {
+			cfg.TokenRef = strings.TrimSpace(providerConfig.Auth.TokenRef)
+		}
+	}
+	return cfg
+}
+
+func readReleaseRepositoryProviderConfig(rootDir string) (releaseRepositoryProviderConfigFile, bool, error) {
+	text, found, err := fsutil.ReadText(filepath.Join(workspace.ForRoot(rootDir).MoyuanDir, "repository.yaml"))
+	if err != nil || !found {
+		return releaseRepositoryProviderConfigFile{}, found, err
+	}
+	var raw releaseRepositoryProviderConfigFile
+	if err := yaml.Unmarshal([]byte(text), &raw); err != nil {
+		return releaseRepositoryProviderConfigFile{}, true, err
+	}
+	return raw, true, nil
+}
+
+func resolveReleaseProviderToken(rootDir string, cfg releaseProviderAPIConfig) (string, error) {
+	if strings.TrimSpace(cfg.TokenRef) == "" {
+		return "", errors.New("release_provider_token_ref_missing")
+	}
+	if strings.TrimSpace(cfg.Owner) == "" || strings.TrimSpace(cfg.Repo) == "" {
+		return "", errors.New("release_provider_repo_coordinates_missing")
+	}
+	token, err := secrets.Resolve(rootDir, cfg.TokenRef, secrets.ResolveOptions{Purpose: "release.provider.publish", AdapterID: cfg.Provider, Required: true})
+	if err != nil {
+		return "", err
+	}
+	if token.Status != "ok" {
+		return "", fmt.Errorf("release_provider_token_%s:%s", token.Status, token.Reason)
+	}
+	return token.Value(), nil
+}
+
+func executeReleaseProviderAdapter(ctx context.Context, execution ProviderExecution, cfg releaseProviderAPIConfig, token string) ProviderExecution {
+	execution.AdapterStatus = "started"
+	results := []ProviderActionResult{}
+	for _, action := range execution.RemotePlan.Actions {
+		switch action.Type {
+		case "push_branch", "create_tag", "push_tag":
+			results = append(results, ProviderActionResult{
+				Type:     action.Type,
+				Status:   "skipped",
+				Decision: "RELEASE_PROVIDER_ACTION_SKIPPED",
+				Reason:   "git_command_execution_not_enabled_in_release_provider_adapter",
+			})
+		case "trigger_workflow":
+			results = append(results, ProviderActionResult{
+				Type:     action.Type,
+				Status:   "skipped",
+				Decision: "RELEASE_PROVIDER_ACTION_SKIPPED",
+				Endpoint: action.Endpoint,
+				Reason:   "workflow_dispatch_not_enabled_in_release_provider_adapter",
+			})
+		case "create_release":
+			result := createRemoteRelease(ctx, cfg, execution, token)
+			results = append(results, result)
+			if result.Status == "failed" {
+				execution.Status = "failed"
+				execution.Decision = "RELEASE_PROVIDER_PUBLISH_FAILED"
+				execution.Reasons = append(execution.Reasons, result.Reason)
+				execution.AdapterStatus = "failed"
+				execution.RemoteResults = results
+				return execution
+			}
+		default:
+			results = append(results, ProviderActionResult{Type: action.Type, Status: "skipped", Decision: "RELEASE_PROVIDER_ACTION_SKIPPED", Reason: "action_unsupported"})
+		}
+	}
+	execution.Status = "completed"
+	execution.Decision = "RELEASE_PROVIDER_PUBLISH_COMPLETED"
+	execution.Reasons = append(execution.Reasons, "release_provider_adapter_completed")
+	execution.AdapterStatus = "completed"
+	execution.RemoteResults = results
+	return execution
+}
+
+func createRemoteRelease(ctx context.Context, cfg releaseProviderAPIConfig, execution ProviderExecution, token string) ProviderActionResult {
+	endpoint, ok := releaseEndpoint(cfg)
+	if !ok {
+		return ProviderActionResult{Type: "create_release", Status: "skipped", Decision: "RELEASE_PROVIDER_ACTION_SKIPPED", Reason: "release_endpoint_unsupported"}
+	}
+	body := map[string]any{
+		"tag_name":   execution.Version,
+		"name":       execution.Version,
+		"body":       "Release " + execution.Version + " created by Moyuan Code.",
+		"draft":      false,
+		"prerelease": false,
+	}
+	if normalize(cfg.Provider) == "gitee" {
+		body["access_token"] = token
+	}
+	result, err := postReleaseProvider(ctx, cfg, endpoint, token, body)
+	if err != nil {
+		result.Type = "create_release"
+		return result
+	}
+	result.Type = "create_release"
+	return result
+}
+
+func postReleaseProvider(ctx context.Context, cfg releaseProviderAPIConfig, endpoint string, token string, body map[string]any) (ProviderActionResult, error) {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return ProviderActionResult{Status: "failed", Decision: "RELEASE_PROVIDER_ACTION_FAILED", Endpoint: endpoint, Reason: "release_provider_payload_invalid"}, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return ProviderActionResult{Status: "failed", Decision: "RELEASE_PROVIDER_ACTION_FAILED", Endpoint: endpoint, Reason: "release_provider_request_invalid"}, err
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("User-Agent", "moyuan-code-release-provider/1")
+	if normalize(cfg.Provider) == "github" {
+		request.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	}
+	response, err := (&http.Client{Timeout: 10 * time.Second}).Do(request)
+	if err != nil {
+		return ProviderActionResult{Status: "failed", Decision: "RELEASE_PROVIDER_ACTION_FAILED", Endpoint: endpoint, Reason: "release_provider_request_failed"}, err
+	}
+	defer response.Body.Close()
+	data, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return ProviderActionResult{Status: "failed", Decision: "RELEASE_PROVIDER_ACTION_FAILED", Endpoint: endpoint, HTTPStatus: response.StatusCode, Reason: fmt.Sprintf("release_provider_http_%d", response.StatusCode)}, errors.New("release_provider_http_failed")
+	}
+	raw := map[string]any{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return ProviderActionResult{Status: "failed", Decision: "RELEASE_PROVIDER_ACTION_FAILED", Endpoint: endpoint, HTTPStatus: response.StatusCode, Reason: "release_provider_response_invalid"}, err
+	}
+	return ProviderActionResult{
+		Status:     "completed",
+		Decision:   "RELEASE_PROVIDER_ACTION_COMPLETED",
+		Endpoint:   endpoint,
+		HTTPStatus: response.StatusCode,
+		RemoteID:   jsonString(raw, "id", "number"),
+		RemoteLink: jsonString(raw, "html_url", "url"),
+	}, nil
+}
+
+func jsonString(raw map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value, ok := raw[key]; ok {
+			switch typed := value.(type) {
+			case string:
+				if strings.TrimSpace(typed) != "" {
+					return strings.TrimSpace(typed)
+				}
+			case float64:
+				return fmt.Sprintf("%.0f", typed)
+			}
+		}
+	}
+	return ""
 }
 
 func repoCoordinates(remoteURL string) (string, string) {

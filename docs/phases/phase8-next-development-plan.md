@@ -1,6 +1,6 @@
 # Phase 8 实施记录
 
-状态：planned
+状态：in_progress
 责任角色：release_manager + devops_owner + security_owner + provider_owner + frontend_owner + qa_owner
 最后更新：2026-05-05
 
@@ -20,7 +20,7 @@ Phase 7 已完成并通过 release readiness：
 
 | 优先级 | ID | 任务 | 状态 | 目标 | 退出条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase8-001` | `release-provider-real-adapter-beta` | planned | GitHub/Gitee release provider adapter 最小真实写入 | approval、secret resolver、write switch 和 replay guard 全部满足 |
+| P0 | `phase8-001` | `release-provider-real-adapter-beta` | completed | GitHub/Gitee release provider adapter 最小真实写入 | approval、secret resolver、write switch 和 replay guard 全部满足 |
 | P0 | `phase8-002` | `ssh-runner-controlled-execution` | planned | SSH runner 真实受控执行 | allowlist 命令可执行，非 allowlist 阻断，输出脱敏 |
 | P1 | `phase8-003` | `post-deploy-smoke-monitor-evidence` | planned | 部署后 smoke/monitor evidence | 失败能阻断发布完成并生成 evidence |
 | P1 | `phase8-004` | `rollback-suggestion-and-runbook` | planned | 回滚建议和 runbook | 失败部署能生成可审查回滚建议 |
@@ -29,11 +29,13 @@ Phase 7 已完成并通过 release readiness：
 
 ## 3. 执行规划：`phase8-001 release-provider-real-adapter-beta`
 
+实现状态：completed。
+
 范围：
 
 - 定义 release provider adapter interface，区分 GitHub、Gitee 和 unsupported provider。
 - 真实写入仍必须同时满足 `MOYUAN_ALLOW_RELEASE_PROVIDER_WRITE=1`、已批准且未消费 approval、secret resolver 成功、release plan ready。
-- 第一版优先支持最小可验证动作：创建 tag/release 或生成 workflow dispatch request；无法安全执行的 action 必须显式 skipped。
+- 第一版支持最小可验证动作：GitHub/Gitee create release HTTP request；branch push、tag push 和 workflow dispatch 仍显式 `skipped`。
 - 远程请求只记录 provider、endpoint category、status code category 和 artifact reference，不记录 token 或响应正文。
 - execution、audit 和 evidence 必须能串联。
 
@@ -46,10 +48,19 @@ Phase 7 已完成并通过 release readiness：
 验收：
 
 - 缺少写开关、approval 或 secret 时仍阻断。
-- 写开关开启且 approval 通过时，adapter 到达真实请求边界或受控 skipped。
+- 写开关开启且 approval 通过、secret resolver 通过时，adapter 可调用 create release；无法安全自动执行的 action 受控 skipped。
 - 真实/模拟远程响应都写入脱敏 execution 和 evidence。
 - `go test ./internal/release ./internal/approvals ./internal/secrets ./internal/api ./internal/cli` 通过。
 - `go test ./...`、`npm run typecheck`、`npm run build`、`git diff --check` 通过。
+
+落地结果：
+
+- `ProviderExecution` 记录 `remote_results` 和 `adapter_status`。
+- unsupported provider 或缺少 create release endpoint 时返回 `RELEASE_PROVIDER_PUBLISH_UNSUPPORTED`，并保持 approval 未消费。
+- 缺少 secret policy 或用途不匹配时返回 `RELEASE_PROVIDER_PUBLISH_AUTH_REQUIRED`，并保持 approval 未消费。
+- secret 解析成功后才消费 approval；消费后执行 create release，approval replay 会被阻断。
+- GitHub token 只进入 Authorization header；Gitee token 只进入请求体 `access_token`，但请求体不写入日志、execution 或 evidence。
+- 测试使用 `httptest` 模拟 GitHub release API，断言 remote request、approval consumption、replay guard 和 secret 脱敏。
 
 ## 4. 验证要求
 

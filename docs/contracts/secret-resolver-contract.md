@@ -103,12 +103,16 @@ Phase 5 第一批接入：
 - Provider local status：`model.provider.status`。
 - Native Runtime env profile：`runtime.invoke`。
 - Visual script render：`visual.render.script`。
+- Git provider PR/MR create：`pull_request.create`。
+- Release provider publish：`release.provider.publish`。
 
 注入规则：
 
 - Claude CLI profile 注入 `ANTHROPIC_AUTH_TOKEN`。
 - Codex CLI profile 注入 `OPENAI_API_KEY`。
 - gpt-image-2 script 注入 `OPENAI_API_KEY`。
+- GitHub release provider publish 注入 HTTP `Authorization` header。
+- Gitee release provider publish 注入 API request body 的 `access_token` 字段；请求体不得写入日志、execution、evidence 或 Memory。
 - Metadata 只记录 `env_keys`、`auth_ref`、provider id 和 model id。
 
 ## 6. 审计和脱敏
