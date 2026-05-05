@@ -6,6 +6,7 @@ import type {
   APITokenSummary,
   ApprovalRecordSummary,
   AuthSessionSummary,
+  ControlLoopRunSummary,
   DeploymentExecutionSummary,
   DeploymentSummary,
   EvidenceSummary,
@@ -92,6 +93,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     auditEventsResponse,
     approvalsResponse,
     gitProviderPlansResponse,
+    controlLoopRunsResponse,
     sessionsResponse,
     apiTokensResponse,
     serviceAccountsResponse,
@@ -121,6 +123,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ audit_events: unknown[] }>>(`/projects/${project.id}/audit-events?channel=all&limit=10`),
     apiGet<ApiEnvelope<{ approvals: unknown[] }>>(`/projects/${project.id}/approvals?limit=6`),
     apiGet<ApiEnvelope<{ git_provider_plans: unknown[] }>>(`/projects/${project.id}/git-provider-plans?limit=5`),
+    apiGet<ApiEnvelope<{ control_loop_runs: unknown[] }>>(`/projects/${project.id}/control-loop/runs?limit=5`),
     apiGet<ApiEnvelope<{ sessions: unknown[] }>>(`/projects/${project.id}/auth/sessions`),
     apiGet<ApiEnvelope<{ api_tokens: unknown[] }>>(`/projects/${project.id}/auth/api-tokens`),
     apiGet<ApiEnvelope<{ service_accounts: unknown[] }>>(`/projects/${project.id}/auth/service-accounts`),
@@ -151,6 +154,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const auditEvents = normalizeAuditEvents(auditEventsResponse?.audit_events ?? []);
   const approvals = normalizeApprovals(approvalsResponse?.approvals ?? []);
   const gitProviderPlans = normalizeGitProviderPlans(gitProviderPlansResponse?.git_provider_plans ?? []);
+  const controlLoopRuns = normalizeControlLoopRuns(controlLoopRunsResponse?.control_loop_runs ?? []);
   const authSessions = normalizeAuthSessions(sessionsResponse?.sessions ?? []);
   const apiTokens = normalizeAPITokens(apiTokensResponse?.api_tokens ?? []);
   const serviceAccounts = normalizeServiceAccounts(serviceAccountsResponse?.service_accounts ?? []);
@@ -178,6 +182,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       recoveries: recoveries.length,
       visual_assets: visualAssets.length,
       visual_render_executions: visualRenderExecutions.length,
+      control_loop_runs: controlLoopRuns.length,
     },
     issues: issues.length > 0 ? issues : demoSnapshot.issues,
     schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
@@ -198,6 +203,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     subagents,
     runtime_recoveries: recoveries,
     operation_repair_candidates: operationRepairCandidates,
+    control_loop_runs: controlLoopRuns,
     visual_assets: visualAssets,
     visual_render_executions: visualRenderExecutions,
     quality_explanations: qualityExplanations,
@@ -437,10 +443,14 @@ function normalizePostDeploymentHistories(rawHistories: unknown[]): PostDeployme
       status: readString(raw, "status", "unknown"),
       decision: readString(raw, "decision", "unknown"),
       failure_class: readString(raw, "failure_class", "unknown"),
+      severity: readString(raw, "severity", ""),
       checks: readObjectArray(raw, "checks").map((check) => ({
         type: readString(check, "type", "check"),
         status: readString(check, "status", "unknown"),
         decision: readString(check, "decision", "unknown"),
+        template_id: readString(check, "template_id", ""),
+        severity: readString(check, "severity", ""),
+        failure_class: readString(check, "failure_class", ""),
         result_count: readObjectArray(check, "results").length,
         reasons: readArray(check, "reasons"),
         checked_at: readString(check, "checked_at", ""),
@@ -646,6 +656,12 @@ function normalizeOperationRepairCandidates(rawCandidates: unknown[]): Operation
     evidence_refs: readArray(raw, "evidence_refs"),
     reasons: readArray(raw, "reasons"),
     review_required: readBoolean(raw, "review_required"),
+    reviewed_at: readString(raw, "reviewed_at", ""),
+    reviewed_by: readString(raw, "reviewed_by", ""),
+    review_decision: readString(raw, "review_decision", ""),
+    review_reason: readString(raw, "review_reason", ""),
+    issue_id: readString(raw, "issue_id", ""),
+    repair_attempt_id: readString(raw, "repair_attempt_id", ""),
     created_at: readString(raw, "created_at", ""),
   }));
 }
@@ -766,6 +782,34 @@ function normalizeGitProviderPlans(rawPlans: unknown[]): GitProviderPlanSummary[
       created_at: readString(raw, "created_at", ""),
     };
   });
+}
+
+function normalizeControlLoopRuns(rawRuns: unknown[]): ControlLoopRunSummary[] {
+  return rawRuns.map((raw, index) => ({
+    id: readString(raw, "id", `control-loop-${index + 1}`),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    trigger: readString(raw, "trigger", "manual"),
+    requested_by: readString(raw, "requested_by", ""),
+    max_steps: readNumber(raw, "max_steps"),
+    step_timeout_ms: readNumber(raw, "step_timeout_ms"),
+    steps: readObjectArray(raw, "steps").map((step, stepIndex) => ({
+      id: readString(step, "id", `control-loop-step-${stepIndex + 1}`),
+      type: readString(step, "type", "unknown"),
+      status: readString(step, "status", "unknown"),
+      decision: readString(step, "decision", "unknown"),
+      summary: readString(step, "summary", ""),
+      reasons: readArray(step, "reasons"),
+      artifact_count: readObjectArray(step, "artifacts").length,
+      evidence_count: readArray(step, "evidence_ids").length,
+      duration_ms: readNumber(step, "duration_ms"),
+      started_at: readString(step, "started_at", ""),
+      finished_at: readString(step, "finished_at", ""),
+    })),
+    reasons: readArray(raw, "reasons"),
+    started_at: readString(raw, "started_at", ""),
+    finished_at: readString(raw, "finished_at", ""),
+  }));
 }
 
 function normalizeAuthSessions(rawSessions: unknown[]): AuthSessionSummary[] {

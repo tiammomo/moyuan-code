@@ -154,9 +154,10 @@ apps/console/
 | Runs | 查看 Runtime 调用、Subagent 输出、diff、stdout/stderr 和风险 |
 | Quality Review | 查看 quality report、review finding、测试缺口和返工建议 |
 | Memory | 查看 record、candidate、compact、命中证据和维护事件 |
-| Providers & Runtimes | 查看 Claude CLI、Codex CLI、MiniMax、GPT、GLM、gpt-image-2 状态 |
-| Runtime Recoveries | 查看原生 runtime 失败归档、fallback candidate、resume hint、stdout/stderr 和 diff 摘要预览 |
+| Providers & Runtimes | 查看 Claude CLI、Codex CLI、MiniMax、GPT、GLM、gpt-image-2 状态，并通过后端 route API 预览 provider candidates |
+| Runtime Recoveries | 查看原生 runtime 失败归档、fallback candidate、resume hint、stdout/stderr 和 diff 摘要预览；复核 operation repair candidates |
 | Subagent Backlog | 查看 retry/archive 后进入调度等待的 subagent、失败原因和重试预算 |
+| Control Loop Runs | 查看控制循环历史、step evidence，并触发一次 bounded control loop |
 | Visual Assets | 查看架构图 plan、diagram spec、prompt、route decision、render execution、script path 和图片生成状态；支持受控 dry-run render |
 | Git & Release | 查看分支、PR/MR plan、release suggestion 和 tag/push 计划；通过受控按钮触发 PR/MR preview、sync 和携带 Approval ID 的 create |
 | Server Resources | 查看 test_dev、production 机器、到期、健康和维护窗口；通过受控表单记录续期和退役 |
@@ -197,13 +198,14 @@ apps/console/
 - Live Workbench：运行中 issue 的状态、日志和下一步持续刷新。
 - Phase 2 Observability：把 runtime recoveries、subagent backlog、visual assets 和 visual render executions 放在同一屏，便于判断“失败如何恢复、任务为什么等待、架构图是否已规划、图片生成是否已进入受控执行”。
 - Runtime Evidence Preview：runtime recovery 可展开 stdout、stderr 和 diff summary 的受控预览；后端只读取 recovery 记录指向且位于 `.moyuan/` 下的归档文件。
-- Operation Repair Candidate Surface：Runtime Recoveries 面板展示从失败 operation 生成的 repair candidate、failure class、repair plan 和 evidence 数量；这些候选只进入人工 review，不自动运行修复。
-- Controlled Actions：低风险动作可从 Console 触发后端 dry-run 或 preview，例如 visual render dry-run、release provider preview；审批决定、API token、service account、PR/MR create、release provider publish、资源续期/退役等写操作必须调用后端受控 API，高风险动作仍进入 approval/authz。
+- Operation Repair Candidate Surface：Runtime Recoveries 面板展示从失败 operation 生成的 repair candidate、failure class、repair plan、evidence 数量和 review 结果；approve/reject 必须调用后端 review API，approve 默认只创建 `review_ready` repair attempt，不自动运行修复。
+- Controlled Actions：低风险动作可从 Console 触发后端 dry-run、preview 或 bounded run，例如 visual render dry-run、release provider preview、provider route preview、control loop run；审批决定、API token、service account、PR/MR create、release provider publish、资源续期/退役、repair candidate review 等写操作必须调用后端受控 API，高风险动作仍进入 approval/authz。
 - Operation Detail：从 Operation History 选中 release provider 或 deployment execution 后，Console 优先读取 operation detail 聚合 API，展开 Evidence Chain，显示 evidence decision、reasons 和 artifact path；API 不可用时回退到 snapshot，刷新按钮触发 `router.refresh()` 重新拉取当前状态。
 - Schema-aware Forms：表单从 contract/schema 生成约束，错误能定位到字段；当前已先落地必填字段预检，后续再接入完整 schema metadata。
-- Provider Telemetry Surface：Provider 面板展示 health/quota/cost/quality 摘要和近期 telemetry 记录，路由异常需要能看到 provider 侧原因；runtime feedback 有 token 估算时展示本次 total tokens。
+- Provider Telemetry Surface：Provider 面板展示 health/quota/cost/quality 摘要和近期 telemetry 记录；Provider route preview 展示 selected/skipped/blocked candidates、score、runtime/model 和 provider 侧原因。
 - Resource Lifecycle Surface：Server Resources 面板展示 lifecycle alerts、expiration state、maintenance records 和资源续期/退役动作状态。
 - Deployment Monitor Surface：Deployment Executions 面板展示 post-deployment history，把 smoke/monitor 状态、失败分类、rollback runbook 状态和 evidence chain 作为后端事实源展示，不在前端自行推断高风险结论。
+- Control Loop Surface：Console 展示 control loop run、step decision、summary、duration、evidence 数量；手动触发只运行 bounded control loop，不启动常驻 scheduler。
 - AI Assist Surface：保留“让 agent 解释当前状态 / 生成修复建议 / 生成发布说明”的入口，但不能绕过后端门禁。
 
 ## 8. 设计语言

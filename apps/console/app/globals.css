@@ -967,7 +967,8 @@ dd {
   text-transform: uppercase;
 }
 
-.controlForm input {
+.controlForm input,
+.controlForm select {
   width: 100%;
   min-height: 34px;
   padding: 0 9px;
@@ -977,7 +978,8 @@ dd {
   color: var(--text);
 }
 
-.controlForm input:focus {
+.controlForm input:focus,
+.controlForm select:focus {
   border-color: #9bb9f9;
   outline: 3px solid rgba(39, 110, 241, 0.12);
 }
@@ -1227,6 +1229,11 @@ dd {
   align-items: center;
 }
 
+.panelActionRow {
+  justify-content: flex-start;
+  padding: 0 14px 12px;
+}
+
 .inlineActionButton {
   display: inline-flex;
   align-items: center;
@@ -1327,6 +1334,66 @@ meter {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.routePreviewBox {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-top: 1px solid #edf1f6;
+}
+
+.routeSummary {
+  display: grid;
+  gap: 4px;
+  margin: 0 14px;
+  padding: 10px;
+  border: 1px solid #dbe7f6;
+  border-radius: 7px;
+  background: #f7fbff;
+}
+
+.routeSummary strong,
+.routeSummary span {
+  overflow-wrap: anywhere;
+}
+
+.routeSummary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.routeCandidateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 14px;
+}
+
+.routeCandidateGrid.compact {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 8px 0 0;
+}
+
+.routeCandidate {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e1e9f4;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.routeCandidate strong,
+.routeCandidate span {
+  overflow-wrap: anywhere;
+}
+
+.routeCandidate span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .telemetryList {
@@ -1626,6 +1693,7 @@ meter {
   .accessList,
   .auditList,
   .controlForm.compact,
+  .routeCandidateGrid,
   .bottomGrid {
     grid-template-columns: 1fr;
   }

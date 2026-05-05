@@ -168,6 +168,7 @@ export type PostDeploymentHistorySummary = {
   status: string;
   decision: string;
   failure_class: string;
+  severity?: string;
   checks: PostDeploymentCheckSummary[];
   rollback: RollbackHistorySummary;
   evidence_ids: string[];
@@ -180,6 +181,9 @@ export type PostDeploymentCheckSummary = {
   type: string;
   status: string;
   decision: string;
+  template_id?: string;
+  severity?: string;
+  failure_class?: string;
   result_count: number;
   reasons: string[];
   checked_at?: string;
@@ -316,7 +320,41 @@ export type OperationRepairCandidateSummary = {
   evidence_refs: string[];
   reasons: string[];
   review_required: boolean;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  review_decision?: string;
+  review_reason?: string;
+  issue_id?: string;
+  repair_attempt_id?: string;
   created_at?: string;
+};
+
+export type ControlLoopStepSummary = {
+  id: string;
+  type: string;
+  status: string;
+  decision: string;
+  summary?: string;
+  reasons: string[];
+  artifact_count: number;
+  evidence_count: number;
+  duration_ms: number;
+  started_at?: string;
+  finished_at?: string;
+};
+
+export type ControlLoopRunSummary = {
+  id: string;
+  status: string;
+  decision: string;
+  trigger: string;
+  requested_by?: string;
+  max_steps: number;
+  step_timeout_ms: number;
+  steps: ControlLoopStepSummary[];
+  reasons: string[];
+  started_at?: string;
+  finished_at?: string;
 };
 
 export type VisualAssetSummary = {
@@ -559,6 +597,7 @@ export type ConsoleSnapshot = {
     recoveries: number;
     visual_assets: number;
     visual_render_executions: number;
+    control_loop_runs: number;
   };
   issues: IssueNode[];
   schedule: ScheduleItem[];
@@ -579,6 +618,7 @@ export type ConsoleSnapshot = {
   subagents: SubagentSummary[];
   runtime_recoveries: RuntimeRecoverySummary[];
   operation_repair_candidates: OperationRepairCandidateSummary[];
+  control_loop_runs: ControlLoopRunSummary[];
   visual_assets: VisualAssetSummary[];
   visual_render_executions: VisualRenderExecutionSummary[];
   quality_explanations: QualityExplanation[];

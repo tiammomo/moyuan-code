@@ -73,6 +73,20 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const [gitActionState, setGitActionState] = useState<Record<string, ActionState>>({});
   const [gitCreateApproved, setGitCreateApproved] = useState(false);
   const [gitCreateApprovalID, setGitCreateApprovalID] = useState("");
+  const [providerRouteForm, setProviderRouteForm] = useState({
+    role: "frontend",
+    taskType: "requirement_planning",
+    outputType: "code",
+    modelStrategy: "default",
+    requiresRepoEdit: true,
+    includesSensitiveCode: false,
+    includesProjectMemory: true,
+  });
+  const [providerRoute, setProviderRoute] = useState<ProviderRouteDecision | null>(null);
+  const [providerRouteState, setProviderRouteState] = useState<ActionState>({ status: "idle" });
+  const [controlLoopActionState, setControlLoopActionState] = useState<ActionState>({ status: "idle" });
+  const [repairReviewForm, setRepairReviewForm] = useState({ reviewerID: "qa-owner", reason: "reviewed in console" });
+  const [repairActionState, setRepairActionState] = useState<Record<string, ActionState>>({});
   const [releaseProviderForm, setReleaseProviderForm] = useState({
     releaseID: snapshot.deployments[0]?.release_id ?? "",
     approved: false,
@@ -495,6 +509,100 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
     }
   }
 
+  async function previewProviderRoute() {
+    if (!requireFields("providerRoute", [["Role", providerRouteForm.role], ["Task Type", providerRouteForm.taskType]])) {
+      setProviderRouteState({ status: "error", message: "Schema validation failed." });
+      return;
+    }
+    setProviderRouteState({ status: "running", message: "Evaluating route candidates..." });
+    try {
+      const payload = await postJSON<ProviderRouteEnvelope>(`/api/projects/${snapshot.project.id}/provider-route`, {
+        role: providerRouteForm.role,
+        model_strategy: providerRouteForm.modelStrategy === "default" ? "" : providerRouteForm.modelStrategy,
+        task_type: providerRouteForm.taskType,
+        output_type: providerRouteForm.outputType,
+        requires_repo_edit: providerRouteForm.requiresRepoEdit,
+        includes_sensitive_code: providerRouteForm.includesSensitiveCode,
+        includes_project_memory: providerRouteForm.includesProjectMemory,
+        includes_secrets: false,
+      });
+      if (!payload.route) {
+        throw new Error(payload.error ?? "Provider route returned no decision.");
+      }
+      setProviderRoute(payload.route);
+      setProviderRouteState({
+        status: payload.route.blocked ? "blocked" : "completed",
+        id: payload.route.provider_id,
+        message: `${payload.route.decision} / ${payload.route.candidates?.length ?? 0} candidates`,
+      });
+      router.refresh();
+    } catch (error) {
+      setProviderRouteState({ status: "error", message: error instanceof Error ? error.message : "Provider route preview failed." });
+    }
+  }
+
+  async function runControlLoop() {
+    setControlLoopActionState({ status: "running", message: "Running bounded control loop..." });
+    try {
+      const payload = await postJSON<ControlLoopRunEnvelope>(`/api/projects/${snapshot.project.id}/control-loop/run`, {
+        trigger: "console_manual",
+        requested_by: "console-owner",
+      });
+      const run = payload.control_loop_run;
+      if (!run) {
+        throw new Error(payload.error ?? "Control loop returned no run.");
+      }
+      setControlLoopActionState({
+        status: run.status === "completed" && !(run.decision ?? "").includes("ATTENTION") ? "completed" : "blocked",
+        id: run.id,
+        message: `${run.decision ?? run.status} / ${run.steps?.length ?? 0} steps`,
+      });
+      router.refresh();
+    } catch (error) {
+      setControlLoopActionState({ status: "error", message: error instanceof Error ? error.message : "Control loop run failed." });
+    }
+  }
+
+  async function reviewOperationRepairCandidate(candidateID: string, decision: "approved" | "rejected") {
+    if (!requireFields("repairReview", [["Reviewer", repairReviewForm.reviewerID], ["Reason", repairReviewForm.reason]])) {
+      return;
+    }
+    setRepairActionState((current) => ({
+      ...current,
+      [candidateID]: { status: "running", message: `${decision === "approved" ? "Approving" : "Rejecting"} repair candidate...` },
+    }));
+    try {
+      const payload = await postJSON<OperationRepairReviewEnvelope>(
+        `/api/projects/${snapshot.project.id}/repair/operation-candidates/${encodeURIComponent(candidateID)}/review`,
+        {
+          decision,
+          reviewer_id: repairReviewForm.reviewerID,
+          reason: repairReviewForm.reason,
+          next_step: decision === "approved" ? "repair_attempt" : "",
+        },
+      );
+      const review = payload.operation_repair_review;
+      const candidate = payload.operation_repair_candidate;
+      if (!review || !candidate) {
+        throw new Error(payload.error ?? "Repair review returned no record.");
+      }
+      setRepairActionState((current) => ({
+        ...current,
+        [candidateID]: {
+          status: candidate.status === "approved" ? "completed" : "blocked",
+          id: payload.repair_attempt?.id ?? candidate.issue_id ?? candidate.id,
+          message: `${review.decision ?? candidate.decision}${payload.repair_attempt?.status ? ` / ${payload.repair_attempt.status}` : ""}`,
+        },
+      }));
+      router.refresh();
+    } catch (error) {
+      setRepairActionState((current) => ({
+        ...current,
+        [candidateID]: { status: "error", message: error instanceof Error ? error.message : "Repair candidate review failed." },
+      }));
+    }
+  }
+
   async function runResourceAction(resourceID: string, action: "renew" | "retire") {
     const fields: Array<[string, string]> = [["Actor", resourceForm.actorID], ["Reason", resourceForm.reason]];
     if (action === "renew") {
@@ -679,6 +787,9 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                     <div>
                       <strong>{compactID(history.execution_id)}</strong>
                       <span>{`${history.decision} / ${history.checks.length} checks / rollback ${history.rollback.status}`}</span>
+                      {history.checks[0]?.template_id ? (
+                        <span>{`${history.checks[0].template_id}${history.severity ? ` / ${history.severity}` : ""}`}</span>
+                      ) : null}
                     </div>
                     <StatusPill tone={toneForStatus(history.failure_class === "none" ? history.status : history.failure_class)} label={history.failure_class} />
                   </div>
@@ -1057,6 +1168,23 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <div className="emptyState">No runtime recovery archived</div>
               )}
             </div>
+            <div className="controlForm compact">
+              <label>
+                <span>Reviewer</span>
+                <input
+                  onChange={(event) => setRepairReviewForm((current) => ({ ...current, reviewerID: event.target.value }))}
+                  value={repairReviewForm.reviewerID}
+                />
+              </label>
+              <label>
+                <span>Reason</span>
+                <input
+                  onChange={(event) => setRepairReviewForm((current) => ({ ...current, reason: event.target.value }))}
+                  value={repairReviewForm.reason}
+                />
+              </label>
+            </div>
+            <SchemaFeedback errors={schemaErrors.repairReview} />
             <div className="signalList">
               {snapshot.operation_repair_candidates.length > 0 ? (
                 snapshot.operation_repair_candidates.slice(0, 3).map((candidate) => (
@@ -1070,7 +1198,34 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                       {candidate.repair_plan_id ? <code>{compactID(candidate.repair_plan_id)}</code> : null}
                       {candidate.evidence_refs.length > 0 ? <code>{candidate.evidence_refs.length} evidence</code> : null}
                       {candidate.review_required ? <code>review required</code> : null}
+                      {candidate.review_decision ? <code>{candidate.review_decision}</code> : null}
+                      {candidate.issue_id ? <code>{compactID(candidate.issue_id)}</code> : null}
+                      {candidate.repair_attempt_id ? <code>{compactID(candidate.repair_attempt_id)}</code> : null}
                     </div>
+                    {candidate.review_reason ? <small>{candidate.review_reason}</small> : null}
+                    {candidate.status === "review_required" || candidate.review_required ? (
+                      <div className="signalActions">
+                        <button
+                          className="inlineActionButton"
+                          disabled={repairActionState[candidate.id]?.status === "running"}
+                          onClick={() => void reviewOperationRepairCandidate(candidate.id, "approved")}
+                          type="button"
+                        >
+                          <CheckCircle2 size={13} />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          className="inlineActionButton danger"
+                          disabled={repairActionState[candidate.id]?.status === "running"}
+                          onClick={() => void reviewOperationRepairCandidate(candidate.id, "rejected")}
+                          type="button"
+                        >
+                          <AlertTriangle size={13} />
+                          <span>Reject</span>
+                        </button>
+                        {repairActionState[candidate.id]?.message ? <ActionFeedback state={repairActionState[candidate.id]} /> : null}
+                      </div>
+                    ) : null}
                   </div>
                 ))
               ) : (
@@ -1101,6 +1256,51 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 ))
               ) : (
                 <div className="emptyState">No subagent backlog</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<RefreshCw size={18} />} title="Control Loop Runs" meta={`${snapshot.control_loop_runs.length} runs`} />
+            <div className="rowActions panelActionRow">
+              <button className="inlineActionButton" disabled={controlLoopActionState.status === "running"} onClick={() => void runControlLoop()} type="button">
+                <RefreshCw size={13} />
+                <span>{controlLoopActionState.status === "running" ? "Running" : "Run Loop"}</span>
+              </button>
+              <ActionFeedback state={controlLoopActionState} />
+            </div>
+            <div className="signalList">
+              {snapshot.control_loop_runs.length > 0 ? (
+                snapshot.control_loop_runs.map((run) => (
+                  <div className="signalItem" key={run.id}>
+                    <div className="signalHeader">
+                      <strong>{compactID(run.id)}</strong>
+                      <StatusPill tone={toneForStatus(run.status)} label={run.decision} />
+                    </div>
+                    <span>
+                      {run.trigger} / {run.steps.length} steps / {shortTimestamp(run.finished_at || run.started_at)}
+                    </span>
+                    <div className="signalMeta">
+                      {run.requested_by ? <code>{run.requested_by}</code> : null}
+                      {run.reasons[0] ? <code>{run.reasons[0]}</code> : null}
+                    </div>
+                    <div className="routeCandidateGrid compact">
+                      {run.steps.slice(0, 3).map((step) => (
+                        <div className="routeCandidate" key={step.id}>
+                          <strong>{step.type}</strong>
+                          <span>{step.summary || step.decision}</span>
+                          <div className="signalMeta">
+                            <code>{step.status}</code>
+                            <code>{step.duration_ms}ms</code>
+                            {step.evidence_count ? <code>{step.evidence_count} evidence</code> : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="emptyState">No control loop runs</div>
               )}
             </div>
           </div>
@@ -1455,6 +1655,91 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                   <StatusPill tone={toneForStatus(provider.health_status || (provider.enabled ? "ok" : "unknown"))} label={provider.health_status || "unknown"} />
                 </div>
               ))}
+            </div>
+            <div className="routePreviewBox">
+              <div className="controlForm compact">
+                <label>
+                  <span>Role</span>
+                  <select onChange={(event) => setProviderRouteForm((current) => ({ ...current, role: event.target.value }))} value={providerRouteForm.role}>
+                    <option value="frontend">frontend</option>
+                    <option value="backend">backend</option>
+                    <option value="devops">devops</option>
+                    <option value="review">review</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Task</span>
+                  <select
+                    onChange={(event) => setProviderRouteForm((current) => ({ ...current, taskType: event.target.value }))}
+                    value={providerRouteForm.taskType}
+                  >
+                    <option value="requirement_planning">requirement_planning</option>
+                    <option value="architecture_planning">architecture_planning</option>
+                    <option value="memory_extraction">memory_extraction</option>
+                    <option value="image_generation">image_generation</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Output</span>
+                  <select
+                    onChange={(event) => setProviderRouteForm((current) => ({ ...current, outputType: event.target.value }))}
+                    value={providerRouteForm.outputType}
+                  >
+                    <option value="code">code</option>
+                    <option value="markdown">markdown</option>
+                    <option value="architecture_diagram">architecture_diagram</option>
+                    <option value="image">image</option>
+                  </select>
+                </label>
+                <label className="checkboxLine">
+                  <input
+                    checked={providerRouteForm.requiresRepoEdit}
+                    onChange={(event) => setProviderRouteForm((current) => ({ ...current, requiresRepoEdit: event.target.checked }))}
+                    type="checkbox"
+                  />
+                  <span>Repo edit</span>
+                </label>
+                <label className="checkboxLine">
+                  <input
+                    checked={providerRouteForm.includesProjectMemory}
+                    onChange={(event) => setProviderRouteForm((current) => ({ ...current, includesProjectMemory: event.target.checked }))}
+                    type="checkbox"
+                  />
+                  <span>Memory</span>
+                </label>
+              </div>
+              <SchemaFeedback errors={schemaErrors.providerRoute} />
+              <div className="rowActions panelActionRow">
+                <button className="inlineActionButton" disabled={providerRouteState.status === "running"} onClick={() => void previewProviderRoute()} type="button">
+                  <Search size={13} />
+                  <span>{providerRouteState.status === "running" ? "Routing" : "Route Preview"}</span>
+                </button>
+                <ActionFeedback state={providerRouteState} />
+              </div>
+              {providerRoute ? (
+                <>
+                  <div className="routeSummary">
+                    <strong>{providerRoute.provider_id || "no provider selected"}</strong>
+                    <span>{providerRoute.explanation?.summary || providerRoute.reason || providerRoute.decision}</span>
+                  </div>
+                  <div className="routeCandidateGrid">
+                    {(providerRoute.candidates ?? []).slice(0, 6).map((candidate, index) => (
+                      <div className="routeCandidate" key={candidate.provider_id || `route-candidate-${index}`}>
+                        <div className="signalHeader">
+                          <strong>{candidate.provider_id}</strong>
+                          <StatusPill tone={toneForStatus(candidate.status ?? "")} label={candidate.status ?? "candidate"} />
+                        </div>
+                        <span>{candidate.reason}</span>
+                        <div className="signalMeta">
+                          {candidate.runtime_id ? <code>{candidate.runtime_id}</code> : null}
+                          {candidate.model_id ? <code>{candidate.model_id}</code> : null}
+                          <code>score {candidate.score ?? 0}</code>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : null}
             </div>
             <div className="telemetryList">
               {snapshot.provider_telemetry.length > 0 ? (
@@ -1876,6 +2161,73 @@ type ResourceActionEnvelope = {
   };
 };
 
+type ProviderRouteCandidate = {
+  provider_id?: string;
+  runtime_id?: string;
+  vendor?: string;
+  api_type?: string;
+  model_id?: string;
+  status?: string;
+  reason?: string;
+  score?: number;
+  signals?: Array<{ type?: string; status?: string; reason?: string }>;
+};
+
+type ProviderRouteDecision = {
+  decision?: string;
+  blocked?: boolean;
+  strategy?: string;
+  provider_id?: string;
+  runtime_id?: string;
+  model_id?: string;
+  reason?: string;
+  explanation?: {
+    summary?: string;
+    selected_provider_id?: string;
+    selected_reason?: string;
+    candidate_count?: number;
+    selected_count?: number;
+    skipped_count?: number;
+    blocked_count?: number;
+  };
+  candidates?: ProviderRouteCandidate[];
+};
+
+type ProviderRouteEnvelope = {
+  error?: string;
+  route?: ProviderRouteDecision;
+};
+
+type ControlLoopRunEnvelope = {
+  error?: string;
+  control_loop_run?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+    steps?: unknown[];
+  };
+};
+
+type OperationRepairReviewEnvelope = {
+  error?: string;
+  operation_repair_review?: {
+    id?: string;
+    decision?: string;
+    status?: string;
+  };
+  operation_repair_candidate?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+    issue_id?: string;
+  };
+  repair_attempt?: {
+    id?: string;
+    status?: string;
+    decision?: string;
+  };
+};
+
 async function postJSON<T extends { error?: string }>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
@@ -1985,7 +2337,17 @@ function groupIssues(issues: IssueNode[]) {
 }
 
 function toneForStatus(status: string): StatusTone {
-  if (status === "accepted" || status === "passed" || status === "ready" || status === "completed" || status === "planned" || status === "ok" || status === "healthy")
+  if (
+    status === "accepted" ||
+    status === "approved" ||
+    status === "selected" ||
+    status === "passed" ||
+    status === "ready" ||
+    status === "completed" ||
+    status === "planned" ||
+    status === "ok" ||
+    status === "healthy"
+  )
     return "ok";
   if (status === "running" || status === "dispatch" || status === "retrying") return "running";
   if (

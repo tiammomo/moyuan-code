@@ -1,6 +1,6 @@
 # Phase 10 实施记录
 
-状态：in_progress
+状态：completed
 责任角色：orchestrator_owner + backend_owner + frontend_owner + devops_owner + qa_owner
 最后更新：2026-05-05
 
@@ -24,7 +24,7 @@ Phase 9 已完成并通过 release readiness：
 | P0 | `phase10-002` | `operation-repair-candidate-review-flow` | completed | 修复候选复核流转 | approve/reject 后可生成 issue 或受控 repair attempt |
 | P1 | `phase10-003` | `release-provider-branch-tag-workflow-preview` | completed | release provider 扩展预览 | branch/tag/workflow 有 preview plan 和 guardrail |
 | P1 | `phase10-004` | `deployment-check-template-policy` | completed | 部署检查模板策略 | smoke/monitor 失败分级可配置、可追踪 |
-| P2 | `phase10-005` | `console-route-repair-operator-surfaces` | planned | Console 操作面增强 | route candidates、repair review、control loop history 可见 |
+| P2 | `phase10-005` | `console-route-repair-operator-surfaces` | completed | Console 操作面增强 | route candidates、repair review、control loop history 可见 |
 
 ## 3. 执行规划：`phase10-001 background-control-loop-scheduler`
 
@@ -131,7 +131,30 @@ Phase 9 已完成并通过 release readiness：
 - 非生产 smoke severity 为 `high`，monitor severity 为 `medium`；production 默认为 `critical`。
 - `smoke_failed`、`monitor_failed` 和 `manual_check_required` 可在 report/history 中被审计。
 
-## 7. 验证要求
+## 7. 执行规划：`phase10-005 console-route-repair-operator-surfaces`
+
+实现状态：completed。
+
+范围：
+
+- Console Providers 面板增加 Provider route preview，可查看 selected、skipped、blocked candidate、score、runtime/model 和 route reason。
+- Runtime Recoveries 面板中的 operation repair candidates 增加 approve/reject 操作，approve 默认进入 `repair_attempt` 准备态。
+- Console 新增 Control Loop Runs 面板，可触发一次 bounded control loop，并展示每个 step 的状态、summary、duration 和 evidence 数量。
+- Deployment post-deployment history 在 Console 中展示 smoke/monitor template 和 severity 摘要。
+
+非目标：
+
+- 不在前端自行计算 route、repair 或 control loop 结论。
+- 不绕过后端 approval、review、repair attempt 和 production 写入控制。
+- 不启动后台常驻 scheduler；Console 只触发一次 bounded run。
+
+落地结果：
+
+- `ConsoleSnapshot` 增加 `control_loop_runs`。
+- Console 的 Provider route preview、repair review 和 control loop run 均调用后端受控 API。
+- 前端 demo snapshot 同步补充 control loop 示例，保证无后端时仍能展示结构。
+
+## 8. 验证要求
 
 每完成一个 Phase 10 issue，至少运行：
 
