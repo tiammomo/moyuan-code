@@ -1,6 +1,6 @@
 # Moyuan Code 文档
 
-当前阶段：Phase 18 已完成 readiness，operations timeline、maintenance policy pack、post-deployment verification、服务器生命周期控制和 Console 运维 dashboard 已收口。下一阶段进入 Phase 19，聚焦受控自动化执行增强与生产可观测性深化。
+当前阶段：Phase 19 已启动，聚焦受控自动化执行增强与生产可观测性深化；Phase 18 operations timeline、maintenance policy pack、post-deployment verification、服务器生命周期控制和 Console 运维 dashboard 已完成 readiness。
 
 `moyuan-code` 是面向代码开发全生命周期的多 Agent 开发框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
@@ -65,6 +65,8 @@
 
 Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 18 已完成主要闭环。当前验收和状态入口：
 
+- [Phase 19 实现 Issue Graph](./phases/phase19-issue-graph.md)：受控自动化执行增强与生产可观测性深化的依赖图。
+- [Phase 19 实施记录](./phases/phase19-next-development-plan.md)：Phase 19 当前任务、验收标准和执行入口。
 - [Phase 18 Release Readiness](./phases/phase18-release-readiness.md)：生产运维闭环与策略化维护控制面的收口验证。
 - [Phase 18 实现 Issue Graph](./phases/phase18-issue-graph.md)：生产运维闭环与策略化维护控制面的依赖图。
 - [Phase 18 实施记录](./phases/phase18-next-development-plan.md)：Phase 18 完成任务、验收标准和执行记录。

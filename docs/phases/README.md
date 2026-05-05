@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+- [Phase 19 实现 Issue Graph](./phase19-issue-graph.md)：Phase 19 受控自动化执行增强与生产可观测性深化的依赖图。
+- [Phase 19 实施记录](./phase19-next-development-plan.md)：Phase 19 当前任务、执行范围和验收记录。
 - [Phase 18 实现 Issue Graph](./phase18-issue-graph.md)：Phase 18 生产运维闭环与策略化维护控制面的依赖图。
 - [Phase 18 实施记录](./phase18-next-development-plan.md)：Phase 18 完成任务、执行范围和验收记录。
 - [Phase 18 Release Readiness](./phase18-release-readiness.md)：Phase 18 生产运维闭环与策略化维护控制面的收口验证。

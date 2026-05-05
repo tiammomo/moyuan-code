@@ -2,7 +2,7 @@
 
 Moyuan Code 是面向代码开发全生命周期的多 Agent 编排框架。系统在理解项目代码的基础上，把用户需求完善为可执行的 Issue Graph，调度 Claude CLI、Codex CLI 和多种模型 Provider 分工开发，并通过鉴权、质量门禁、Git、发布投产、Memory、日志和自我修复持续管理项目迭代。
 
-当前已完成 Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 18 的主要闭环；下一阶段进入 Phase 19，聚焦受控自动化执行增强与生产可观测性深化。
+当前已完成 Phase 1 本地 CLI MVP、Beta 控制面能力、Phase 2 到 Phase 18 的主要闭环；Phase 19 已启动，聚焦受控自动化执行增强与生产可观测性深化。
 
 核心设计入口见 [docs/README.md](./docs/README.md)。
 Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
@@ -30,7 +30,7 @@ Phase 规划与验收记录见 [docs/phases/](./docs/phases/README.md)。
 - Repair 已具备受控 attempt、最大尝试次数、runtime 执行、quality gate、状态查询和修复经验 Memory 沉淀。
 - Batch Execution 已具备 dry-run plan、受控 run、隔离 worktree、质量复核、合入队列和 Console 操作面。
 - Release/Deployment 已具备 release candidate、provider preview/publish gate、PR/MR plan、deployment execution、approval proof、rollback preview、monitor summary、deployment rehearsal、release admission 和风险修复 handoff。
-- 当前实现重点：Phase 18 readiness 已完成，下一步进入 Phase 19 规划和实现入口。
+- 当前实现重点：Phase 19 已打开 issue graph，第一批任务从 operations audit export 开始。
 
 ## 本地运行
 
