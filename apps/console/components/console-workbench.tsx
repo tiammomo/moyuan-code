@@ -143,6 +143,8 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const remoteRehearsals = remoteRehearsalReport?.rehearsals ?? [];
   const writeReviewPacketReport = snapshot.write_review_packets;
   const writeReviewPackets = writeReviewPacketReport?.packets ?? [];
+  const writeExecutionPlanReport = snapshot.write_execution_plans;
+  const writeExecutionPlans = writeExecutionPlanReport?.plans ?? [];
   const controlLoopQueue = snapshot.control_loop_queue ?? [];
   const decisionEntries = decisionLedger?.entries ?? [];
   const latestControlLoopRun = snapshot.control_loop_runs[0];
@@ -1978,6 +1980,60 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 </>
               ) : (
                 <div className="emptyState">No write review packets</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <PanelTitle
+              icon={<Play size={18} />}
+              title="Write Execution Plan"
+              meta={writeExecutionPlanReport ? `${writeExecutionPlanReport.plan_count} plans` : "not generated"}
+            />
+            <div className="signalList">
+              {writeExecutionPlanReport ? (
+                <>
+                  <div className="signalItem">
+                    <div className="signalHeader">
+                      <strong>{compactID(writeExecutionPlanReport.id)}</strong>
+                      <StatusPill tone={writeExecutionPlanReport.external_write_count > 0 ? "blocked" : writeExecutionPlanReport.blocked_count > 0 ? "blocked" : "ok"} label={`${writeExecutionPlanReport.planned_count} preview`} />
+                    </div>
+                    <span>
+                      ready {writeExecutionPlanReport.ready_count} / manual {writeExecutionPlanReport.manual_required_count} / external writes{" "}
+                      {writeExecutionPlanReport.external_write_count}
+                    </span>
+                    <div className="signalMeta">
+                      {Object.entries(writeExecutionPlanReport.by_mode)
+                        .slice(0, 3)
+                        .map(([mode, count]) => (
+                          <code key={mode}>
+                            {mode}:{count}
+                          </code>
+                        ))}
+                    </div>
+                  </div>
+                  {writeExecutionPlans.slice(0, 4).map((plan) => (
+                    <div className="signalItem" key={plan.id}>
+                      <div className="signalHeader">
+                        <strong>{plan.mode}</strong>
+                        <StatusPill tone={toneForStatus(plan.status)} label={plan.decision} />
+                      </div>
+                      <span>
+                        {plan.provider || "provider"} / {plan.environment || "env"} / {compactID(plan.operation_id || plan.review_packet_id || plan.id)}
+                      </span>
+                      <div className="signalMeta">
+                        {plan.review_packet_id ? <code>{compactID(plan.review_packet_id)}</code> : null}
+                        {plan.approval_id ? <code>{compactID(plan.approval_id)}</code> : null}
+                        <code>{plan.apply_allowed ? "apply allowed" : "apply locked"}</code>
+                        <code>{plan.external_write_performed ? "external write" : "no external write"}</code>
+                        {plan.evidence_refs.length ? <code>{plan.evidence_refs.length} evidence</code> : null}
+                      </div>
+                      {plan.reasons[0] ? <small>{plan.reasons[0]}</small> : null}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="emptyState">No write execution plans</div>
               )}
             </div>
           </div>

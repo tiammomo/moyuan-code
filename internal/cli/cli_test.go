@@ -250,6 +250,14 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	reviewPacketList := runCLI(t, root, "operations", "write-review-packets", "list", "--operation-id", executionID, "--limit", "5")
 	assertContains(t, reviewPacketList.stdout, `"write_review_packets"`)
 	assertContains(t, reviewPacketList.stdout, executionID)
+
+	executionPlan := runCLI(t, root, "operations", "write-execution-plans", "create", "--review-packet-id", "missing-review-packet", "--mode", "preview", "--limit", "5")
+	assertContains(t, executionPlan.stdout, `"write_execution_plans"`)
+	assertContains(t, executionPlan.stdout, `"WRITE_EXECUTION_REVIEW_PACKET_MISSING"`)
+	assertContains(t, executionPlan.stdout, `"external_write_performed": false`)
+	executionPlanList := runCLI(t, root, "operations", "write-execution-plans", "list", "--review-packet-id", "missing-review-packet", "--limit", "5")
+	assertContains(t, executionPlanList.stdout, `"write_execution_plans"`)
+	assertContains(t, executionPlanList.stdout, `"missing-review-packet"`)
 }
 
 func TestControlLoopCLIRunsDurableIdempotentSteps(t *testing.T) {

@@ -385,6 +385,37 @@ func Timeline(rootDir string, options TimelineOptions) ([]TimelineItem, error) {
 		})
 	}
 
+	executionPlanReport, err := ListWriteExecutionPlans(rootDir, WriteExecutionPlanOptions{Limit: sourceLimit})
+	if err != nil {
+		return nil, err
+	}
+	for _, plan := range executionPlanReport.Plans {
+		refs, err := evidenceRefs(rootDir, "write_execution_plan", plan.ID, plan.EvidenceRefs)
+		if err != nil {
+			return nil, err
+		}
+		add(TimelineItem{
+			ID:           plan.ID,
+			Type:         "write_execution_plan",
+			Operation:    "operations.write_execution_plan.create",
+			Status:       plan.Status,
+			Decision:     plan.Decision,
+			Reasons:      append([]string{}, plan.Reasons...),
+			PrimaryRef:   plan.OperationID,
+			SecondaryRef: plan.ReviewPacketID,
+			Environment:  plan.Environment,
+			EvidenceRefs: refs,
+			Timestamp:    plan.CreatedAt,
+			Metadata: map[string]any{
+				"provider":                 plan.Provider,
+				"mode":                     plan.Mode,
+				"approval_id":              plan.ApprovalID,
+				"apply_allowed":            plan.ApplyAllowed,
+				"external_write_performed": plan.ExternalWritePerformed,
+			},
+		})
+	}
+
 	admissions, err := deployment.ListReleaseAdmissions(rootDir, sourceLimit)
 	if err != nil {
 		return nil, err

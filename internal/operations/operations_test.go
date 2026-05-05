@@ -704,6 +704,70 @@ func TestCreateWriteReviewPacketsAggregatesAdmissionAndEvidence(t *testing.T) {
 	}
 }
 
+func TestCreateWriteExecutionPlansGuardsApplyMode(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "execution-plan-resource",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2099-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, renewal, found, err := serverresources.Renew(root, serverresources.RenewalOptions{ResourceID: "execution-plan-resource", ExpiresAt: "2099-02-01", ActorID: "ops", Reason: "execution plan test"})
+	if err != nil || !found {
+		t.Fatalf("expected renewal, found=%v err=%v", found, err)
+	}
+	reviewReport, err := CreateWriteReviewPackets(root, WriteReviewPacketOptions{OperationID: renewal.ID, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	packet := reviewReport.Packets[0]
+
+	preview, err := CreateWriteExecutionPlans(root, WriteExecutionPlanOptions{ReviewPacketID: packet.ID, Mode: "preview", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Summary.PlanCount != 1 || preview.Summary.PlannedCount != 1 || preview.Plans[0].ExternalWritePerformed {
+		t.Fatalf("expected preview plan without external write, got %+v", preview)
+	}
+
+	t.Setenv("MOYUAN_ALLOW_REAL_WRITE", "")
+	blocked, err := CreateWriteExecutionPlans(root, WriteExecutionPlanOptions{ReviewPacketID: packet.ID, Mode: "apply", ApprovalID: "approval-test", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blocked.Plans[0].Status != "blocked" || blocked.Plans[0].Decision != "WRITE_EXECUTION_APPLY_SWITCH_DISABLED" || blocked.Plans[0].ExternalWritePerformed {
+		t.Fatalf("expected apply switch block without external write, got %+v", blocked.Plans[0])
+	}
+
+	t.Setenv("MOYUAN_ALLOW_REAL_WRITE", "1")
+	ready, err := CreateWriteExecutionPlans(root, WriteExecutionPlanOptions{ReviewPacketID: packet.ID, Mode: "apply", ApprovalID: "approval-test", RequestedBy: "qa", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ready.Plans[0].Status != "ready" || ready.Plans[0].Decision != "WRITE_EXECUTION_APPLY_READY" || !ready.Plans[0].ApplyAllowed || ready.Plans[0].ExternalWritePerformed {
+		t.Fatalf("expected apply-ready plan without external write, got %+v", ready.Plans[0])
+	}
+	loaded, found, err := LoadWriteExecutionPlan(root, ready.Plans[0].ID)
+	if err != nil || !found || loaded.ID != ready.Plans[0].ID {
+		t.Fatalf("expected persisted write execution plan, found=%v err=%v loaded=%+v", found, err, loaded)
+	}
+	timeline, err := Timeline(root, TimelineOptions{Type: "write_execution_plan", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !timelineContainsID(timeline, ready.Plans[0].ID) {
+		t.Fatalf("expected write execution plan in timeline, got %+v", timeline)
+	}
+}
+
 func timelineContainsType(items []TimelineItem, typ string) bool {
 	for _, item := range items {
 		if item.Type == typ {

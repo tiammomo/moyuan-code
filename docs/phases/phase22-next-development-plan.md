@@ -1,6 +1,6 @@
 # Phase 22 实施记录
 
-状态：planned
+状态：ready
 责任角色：orchestrator_owner + devops_owner + release_owner + backend_owner + frontend_owner + qa_owner + security_owner
 最后更新：2026-05-05
 
@@ -14,14 +14,14 @@ Phase 22 只能在 Phase 21 完成后进入。唯一前置输入是 write review
 
 | 优先级 | Issue | 名称 | 状态 | 目标 | 验收 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `phase22-001` | `guarded-write-execution-plan` | planned | 生成 preview/apply 执行计划契约 | Apply 受 packet、approval、write switch 保护 |
-| P0 | `phase22-002` | `write-execution-api-cli` | planned | API/CLI create/list | 可查询、可审计、可测试 |
-| P1 | `phase22-003` | `console-write-execution-plan` | planned | Console 展示 execution plan | 前端只读展示事实源 |
-| P1 | `phase22-004` | `phase22-readiness` | planned | Phase 22 收口 | 全量门禁和后续入口完成 |
+| P0 | `phase22-001` | `guarded-write-execution-plan` | completed | 生成 preview/apply 执行计划契约 | Apply 受 packet、approval、write switch 保护 |
+| P0 | `phase22-002` | `write-execution-api-cli` | completed | API/CLI create/list | 可查询、可审计、可测试 |
+| P1 | `phase22-003` | `console-write-execution-plan` | completed | Console 展示 execution plan | 前端只读展示事实源 |
+| P1 | `phase22-004` | `phase22-readiness` | completed | Phase 22 收口 | 全量门禁和后续入口完成 |
 
 ## 3. 执行规划：`phase22-001 guarded-write-execution-plan`
 
-实现状态：planned。
+实现状态：completed。
 
 范围：
 
@@ -36,9 +36,16 @@ Phase 22 只能在 Phase 21 完成后进入。唯一前置输入是 write review
 - 不消费 secret 明文。
 - 不替代后续 provider adapter。
 
+完成记录：
+
+- `internal/operations` 新增 write execution plan create/list/load。
+- Preview mode 输出 `WRITE_EXECUTION_PREVIEW_READY`，不要求真实写入开关。
+- Apply mode 强制要求 ready review packet、approval id 和 `MOYUAN_ALLOW_REAL_WRITE=1`。
+- 所有 plan 都记录 `external_write_performed=false`。
+
 ## 4. 执行规划：`phase22-002 write-execution-api-cli`
 
-实现状态：planned。
+实现状态：completed。
 
 范围：
 
@@ -46,24 +53,41 @@ Phase 22 只能在 Phase 21 完成后进入。唯一前置输入是 write review
 - CLI 增加 `moyuan operations write-execution-plans create|list ...`。
 - 单测覆盖 preview、apply switch disabled、apply ready 但 external write 未执行。
 
+完成记录：
+
+- API 增加 `POST/GET /v1/projects/:project_id/operations/write-execution-plans`。
+- CLI 增加 `moyuan operations write-execution-plans create|list ...`。
+- Plan 持久化 `.moyuan/lifecycle/deployments/write-execution-plans/*.json`，追加 `write-execution-plans.jsonl`，写入 evidence，并进入 operations timeline。
+
 ## 5. 执行规划：`phase22-003 console-write-execution-plan`
 
-实现状态：planned。
+实现状态：completed。
 
 范围：
 
 - Console Operations 面板读取 `write_execution_plans`。
 - 展示 plan mode、status、decision、review packet id、approval id、reasons、rule refs、evidence refs 和 external write 标记。
 
+完成记录：
+
+- Console 数据层新增 `write_execution_plans` 拉取、类型和 normalize。
+- Operations 视图新增 Write Execution Plan 面板，展示 mode、status、decision、review packet、approval、apply allowed 和 external write 标记。
+
 ## 6. 执行规划：`phase22-004 phase22-readiness`
 
-实现状态：planned。
+实现状态：completed。
 
 范围：
 
 - 运行全量门禁。
 - 回写 README、docs 入口、Phase 22 issue graph、实施记录和 readiness。
 - 明确 Phase 23+ 真实 adapter 的入口与保留边界。
+
+完成记录：
+
+- 新增 [Phase 22 Release Readiness](./phase22-release-readiness.md)。
+- Phase 22 issue graph、实施记录和 docs phase 入口已更新为 ready。
+- 后续真实 adapter 必须基于本阶段 execution plan contract 单独实现。
 
 ## 7. 验证要求
 

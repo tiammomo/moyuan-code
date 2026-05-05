@@ -3370,6 +3370,70 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusAccepted, gin.H{"write_review_packets": report})
 	})
+	router.GET("/v1/projects/:project_id/operations/write-execution-plans", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		report, err := operations.ListWriteExecutionPlans(rootDir, operations.WriteExecutionPlanOptions{
+			ReviewPacketID: c.Query("review_packet_id"),
+			Mode:           c.Query("mode"),
+			Status:         c.Query("status"),
+			Decision:       c.Query("decision"),
+			Limit:          queryLimit(c, 20),
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"write_execution_plans": report})
+	})
+	router.POST("/v1/projects/:project_id/operations/write-execution-plans", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req struct {
+			ReviewPacketID string `json:"review_packet_id"`
+			Mode           string `json:"mode"`
+			ApprovalID     string `json:"approval_id"`
+			RequestedBy    string `json:"requested_by"`
+			Status         string `json:"status"`
+			Decision       string `json:"decision"`
+			Limit          int    `json:"limit"`
+		}
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		if req.Limit <= 0 {
+			req.Limit = 20
+		}
+		report, err := operations.CreateWriteExecutionPlans(rootDir, operations.WriteExecutionPlanOptions{
+			ReviewPacketID: req.ReviewPacketID,
+			Mode:           req.Mode,
+			ApprovalID:     req.ApprovalID,
+			RequestedBy:    req.RequestedBy,
+			Status:         req.Status,
+			Decision:       req.Decision,
+			Limit:          req.Limit,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"write_execution_plans": report})
+	})
 	router.GET("/v1/projects/:project_id/operations/:operation_type/:operation_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

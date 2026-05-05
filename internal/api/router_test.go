@@ -439,6 +439,8 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/operations/remote-execution-rehearsals?limit=5&execution_id="+evidenceRecords[0].ParentID, http.StatusOK, `"remote_execution_rehearsals"`, `"remote_write_never_executed"`)
 	assertPostContains(t, router, "/v1/projects/managed/operations/write-review-packets", `{"operation_id":"`+evidenceRecords[0].ParentID+`","limit":5}`, http.StatusAccepted, `"write_review_packets"`, `"markdown"`, evidenceRecords[0].ParentID)
 	assertGETContains(t, router, "/v1/projects/managed/operations/write-review-packets?limit=5&operation_id="+evidenceRecords[0].ParentID, http.StatusOK, `"write_review_packets"`, evidenceRecords[0].ParentID)
+	assertPostContains(t, router, "/v1/projects/managed/operations/write-execution-plans", `{"review_packet_id":"missing-review-packet","mode":"preview","limit":5}`, http.StatusAccepted, `"write_execution_plans"`, `"WRITE_EXECUTION_REVIEW_PACKET_MISSING"`, `"external_write_performed":false`)
+	assertGETContains(t, router, "/v1/projects/managed/operations/write-execution-plans?limit=5&review_packet_id=missing-review-packet", http.StatusOK, `"write_execution_plans"`, `"missing-review-packet"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/"+evidenceRecords[0].ParentID+"/post-deployment-history", http.StatusOK, `"post_deployment_history"`, `"execution_blocked"`)
 	assertPostContains(t, router, "/v1/projects/managed/post-deployment-verifications", `{"execution_id":"`+evidenceRecords[0].ParentID+`","monitor_limit":5}`, http.StatusAccepted, `"post_deployment_verification"`, `"POST_DEPLOYMENT_VERIFICATION_ATTENTION_REQUIRED"`)
 	verifications, err := deployment.ListPostDeploymentVerifications(root, 1)
