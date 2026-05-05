@@ -2,7 +2,9 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"moyuan-code/internal/deployment"
@@ -224,6 +226,87 @@ func TestTimelineAggregatesOperationsAndFilters(t *testing.T) {
 	}
 	if !timelineContainsID(envFiltered, verification.ID) {
 		t.Fatalf("expected verification in environment filtered operations, got %+v", envFiltered)
+	}
+}
+
+func TestExportAuditBuildsMarkdownAndRedactsSecrets(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := serverresources.Add(root, serverresources.Resource{
+		ID:          "dev-audit",
+		Environment: "test_dev",
+		Host:        "127.0.0.1",
+		Provider:    "local_vm",
+		Owner:       "ops",
+		AuthRef:     "env:DEV_SERVER_SSH_KEY",
+		ExpiresAt:   "2099-01-01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := serverresources.RecordDeploymentReference(root, serverresources.DeploymentRef{
+		ResourceID:   "dev-audit",
+		Kind:         "deployment_plan",
+		DeploymentID: "deployment-audit-ref",
+		Environment:  "test_dev",
+		Status:       "planned",
+		Decision:     "DEPLOY_PLAN_READY",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	execution, err := deployment.Execute(context.Background(), root, deployment.ExecuteOptions{DeploymentID: "missing-deployment", Mode: "dry_run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := deployment.BuildMonitorSummary(root, deployment.MonitorSummaryOptions{Environment: "test_dev", Limit: 5}); err != nil {
+		t.Fatal(err)
+	}
+	verification, err := deployment.BuildPostDeploymentVerification(root, deployment.PostDeploymentVerificationOptions{ExecutionID: execution.ID, Environment: "test_dev", MonitorLimit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoff := deploymentRiskHandoffTimeline{
+		ID:             "deployment-risk-handoff-secret",
+		SourceType:     "post_deployment_verification",
+		SourceID:       verification.ID,
+		Status:         "review_required",
+		Decision:       "DEPLOYMENT_RISK_HANDOFF_REVIEW_REQUIRED",
+		FailureClass:   "post_deployment_attention",
+		Reasons:        []string{"token=plain-secret should be redacted"},
+		ReviewRequired: true,
+		CreatedAt:      verification.CreatedAt,
+	}
+	if err := fsutil.WriteJSON(filepath.Join(deploymentRiskHandoffTimelineDir(root), handoff.ID+".json"), handoff); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := ExportAudit(root, AuditExportOptions{Format: "markdown", Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Format != "markdown" || report.Markdown == "" || !strings.Contains(report.Markdown, "Operations Audit Export") {
+		t.Fatalf("expected markdown audit export, got %+v", report)
+	}
+	if report.Summary.TimelineItemCount == 0 || report.Summary.PostDeploymentVerificationCount == 0 || report.Summary.ResourceDeploymentRefCount == 0 {
+		t.Fatalf("expected timeline, verification and resource refs in report: %+v", report.Summary)
+	}
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "plain-secret") {
+		t.Fatalf("audit export leaked secret-like text: %s", string(encoded))
+	}
+	if !report.Summary.RedactionApplied {
+		t.Fatalf("expected redaction flag in summary: %+v", report.Summary)
+	}
+	typeOnly, err := ExportAudit(root, AuditExportOptions{Type: "resource-deployment-ref", Environment: "test_dev", Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(typeOnly.Timeline) == 0 || typeOnly.Timeline[0].Type != "resource_deployment_ref" || len(typeOnly.PostDeploymentVerifications) != 0 {
+		t.Fatalf("expected type filtered resource deployment refs only, got %+v", typeOnly)
 	}
 }
 

@@ -202,6 +202,12 @@ func TestOperationsTimelineCLIListsDeploymentFacts(t *testing.T) {
 	assertContains(t, timeline.stdout, `"type": "deployment_execution"`)
 	assertContains(t, timeline.stdout, `"primary_ref": "missing-deployment"`)
 	assertContains(t, timeline.stdout, `"evidence_refs"`)
+
+	report := runCLI(t, root, "operations", "audit-export", "--type", "deployment_execution", "--limit", "5", "--format", "markdown")
+	assertContains(t, report.stdout, `"operations_audit_export"`)
+	assertContains(t, report.stdout, `"format": "markdown"`)
+	assertContains(t, report.stdout, `"markdown":`)
+	assertContains(t, report.stdout, `"deployment_execution"`)
 }
 
 func TestMaintenancePolicyCLIExplainsProductionGate(t *testing.T) {

@@ -256,6 +256,7 @@ func usage() string {
 		"moyuan evidence list [--parent-type <type>] [--parent-id <id>] [--limit 20]",
 		"moyuan evidence show <evidence-id>",
 		"moyuan operations timeline [--type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
+		"moyuan operations audit-export [--format json|markdown] [--type <type>] [--status <status>] [--decision <decision>] [--environment <env>] [--limit 20]",
 		"moyuan logs tail [--stream run] [--limit 20]",
 		"",
 	}, "\n")
@@ -1882,6 +1883,16 @@ func handleOperations(args []string, cwd string) (string, any, int, error) {
 			Limit:       flagInt(args, "--limit", 20),
 		})
 		return "", map[string]any{"operations_timeline": items}, 0, err
+	case "audit-export":
+		report, err := operations.ExportAudit(rootDir, operations.AuditExportOptions{
+			Type:        flagValue(args, "--type", ""),
+			Status:      flagValue(args, "--status", ""),
+			Decision:    flagValue(args, "--decision", ""),
+			Environment: flagValue(args, "--environment", ""),
+			Limit:       flagInt(args, "--limit", 20),
+			Format:      flagValue(args, "--format", "json"),
+		})
+		return "", map[string]any{"operations_audit_export": report}, 0, err
 	}
 	return "unknown operations command\n", nil, 1, nil
 }

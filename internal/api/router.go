@@ -3067,6 +3067,30 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"operations_timeline": items})
 	})
+	router.GET("/v1/projects/:project_id/operations/audit-export", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		report, err := operations.ExportAudit(rootDir, operations.AuditExportOptions{
+			Type:        c.Query("type"),
+			Status:      c.Query("status"),
+			Decision:    c.Query("decision"),
+			Environment: c.Query("environment"),
+			Limit:       queryLimit(c, 20),
+			Format:      c.Query("format"),
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"operations_audit_export": report})
+	})
 	router.GET("/v1/projects/:project_id/operations/:operation_type/:operation_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

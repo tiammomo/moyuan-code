@@ -430,6 +430,7 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertGETContains(t, router, "/v1/projects/managed/operations/timeline?limit=20&type=release_admission", http.StatusOK, `"operations_timeline"`, `"release_admission"`, admissions[0].ID, `"evidence_refs"`)
 	assertGETContains(t, router, "/v1/projects/managed/operations/timeline?limit=20&type=deployment_execution", http.StatusOK, `"operations_timeline"`, `"deployment_execution"`, evidenceRecords[0].ParentID)
 	assertGETContains(t, router, "/v1/projects/managed/operations/timeline?limit=20&environment=test_dev", http.StatusOK, `"operations_timeline"`, `"resource_health_scan"`, `"server_resource"`)
+	assertGETContains(t, router, "/v1/projects/managed/operations/audit-export?limit=20&environment=test_dev&format=markdown", http.StatusOK, `"operations_audit_export"`, `"markdown"`, `Operations Audit Export`, `"resource_deployment_refs"`)
 	assertGETContains(t, router, "/v1/projects/managed/deployment-executions/"+evidenceRecords[0].ParentID+"/post-deployment-history", http.StatusOK, `"post_deployment_history"`, `"execution_blocked"`)
 	assertPostContains(t, router, "/v1/projects/managed/post-deployment-verifications", `{"execution_id":"`+evidenceRecords[0].ParentID+`","monitor_limit":5}`, http.StatusAccepted, `"post_deployment_verification"`, `"POST_DEPLOYMENT_VERIFICATION_ATTENTION_REQUIRED"`)
 	verifications, err := deployment.ListPostDeploymentVerifications(root, 1)
