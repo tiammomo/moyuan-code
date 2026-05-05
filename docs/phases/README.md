@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+- [Phase 20 实现 Issue Graph](./phase20-issue-graph.md)：Phase 20 受控生产写入演练与远程运维执行增强的依赖图。
+- [Phase 20 实施记录](./phase20-next-development-plan.md)：Phase 20 当前任务、执行范围和验收记录。
 - [Phase 19 实现 Issue Graph](./phase19-issue-graph.md)：Phase 19 受控自动化执行增强与生产可观测性深化的依赖图。
 - [Phase 19 实施记录](./phase19-next-development-plan.md)：Phase 19 当前任务、执行范围和验收记录。
 - [Phase 19 Release Readiness](./phase19-release-readiness.md)：Phase 19 受控自动化执行增强与生产可观测性深化的收口验证。
