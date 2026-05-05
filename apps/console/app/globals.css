@@ -687,7 +687,133 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.operationList {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.operationItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.operationItem.selected,
+.operationItem:hover {
+  border-color: #b7c9f8;
+  background: #f1f6ff;
+}
+
+.operationItem div {
+  min-width: 0;
+}
+
+.operationItem strong,
+.operationItem span {
+  display: block;
+}
+
+.operationItem span,
+.operationItem time {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.operationItem span {
+  overflow-wrap: anywhere;
+}
+
+.operationDetail {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detailHeader div {
+  min-width: 0;
+}
+
+.detailHeader strong,
+.detailHeader span {
+  display: block;
+}
+
+.detailHeader span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.operationDetail dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.operationDetail dl div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.operationDetail dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.operationDetail dd {
+  margin: 4px 0 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.detailChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detailChips code {
+  max-width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #d7e2f3;
+  border-radius: 6px;
+  background: #f5f8fd;
+  color: #37506e;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.detailChips.subtle code {
+  border-color: #e6ebf2;
+  background: #fff;
+  color: var(--muted);
+}
+
 .lowerGrid,
+.operationGrid,
 .observabilityGrid,
 .auditGrid,
 .accessGrid,
@@ -701,6 +827,10 @@ dd {
 .observabilityGrid,
 .bottomGrid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.operationGrid {
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
 }
 
 .auditGrid {
@@ -1416,6 +1546,7 @@ meter {
   .mainGrid,
   .opsGrid,
   .lowerGrid,
+  .operationGrid,
   .observabilityGrid,
   .auditGrid,
   .accessForms,

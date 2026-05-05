@@ -128,6 +128,39 @@ export type DeploymentExecutionSummary = {
   reasons: string[];
   step_count: number;
   started_at?: string;
+  finished_at?: string;
+};
+
+export type ReleaseProviderExecutionSummary = {
+  id: string;
+  release_id: string;
+  version?: string;
+  provider?: string;
+  mode: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  approval_id?: string;
+  approval_consumed: boolean;
+  write_enabled: boolean;
+  action_count: number;
+  remote_status?: string;
+  started_at?: string;
+  finished_at?: string;
+};
+
+export type EvidenceSummary = {
+  id: string;
+  parent_type: string;
+  parent_id: string;
+  subject_type: string;
+  subject_id: string;
+  operation: string;
+  status: string;
+  decision: string;
+  reasons: string[];
+  artifact_count: number;
+  created_at?: string;
 };
 
 export type RunSummary = {
@@ -268,6 +301,23 @@ export type TimelineEvent = {
   time: string;
 };
 
+export type OperationHistoryItem = {
+  id: string;
+  type: "release_provider" | "deployment" | "visual_render" | "evidence";
+  title: string;
+  detail: string;
+  status: string;
+  decision: string;
+  tone: StatusTone;
+  time: string;
+  occurred_at?: string;
+  primary_ref?: string;
+  secondary_ref?: string;
+  evidence_ids: string[];
+  reasons: string[];
+  metadata: string[];
+};
+
 export type QualitySignal = {
   id: string;
   title: string;
@@ -389,6 +439,9 @@ export type ConsoleSnapshot = {
   maintenance_records: MaintenanceRecordSummary[];
   deployments: DeploymentSummary[];
   executions: DeploymentExecutionSummary[];
+  release_provider_executions: ReleaseProviderExecutionSummary[];
+  evidence: EvidenceSummary[];
+  operation_history: OperationHistoryItem[];
   runs: RunSummary[];
   subagents: SubagentSummary[];
   runtime_recoveries: RuntimeRecoverySummary[];

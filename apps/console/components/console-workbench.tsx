@@ -55,6 +55,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   const router = useRouter();
   const [activeView, setActiveView] = useState<ConsoleView>("Projects");
   const [selectedIssueID, setSelectedIssueID] = useState(snapshot.issues[0]?.id ?? "");
+  const [selectedOperationID, setSelectedOperationID] = useState(snapshot.operation_history[0]?.id ?? "");
   const [requirementText, setRequirementText] = useState("");
   const [requirementState, setRequirementState] = useState<RequirementSubmitState>({ status: "idle" });
   const [schemaErrors, setSchemaErrors] = useState<Record<string, string[]>>({});
@@ -79,6 +80,7 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
   });
   const [releaseProviderActionState, setReleaseProviderActionState] = useState<ActionState>({ status: "idle" });
   const selectedIssue = snapshot.issues.find((issue) => issue.id === selectedIssueID) ?? snapshot.issues[0];
+  const selectedOperation = snapshot.operation_history.find((operation) => operation.id === selectedOperationID) ?? snapshot.operation_history[0];
   const groupedIssues = useMemo(() => groupIssues(snapshot.issues), [snapshot.issues]);
   const latestDeployment = snapshot.deployments[0];
   const activeSessions = snapshot.auth_sessions.filter((session) => session.status === "active");
@@ -651,6 +653,82 @@ export function ConsoleWorkbench({ snapshot }: { snapshot: ConsoleSnapshot }) {
                 <div className="emptyState">No deployment executions yet</div>
               )}
             </div>
+          </div>
+        </section>
+
+        <section className="operationGrid" hidden={!viewVisible(activeView, ["Projects", "Deployments"])}>
+          <div className="panel operationHistoryPanel">
+            <PanelTitle icon={<ScrollText size={18} />} title="Operation History" meta={`${snapshot.operation_history.length} traced`} />
+            <div className="operationList">
+              {snapshot.operation_history.length > 0 ? (
+                snapshot.operation_history.map((operation) => (
+                  <button
+                    className={`operationItem ${selectedOperation?.id === operation.id ? "selected" : ""}`}
+                    key={operation.id}
+                    onClick={() => setSelectedOperationID(operation.id)}
+                    type="button"
+                  >
+                    <StatusDot tone={operation.tone} />
+                    <div>
+                      <strong>{operation.title}</strong>
+                      <span>{operation.detail}</span>
+                    </div>
+                    <time>{operation.time}</time>
+                  </button>
+                ))
+              ) : (
+                <div className="emptyState">No operation history</div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel operationDetailPanel">
+            <PanelTitle icon={<Activity size={18} />} title="Execution Detail" meta={selectedOperation?.type ?? "operation"} />
+            {selectedOperation ? (
+              <div className="operationDetail">
+                <div className="detailHeader">
+                  <div>
+                    <strong>{selectedOperation.title}</strong>
+                    <span>{selectedOperation.id}</span>
+                  </div>
+                  <StatusPill tone={selectedOperation.tone} label={selectedOperation.status} />
+                </div>
+                <dl>
+                  <div>
+                    <dt>Decision</dt>
+                    <dd>{selectedOperation.decision}</dd>
+                  </div>
+                  <div>
+                    <dt>Primary Ref</dt>
+                    <dd>{selectedOperation.primary_ref || "none"}</dd>
+                  </div>
+                  <div>
+                    <dt>Secondary Ref</dt>
+                    <dd>{selectedOperation.secondary_ref || "none"}</dd>
+                  </div>
+                  <div>
+                    <dt>Evidence</dt>
+                    <dd>{selectedOperation.evidence_ids.length > 0 ? selectedOperation.evidence_ids.map(compactID).join(", ") : "none"}</dd>
+                  </div>
+                </dl>
+                {selectedOperation.reasons.length > 0 ? (
+                  <div className="detailChips">
+                    {selectedOperation.reasons.slice(0, 3).map((reason) => (
+                      <code key={reason}>{reason}</code>
+                    ))}
+                  </div>
+                ) : null}
+                {selectedOperation.metadata.length > 0 ? (
+                  <div className="detailChips subtle">
+                    {selectedOperation.metadata.map((item) => (
+                      <code key={item}>{item}</code>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="emptyState">Select an operation</div>
+            )}
           </div>
         </section>
 

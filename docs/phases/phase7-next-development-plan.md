@@ -25,7 +25,7 @@ Phase 6 已完成并通过 release readiness：
 | P0 | `phase7-002` | `ssh-executor-guarded-runner` | completed | SSH executor 受控执行边界 | 默认阻断真实 SSH，启用后只执行白名单命令 |
 | P1 | `phase7-003` | `post-action-evidence-model` | completed | 发布/部署/烟测/监控/回滚证据链 | 每次操作能查询统一 evidence |
 | P1 | `phase7-004` | `runtime-telemetry-feedback-loop` | completed | runtime/quality 结果反哺 provider telemetry | route decision 可读取执行反馈 |
-| P2 | `phase7-005` | `console-execution-detail-history` | planned | Console execution detail 和 operation history | 用户能追踪 preview、approval、publish、evidence |
+| P2 | `phase7-005` | `console-execution-detail-history` | completed | Console execution detail 和 operation history | 用户能追踪 preview、approval、publish、evidence |
 
 ## 3. 执行规划：`phase7-001 release-provider-approval-consumption`
 
@@ -214,7 +214,44 @@ Phase 6 已完成并通过 release readiness：
 - `npm run build` 通过。
 - `git diff --check` 通过。
 
-## 11. 验证要求
+## 11. 执行规划：`phase7-005 console-execution-detail-history`
+
+范围：
+
+- Release provider execution 增加 list API，支持 Console 拉取近期 preview/publish 记录。
+- Console snapshot 增加 release provider executions、evidence 和 operation history。
+- Deployments 工作区增加 operation history 列表和 execution detail 面板。
+- Operation detail 展示 status、decision、primary ref、secondary ref、evidence ids、reasons 和 metadata。
+
+非目标：
+
+- 不在 Console 里判定执行成功，仍以后端 execution/evidence 为事实源。
+- 不展示 secret、stdout/stderr 原文或远程响应正文。
+- 不在本任务中实现真实 release provider write 或真实 SSH runner。
+
+验收：
+
+- `GET /v1/projects/:project_id/release-provider-executions` 可查询 release provider execution 列表。
+- Console 能展示 deployment execution、release provider execution、visual render 和 evidence 关联历史。
+- `go test ./internal/release ./internal/api` 通过。
+- `npm run typecheck` 通过。
+
+## 12. 已完成任务：`phase7-005 console-execution-detail-history`
+
+范围：
+
+- `internal/release` 增加 `ListProviderExecutions`。
+- API 增加 `GET /v1/projects/:project_id/release-provider-executions`。
+- Console live snapshot 拉取 release provider execution list 和 evidence list。
+- Console 新增 operation history/detail 区域，展示 deployment、release provider、visual render 和 evidence 关联。
+- Demo snapshot 补齐 release provider execution、evidence 和 operation history 示例。
+
+验证：
+
+- `go test ./internal/release ./internal/api` 通过。
+- `npm run typecheck` 通过。
+
+## 13. 验证要求
 
 每完成一个 Phase 7 issue，至少运行：
 

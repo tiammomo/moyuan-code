@@ -60,6 +60,13 @@ func TestProviderPreviewAndPublishApprovalFlow(t *testing.T) {
 	if err != nil || !found || loaded.ID != previewOnly.ID {
 		t.Fatalf("expected persisted provider execution, found=%v err=%v loaded=%+v", found, err, loaded)
 	}
+	executions, err := ListProviderExecutions(root, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(executions) < 3 || executions[0].ID != previewOnly.ID {
+		t.Fatalf("expected newest provider execution first, got %+v", executions)
+	}
 	evidenceRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "release_provider_execution", ParentID: previewOnly.ID, Limit: 10})
 	if err != nil || len(evidenceRecords) != 1 || evidenceRecords[0].Decision != previewOnly.Decision {
 		t.Fatalf("expected provider execution evidence, records=%+v err=%v", evidenceRecords, err)

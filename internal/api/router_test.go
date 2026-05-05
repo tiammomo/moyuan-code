@@ -20,6 +20,7 @@ import (
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/memory"
 	"moyuan-code/internal/orchestrator"
+	"moyuan-code/internal/release"
 	"moyuan-code/internal/repair"
 	"moyuan-code/internal/requirement"
 	runtimemgr "moyuan-code/internal/runtime"
@@ -266,6 +267,16 @@ func TestGinRouterServesProjectStateEndpoints(t *testing.T) {
 	assertPostContains(t, router, "/v1/projects/managed/issues/phase1-001/git-provider-plan", `{}`, http.StatusAccepted, `"git_provider_plan"`, `"GIT_PROVIDER_BLOCKED"`, `"dirty_worktree"`)
 	assertGETContains(t, router, "/v1/projects/managed/git-provider-plans?limit=5", http.StatusOK, `"git_provider_plans"`, `"GIT_PROVIDER_BLOCKED"`)
 	assertPostContains(t, router, "/v1/projects/managed/releases/suggest", `{"version":"v0.1.0","min_issues":1}`, http.StatusAccepted, `"release"`, `"RELEASE_BLOCKED"`, `"dirty_worktree"`)
+	releasePlan, err := release.Suggest(context.Background(), root, release.SuggestOptions{Version: "v0.1.1", MinIssues: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseProviderExecution, found, err := release.ProviderPreview(root, releasePlan.ID)
+	if err != nil || !found {
+		t.Fatalf("expected release provider preview execution, found=%v err=%v", found, err)
+	}
+	assertGETContains(t, router, "/v1/projects/managed/release-provider-executions?limit=5", http.StatusOK, `"release_provider_executions"`, releaseProviderExecution.ID)
+	assertGETContains(t, router, "/v1/projects/managed/release-provider-executions/"+releaseProviderExecution.ID, http.StatusOK, `"release_provider_execution"`, releaseProviderExecution.ID)
 	assertPostContains(t, router, "/v1/projects/managed/resources", `{"id":"dev-api","environment":"test_dev","host":"10.0.0.11","provider":"local_vm","owner":"dev-owner","auth_ref":"env:DEV_SERVER_SSH_KEY","expires_at":"2099-01-01"}`, http.StatusCreated, `"resource"`, `"dev-api"`)
 	assertGETContains(t, router, "/v1/projects/managed/resources", http.StatusOK, `"resources"`, `"dev-api"`)
 	assertGETContains(t, router, "/v1/projects/managed/resources/dev-api", http.StatusOK, `"resource"`, `"test_dev"`)

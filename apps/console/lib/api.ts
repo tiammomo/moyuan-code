@@ -8,14 +8,17 @@ import type {
   AuthSessionSummary,
   DeploymentExecutionSummary,
   DeploymentSummary,
+  EvidenceSummary,
   GitProviderPlanSummary,
   IssueNode,
   MaintenanceRecordSummary,
+  OperationHistoryItem,
   ProjectSummary,
   ProviderSummary,
   ProviderTelemetrySummary,
   QualityExplanation,
   QualitySignal,
+  ReleaseProviderExecutionSummary,
   RuntimeRecoverySummary,
   RunSummary,
   ResourceSummary,
@@ -70,6 +73,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     maintenanceResponse,
     deploymentsResponse,
     executionsResponse,
+    releaseProviderExecutionsResponse,
+    evidenceResponse,
     runsResponse,
     subagentsResponse,
     recoveriesResponse,
@@ -94,6 +99,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ maintenance_records: unknown[] }>>(`/projects/${project.id}/resources/maintenance?limit=5`),
     apiGet<ApiEnvelope<{ deployments: unknown[] }>>(`/projects/${project.id}/deployments?limit=4`),
     apiGet<ApiEnvelope<{ executions: unknown[] }>>(`/projects/${project.id}/deployment-executions?limit=4`),
+    apiGet<ApiEnvelope<{ release_provider_executions: unknown[] }>>(`/projects/${project.id}/release-provider-executions?limit=6`),
+    apiGet<ApiEnvelope<{ evidence: unknown[] }>>(`/projects/${project.id}/evidence?limit=10`),
     apiGet<ApiEnvelope<{ runs: unknown[] }>>(`/projects/${project.id}/runs?limit=12`),
     apiGet<ApiEnvelope<{ subagents: unknown[] }>>(`/projects/${project.id}/subagents?limit=12`),
     apiGet<ApiEnvelope<{ runtime_recoveries: unknown[] }>>(`/projects/${project.id}/runtime-recoveries?limit=6`),
@@ -120,6 +127,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const maintenanceRecords = normalizeMaintenanceRecords(maintenanceResponse?.maintenance_records ?? []);
   const deployments = normalizeDeployments(deploymentsResponse?.deployments ?? []);
   const executions = normalizeExecutions(executionsResponse?.executions ?? []);
+  const releaseProviderExecutions = normalizeReleaseProviderExecutions(releaseProviderExecutionsResponse?.release_provider_executions ?? []);
+  const evidence = normalizeEvidence(evidenceResponse?.evidence ?? []);
   const runs = normalizeRuns(runsResponse?.runs ?? []);
   const subagents = normalizeSubagents(subagentsResponse?.subagents ?? []);
   const recoveries = normalizeRuntimeRecoveries(recoveriesResponse?.runtime_recoveries ?? []);
@@ -134,7 +143,8 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const serviceAccounts = normalizeServiceAccounts(serviceAccountsResponse?.service_accounts ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
   const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
-  const timeline = liveTimeline(runs, executions, deployments);
+  const operationHistory = buildOperationHistory(releaseProviderExecutions, executions, visualRenderExecutions, evidence);
+  const timeline = liveTimeline(runs, executions, deployments, releaseProviderExecutions);
   const qualitySignals = normalizeQualitySignals(qualityExplanations, qualityReports);
 
   return {
@@ -164,6 +174,9 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     maintenance_records: maintenanceRecords,
     deployments,
     executions,
+    release_provider_executions: releaseProviderExecutions,
+    evidence,
+    operation_history: operationHistory,
     runs,
     subagents,
     runtime_recoveries: recoveries,
@@ -355,6 +368,46 @@ function normalizeExecutions(rawExecutions: unknown[]): DeploymentExecutionSumma
     reasons: readArray(raw, "reasons"),
     step_count: readObjectArray(raw, "steps").length,
     started_at: readString(raw, "started_at", ""),
+    finished_at: readString(raw, "finished_at", ""),
+  }));
+}
+
+function normalizeReleaseProviderExecutions(rawExecutions: unknown[]): ReleaseProviderExecutionSummary[] {
+  return rawExecutions.map((raw, index) => {
+    const remotePlan = readUnknown(raw, "remote_plan");
+    return {
+      id: readString(raw, "id", `release-provider-execution-${index + 1}`),
+      release_id: readString(raw, "release_id", ""),
+      version: readString(raw, "version", ""),
+      provider: readString(raw, "provider", ""),
+      mode: readString(raw, "mode", "preview"),
+      status: readString(raw, "status", "unknown"),
+      decision: readString(raw, "decision", "unknown"),
+      reasons: readArray(raw, "reasons"),
+      approval_id: readString(raw, "approval_id", ""),
+      approval_consumed: readBoolean(raw, "approval_consumed"),
+      write_enabled: readBoolean(raw, "write_enabled"),
+      action_count: readObjectArray(remotePlan, "actions").length,
+      remote_status: readString(remotePlan, "status", ""),
+      started_at: readString(raw, "started_at", ""),
+      finished_at: readString(raw, "finished_at", ""),
+    };
+  });
+}
+
+function normalizeEvidence(rawRecords: unknown[]): EvidenceSummary[] {
+  return rawRecords.map((raw, index) => ({
+    id: readString(raw, "id", `evidence-${index + 1}`),
+    parent_type: readString(raw, "parent_type", ""),
+    parent_id: readString(raw, "parent_id", ""),
+    subject_type: readString(raw, "subject_type", ""),
+    subject_id: readString(raw, "subject_id", ""),
+    operation: readString(raw, "operation", "operation"),
+    status: readString(raw, "status", "unknown"),
+    decision: readString(raw, "decision", "unknown"),
+    reasons: readArray(raw, "reasons"),
+    artifact_count: readObjectArray(raw, "artifacts").length,
+    created_at: readString(raw, "created_at", ""),
   }));
 }
 
@@ -636,13 +689,113 @@ function normalizeQualitySignals(explanations: QualityExplanation[], reports: Re
   }));
 }
 
-function liveTimeline(runs: RunSummary[], executions: DeploymentExecutionSummary[], deployments: DeploymentSummary[]) {
-  return [
+function buildOperationHistory(
+  releaseProviderExecutions: ReleaseProviderExecutionSummary[],
+  executions: DeploymentExecutionSummary[],
+  visualExecutions: VisualRenderExecutionSummary[],
+  evidence: EvidenceSummary[],
+): OperationHistoryItem[] {
+  const evidenceByParent = new Map<string, EvidenceSummary[]>();
+  for (const record of evidence) {
+    const key = `${record.parent_type}:${record.parent_id}`;
+    evidenceByParent.set(key, [...(evidenceByParent.get(key) ?? []), record]);
+  }
+
+  const items: OperationHistoryItem[] = [
+    ...releaseProviderExecutions.map((execution) => {
+      const linkedEvidence = evidenceByParent.get(`release_provider_execution:${execution.id}`) ?? [];
+      return {
+        id: execution.id,
+        type: "release_provider" as const,
+        title: `Release provider ${execution.mode}`,
+        detail: `${execution.decision} / ${execution.action_count} actions`,
+        status: execution.status,
+        decision: execution.decision,
+        tone: toneFromStatus(execution.status),
+        time: shortTime(execution.finished_at || execution.started_at),
+        occurred_at: execution.finished_at || execution.started_at,
+        primary_ref: execution.release_id,
+        secondary_ref: execution.provider || execution.version,
+        evidence_ids: linkedEvidence.map((record) => record.id),
+        reasons: execution.reasons,
+        metadata: [
+          execution.write_enabled ? "write enabled" : "preview guarded",
+          execution.approval_consumed ? "approval consumed" : "approval not consumed",
+          execution.remote_status ? `remote ${execution.remote_status}` : "",
+        ].filter(Boolean),
+      };
+    }),
+    ...executions.map((execution) => {
+      const linkedEvidence = evidenceByParent.get(`deployment_execution:${execution.id}`) ?? [];
+      return {
+        id: execution.id,
+        type: "deployment" as const,
+        title: `Deployment ${execution.mode}`,
+        detail: `${execution.decision} / ${execution.step_count} steps`,
+        status: execution.status,
+        decision: execution.decision,
+        tone: toneFromStatus(execution.status),
+        time: shortTime(execution.finished_at || execution.started_at),
+        occurred_at: execution.finished_at || execution.started_at,
+        primary_ref: execution.deployment_id,
+        secondary_ref: execution.environment,
+        evidence_ids: linkedEvidence.map((record) => record.id),
+        reasons: execution.reasons,
+        metadata: [`environment ${execution.environment}`, `${execution.step_count} steps`],
+      };
+    }),
+    ...visualExecutions.map((execution) => ({
+      id: execution.id,
+      type: "visual_render" as const,
+      title: `Visual render ${execution.mode}`,
+      detail: `${execution.decision} / ${execution.step_count} steps`,
+      status: execution.status,
+      decision: execution.decision,
+      tone: toneFromStatus(execution.status),
+      time: shortTime(execution.finished_at || execution.started_at),
+      occurred_at: execution.finished_at || execution.started_at,
+      primary_ref: execution.asset_id,
+      secondary_ref: execution.provider_id,
+      evidence_ids: [],
+      reasons: execution.reasons,
+      metadata: [execution.image_path ? "image artifact" : "", execution.script_path ? "script artifact" : ""].filter(Boolean),
+    })),
+    ...evidence
+      .filter((record) => !record.parent_id)
+      .map((record) => ({
+        id: record.id,
+        type: "evidence" as const,
+        title: record.operation,
+        detail: `${record.decision} / ${record.artifact_count} artifacts`,
+        status: record.status,
+        decision: record.decision,
+        tone: toneFromStatus(record.status),
+        time: shortTime(record.created_at),
+        occurred_at: record.created_at,
+        primary_ref: record.subject_id,
+        secondary_ref: record.subject_type,
+        evidence_ids: [record.id],
+        reasons: record.reasons,
+        metadata: [`${record.artifact_count} artifacts`],
+      })),
+  ];
+
+  return items.sort((a, b) => timestampOf(b.occurred_at) - timestampOf(a.occurred_at)).slice(0, 12);
+}
+
+function liveTimeline(
+  runs: RunSummary[],
+  executions: DeploymentExecutionSummary[],
+  deployments: DeploymentSummary[],
+  releaseProviderExecutions: ReleaseProviderExecutionSummary[],
+) {
+  const items = [
     ...runs.map((run) => ({
       id: run.run_id,
       title: `Run ${run.issue_id || run.run_id}`,
       detail: `${run.runtime_id || "runtime pending"} / quality ${run.quality_status || "pending"}`,
       tone: toneFromStatus(run.status),
+      occurred_at: run.updated_at,
       time: shortTime(run.updated_at),
     })),
     ...executions.map((execution) => ({
@@ -650,16 +803,28 @@ function liveTimeline(runs: RunSummary[], executions: DeploymentExecutionSummary
       title: `Deploy execution ${execution.mode}`,
       detail: `${execution.decision} / ${execution.step_count} steps`,
       tone: toneFromStatus(execution.status),
+      occurred_at: execution.finished_at || execution.started_at,
       time: shortTime(execution.started_at),
+    })),
+    ...releaseProviderExecutions.map((execution) => ({
+      id: execution.id,
+      title: `Release provider ${execution.mode}`,
+      detail: `${execution.decision} / ${execution.action_count} actions`,
+      tone: toneFromStatus(execution.status),
+      occurred_at: execution.finished_at || execution.started_at,
+      time: shortTime(execution.finished_at || execution.started_at),
     })),
     ...deployments.map((deployment) => ({
       id: deployment.id,
       title: `Deployment plan ${deployment.environment}`,
       detail: `${deployment.decision} / ${deployment.resource_count} resources`,
       tone: toneFromStatus(deployment.status),
+      occurred_at: deployment.created_at,
       time: shortTime(deployment.created_at),
     })),
-  ].slice(0, 5);
+  ].sort((a, b) => timestampOf(b.occurred_at) - timestampOf(a.occurred_at));
+
+  return items.slice(0, 5).map(({ occurred_at: _, ...item }) => item);
 }
 
 function laneFor(role: string, status: string): IssueNode["lane"] {
@@ -729,4 +894,10 @@ function shortTime(value?: string) {
     minute: "2-digit",
     hour12: false,
   }).format(date);
+}
+
+function timestampOf(value?: string) {
+  if (!value || value === "live") return 0;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
 }

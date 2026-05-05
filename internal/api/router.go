@@ -1158,6 +1158,23 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(status, gin.H{"release_provider_execution": execution})
 	})
+	router.GET("/v1/projects/:project_id/release-provider-executions", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		executions, err := release.ListProviderExecutions(rootDir, queryLimit(c, 10))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"release_provider_executions": executions})
+	})
 	router.GET("/v1/projects/:project_id/release-provider-executions/:execution_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {

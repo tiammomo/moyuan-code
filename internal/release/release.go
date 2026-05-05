@@ -314,6 +314,38 @@ func LoadProviderExecution(rootDir string, id string) (ProviderExecution, bool, 
 	return execution, found, err
 }
 
+func ListProviderExecutions(rootDir string, limit int) ([]ProviderExecution, error) {
+	dir := filepath.Join(workspace.ForRoot(rootDir).ReleasesDir, "provider-executions")
+	if err := fsutil.EnsureDir(dir); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	executions := []ProviderExecution{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var execution ProviderExecution
+		found, err := fsutil.ReadJSON(filepath.Join(dir, entry.Name()), &execution)
+		if err != nil {
+			return nil, err
+		}
+		if found && execution.ID != "" {
+			executions = append(executions, execution)
+		}
+	}
+	sort.SliceStable(executions, func(i, j int) bool {
+		return executions[i].StartedAt > executions[j].StartedAt
+	})
+	if limit > 0 && len(executions) > limit {
+		return executions[:limit], nil
+	}
+	return executions, nil
+}
+
 func finish(rootDir string, plan Plan) (Plan, error) {
 	if err := fsutil.WriteJSON(planPath(rootDir, plan.ID), plan); err != nil {
 		return Plan{}, err
