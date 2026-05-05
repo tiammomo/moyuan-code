@@ -18,7 +18,7 @@ Phase 14 的目标是把 Phase 13 的 release candidate 链路推进到“受控
 
 | Issue | 名称 | 状态 | 范围 | 前置 | 责任角色 | 验收重点 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `phase14-001` | `release-candidate-provider-publish-bridge` | planned | candidate -> release provider publish、approval request、write switch、secret resolver、provider execution evidence | Phase 13 readiness | `release_owner` + `security_owner` | release candidate 可调用受控 provider publish，默认只生成 approval/preview-only 阻断 |
+| `phase14-001` | `release-candidate-provider-publish-bridge` | completed | candidate -> release provider publish、approval request、write switch、secret resolver、provider execution evidence | Phase 13 readiness | `release_owner` + `security_owner` | release candidate 可调用受控 provider publish，默认只生成 approval/preview-only 阻断 |
 | `phase14-002` | `release-candidate-pr-mr-create-bridge` | planned | candidate PR/MR plan -> Git Provider create、approval、remote write switch、replay guard | `phase14-001` | `git_owner` + `security_owner` | release branch 到 default branch 的 PR/MR 创建可受控执行，不绕过审批 |
 | `phase14-003` | `candidate-deployment-execution-bridge` | planned | candidate deployment plan -> deployment execution、dry-run/ssh preview/local shell/ssh execute、approval | `phase13-004` | `devops_owner` + `backend_owner` | deployment execution 可从 candidate 链路触发，生产真实执行仍默认阻断 |
 | `phase14-004` | `post-deploy-smoke-monitor-feedback` | planned | smoke、monitor、rollback suggestion、post deployment history 与 candidate/release 状态关联 | `phase14-003` | `devops_owner` + `qa_owner` | 线上检查结果能回写为证据，失败时给出 rollback 建议 |

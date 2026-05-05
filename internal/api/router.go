@@ -902,6 +902,40 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"release_candidate_provider_preview": preview})
 	})
+	router.POST("/v1/projects/:project_id/release-candidates/:candidate_id/provider-publish", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		var req releaseProviderPublishRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		execution, found, err := release.ProviderPublishForCandidate(rootDir, release.CandidateProviderPublishOptions{
+			CandidateID: c.Param("candidate_id"),
+			Approved:    req.Approved,
+			ApprovalID:  req.ApprovalID,
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(c, http.StatusNotFound, "release candidate not found")
+			return
+		}
+		status := http.StatusOK
+		if execution.Status == "blocked" || execution.Decision == "RELEASE_PROVIDER_PUBLISH_PREVIEW_ONLY" {
+			status = http.StatusAccepted
+		}
+		c.JSON(status, gin.H{"release_provider_execution": execution})
+	})
 	router.POST("/v1/projects/:project_id/release-candidates/:candidate_id/deployment-plan", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -3187,6 +3221,8 @@ func protectedAuthzRule(method string, fullPath string, rawPath string) (authzRu
 		return authzRule{Action: "release.candidate.apply", Risk: "high", Scopes: []string{"release:write", "git:write"}}, true
 	case "/v1/projects/:project_id/release-candidates/:candidate_id/provider-preview":
 		return authzRule{Action: "release.candidate.provider_preview", Risk: "normal", Scopes: []string{"release:write"}}, true
+	case "/v1/projects/:project_id/release-candidates/:candidate_id/provider-publish":
+		return authzRule{Action: "release.candidate.provider_publish", Risk: "high", Scopes: []string{"release:write"}}, true
 	case "/v1/projects/:project_id/release-candidates/:candidate_id/deployment-plan":
 		return authzRule{Action: "release.candidate.deployment_plan", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case "/v1/projects/:project_id/providers/ops/refresh":
@@ -3249,6 +3285,8 @@ func protectedAuthzRuleByRawPath(method string, rawPath string) (authzRule, bool
 		return authzRule{Action: "release.candidate.apply", Risk: "high", Scopes: []string{"release:write", "git:write"}}, true
 	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/provider-preview"):
 		return authzRule{Action: "release.candidate.provider_preview", Risk: "normal", Scopes: []string{"release:write"}}, true
+	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/provider-publish"):
+		return authzRule{Action: "release.candidate.provider_publish", Risk: "high", Scopes: []string{"release:write"}}, true
 	case strings.Contains(rawPath, "/release-candidates/") && strings.HasSuffix(rawPath, "/deployment-plan"):
 		return authzRule{Action: "release.candidate.deployment_plan", Risk: "normal", Scopes: []string{"deploy:write"}}, true
 	case strings.Contains(rawPath, "/providers/ops/refresh"):

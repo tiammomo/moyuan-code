@@ -246,6 +246,89 @@ func TestProviderPreviewForCandidateRequiresAppliedReleaseBranchAndBuildsPreview
 	}
 }
 
+func TestProviderPublishForCandidateRequiresPreviewAndUsesApprovalFlow(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseProviderRepositoryConfig(t, root, "https://api.github.test")
+	candidate, err := finishCandidate(root, Candidate{
+		ID:             "release-candidate-publish",
+		ReleaseBatchID: "release-batch-v0.2.0",
+		Status:         "ready",
+		Decision:       "RELEASE_CANDIDATE_READY",
+		Version:        "v0.2.0",
+		Provider:       "github",
+		RemoteName:     "origin",
+		RemoteURL:      "git@github.com:owner/repo.git",
+		ReleaseBranch:  "release/v0.2.0",
+		SourceBranch:   "moyuan/integration/release",
+		CreatedAt:      "2026-05-05T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	missingApply, found, err := ProviderPublishForCandidate(root, CandidateProviderPublishOptions{CandidateID: candidate.ID})
+	if err != nil || !found {
+		t.Fatalf("expected provider publish blocked record, found=%v err=%v", found, err)
+	}
+	if missingApply.Decision != "RELEASE_CANDIDATE_PROVIDER_PUBLISH_BLOCKED" || !containsReleaseReason(missingApply.Reasons, "release_branch_apply_missing") {
+		t.Fatalf("expected release branch apply block, got %+v", missingApply)
+	}
+	_, err = finishCandidateApply(root, CandidateApply{
+		ID:             "release-candidate-apply-publish",
+		CandidateID:    candidate.ID,
+		ReleaseBatchID: candidate.ReleaseBatchID,
+		Status:         "applied",
+		Decision:       "RELEASE_BRANCH_APPLY_COMPLETED",
+		ReleaseBranch:  candidate.ReleaseBranch,
+		SourceBranch:   candidate.SourceBranch,
+		StartedAt:      "2026-05-05T00:01:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	missingPreview, found, err := ProviderPublishForCandidate(root, CandidateProviderPublishOptions{CandidateID: candidate.ID})
+	if err != nil || !found {
+		t.Fatalf("expected provider publish blocked by preview, found=%v err=%v", found, err)
+	}
+	if missingPreview.Decision != "RELEASE_CANDIDATE_PROVIDER_PUBLISH_BLOCKED" || !containsReleaseReason(missingPreview.Reasons, "provider_preview_missing") {
+		t.Fatalf("expected provider preview block, got %+v", missingPreview)
+	}
+	preview, found, err := ProviderPreviewForCandidate(root, candidate.ID)
+	if err != nil || !found || preview.Decision != "RELEASE_CANDIDATE_PROVIDER_PREVIEW_READY" {
+		t.Fatalf("expected provider preview ready, found=%v preview=%+v err=%v", found, preview, err)
+	}
+
+	blocked, found, err := ProviderPublishForCandidate(root, CandidateProviderPublishOptions{CandidateID: candidate.ID})
+	if err != nil || !found {
+		t.Fatalf("expected approval-required provider publish, found=%v err=%v", found, err)
+	}
+	if blocked.Decision != "RELEASE_PROVIDER_PUBLISH_APPROVAL_REQUIRED" || blocked.ApprovalID == "" || blocked.CandidateID != candidate.ID || blocked.ReleaseID != candidate.ID {
+		t.Fatalf("expected candidate approval requirement, got %+v", blocked)
+	}
+	_, found, err = approvals.Decide(root, blocked.ApprovalID, approvals.DecisionOptions{Decision: "approved", DecidedBy: "release-manager", Reason: "candidate release gates passed"})
+	if err != nil || !found {
+		t.Fatalf("expected approval decision, found=%v err=%v", found, err)
+	}
+	previewOnly, found, err := ProviderPublishForCandidate(root, CandidateProviderPublishOptions{CandidateID: candidate.ID, Approved: true, ApprovalID: blocked.ApprovalID})
+	if err != nil || !found {
+		t.Fatalf("expected preview-only provider publish, found=%v err=%v", found, err)
+	}
+	if previewOnly.Decision != "RELEASE_PROVIDER_PUBLISH_PREVIEW_ONLY" || previewOnly.WriteEnabled || previewOnly.ApprovalConsumed || previewOnly.CandidateID != candidate.ID {
+		t.Fatalf("expected preview-only candidate publish with unconsumed approval, got %+v", previewOnly)
+	}
+	if _, found, err := approvals.VerifyApproved(root, blocked.ApprovalID, approvals.RequestOptions{TargetType: "release_provider_publish", TargetID: candidate.ID, Action: "release.provider.publish"}); err != nil || !found {
+		t.Fatalf("expected preview-only publish to keep candidate approval reusable, found=%v err=%v", found, err)
+	}
+	evidenceRecords, err := evidence.List(root, evidence.ListOptions{ParentType: "release_provider_execution", ParentID: previewOnly.ID, Limit: 10})
+	if err != nil || len(evidenceRecords) != 1 || evidenceRecords[0].SubjectType != "release_candidate" || evidenceRecords[0].SubjectID != candidate.ID {
+		t.Fatalf("expected candidate provider execution evidence, records=%+v err=%v", evidenceRecords, err)
+	}
+}
+
 func TestPlanBatchSuggestsReleaseWhenIntegrationApplyThresholdMet(t *testing.T) {
 	root := t.TempDir()
 	if _, err := workspace.Ensure(root); err != nil {

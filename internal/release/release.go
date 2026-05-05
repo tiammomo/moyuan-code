@@ -62,14 +62,16 @@ type IssueSummary struct {
 }
 
 type ProviderOptions struct {
-	ReleaseID  string `json:"release_id"`
-	Approved   bool   `json:"approved,omitempty"`
-	ApprovalID string `json:"approval_id,omitempty"`
+	ReleaseID   string `json:"release_id"`
+	CandidateID string `json:"candidate_id,omitempty"`
+	Approved    bool   `json:"approved,omitempty"`
+	ApprovalID  string `json:"approval_id,omitempty"`
 }
 
 type ProviderExecution struct {
 	ID               string                 `json:"id"`
 	ReleaseID        string                 `json:"release_id"`
+	CandidateID      string                 `json:"candidate_id,omitempty"`
 	Version          string                 `json:"version,omitempty"`
 	Provider         string                 `json:"provider,omitempty"`
 	Mode             string                 `json:"mode"`
@@ -263,18 +265,32 @@ func ProviderPreview(rootDir string, releaseID string) (ProviderExecution, bool,
 
 func ProviderPublish(rootDir string, options ProviderOptions) (ProviderExecution, bool, error) {
 	options.ReleaseID = strings.TrimSpace(options.ReleaseID)
+	options.CandidateID = strings.TrimSpace(options.CandidateID)
 	options.ApprovalID = strings.TrimSpace(options.ApprovalID)
 	plan, found, err := Load(rootDir, options.ReleaseID)
 	if err != nil || !found {
 		return ProviderExecution{}, found, err
 	}
+	return providerPublishPlan(rootDir, plan, options)
+}
+
+func providerPublishPlan(rootDir string, plan Plan, options ProviderOptions) (ProviderExecution, bool, error) {
 	execution := newProviderExecution(plan, "publish")
+	execution.CandidateID = strings.TrimSpace(options.CandidateID)
 	if !releaseReady(plan) {
 		execution.Reasons = append(execution.Reasons, "release_not_suggested:"+plan.Decision)
 		return finishProviderExecution(rootDir, execution)
 	}
 	execution.RemotePlan = buildProviderRemotePlan(rootDir, plan)
 	if !options.Approved {
+		metadata := map[string]any{
+			"release_id": plan.ID,
+			"version":    plan.Version,
+			"provider":   plan.Provider,
+		}
+		if execution.CandidateID != "" {
+			metadata["candidate_id"] = execution.CandidateID
+		}
 		approval, err := approvals.Request(rootDir, approvals.RequestOptions{
 			TargetType:  "release_provider_publish",
 			TargetID:    plan.ID,
@@ -282,11 +298,7 @@ func ProviderPublish(rootDir string, options ProviderOptions) (ProviderExecution
 			RiskLevel:   "high",
 			RequestedBy: "system",
 			Reason:      "release provider publish writes branch, tag, release, or workflow state to remote Git provider",
-			Metadata: map[string]any{
-				"release_id": plan.ID,
-				"version":    plan.Version,
-				"provider":   plan.Provider,
-			},
+			Metadata:    metadata,
 		})
 		if err != nil {
 			return ProviderExecution{}, true, err
@@ -440,16 +452,23 @@ func finishProviderExecution(rootDir string, execution ProviderExecution) (Provi
 	_ = logging.Log(rootDir, "release", "release.provider.execution.created", map[string]any{
 		"execution_id": execution.ID,
 		"release_id":   execution.ReleaseID,
+		"candidate_id": execution.CandidateID,
 		"mode":         execution.Mode,
 		"decision":     execution.Decision,
 		"status":       execution.Status,
 		"provider":     execution.Provider,
 	})
+	subjectType := "release"
+	subjectID := execution.ReleaseID
+	if execution.CandidateID != "" {
+		subjectType = "release_candidate"
+		subjectID = execution.CandidateID
+	}
 	if _, err := evidence.Add(rootDir, evidence.AddOptions{
 		ParentType:  "release_provider_execution",
 		ParentID:    execution.ID,
-		SubjectType: "release",
-		SubjectID:   execution.ReleaseID,
+		SubjectType: subjectType,
+		SubjectID:   subjectID,
 		Operation:   "release.provider." + execution.Mode,
 		Status:      execution.Status,
 		Decision:    execution.Decision,
