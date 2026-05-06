@@ -143,28 +143,17 @@ apps/console/
 
 ## 5. 页面模型
 
-第一批页面按工作流而不是模块菜单组织：
+第一批页面按工作流而不是模块菜单组织。左侧只保留 7 个主入口，原细页面放到页内 tabs：
 
-| 页面 | 目标 |
-| --- | --- |
-| Projects | 查看已接入项目、理解状态、Git 状态、最近风险 |
-| Project Overview | 项目画像、模块地图、命令、Memory 摘要、下一步建议 |
-| Requirement Planning | 输入需求、查看澄清判断、完善后的需求和 Issue Graph |
-| Issue Graph | 图形化展示依赖、并发度、waiting reason 和执行计划 |
-| Batch Execution | 查看 batch plan、batch run、issue worktree、merge queue，并触发受控 dry-run / merge queue build |
-| Runs | 查看 Runtime 调用、Subagent 输出、diff、stdout/stderr 和风险 |
-| Quality Review | 查看 quality report、review finding、测试缺口和返工建议 |
-| Memory | 查看 record、candidate、compact、命中证据和维护事件 |
-| Providers & Runtimes | 查看 Claude CLI、Codex CLI、MiniMax、GPT、GLM、gpt-image-2 状态，并通过后端 route API 预览 provider candidates |
-| Runtime Recoveries | 查看原生 runtime 失败归档、fallback candidate、resume hint、stdout/stderr 和 diff 摘要预览；复核 operation repair candidates |
-| Subagent Backlog | 查看 retry/archive 后进入调度等待的 subagent、失败原因和重试预算 |
-| Control Loop Runs | 查看控制循环历史、step evidence，并触发一次 bounded control loop |
-| Visual Assets | 查看架构图 plan、diagram spec、prompt、route decision、render execution、script path 和图片生成状态；支持受控 dry-run render |
-| Git & Release | 查看分支、PR/MR plan、release suggestion 和 tag/push 计划；通过受控按钮触发 PR/MR preview、sync 和携带 Approval ID 的 create |
-| Server Resources | 查看 test_dev、production 机器、到期、健康和维护窗口；通过受控表单记录续期和退役 |
-| Deployments | 查看部署计划、审批、post-deployment history、post-deployment verification、线上冒烟、监控和 rollback |
-| Logs & Audit | 查看核心日志、审计事件和 trace |
-| Settings | 项目配置索引、权限、策略和 schema 校验结果 |
+| 左侧入口 | 页内 tabs | 目标 |
+| --- | --- | --- |
+| 项目工作台 | 项目接入 | 查看已接入项目、切换当前项目、当前项目画像、Git 状态、需求录入、澄清补充和下一步建议 |
+| 需求与 Issue | Issue Graph、批量执行 | 展示依赖、并发度、waiting reason、batch plan、worktree、merge queue 和 release batch readiness |
+| 执行与恢复 | 运行时间线、操作证据 | 查看 Runtime 调用、Subagent 输出、runtime recovery、operation detail、evidence chain 和 repair candidate |
+| 质量与验证 | 代码质量、测试验证 | 查看 quality report、review finding、测试缺口、dry-run、资源健康、post-deployment verification、monitor summary、rehearsal 和 release admission |
+| 发布与部署 | 发布部署、执行安全 | 查看 Release、PR/MR、Deployment、Server Resource、write proof/admission、remote rehearsal、write adapter execution/recovery 和 control queue |
+| AI 能力 | Provider、技能、Memory | 查看 Provider/runtime 状态、route preview、Visual assets、Skill registry/binding/effectiveness、Memory record/candidate/search |
+| 权限与审计 | 权限审计 | 查看审批队列、决策账本、身份对象、审计事件、trace 和 schema 校验结果 |
 
 ## 6. 渲染模式
 
@@ -199,8 +188,15 @@ apps/console/
 - Live Workbench：运行中 issue 的状态、日志和下一步持续刷新。
 - Phase 2 Observability：把 runtime recoveries、subagent backlog、visual assets 和 visual render executions 放在同一屏，便于判断“失败如何恢复、任务为什么等待、架构图是否已规划、图片生成是否已进入受控执行”。
 - Runtime Evidence Preview：runtime recovery 可展开 stdout、stderr 和 diff summary 的受控预览；后端只读取 recovery 记录指向且位于 `.moyuan/` 下的归档文件。
-- Operation Repair Candidate Surface：Runtime Recoveries 面板展示从失败 operation 生成的 repair candidate、failure class、repair plan、evidence 数量和 review 结果；approve/reject 必须调用后端 review API，approve 默认只创建 `review_ready` repair attempt，不自动运行修复。
-- Controlled Actions：低风险动作可从 Console 触发后端 dry-run、preview 或 bounded run，例如 visual render dry-run、release provider preview、provider route preview、control loop run；审批决定、API token、service account、PR/MR create、release provider publish、资源续期/退役、repair candidate review 等写操作必须调用后端受控 API，高风险动作仍进入 approval/authz。
+- Operation Repair Candidate Surface：Runtime Recoveries 面板展示 repair candidate、failure class、repair plan、evidence 数量和 review 结果；Operation Detail 可从选中的后端 operation 生成 repair candidate；approve/reject 必须调用后端 review API，approve 默认只创建 `review_ready` repair attempt，不自动运行修复。
+- Controlled Actions：低风险动作可从 Console 触发后端 dry-run、preview 或 bounded run，例如 visual diagram plan、visual render dry-run、release provider preview、provider route preview、issue merge decision、git provider plan、memory search、control loop run；审批决定、approval create、API token、session revoke、service account、PR/MR create、release provider publish、deployment plan/execute、batch plan、资源新增/续期/退役/禁用、Provider 管理、Skill 管理、repair candidate review 等写操作必须调用后端受控 API，高风险动作仍进入 approval/authz。
+- Modal-first Input：录入、补充参数、审批理由、执行模式、目标资源、Secret Ref、Approval ID 和 reviewer/reason 默认进入弹窗；页面常驻区域只保留状态、证据摘要和动作入口。已落地项目接入、需求澄清补充、服务器资源、deployment plan/execute、batch plan、风险复核、审批创建/决策、会话和 Token 撤销、Provider 管理、Provider Ops snapshot、Skill 管理、Memory 搜索、Quality report 详情、control queue 和写入 adapter create 链路。必填项必须显示 `*`，并在前端预检和后端 schema 错误之间保持一致。
+- Project Context First：当前项目是 Console 的全局上下文，URL 使用 `?project=<project_id>` 表示；顶部常驻项目切换器，切换后服务端重新拉取该项目下的 Issue、运行、质量、发布、部署、AI 能力和审计数据，所有写操作都使用当前 `project_id`。
+- Project Onboarding Fields：项目接入顶部不是说明卡片，只保留接入动作；下方项目列表展示绑定事实：`项目名称`、`Git 地址`、`本机路径`。当前项目默认置顶，Git 地址以后端 `remote_url` 或 source remote 字段为准，Git 远程缺失时显示“未绑定 Git 远程”。
+- Workflow Navigation：左侧导航只保留 `项目工作台`、`需求与 Issue`、`执行与恢复`、`质量与验证`、`发布与部署`、`AI 能力`、`权限与审计` 7 个主入口；细能力在页面内 tabs 切换，避免把后端模块目录暴露给中文业务用户。
+- Testing & Validation Surface：测试验证作为 `质量与验证` 内 tab，集中展示 quality signal、dry-run、resource health scan、monitor summary、post-deployment verification、deployment rehearsal、rehearsal scheduler 和 release admission。它只回答“是否可继续”，不承载 adapter 低层 guard。
+- Write Adapter Surface：执行适配器作为 `发布与部署` 内 `执行安全` tab，集中展示 write proof/admission、provider proof requirement、remote execution rehearsal、write review packet、write execution plan、write adapter execution/recovery 和 control queue。它只展示后端执行事实和受控入口，不替代业务发布流水线。
+- Skill Surface：Skill 作为 `AI 能力` 内 tab，展示 registry、binding、effectiveness 和最新 recommendation；新增、推荐、绑定、效果记录和禁用全部走弹窗。
 - Operation Detail：从 Operation History 选中 release provider 或 deployment execution 后，Console 优先读取 operation detail 聚合 API，展开 Evidence Chain，显示 evidence decision、reasons 和 artifact path；API 不可用时回退到 snapshot，刷新按钮触发 `router.refresh()` 重新拉取当前状态。
 - Schema-aware Forms：表单从 contract/schema 生成约束，错误能定位到字段；当前已先落地必填字段预检，后续再接入完整 schema metadata。
 - Provider Telemetry Surface：Provider 面板展示 health/quota/cost/quality 摘要和近期 telemetry 记录；Provider route preview 展示 selected/skipped/blocked candidates、score、runtime/model 和 provider 侧原因。
@@ -290,7 +286,9 @@ apps/console/
 - Next.js 16、TypeScript、基础 App Shell。已完成首版。
 - 固定端口 `3000`。已完成。
 - 配置 `/api/* -> 127.0.0.1:8080/v1/*` rewrite。已完成。
-- 建立 API adapter、错误模型和 demo fallback。已完成首版。
+- 建立 API adapter、错误模型和 demo fallback。已完成首版；demo fallback 仅用于后端不可用或没有项目列表的演示模式，live 项目上下文不得用 demo 数据补空。
+- 项目上下文隔离：`?project=<project_id>` 是 Issue、运行、质量、发布、AI 能力和审计数据的全局上下文；前端需要兼容 Issue Graph 的 `nodes` 字段，并在当前项目没有真实图谱时展示空状态。
+- 需求闭环：`需求与 Issue / 需求登记` 承接需求录入和拆 issue，`需求记录` 只展示通过 Moyuan requirement planner 生成的需求；commit/diff 信息只来自 Moyuan issue run 返回的受控运行结果，不扫描外部 git 历史。
 
 第二阶段：可视化核心
 
@@ -303,11 +301,10 @@ apps/console/
 
 第三阶段：生产闭环
 
-- Providers & Runtimes。
-- Memory。
-- Git & Release。
-- Server Resources。
-- Deployments。
+- AI 能力：Providers & Runtimes、Skills、Memory、Visual Assets。
+- 发布与部署：Git & Release、Server Resources、Deployments、执行安全。
+- 质量与验证：Testing & Validation、release admission、post-deployment verification。
+- Write Adapters。
 - Logs & Audit。
 
 第四阶段：体验增强
@@ -316,5 +313,6 @@ apps/console/
 - Live status。
 - Diff-first Review。
 - Approval Drawer。
+- Modal coverage for all create/approve/execute/repair actions。
 - AI Assist Surface。
 - Playwright 主流程覆盖。
