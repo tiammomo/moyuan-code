@@ -29,8 +29,17 @@ func Slugify(value string) string {
 	if slug == "" {
 		return "project"
 	}
-	if len(slug) > 80 {
-		return strings.Trim(slug[:80], "-")
+	return TrimSlug(slug, 80)
+}
+
+func TrimSlug(value string, maxRunes int) string {
+	value = strings.Trim(value, "-")
+	if maxRunes <= 0 {
+		return value
 	}
-	return slug
+	runes := []rune(value)
+	if len(runes) <= maxRunes {
+		return value
+	}
+	return strings.Trim(string(runes[:maxRunes]), "-")
 }

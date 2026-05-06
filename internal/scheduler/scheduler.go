@@ -242,6 +242,9 @@ func decisionFor(node issues.Node) DispatchDecision {
 }
 
 func roleFor(node issues.Node) string {
+	if strings.TrimSpace(node.Role) != "" {
+		return strings.TrimSpace(node.Role)
+	}
 	text := strings.ToLower(node.Title)
 	switch {
 	case strings.Contains(text, "frontend") || strings.Contains(text, "ui"):

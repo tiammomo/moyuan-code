@@ -49,7 +49,7 @@ func Full(ctx context.Context, rootDir string, since *string) (Profile, error) {
 	if err != nil {
 		return Profile{}, err
 	}
-	stack := detectStack(rootDir)
+	stack := DetectStack(rootDir)
 	entries := topEntries(rootDir)
 	riskFiles := riskFiles(rootDir)
 	mode := "full"
@@ -116,7 +116,7 @@ func Incremental(ctx context.Context, rootDir string, since string) (Profile, er
 	return Full(ctx, rootDir, &since)
 }
 
-func detectStack(rootDir string) Stack {
+func DetectStack(rootDir string) Stack {
 	stack := Stack{
 		Languages:       []string{},
 		Frameworks:      []string{},
@@ -125,41 +125,140 @@ func detectStack(rootDir string) Stack {
 		TestCommands:    []string{},
 		LintCommands:    []string{},
 	}
-	if fsutil.Exists(filepath.Join(rootDir, "package.json")) {
-		stack.Languages = append(stack.Languages, "TypeScript/JavaScript")
-		stack.PackageManagers = append(stack.PackageManagers, "npm")
-		data, err := os.ReadFile(filepath.Join(rootDir, "package.json"))
+	for _, packageFile := range findStackFiles(rootDir, "package.json") {
+		appendUnique(&stack.Languages, "TypeScript/JavaScript")
+		appendUnique(&stack.PackageManagers, "npm")
+		data, err := os.ReadFile(packageFile)
 		if err == nil {
 			var pkg struct {
-				Scripts map[string]string `json:"scripts"`
+				Scripts         map[string]string `json:"scripts"`
+				Dependencies    map[string]string `json:"dependencies"`
+				DevDependencies map[string]string `json:"devDependencies"`
 			}
 			if json.Unmarshal(data, &pkg) == nil {
 				if pkg.Scripts["build"] != "" {
-					stack.BuildCommands = append(stack.BuildCommands, "npm run build")
+					appendUnique(&stack.BuildCommands, commandInDir(rootDir, packageFile, "npm run build"))
 				}
 				if pkg.Scripts["test"] != "" {
-					stack.TestCommands = append(stack.TestCommands, "npm test")
+					appendUnique(&stack.TestCommands, commandInDir(rootDir, packageFile, "npm test"))
 				}
 				if pkg.Scripts["lint"] != "" {
-					stack.LintCommands = append(stack.LintCommands, "npm run lint")
+					appendUnique(&stack.LintCommands, commandInDir(rootDir, packageFile, "npm run lint"))
 				}
+				detectFrameworks(&stack, pkg.Dependencies, pkg.DevDependencies)
 			}
 		}
 	}
-	if fsutil.Exists(filepath.Join(rootDir, "pyproject.toml")) {
-		stack.Languages = append(stack.Languages, "Python")
-		stack.PackageManagers = append(stack.PackageManagers, "pip/uv")
+	if len(findStackFiles(rootDir, "pyproject.toml")) > 0 || len(findStackFiles(rootDir, "requirements.txt")) > 0 {
+		appendUnique(&stack.Languages, "Python")
+		appendUnique(&stack.PackageManagers, "pip/uv")
+		for _, pyproject := range findStackFiles(rootDir, "pyproject.toml") {
+			appendUnique(&stack.TestCommands, commandInDir(rootDir, pyproject, "python -m pytest"))
+		}
 	}
-	if fsutil.Exists(filepath.Join(rootDir, "go.mod")) {
-		stack.Languages = append(stack.Languages, "Go")
-		stack.PackageManagers = append(stack.PackageManagers, "go")
-		stack.BuildCommands = append(stack.BuildCommands, "go build ./...")
-		stack.TestCommands = append(stack.TestCommands, "go test ./...")
+	for _, goMod := range findStackFiles(rootDir, "go.mod") {
+		appendUnique(&stack.Languages, "Go")
+		appendUnique(&stack.PackageManagers, "go")
+		appendUnique(&stack.BuildCommands, commandInDir(rootDir, goMod, "go build ./..."))
+		appendUnique(&stack.TestCommands, commandInDir(rootDir, goMod, "go test ./..."))
 	}
 	if len(stack.Languages) == 0 {
 		stack.Languages = append(stack.Languages, "unknown")
 	}
 	return stack
+}
+
+func findStackFiles(rootDir string, filename string) []string {
+	matches := []string{}
+	rootDir = filepath.Clean(rootDir)
+	_ = filepath.WalkDir(rootDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if path == rootDir {
+				return nil
+			}
+			if skipStackDir(entry.Name()) {
+				return filepath.SkipDir
+			}
+			rel, relErr := filepath.Rel(rootDir, path)
+			if relErr == nil && pathDepth(rel) >= 3 {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.Name() == filename {
+			matches = append(matches, path)
+		}
+		return nil
+	})
+	sort.Strings(matches)
+	return matches
+}
+
+func skipStackDir(name string) bool {
+	if strings.HasPrefix(name, ".") {
+		return true
+	}
+	switch name {
+	case "node_modules", "dist", "build", "__pycache__", "venv", "skills":
+		return true
+	default:
+		return false
+	}
+}
+
+func pathDepth(rel string) int {
+	if rel == "." || rel == "" {
+		return 0
+	}
+	return len(strings.Split(filepath.ToSlash(rel), "/"))
+}
+
+func commandInDir(rootDir string, file string, command string) string {
+	dir := filepath.Dir(file)
+	rel, err := filepath.Rel(rootDir, dir)
+	if err != nil || rel == "." {
+		return command
+	}
+	return "cd " + filepath.ToSlash(rel) + " && " + command
+}
+
+func detectFrameworks(stack *Stack, dependencies map[string]string, devDependencies map[string]string) {
+	hasDep := func(name string) bool {
+		_, ok := dependencies[name]
+		if ok {
+			return true
+		}
+		_, ok = devDependencies[name]
+		return ok
+	}
+	if hasDep("next") {
+		appendUnique(&stack.Frameworks, "Next.js")
+	}
+	if hasDep("react") {
+		appendUnique(&stack.Frameworks, "React")
+	}
+	if hasDep("vite") {
+		appendUnique(&stack.Frameworks, "Vite")
+	}
+	if hasDep("vue") {
+		appendUnique(&stack.Frameworks, "Vue")
+	}
+}
+
+func appendUnique(items *[]string, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	for _, item := range *items {
+		if item == value {
+			return
+		}
+	}
+	*items = append(*items, value)
 }
 
 func topEntries(rootDir string) []Entry {
@@ -213,10 +312,35 @@ func writeArtifacts(paths workspace.Paths, profile Profile) error {
 		return err
 	}
 	moduleLines := []string{"# Module Map", "", "## Top-Level Entries"}
+	entryNames := map[string]bool{}
 	for _, entry := range profile.TopLevelEntries {
+		entryNames[entry.Name] = true
 		moduleLines = append(moduleLines, "- "+entry.Type+": `"+entry.Name+"`")
 	}
-	moduleLines = append(moduleLines, "", "## Heuristic Responsibilities", "- `docs/` indicates design and documentation surfaces.", "- `scripts/` indicates automation and helper entry points.", "- `cmd/` and `internal/` indicate Go control plane code.")
+	moduleLines = append(moduleLines, "", "## Heuristic Responsibilities")
+	responsibilities := []string{}
+	if entryNames["frontend"] {
+		responsibilities = append(responsibilities, "- `frontend/` indicates the user-facing web application surface.")
+	}
+	if entryNames["backend"] {
+		responsibilities = append(responsibilities, "- `backend/` indicates server/API or data service code.")
+	}
+	if entryNames["skills"] {
+		responsibilities = append(responsibilities, "- `skills/` indicates project-specific AI/tool skills.")
+	}
+	if entryNames["docs"] {
+		responsibilities = append(responsibilities, "- `docs/` indicates design and documentation surfaces.")
+	}
+	if entryNames["scripts"] {
+		responsibilities = append(responsibilities, "- `scripts/` indicates automation and helper entry points.")
+	}
+	if entryNames["cmd"] || entryNames["internal"] {
+		responsibilities = append(responsibilities, "- `cmd/` and `internal/` indicate Go control plane code.")
+	}
+	if len(responsibilities) == 0 {
+		responsibilities = append(responsibilities, "- No common module responsibilities detected yet.")
+	}
+	moduleLines = append(moduleLines, responsibilities...)
 	if err := fsutil.WriteText(filepath.Join(paths.ComprehensionDir, "module-map.md"), strings.Join(moduleLines, "\n")+"\n"); err != nil {
 		return err
 	}

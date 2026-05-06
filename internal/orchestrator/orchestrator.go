@@ -45,6 +45,12 @@ func Plan(rootDir string, epicID string) (scheduler.Plan, error) {
 	return scheduler.Build(rootDir, epicID, 1)
 }
 
+func LoadResult(rootDir string, runID string) (Result, bool, error) {
+	var result Result
+	found, err := fsutil.ReadJSON(filepath.Join(workspace.ForRoot(rootDir).OrchestratorDir, runID+"-result.json"), &result)
+	return result, found, err
+}
+
 func RunIssue(ctx context.Context, rootDir string, issueID string, runtimeID string, prompt string) (Result, error) {
 	return RunIssueWithOptions(ctx, rootDir, issueID, RunOptions{RuntimeID: runtimeID, Role: "backend", Prompt: prompt})
 }

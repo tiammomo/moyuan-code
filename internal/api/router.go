@@ -1,7 +1,10 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -10,10 +13,12 @@ import (
 	"moyuan-code/internal/approvals"
 	"moyuan-code/internal/auth"
 	"moyuan-code/internal/batch"
+	"moyuan-code/internal/comprehension"
 	"moyuan-code/internal/controlloop"
 	"moyuan-code/internal/controlplane"
 	"moyuan-code/internal/deployment"
 	"moyuan-code/internal/evidence"
+	"moyuan-code/internal/git"
 	"moyuan-code/internal/gitprovider"
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/logging"
@@ -32,7 +37,9 @@ import (
 	"moyuan-code/internal/skills"
 	"moyuan-code/internal/store"
 	"moyuan-code/internal/subagent"
+	"moyuan-code/internal/textutil"
 	"moyuan-code/internal/visuals"
+	"moyuan-code/internal/workspace"
 	issueworktree "moyuan-code/internal/worktree"
 )
 
@@ -43,8 +50,51 @@ type Options struct {
 	Store   *store.Store
 }
 
+type projectCreateRequest struct {
+	Mode      string `json:"mode"`
+	LocalPath string `json:"local_path"`
+	RemoteURL string `json:"remote_url"`
+	DestPath  string `json:"dest_path"`
+	Provider  string `json:"provider"`
+}
+
+type projectListItem struct {
+	ID              string         `json:"id"`
+	Name            string         `json:"name"`
+	Root            string         `json:"root"`
+	Source          map[string]any `json:"source,omitempty"`
+	SourceType      string         `json:"source_type,omitempty"`
+	Provider        string         `json:"provider,omitempty"`
+	RemoteURL       string         `json:"remote_url,omitempty"`
+	Languages       []string       `json:"languages,omitempty"`
+	Frameworks      []string       `json:"frameworks,omitempty"`
+	PackageManagers []string       `json:"package_managers,omitempty"`
+	OwnerID         string         `json:"owner_id,omitempty"`
+	Status          string         `json:"status"`
+	RegisteredAt    string         `json:"registered_at,omitempty"`
+}
+
 type requirementPlanRequest struct {
 	Text string `json:"text"`
+}
+
+type runListItem struct {
+	RunID           string   `json:"run_id"`
+	IssueID         string   `json:"issue_id"`
+	Status          string   `json:"status"`
+	SubagentID      string   `json:"subagent_id,omitempty"`
+	RuntimeID       string   `json:"runtime_id,omitempty"`
+	RuntimeStatus   string   `json:"runtime_status,omitempty"`
+	RecoveryID      string   `json:"recovery_id,omitempty"`
+	QualityStatus   string   `json:"quality_status,omitempty"`
+	QualityReportID string   `json:"quality_report_id,omitempty"`
+	UpdatedAt       string   `json:"updated_at"`
+	CommitBefore    string   `json:"commit_before,omitempty"`
+	CommitAfter     string   `json:"commit_after,omitempty"`
+	CommitChanged   bool     `json:"commit_changed,omitempty"`
+	DiffSummaryPath string   `json:"diff_summary_path,omitempty"`
+	ChangedFiles    []string `json:"changed_files,omitempty"`
+	ManagedBy       string   `json:"managed_by,omitempty"`
 }
 
 type routeRequest struct {
@@ -305,12 +355,25 @@ func NewRouter(options Options) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"version": Version})
 	})
 	router.GET("/v1/projects", func(c *gin.Context) {
-		projects, err := projects(options)
+		projects, err := projects(c.Request.Context(), options)
 		if err != nil {
 			writeError(c, http.StatusInternalServerError, err.Error())
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"projects": projects})
+	})
+	router.POST("/v1/projects", func(c *gin.Context) {
+		var req projectCreateRequest
+		if err := c.BindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		project, err := registerProject(c.Request.Context(), options, req)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"project": project})
 	})
 	router.GET("/v1/projects/:project_id", func(c *gin.Context) {
 		project, _, ok, err := findProject(options, c.Param("project_id"))
@@ -1212,7 +1275,7 @@ func NewRouter(options Options) *gin.Engine {
 			writeError(c, http.StatusInternalServerError, err.Error())
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"runs": states})
+		c.JSON(http.StatusOK, gin.H{"runs": enrichRunStates(rootDir, states)})
 	})
 	router.GET("/v1/projects/:project_id/runs/:run_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
@@ -1233,7 +1296,7 @@ func NewRouter(options Options) *gin.Engine {
 			writeError(c, http.StatusNotFound, "run state not found")
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"run": state})
+		c.JSON(http.StatusOK, gin.H{"run": enrichRunState(rootDir, state)})
 	})
 	router.GET("/v1/projects/:project_id/audit-events", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
@@ -4141,6 +4204,23 @@ func NewRouter(options Options) *gin.Engine {
 		}
 		c.JSON(http.StatusOK, gin.H{"records": records})
 	})
+	router.GET("/v1/projects/:project_id/requirements", func(c *gin.Context) {
+		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok {
+			writeError(c, http.StatusNotFound, "project not found")
+			return
+		}
+		plans, err := requirement.List(rootDir, queryLimit(c, 20))
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"requirements": plans})
+	})
 	router.GET("/v1/projects/:project_id/requirements/:requirement_id", func(c *gin.Context) {
 		_, rootDir, ok, err := findProject(options, c.Param("project_id"))
 		if err != nil {
@@ -4438,11 +4518,231 @@ func NewRouter(options Options) *gin.Engine {
 	return router
 }
 
-func projects(options Options) (any, error) {
+func projects(ctx context.Context, options Options) ([]projectListItem, error) {
 	if options.Store != nil {
-		return options.Store.ListProjects()
+		records, err := options.Store.ListProjects()
+		if err != nil {
+			return nil, err
+		}
+		items := make([]projectListItem, 0, len(records))
+		for _, project := range records {
+			stack := projectStack(project.Root)
+			items = append(items, projectListItem{
+				ID:              project.ID,
+				Name:            project.Name,
+				Root:            project.Root,
+				SourceType:      project.SourceType,
+				Provider:        project.Provider,
+				RemoteURL:       projectRemoteURL(ctx, project.Root),
+				Languages:       stack.Languages,
+				Frameworks:      stack.Frameworks,
+				PackageManagers: stack.PackageManagers,
+				OwnerID:         project.OwnerID,
+				Status:          project.Status,
+				RegisteredAt:    project.RegisteredAt,
+			})
+		}
+		return items, nil
 	}
-	return controlplane.List(options.RootDir)
+	records, err := controlplane.List(options.RootDir)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]projectListItem, 0, len(records))
+	for _, project := range records {
+		stack := projectStack(project.Root)
+		items = append(items, projectListItem{
+			ID:              project.ID,
+			Name:            project.Name,
+			Root:            project.Root,
+			Source:          project.Source,
+			SourceType:      sourceValue(project.Source, "type"),
+			Provider:        sourceValue(project.Source, "provider"),
+			RemoteURL:       firstNonEmptyString(sourceValue(project.Source, "url"), projectRemoteURL(ctx, project.Root)),
+			Languages:       stack.Languages,
+			Frameworks:      stack.Frameworks,
+			PackageManagers: stack.PackageManagers,
+			OwnerID:         project.OwnerID,
+			Status:          project.Status,
+			RegisteredAt:    project.RegisteredAt,
+		})
+	}
+	return items, nil
+}
+
+func enrichRunStates(rootDir string, states []orchestrator.RunState) []runListItem {
+	items := make([]runListItem, 0, len(states))
+	for _, state := range states {
+		items = append(items, enrichRunState(rootDir, state))
+	}
+	return items
+}
+
+func enrichRunState(rootDir string, state orchestrator.RunState) runListItem {
+	item := runListItem{
+		RunID:           state.RunID,
+		IssueID:         state.IssueID,
+		Status:          state.Status,
+		SubagentID:      state.SubagentID,
+		RuntimeID:       state.RuntimeID,
+		RuntimeStatus:   state.RuntimeStatus,
+		RecoveryID:      state.RecoveryID,
+		QualityStatus:   state.QualityStatus,
+		QualityReportID: state.QualityReportID,
+		UpdatedAt:       state.UpdatedAt,
+		ChangedFiles:    []string{},
+		ManagedBy:       "moyuan_issue_run",
+	}
+	result, found, err := orchestrator.LoadResult(rootDir, state.RunID)
+	if err != nil || !found {
+		return item
+	}
+	if result.RuntimeResult.GitBefore.Head != nil {
+		item.CommitBefore = *result.RuntimeResult.GitBefore.Head
+	}
+	if result.RuntimeResult.GitAfter.Head != nil {
+		item.CommitAfter = *result.RuntimeResult.GitAfter.Head
+	}
+	item.CommitChanged = item.CommitBefore != "" && item.CommitAfter != "" && item.CommitBefore != item.CommitAfter
+	item.DiffSummaryPath = result.RuntimeResult.DiffSummaryPath
+	item.ChangedFiles = append([]string{}, result.RuntimeResult.ChangedFiles...)
+	return item
+}
+
+func projectStack(rootDir string) comprehension.Stack {
+	return comprehension.DetectStack(rootDir)
+}
+
+func projectRemoteURL(ctx context.Context, rootDir string) string {
+	status := git.StatusOf(ctx, rootDir)
+	if status.Remote == nil {
+		return ""
+	}
+	return strings.TrimSpace(*status.Remote)
+}
+
+func sourceValue(source map[string]any, key string) string {
+	if source == nil {
+		return ""
+	}
+	value, _ := source[key].(string)
+	return strings.TrimSpace(value)
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func registerProject(ctx context.Context, options Options, req projectCreateRequest) (controlplane.Project, error) {
+	mode := strings.TrimSpace(req.Mode)
+	localPath := strings.TrimSpace(req.LocalPath)
+	remoteURL := strings.TrimSpace(req.RemoteURL)
+	if mode == "" {
+		if localPath != "" {
+			mode = "local"
+		} else if remoteURL != "" {
+			mode = "remote"
+		}
+	}
+
+	var rootDir string
+	var source map[string]any
+	switch mode {
+	case "local":
+		if localPath == "" {
+			return controlplane.Project{}, errors.New("local_path_required")
+		}
+		abs, err := filepath.Abs(localPath)
+		if err != nil {
+			return controlplane.Project{}, err
+		}
+		rootDir = abs
+		if _, err := workspace.Ensure(rootDir); err != nil {
+			return controlplane.Project{}, err
+		}
+		if err := git.BindLocal(rootDir); err != nil {
+			return controlplane.Project{}, err
+		}
+		source = map[string]any{"type": "local_path", "provider": "local", "path": rootDir}
+	case "remote":
+		if remoteURL == "" {
+			return controlplane.Project{}, errors.New("remote_url_required")
+		}
+		destDir := strings.TrimSpace(req.DestPath)
+		if destDir == "" {
+			destDir = git.DefaultRemoteProjectDir(options.RootDir, remoteURL)
+		}
+		abs, err := filepath.Abs(destDir)
+		if err != nil {
+			return controlplane.Project{}, err
+		}
+		rootDir = abs
+		if err := git.Clone(ctx, remoteURL, rootDir); err != nil {
+			return controlplane.Project{}, err
+		}
+		if _, err := workspace.Ensure(rootDir); err != nil {
+			return controlplane.Project{}, err
+		}
+		provider := strings.TrimSpace(req.Provider)
+		if provider == "" {
+			provider = inferGitProvider(remoteURL)
+		}
+		if err := git.BindRemote(rootDir, remoteURL, provider); err != nil {
+			return controlplane.Project{}, err
+		}
+		source = map[string]any{"type": "remote_git", "provider": provider, "url": remoteURL, "clone_path": rootDir}
+	default:
+		return controlplane.Project{}, errors.New("project_mode_must_be_local_or_remote")
+	}
+
+	owner, err := auth.InitOwner(rootDir, filepath.Base(rootDir))
+	if err != nil {
+		return controlplane.Project{}, err
+	}
+	if _, err := comprehension.Full(ctx, rootDir, nil); err != nil {
+		return controlplane.Project{}, err
+	}
+	if _, _, err := issues.GenerateProjectKickoff(rootDir); err != nil {
+		return controlplane.Project{}, err
+	}
+	_, _ = workspace.Ensure(options.RootDir)
+	project := controlplane.Project{
+		ID:      textutil.Slugify(filepath.Base(rootDir)),
+		Name:    filepath.Base(rootDir),
+		Root:    rootDir,
+		Source:  source,
+		OwnerID: owner.ActorID,
+		Status:  "active",
+	}
+	registeredProject, err := controlplane.Register(options.RootDir, project)
+	if err != nil {
+		return controlplane.Project{}, err
+	}
+	if options.Store != nil {
+		if err := options.Store.UpsertProject(registeredProject); err != nil {
+			return controlplane.Project{}, err
+		}
+	}
+	return registeredProject, nil
+}
+
+func inferGitProvider(remoteURL string) string {
+	normalized := strings.ToLower(remoteURL)
+	switch {
+	case strings.Contains(normalized, "github.com"):
+		return "github"
+	case strings.Contains(normalized, "gitee.com"):
+		return "gitee"
+	case strings.Contains(normalized, "gitlab.com"):
+		return "gitlab"
+	default:
+		return "generic_git"
+	}
 }
 
 func findProject(options Options, projectID string) (any, string, bool, error) {

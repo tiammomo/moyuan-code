@@ -1,7 +1,11 @@
 package requirement
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -47,7 +51,10 @@ type IssueSpec struct {
 func PlanFromText(rootDir string, text string) (Plan, error) {
 	now := time.Now().UTC()
 	raw := strings.TrimSpace(text)
-	id := "req-" + now.Format("20060102150405")
+	id, err := newPlanID(now)
+	if err != nil {
+		return Plan{}, err
+	}
 	epicID := id + "-" + shortSlug(raw)
 	decision := decide(raw)
 	criteria := acceptanceCriteria(raw)
@@ -81,14 +88,81 @@ func PlanFromText(rootDir string, text string) (Plan, error) {
 	return plan, nil
 }
 
+func newPlanID(now time.Time) (string, error) {
+	var suffix [4]byte
+	if _, err := rand.Read(suffix[:]); err != nil {
+		return "", err
+	}
+	return "req-" + now.Format("20060102150405") + "-" + hex.EncodeToString(suffix[:]), nil
+}
+
 func Load(rootDir string, id string) (Plan, bool, error) {
 	var plan Plan
 	found, err := fsutil.ReadJSON(planPath(rootDir, id), &plan)
+	if found {
+		plan = refreshIssueGraph(rootDir, plan)
+	}
 	return plan, found, err
+}
+
+func List(rootDir string, limit int) ([]Plan, error) {
+	dir := filepath.Join(workspace.ForRoot(rootDir).LifecycleDir, "requirements")
+	if err := fsutil.EnsureDir(dir); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	plans := []Plan{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		var plan Plan
+		found, err := fsutil.ReadJSON(filepath.Join(dir, entry.Name()), &plan)
+		if err != nil {
+			return nil, err
+		}
+		if found && plan.ID != "" {
+			plans = append(plans, refreshIssueGraph(rootDir, plan))
+		}
+	}
+	sort.SliceStable(plans, func(i, j int) bool {
+		return plans[i].CreatedAt > plans[j].CreatedAt
+	})
+	if limit > 0 && len(plans) > limit {
+		return plans[:limit], nil
+	}
+	return plans, nil
 }
 
 func planPath(rootDir string, id string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).LifecycleDir, "requirements", id+".json")
+}
+
+func refreshIssueGraph(rootDir string, plan Plan) Plan {
+	graph, ok, err := issues.LoadGraph(rootDir, plan.EpicID)
+	if err == nil && ok {
+		plan.IssueGraph = graph
+		plan.Schedule = issues.Summarize(graph)
+		plan.Issues = syncIssueSpecStatuses(plan.Issues, graph)
+	}
+	return plan
+}
+
+func syncIssueSpecStatuses(specs []IssueSpec, graph issues.Graph) []IssueSpec {
+	statusByID := map[string]string{}
+	for _, node := range graph.Nodes {
+		statusByID[node.ID] = node.Status
+	}
+	next := append([]IssueSpec{}, specs...)
+	for index := range next {
+		if status := statusByID[next[index].ID]; status != "" {
+			next[index].Status = status
+		}
+	}
+	return next
 }
 
 func decide(text string) Decision {
@@ -211,19 +285,11 @@ func graphFor(epicID string, text string, specs []IssueSpec, blocked bool) issue
 }
 
 func issuePrefix(epicID string) string {
-	slug := textutil.Slugify(epicID)
-	if len(slug) > 42 {
-		slug = strings.Trim(slug[:42], "-")
-	}
-	return slug
+	return textutil.TrimSlug(textutil.Slugify(epicID), 42)
 }
 
 func shortSlug(text string) string {
-	slug := textutil.Slugify(text)
-	if len(slug) > 32 {
-		return strings.Trim(slug[:32], "-")
-	}
-	return slug
+	return textutil.TrimSlug(textutil.Slugify(text), 32)
 }
 
 func shortTitle(text string) string {

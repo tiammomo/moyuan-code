@@ -1,7 +1,9 @@
 package requirement
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"moyuan-code/internal/issues"
 	"moyuan-code/internal/workspace"
@@ -44,6 +46,59 @@ func TestPlanFromTextCreatesIssueGraphAndSchedule(t *testing.T) {
 	}
 	if !ok || len(schedule.ReadyQueue) != 1 || len(schedule.BlockedQueue) != 2 {
 		t.Fatalf("unexpected schedule ok=%v schedule=%+v", ok, schedule)
+	}
+}
+
+func TestPlanFromTextCreatesUniqueIDsForRapidRequests(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := PlanFromText(root, "实现后端 API 支持恢复队列审批消费，并补充 go test 验证")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := PlanFromText(root, "实现后端 API 支持 release provider 发布，并补充 go test 验证")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID == second.ID {
+		t.Fatalf("expected unique plan IDs, got %s", first.ID)
+	}
+
+	plans, err := List(root, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plans) != 2 {
+		t.Fatalf("expected both plans to be listed, got %d", len(plans))
+	}
+}
+
+func TestPlanFromTextDoesNotCreateGarbledIssueIDs(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := PlanFromText(root, "Phase 29：实现 GitHub/Gitee release provider 真实发布 adapter，并补充 API 测试验证")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !utf8.ValidString(plan.EpicID) {
+		t.Fatalf("epic id is not valid utf8: %q", plan.EpicID)
+	}
+	if strings.ContainsRune(plan.EpicID, '\uFFFD') {
+		t.Fatalf("epic id contains replacement character: %q", plan.EpicID)
+	}
+	for _, issue := range plan.Issues {
+		if !utf8.ValidString(issue.ID) {
+			t.Fatalf("issue id is not valid utf8: %q", issue.ID)
+		}
+		if strings.ContainsRune(issue.ID, '\uFFFD') {
+			t.Fatalf("issue id contains replacement character: %q", issue.ID)
+		}
 	}
 }
 

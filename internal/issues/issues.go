@@ -1,6 +1,7 @@
 package issues
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"moyuan-code/internal/fsutil"
@@ -19,6 +20,7 @@ type Node struct {
 	ID        string   `json:"id"`
 	Title     string   `json:"title"`
 	Status    string   `json:"status"`
+	Role      string   `json:"role,omitempty"`
 	DependsOn []string `json:"depends_on"`
 }
 
@@ -55,6 +57,98 @@ func Phase1Template() Graph {
 	}
 }
 
+func ProjectKickoffTemplate(rootDir string) Graph {
+	projectName := filepath.Base(rootDir)
+	nodes := []Node{
+		{ID: "phase1-001", Title: "项目画像与技术栈确认", Status: "ready", Role: "architect", DependsOn: []string{}},
+	}
+	qualityDeps := []string{"phase1-001"}
+	nextID := 2
+	addNode := func(title string, role string) {
+		id := phase1NodeID(nextID)
+		nodes = append(nodes, Node{ID: id, Title: title, Status: "blocked", Role: role, DependsOn: []string{"phase1-001"}})
+		qualityDeps = append(qualityDeps, id)
+		nextID++
+	}
+
+	if hasAny(rootDir, []string{"backend", filepath.Join("backend", "pyproject.toml"), filepath.Join("backend", "requirements.txt"), "pyproject.toml", "requirements.txt"}) {
+		title := "后端服务与数据基线"
+		if hasAny(rootDir, []string{filepath.Join("backend", "pyproject.toml"), filepath.Join("backend", "requirements.txt"), "pyproject.toml", "requirements.txt"}) {
+			title = "Python 后端服务与数据基线"
+		}
+		addNode(title, "backend")
+	}
+	if hasAny(rootDir, []string{"frontend", filepath.Join("frontend", "package.json"), filepath.Join("frontend", "next.config.mjs"), "package.json"}) {
+		title := "前端应用运行与交互验证"
+		if hasAny(rootDir, []string{filepath.Join("frontend", "next.config.mjs"), filepath.Join("frontend", "next.config.ts"), "next.config.mjs", "next.config.ts"}) {
+			title = "Next.js 前端应用运行与交互验证"
+		}
+		addNode(title, "frontend")
+	}
+	if hasAny(rootDir, []string{"skills"}) {
+		addNode("项目 Skills 与工具契约梳理", "backend")
+	}
+	if hasAny(rootDir, []string{"docs", "README.md"}) {
+		addNode("需求文档与验收边界整理", "architect")
+	}
+	if len(nodes) == 1 {
+		addNode("项目实现规划补齐", "backend")
+	}
+	nodes = append(nodes, Node{
+		ID:        phase1NodeID(nextID),
+		Title:     "当前项目测试与质量基线",
+		Status:    "blocked",
+		Role:      "quality_owner",
+		DependsOn: qualityDeps,
+	})
+
+	return Graph{
+		Epic:  Epic{ID: "phase1-epic", Title: projectName + " 项目接入基线", Status: "planned"},
+		Nodes: nodes,
+	}
+}
+
+func IsPhase1Template(graph Graph) bool {
+	template := Phase1Template()
+	if graph.Epic.ID != template.Epic.ID || graph.Epic.Title != template.Epic.Title || len(graph.Nodes) != len(template.Nodes) {
+		return false
+	}
+	for index, node := range graph.Nodes {
+		templateNode := template.Nodes[index]
+		if node.ID != templateNode.ID || node.Title != templateNode.Title || node.Status != templateNode.Status {
+			return false
+		}
+	}
+	return true
+}
+
+func phase1NodeID(index int) string {
+	return fmt.Sprintf("phase1-%03d", index)
+}
+
+func hasAny(rootDir string, relPaths []string) bool {
+	for _, relPath := range relPaths {
+		if fsutil.Exists(filepath.Join(rootDir, relPath)) {
+			return true
+		}
+	}
+	return false
+}
+
+func shouldUseProjectKickoff(rootDir string) bool {
+	return hasAny(rootDir, []string{
+		"backend",
+		"frontend",
+		"skills",
+		"package.json",
+		"pyproject.toml",
+		"requirements.txt",
+		filepath.Join("backend", "pyproject.toml"),
+		filepath.Join("backend", "requirements.txt"),
+		filepath.Join("frontend", "package.json"),
+	})
+}
+
 func graphPath(rootDir string, epicID string) string {
 	return filepath.Join(workspace.ForRoot(rootDir).IssueGraphsDir, textutil.Slugify(epicID)+".json")
 }
@@ -71,6 +165,9 @@ func LoadGraph(rootDir string, epicID string) (Graph, bool, error) {
 		return Graph{}, false, err
 	}
 	if found {
+		if IsPhase1Template(graph) && shouldUseProjectKickoff(rootDir) {
+			return ProjectKickoffTemplate(rootDir), true, nil
+		}
 		return graph, true, nil
 	}
 	if textutil.Slugify(epicID) == "phase1-epic" {
@@ -125,6 +222,18 @@ func SaveSchedule(rootDir string, schedule Schedule) error {
 
 func GeneratePhase1(rootDir string) (Graph, Schedule, error) {
 	graph := Phase1Template()
+	if err := SaveGraph(rootDir, graph); err != nil {
+		return Graph{}, Schedule{}, err
+	}
+	schedule := Summarize(graph)
+	if err := SaveSchedule(rootDir, schedule); err != nil {
+		return Graph{}, Schedule{}, err
+	}
+	return graph, schedule, nil
+}
+
+func GenerateProjectKickoff(rootDir string) (Graph, Schedule, error) {
+	graph := ProjectKickoffTemplate(rootDir)
 	if err := SaveGraph(rootDir, graph); err != nil {
 		return Graph{}, Schedule{}, err
 	}
