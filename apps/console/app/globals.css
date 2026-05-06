@@ -19,6 +19,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   min-height: 100%;
@@ -43,6 +47,16 @@ button {
   color: inherit;
 }
 
+.consoleLoading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
@@ -56,6 +70,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  overflow-y: auto;
   padding: 22px 16px;
   border-right: 1px solid var(--line);
   background: #f9fbfd;
@@ -162,6 +177,36 @@ button {
   margin-bottom: 20px;
 }
 
+.viewTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -6px 0 20px;
+}
+
+.viewTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: #394657;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.viewTab.active,
+.viewTab:hover {
+  border-color: #102033;
+  background: #102033;
+  color: #fff;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--blue);
@@ -181,6 +226,16 @@ h1 {
   line-height: 1.15;
 }
 
+.projectRoot {
+  display: block;
+  max-width: min(620px, 48vw);
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
 .topActions {
   display: flex;
   align-items: center;
@@ -190,7 +245,7 @@ h1 {
 .searchBox {
   display: flex;
   align-items: center;
-  width: min(420px, 36vw);
+  width: min(380px, 30vw);
   height: 40px;
   gap: 10px;
   padding: 0 12px;
@@ -199,6 +254,139 @@ h1 {
   background: var(--surface);
   color: var(--muted);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.projectMenu {
+  position: relative;
+  width: min(300px, 30vw);
+}
+
+.projectMenu summary {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 40px;
+  gap: 9px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: #102033;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  list-style: none;
+}
+
+.projectMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.projectMenuIcon {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 7px;
+  background: #eaf1fb;
+  color: var(--blue);
+}
+
+.projectMenuText {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.projectMenuText span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.projectMenuText strong {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectMenuChevron {
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.16s ease;
+}
+
+.projectMenu[open] .projectMenuChevron {
+  transform: rotate(90deg);
+}
+
+.projectMenuPanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  width: 100%;
+  max-height: 320px;
+  gap: 4px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #cfd9e8;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+}
+
+.projectMenuOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 46px;
+  gap: 12px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #102033;
+  cursor: pointer;
+  text-align: left;
+}
+
+.projectMenuOption.active,
+.projectMenuOption:hover {
+  background: #edf4ff;
+}
+
+.projectMenuOption.active {
+  color: var(--blue);
+}
+
+.projectMenuOptionText {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.projectMenuOptionText strong {
+  font-size: 13px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectMenuOptionText span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .iconButton {
@@ -283,29 +471,179 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   min-height: 48px;
   padding: 0 14px;
   border-bottom: 1px solid var(--line);
 }
 
-.panelTitle div {
+.panelTitleMain {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
-.panelTitle span {
+.panelTitleMain strong {
+  white-space: nowrap;
+}
+
+.panelTitleMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.panelTitleMeta > span {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.graphCanvas {
+  display: block;
+  overflow: hidden;
+  padding: 14px;
+  min-height: 410px;
+}
+
+.issueDagViewport {
+  width: 100%;
+  min-height: 410px;
+  overflow: auto;
+  border: 1px solid #e1e7ef;
+  border-radius: 8px;
+  background:
+    linear-gradient(#f8fafc 1px, transparent 1px),
+    linear-gradient(90deg, #f8fafc 1px, transparent 1px),
+    #fff;
+  background-size: 28px 28px;
+}
+
+.issueDagSurface {
+  position: relative;
+  min-width: 100%;
+}
+
+.issueDagEdges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.issueDagEdges marker path {
+  fill: #9aa9bb;
+}
+
+.issueDagColumnLabel {
+  fill: #66758a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.issueDagEdge {
+  fill: none;
+  stroke: #aab8c9;
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}
+
+.issueDagEdge.upstream {
+  stroke: #276ef1;
+  stroke-width: 2.2;
+}
+
+.issueDagEdge.downstream {
+  stroke: #138a5b;
+  stroke-width: 2.2;
+}
+
+.issueDagEdge.dimmed {
+  opacity: 0.22;
+}
+
+.issueDagNode {
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 6px 18px rgba(24, 35, 50, 0.07);
+  cursor: pointer;
+  text-align: left;
+}
+
+.issueDagNode span {
+  color: #17202a;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.issueDagNode small {
   color: var(--muted);
   font-size: 12px;
 }
 
-.graphCanvas {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(96px, 1fr));
-  gap: 10px;
-  overflow-x: auto;
-  padding: 14px;
-  min-height: 410px;
+.issueDagNodeMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.issueDagNodeMeta code {
+  padding: 2px 5px;
+  border: 1px solid #dce4ee;
+  border-radius: 5px;
+  background: #f7f9fc;
+  color: #4c5e73;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.issueDagNode.selected {
+  z-index: 2;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(39, 110, 241, 0.14), 0 10px 24px rgba(24, 35, 50, 0.12);
+}
+
+.issueDagNode.upstream {
+  border-color: #8cb5ff;
+}
+
+.issueDagNode.downstream {
+  border-color: #8fd3b7;
+}
+
+.issueDagNode.dimmed {
+  opacity: 0.45;
+}
+
+.issueDagNode.ok {
+  background: #f4fbf7;
+}
+
+.issueDagNode.running {
+  background: #f4f7ff;
+}
+
+.issueDagNode.warning {
+  background: #fff9ed;
+}
+
+.issueDagNode.blocked {
+  background: #fff4f3;
 }
 
 .lane {
@@ -389,8 +727,19 @@ h1 {
   background: #fff4f3;
 }
 
+.graphEmptyState {
+  grid-column: 1 / -1;
+  min-height: 260px;
+  padding: 18px;
+  text-align: center;
+}
+
 .inspector {
   min-height: 410px;
+}
+
+.inspectorEmptyState {
+  margin: 16px;
 }
 
 .inspectorBody {
@@ -435,17 +784,48 @@ dd {
   gap: 8px;
 }
 
+.dependencyListTitle {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .dependencyList span {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   color: #45546a;
   font-size: 13px;
 }
 
+.dependencyList strong {
+  min-width: 0;
+  color: #17202a;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.dependencyList code {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f7f9fc;
+  color: #526176;
+  font-family: inherit;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .warningLine,
 .approvalStrip,
-.decisionStrip {
+.decisionStrip,
+.commitStrip {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -464,16 +844,33 @@ dd {
   color: #145f43;
 }
 
-.decisionStrip div {
+.commitStrip {
+  align-items: flex-start;
+  border-color: #c8d7ee;
+  background: #f4f7ff;
+  color: #244772;
+}
+
+.decisionStrip div,
+.commitStrip div {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-.decisionStrip span {
+.decisionStrip span,
+.commitStrip span {
   color: #45715e;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+.commitStrip span {
+  color: #526984;
+}
+
+.commitStrip code {
+  width: fit-content;
 }
 
 .chipSection {
@@ -540,6 +937,18 @@ dd {
   display: grid;
   gap: 12px;
   padding: 14px;
+}
+
+.textareaField {
+  display: grid;
+  gap: 6px;
+}
+
+.textareaField > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .requirementForm textarea {
@@ -640,8 +1049,7 @@ dd {
   overflow-wrap: anywhere;
 }
 
-.controlForm + .schemaFeedback,
-.releaseProviderBox .schemaFeedback {
+.controlForm + .schemaFeedback {
   margin-top: -4px;
 }
 
@@ -657,6 +1065,100 @@ dd {
   gap: 8px;
   align-items: center;
   padding: 14px 14px 0;
+}
+
+.panelCommandBody {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+}
+
+.panelCommandBody div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.panelCommandBody strong,
+.panelCommandBody span {
+  overflow-wrap: anywhere;
+}
+
+.panelCommandBody span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.projectCardMeta {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 7px 12px;
+  align-items: start;
+}
+
+.projectCardMeta span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.projectCardMeta strong,
+.projectCardMeta code {
+  min-width: 0;
+  color: #102033;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.projectCardMeta code {
+  padding: 0;
+  background: transparent;
+  font-family: inherit;
+}
+
+.requirementIssueList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.requirementIssueList span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: #435269;
+  font-size: 11px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commitLine {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 7px;
+  color: #526984;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.commitLine span {
+  overflow-wrap: anywhere;
+}
+
+.projectCardMeta {
+  padding-top: 4px;
 }
 
 .executionItem {
@@ -899,7 +1401,11 @@ dd {
 .lowerGrid,
 .observabilityGrid,
 .bottomGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.singlePanelGrid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .operationGrid {
@@ -919,7 +1425,7 @@ dd {
 }
 
 .controlForm,
-.accessForms {
+.accessCommandGrid {
   display: grid;
   gap: 10px;
 }
@@ -932,16 +1438,155 @@ dd {
 }
 
 .controlForm.compact {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
   padding: 14px 14px 0;
   border: 0;
   background: transparent;
 }
 
+.projectOnboardingForm,
+.resourceCreateForm,
+.modalGridForm {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  align-items: end;
+  margin: 14px;
+}
+
+.modalForm {
+  margin: 0;
+  border: 0;
+  background: transparent;
+}
+
+.resourceCreateForm + .controlForm.compact {
+  padding-top: 0;
+}
+
+.formWide,
+.projectOnboardingForm .schemaFeedback,
+.resourceCreateForm .schemaFeedback,
+.modalGridForm .schemaFeedback {
+  grid-column: 1 / -1;
+}
+
+.projectOnboardingForm .schemaFeedback,
+.resourceCreateForm .schemaFeedback,
+.modalGridForm .schemaFeedback {
+  margin: 0;
+}
+
+.modeSwitch {
+  display: inline-flex;
+  width: fit-content;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.modeSwitch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.modeSwitch button.active {
+  background: #eaf1fb;
+  color: #102033;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.modalPanel {
+  display: grid;
+  width: min(760px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.modalContext {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.modalContext span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.modalContext strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.modalDetail {
+  margin: 0;
+  max-height: 620px;
+  overflow: auto;
+}
+
+.modalActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.requiredMark {
+  color: var(--red);
+  font-weight: 900;
+}
+
 .controlFormTitle,
 .buttonRow,
 .rowActions,
-.releaseControls,
 .checkboxLine {
   display: flex;
   align-items: center;
@@ -968,8 +1613,10 @@ dd {
 }
 
 .controlForm input,
-.controlForm select {
+.controlForm select,
+.controlForm textarea {
   width: 100%;
+  min-width: 0;
   min-height: 34px;
   padding: 0 9px;
   border: 1px solid var(--line);
@@ -978,15 +1625,49 @@ dd {
   color: var(--text);
 }
 
+.controlForm textarea {
+  min-height: 88px;
+  padding: 9px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
 .controlForm input:focus,
-.controlForm select:focus {
+.controlForm select:focus,
+.controlForm textarea:focus {
   border-color: #9bb9f9;
   outline: 3px solid rgba(39, 110, 241, 0.12);
 }
 
-.accessForms {
+.accessCommandGrid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 14px 14px 0;
+}
+
+.accessCommand {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.accessCommand > span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.accessCommand .buttonRow {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.accessCommand .actionMessage {
+  flex-basis: 100%;
 }
 
 .accessList {
@@ -1095,6 +1776,14 @@ dd {
   background: var(--surface-2);
 }
 
+.providerRow {
+  flex-wrap: wrap;
+}
+
+.providerRow .actionMessage {
+  flex-basis: 100%;
+}
+
 .timelineItem div,
 .qualityItem div,
 .providerRow div,
@@ -1171,6 +1860,11 @@ dd {
   padding: 14px;
 }
 
+.compactList,
+.qualityReportList {
+  padding-top: 0;
+}
+
 .signalItem {
   display: grid;
   gap: 8px;
@@ -1179,6 +1873,11 @@ dd {
   border: 1px solid #e6ebf2;
   border-radius: 7px;
   background: var(--surface-2);
+}
+
+.compactSignal,
+.qualityReportList .signalItem {
+  min-height: auto;
 }
 
 .signalHeader {
@@ -1469,25 +2168,6 @@ meter {
   padding: 0 14px 14px;
 }
 
-.releaseControls {
-  justify-content: flex-end;
-  padding: 0 14px 12px;
-}
-
-.releaseProviderBox {
-  display: grid;
-  gap: 10px;
-  margin: 0 14px 14px;
-  padding: 12px;
-  border: 1px solid #e6ebf2;
-  border-radius: 8px;
-  background: var(--surface-2);
-}
-
-.releaseProviderBox .controlForm.compact {
-  padding: 0;
-}
-
 .rowActions.wide {
   justify-content: space-between;
 }
@@ -1496,36 +2176,13 @@ meter {
   margin-left: auto;
 }
 
-.checkboxLine,
-.approvalIDInput {
+.checkboxLine {
   min-height: 28px;
 }
 
 .checkboxLine input {
   width: 14px;
   height: 14px;
-}
-
-.approvalIDInput {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.approvalIDInput span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.approvalIDInput input {
-  width: clamp(150px, 24vw, 240px);
-  min-height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: #fff;
 }
 
 .prmrItem {
@@ -1608,6 +2265,7 @@ meter {
   border-radius: 999px;
   font-size: 11px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .statusPill.ok {
@@ -1689,7 +2347,7 @@ meter {
   .operationGrid,
   .observabilityGrid,
   .auditGrid,
-  .accessForms,
+  .accessCommandGrid,
   .accessList,
   .auditList,
   .controlForm.compact,
@@ -1730,6 +2388,29 @@ meter {
   .topActions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .projectRoot {
+    max-width: none;
+  }
+
+  .projectMenu {
+    width: 100%;
+  }
+
+  .projectMenuPanel {
+    width: 100%;
+  }
+
+  .viewTabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-bottom: 16px;
+    padding-bottom: 4px;
+  }
+
+  .viewTab {
+    flex: 0 0 auto;
   }
 
   .searchBox {

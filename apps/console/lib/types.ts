@@ -5,6 +5,12 @@ export type ProjectSummary = {
   name: string;
   root: string;
   status: string;
+  remote_url?: string;
+  languages?: string[];
+  frameworks?: string[];
+  package_managers?: string[];
+  source_type?: string;
+  provider?: string;
   source?: Record<string, unknown>;
 };
 
@@ -25,10 +31,38 @@ export type IssueNode = {
   quality_reasons?: string[];
   review_status?: string;
   blocking_findings?: QualityFinding[];
+  commit_before?: string;
+  commit_after?: string;
+  commit_changed?: boolean;
+  changed_files?: string[];
+  diff_summary_path?: string;
   skills?: string[];
   output_contract?: string[];
   blocked_reason?: string;
   lane: "plan" | "backend" | "frontend" | "quality" | "release";
+};
+
+export type RequirementIssueSummary = {
+  id: string;
+  title: string;
+  status: string;
+  role?: string;
+  depends_on: string[];
+};
+
+export type RequirementSummary = {
+  id: string;
+  epic_id: string;
+  title: string;
+  status: string;
+  clarified_requirement: string;
+  raw_text: string;
+  issue_count: number;
+  accepted_count: number;
+  blocked_count: number;
+  commit_count: number;
+  issues: RequirementIssueSummary[];
+  created_at?: string;
 };
 
 export type ScheduleItem = {
@@ -87,6 +121,68 @@ export type ProviderTelemetrySummary = {
   incremental_cost?: number;
   estimated_cost?: number;
   feedback_status?: string;
+  created_at?: string;
+};
+
+export type SkillSummary = {
+  id: string;
+  name: string;
+  source: string;
+  version?: string;
+  description?: string;
+  enabled: boolean;
+  risk_level: string;
+  compatible_roles: string[];
+  tags: string[];
+  required_tools: string[];
+  auth_ref?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type SkillBindingSummary = {
+  id: string;
+  skill_id: string;
+  target_type: string;
+  target_id: string;
+  priority: number;
+  status: string;
+  config: Record<string, string>;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type SkillEffectivenessSummary = {
+  id: string;
+  skill_id: string;
+  binding_id?: string;
+  subagent_id?: string;
+  run_id?: string;
+  issue_id?: string;
+  outcome: string;
+  quality_impact: string;
+  rework_reduced: boolean;
+  duration_seconds: number;
+  findings: string[];
+  created_at?: string;
+};
+
+export type SkillRecommendationCandidateSummary = {
+  skill_id: string;
+  name: string;
+  source: string;
+  score: number;
+  reasons: string[];
+  risks: string[];
+};
+
+export type SkillRecommendationSummary = {
+  id: string;
+  issue_id?: string;
+  role: string;
+  task_type?: string;
+  risk_level: string;
+  candidates: SkillRecommendationCandidateSummary[];
   created_at?: string;
 };
 
@@ -540,6 +636,12 @@ export type RunSummary = {
   recovery_id?: string;
   quality_status?: string;
   quality_report_id?: string;
+  commit_before?: string;
+  commit_after?: string;
+  commit_changed?: boolean;
+  changed_files?: string[];
+  diff_summary_path?: string;
+  managed_by?: string;
   updated_at?: string;
 };
 
@@ -947,6 +1049,20 @@ export type QualityExplanation = {
   findings: QualityFinding[];
 };
 
+export type QualityReportSummary = {
+  id: string;
+  task_id: string;
+  status: string;
+  review_status: string;
+  findings_count: number;
+  check_count: number;
+  changed_files: string[];
+  diff_summary_path?: string;
+  checks: QualityCheck[];
+  findings: QualityFinding[];
+  created_at?: string;
+};
+
 export type TimelineEvent = {
   id: string;
   title: string;
@@ -1022,6 +1138,20 @@ export type MemorySignal = {
   summary: string;
   kind: string;
   score: number;
+};
+
+export type MemoryRecordSummary = {
+  id: string;
+  kind: string;
+  summary: string;
+  tags: string[];
+  source?: string;
+  scope?: string;
+  scopes: string[];
+  confidence: number;
+  score: number;
+  created_by?: string;
+  created_at?: string;
 };
 
 export type AuditEventSummary = {
@@ -1513,6 +1643,7 @@ export type ConsoleSnapshot = {
   mode: "live" | "demo";
   backendStatus: StatusTone;
   generatedAt: string;
+  projects: ProjectSummary[];
   project: ProjectSummary;
   stats: {
     issues: number;
@@ -1535,12 +1666,17 @@ export type ConsoleSnapshot = {
     integration_applies: number;
     release_batches: number;
     release_candidates: number;
+    skills: number;
   };
+  requirements: RequirementSummary[];
   issues: IssueNode[];
   schedule: ScheduleItem[];
   subagent_backlog: SubagentBacklogItem[];
   providers: ProviderSummary[];
   provider_telemetry: ProviderTelemetrySummary[];
+  skills: SkillSummary[];
+  skill_bindings: SkillBindingSummary[];
+  skill_effectiveness: SkillEffectivenessSummary[];
   resources: ResourceSummary[];
   lifecycle_alerts: LifecycleAlertSummary[];
   maintenance_records: MaintenanceRecordSummary[];
@@ -1580,6 +1716,7 @@ export type ConsoleSnapshot = {
   deployment_feedback: CandidateDeploymentFeedbackSummary[];
   visual_assets: VisualAssetSummary[];
   visual_render_executions: VisualRenderExecutionSummary[];
+  quality_reports: QualityReportSummary[];
   quality_explanations: QualityExplanation[];
   approvals: ApprovalRecordSummary[];
   audit_events: AuditEventSummary[];

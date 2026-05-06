@@ -25,6 +25,10 @@ pnpm-debug.log*
 /dist/
 /coverage.out
 
+# Browser test output
+test-results/
+playwright-report/
+
 # Moyuan runtime state
 .moyuan/state.db
 .moyuan/logs/

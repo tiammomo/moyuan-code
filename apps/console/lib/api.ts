@@ -41,7 +41,9 @@ import type {
   ProviderProofRequirementReportSummary,
   ProviderProofRequirementSummary,
   QualityExplanation,
+  QualityReportSummary,
   QualitySignal,
+  RequirementSummary,
   RehearsalSchedulerRunSummary,
   ReleaseProviderExecutionSummary,
   ReleaseAdmissionSummary,
@@ -59,6 +61,9 @@ import type {
   RemoteExecutionRehearsalSummary,
   ScheduleItem,
   ServiceAccountSummary,
+  SkillBindingSummary,
+  SkillEffectivenessSummary,
+  SkillSummary,
   SubagentBacklogItem,
   SubagentSummary,
   VisualAssetSummary,
@@ -87,7 +92,7 @@ type ApiEnvelope<T> = T & { error?: string };
 async function apiGet<T>(path: string): Promise<T | null> {
   try {
     const response = await fetch(`${apiBase}${path}`, {
-      next: { revalidate: 3 },
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -100,25 +105,32 @@ async function apiGet<T>(path: string): Promise<T | null> {
   }
 }
 
-export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
+export async function getConsoleSnapshot(projectID?: string): Promise<ConsoleSnapshot> {
   await connection();
 
   const projectsResponse = await apiGet<ApiEnvelope<{ projects: ProjectSummary[] }>>("/projects");
   const projects = projectsResponse?.projects ?? [];
-  const project = projects[0];
+  const requestedProjectID = projectID?.trim();
+  const project = projects.find((candidate) => candidate.id === requestedProjectID) ?? projects[0];
 
   if (!project) {
+    const demoProjects = demoSnapshot.projects.length > 0 ? demoSnapshot.projects : [demoSnapshot.project];
+    const demoProject = demoProjects.find((candidate) => candidate.id === requestedProjectID) ?? demoSnapshot.project;
     return {
       ...demoSnapshot,
       generatedAt: new Date().toISOString(),
+      projects: demoProjects,
+      project: demoProject,
     };
   }
 
   const [
-    graphResponse,
-    scheduleResponse,
+    requirementsResponse,
     providersResponse,
     providerTelemetryResponse,
+    skillsResponse,
+    skillBindingsResponse,
+    skillEffectivenessResponse,
     resourcesResponse,
     lifecycleAlertsResponse,
     maintenanceResponse,
@@ -176,12 +188,12 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     writeAdapterRecoveriesResponse,
     controlLoopQueueResponse,
   ] = await Promise.all([
-    apiGet<ApiEnvelope<{ issue_graph: { issues?: unknown[] } }>>(`/projects/${project.id}/epics/phase1-epic/issue-graph`),
-    apiGet<ApiEnvelope<{ schedule: { dispatch_queue?: unknown[]; waiting_queue?: unknown[]; subagent_backlog?: unknown[] } }>>(
-      `/projects/${project.id}/epics/phase1-epic/schedule?limit=4`,
-    ),
+    apiGet<ApiEnvelope<{ requirements: unknown[] }>>(`/projects/${project.id}/requirements?limit=20`),
     apiGet<ApiEnvelope<{ providers: unknown[] }>>(`/projects/${project.id}/providers`),
     apiGet<ApiEnvelope<{ provider_telemetry: unknown[] }>>(`/projects/${project.id}/providers/telemetry?limit=6`),
+    apiGet<ApiEnvelope<{ skills: unknown[] }>>(`/projects/${project.id}/skills`),
+    apiGet<ApiEnvelope<{ skill_bindings: unknown[] }>>(`/projects/${project.id}/skills/bindings`),
+    apiGet<ApiEnvelope<{ skill_effectiveness: unknown[] }>>(`/projects/${project.id}/skills/effectiveness?limit=8`),
     apiGet<ApiEnvelope<{ resources: unknown[] }>>(`/projects/${project.id}/resources`),
     apiGet<ApiEnvelope<{ lifecycle_alerts: unknown[] }>>(`/projects/${project.id}/resources/lifecycle-alerts?limit=5`),
     apiGet<ApiEnvelope<{ maintenance_records: unknown[] }>>(`/projects/${project.id}/resources/maintenance?limit=5`),
@@ -240,13 +252,11 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     apiGet<ApiEnvelope<{ control_loop_queue: unknown[] }>>(`/projects/${project.id}/control-loop/queue?limit=20`),
   ]);
 
-  const schedule = [
-    ...normalizeScheduleItems(scheduleResponse?.schedule.dispatch_queue ?? [], "dispatch"),
-    ...normalizeScheduleItems(scheduleResponse?.schedule.waiting_queue ?? [], "waiting"),
-  ];
-  const subagentBacklog = normalizeSubagentBacklog(scheduleResponse?.schedule.subagent_backlog ?? []);
   const providers = normalizeProviders(providersResponse?.providers ?? []);
   const providerTelemetry = normalizeProviderTelemetry(providerTelemetryResponse?.provider_telemetry ?? []);
+  const skills = normalizeSkills(skillsResponse?.skills ?? []);
+  const skillBindings = normalizeSkillBindings(skillBindingsResponse?.skill_bindings ?? []);
+  const skillEffectiveness = normalizeSkillEffectiveness(skillEffectivenessResponse?.skill_effectiveness ?? []);
   const resources = normalizeResources(resourcesResponse?.resources ?? []);
   const lifecycleAlerts = normalizeLifecycleAlerts(lifecycleAlertsResponse?.lifecycle_alerts ?? []);
   const maintenanceRecords = normalizeMaintenanceRecords(maintenanceResponse?.maintenance_records ?? []);
@@ -267,6 +277,10 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const releaseProviderExecutions = normalizeReleaseProviderExecutions(releaseProviderExecutionsResponse?.release_provider_executions ?? []);
   const evidence = normalizeEvidence(evidenceResponse?.evidence ?? []);
   const runs = normalizeRuns(runsResponse?.runs ?? []);
+  const requirements = normalizeRequirements(requirementsResponse?.requirements ?? [], runs);
+  const issueGraphItems = readActiveRequirementGraphItems(requirements);
+  const schedule = normalizeScheduleItemsFromGraph(issueGraphItems);
+  const subagentBacklog: SubagentBacklogItem[] = [];
   const subagents = normalizeSubagents(subagentsResponse?.subagents ?? []);
   const recoveries = normalizeRuntimeRecoveries(recoveriesResponse?.runtime_recoveries ?? []);
   const operationRepairCandidates = normalizeOperationRepairCandidates(operationRepairCandidatesResponse?.operation_repair_candidates ?? []);
@@ -305,7 +319,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
   const writeAdapterRecoveries = normalizeWriteAdapterRecoveryReport(writeAdapterRecoveriesResponse?.write_adapter_recoveries);
   const controlLoopQueue = normalizeControlLoopQueue(controlLoopQueueResponse?.control_loop_queue ?? []);
   const qualityExplanations = await fetchQualityExplanations(project.id, runs, qualityReports);
-  const issues = normalizeIssues(graphResponse?.issue_graph?.issues ?? [], runs, subagents, qualityExplanations);
+  const issues = normalizeIssues(issueGraphItems, runs, subagents, qualityExplanations);
   const operationsTimeline = normalizeOperationsTimeline(operationsTimelineResponse?.operations_timeline ?? []);
   const operationHistory = operationsTimeline.length > 0 ? operationsTimeline : buildOperationHistory(releaseProviderExecutions, executions, visualRenderExecutions, evidence);
   const operationDetails = await fetchOperationDetails(project.id, operationHistory);
@@ -316,6 +330,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     mode: "live",
     backendStatus: "ok",
     generatedAt: new Date().toISOString(),
+    projects,
     project,
     stats: {
       issues: issues.length,
@@ -338,12 +353,17 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
       integration_applies: integrationApplies.length,
       release_batches: releaseBatches.length,
       release_candidates: releaseCandidates.length,
+      skills: skills.length,
     },
-    issues: issues.length > 0 ? issues : demoSnapshot.issues,
-    schedule: schedule.length > 0 ? schedule : demoSnapshot.schedule,
+    requirements,
+    issues,
+    schedule,
     subagent_backlog: subagentBacklog,
-    providers: providers.length > 0 ? providers : demoSnapshot.providers,
+    providers,
     provider_telemetry: providerTelemetry,
+    skills,
+    skill_bindings: skillBindings,
+    skill_effectiveness: skillEffectiveness,
     resources,
     lifecycle_alerts: lifecycleAlerts,
     maintenance_records: maintenanceRecords,
@@ -383,6 +403,7 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     deployment_feedback: deploymentFeedback,
     visual_assets: visualAssets,
     visual_render_executions: visualRenderExecutions,
+    quality_reports: qualityReports,
     quality_explanations: qualityExplanations,
     approvals,
     audit_events: auditEvents,
@@ -401,43 +422,72 @@ export async function getConsoleSnapshot(): Promise<ConsoleSnapshot> {
     auth_sessions: authSessions,
     api_tokens: apiTokens,
     service_accounts: serviceAccounts,
-    timeline: timeline.length > 0 ? timeline : demoSnapshot.timeline,
-    quality: qualitySignals.length > 0 ? qualitySignals : demoSnapshot.quality,
+    timeline,
+    quality: qualitySignals,
     memory:
       memoryResponse?.candidates?.map((candidate, index) => ({
         id: `candidate-${index + 1}`,
         kind: readString(candidate, "kind", "candidate"),
         summary: readString(candidate, "summary", "Memory candidate"),
         score: Number(readUnknown(candidate, "score") ?? 0.72),
-      })) ?? demoSnapshot.memory,
+      })) ?? [],
   };
 }
 
-function normalizeScheduleItems(rawItems: unknown[], fallbackStatus: string): ScheduleItem[] {
-  return rawItems.map((raw, index) => ({
-    issue_id: readString(raw, "issue_id", `issue-${index + 1}`),
-    status: readString(raw, "decision", readString(raw, "status", fallbackStatus)),
-    runtime_id: readString(raw, "runtime_id", ""),
-    reason: readString(raw, "reason", ""),
-    blocked_reason: readString(raw, "blocked_reason", ""),
-    subagent_id: readString(raw, "subagent_id", ""),
-    subagent_status: readString(raw, "subagent_status", ""),
-    recovery_id: readString(raw, "recovery_id", ""),
-    retry_count: readNumber(raw, "retry_count"),
-    max_retries: readNumber(raw, "max_retries"),
+function readActiveRequirementGraphItems(requirements: RequirementSummary[]) {
+  const activeRequirement = requirements.filter(isActiveRequirement).sort(compareActiveRequirements)[0];
+
+  if (!activeRequirement) {
+    return [];
+  }
+
+  const pendingIssues = activeRequirement.issues.filter(isPendingRequirementIssue);
+  const pendingIssueIDs = new Set(pendingIssues.map((issue) => issue.id));
+  return pendingIssues.map((issue) => ({
+    ...issue,
+    depends_on: issue.depends_on.filter((dependencyID) => pendingIssueIDs.has(dependencyID)),
   }));
 }
 
-function normalizeSubagentBacklog(rawItems: unknown[]): SubagentBacklogItem[] {
+function isActiveRequirement(requirement: RequirementSummary) {
+  if (isFinishedRequirementStatus(requirement.status)) {
+    return false;
+  }
+  return requirement.issues.some(isPendingRequirementIssue);
+}
+
+function compareActiveRequirements(left: RequirementSummary, right: RequirementSummary) {
+  const leftPhase = phaseNumberForRequirement(left);
+  const rightPhase = phaseNumberForRequirement(right);
+  if (leftPhase !== rightPhase) {
+    return leftPhase - rightPhase;
+  }
+  const leftCreatedAt = Date.parse(left.created_at ?? "");
+  const rightCreatedAt = Date.parse(right.created_at ?? "");
+  return (Number.isNaN(leftCreatedAt) ? Number.MAX_SAFE_INTEGER : leftCreatedAt) - (Number.isNaN(rightCreatedAt) ? Number.MAX_SAFE_INTEGER : rightCreatedAt);
+}
+
+function phaseNumberForRequirement(requirement: RequirementSummary) {
+  const match = `${requirement.raw_text} ${requirement.title} ${requirement.epic_id}`.match(/phase\s*(\d+)/i);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function isFinishedRequirementStatus(status: string) {
+  return finishedRequirementStatuses.has(status.trim().toLowerCase());
+}
+
+function isPendingRequirementIssue(issue: RequirementSummary["issues"][number]) {
+  return !finishedIssueStatuses.has(issue.status.trim().toLowerCase());
+}
+
+const finishedRequirementStatuses = new Set(["accepted", "archived", "closed", "completed", "done"]);
+const finishedIssueStatuses = new Set(["accepted", "archived", "closed", "completed", "done", "passed", "success", "succeeded"]);
+
+function normalizeScheduleItemsFromGraph(rawItems: unknown[]): ScheduleItem[] {
   return rawItems.map((raw, index) => ({
-    issue_id: readString(raw, "issue_id", `issue-${index + 1}`),
-    subagent_id: readString(raw, "subagent_id", `subagent-${index + 1}`),
-    status: readString(raw, "status", "archived"),
-    reason: readString(raw, "reason", ""),
-    recovery_id: readString(raw, "recovery_id", ""),
-    failure_category: readString(raw, "failure_category", ""),
-    retry_count: readNumber(raw, "retry_count"),
-    max_retries: readNumber(raw, "max_retries"),
+    issue_id: readString(raw, "id", `issue-${index + 1}`),
+    status: readString(raw, "status", "planned"),
+    blocked_reason: readString(raw, "blocked_reason", ""),
   }));
 }
 
@@ -483,6 +533,11 @@ function normalizeIssues(rawIssues: unknown[], runs: RunSummary[], subagents: Su
       quality_reasons: explanation?.reasons ?? [],
       review_status: explanation?.review_status,
       blocking_findings: explanation?.findings.filter((finding) => finding.blocking) ?? [],
+      commit_before: run?.commit_before,
+      commit_after: run?.commit_after,
+      commit_changed: run?.commit_changed,
+      changed_files: run?.changed_files ?? [],
+      diff_summary_path: run?.diff_summary_path,
       skills: subagent?.skills ?? [],
       output_contract: subagent?.output_contract ?? [],
       blocked_reason: readString(raw, "blocked_reason", ""),
@@ -531,6 +586,55 @@ function normalizeProviderTelemetry(rawRecords: unknown[]): ProviderTelemetrySum
     incremental_cost: readNumber(raw, "incremental_cost"),
     estimated_cost: readNumber(raw, "estimated_cost"),
     feedback_status: readString(raw, "feedback_status", ""),
+    created_at: readString(raw, "created_at", ""),
+  }));
+}
+
+function normalizeSkills(rawSkills: unknown[]): SkillSummary[] {
+  return rawSkills.map((raw, index) => ({
+    id: readString(raw, "id", `skill-${index + 1}`),
+    name: readString(raw, "name", `Skill ${index + 1}`),
+    source: readString(raw, "source", "local"),
+    version: readString(raw, "version", ""),
+    description: readString(raw, "description", ""),
+    enabled: readBoolean(raw, "enabled"),
+    risk_level: readString(raw, "risk_level", "medium"),
+    compatible_roles: readArray(raw, "compatible_roles"),
+    tags: readArray(raw, "tags"),
+    required_tools: readArray(raw, "required_tools"),
+    auth_ref: readString(raw, "auth_ref", ""),
+    created_at: readString(raw, "created_at", ""),
+    updated_at: readString(raw, "updated_at", ""),
+  }));
+}
+
+function normalizeSkillBindings(rawBindings: unknown[]): SkillBindingSummary[] {
+  return rawBindings.map((raw, index) => ({
+    id: readString(raw, "id", `skill-binding-${index + 1}`),
+    skill_id: readString(raw, "skill_id", ""),
+    target_type: readString(raw, "target_type", "role"),
+    target_id: readString(raw, "target_id", ""),
+    priority: readNumber(raw, "priority"),
+    status: readString(raw, "status", "active"),
+    config: readStringMap(raw, "config"),
+    created_at: readString(raw, "created_at", ""),
+    updated_at: readString(raw, "updated_at", ""),
+  }));
+}
+
+function normalizeSkillEffectiveness(rawRecords: unknown[]): SkillEffectivenessSummary[] {
+  return rawRecords.map((raw, index) => ({
+    id: readString(raw, "id", `skill-effectiveness-${index + 1}`),
+    skill_id: readString(raw, "skill_id", ""),
+    binding_id: readString(raw, "binding_id", ""),
+    subagent_id: readString(raw, "subagent_id", ""),
+    run_id: readString(raw, "run_id", ""),
+    issue_id: readString(raw, "issue_id", ""),
+    outcome: readString(raw, "outcome", "unknown"),
+    quality_impact: readString(raw, "quality_impact", "unknown"),
+    rework_reduced: readBoolean(raw, "rework_reduced"),
+    duration_seconds: readNumber(raw, "duration_seconds"),
+    findings: readArray(raw, "findings"),
     created_at: readString(raw, "created_at", ""),
   }));
 }
@@ -1073,6 +1177,62 @@ function normalizeEvidenceArtifacts(rawArtifacts: Record<string, unknown>[]): Ev
   }));
 }
 
+function normalizeRequirements(rawRequirements: unknown[], runs: RunSummary[]): RequirementSummary[] {
+  const runsByIssue = new Map<string, RunSummary[]>();
+  for (const run of runs) {
+    if (!run.issue_id) continue;
+    const records = runsByIssue.get(run.issue_id) ?? [];
+    records.push(run);
+    runsByIssue.set(run.issue_id, records);
+  }
+
+  return rawRequirements.map((raw, index) => {
+    const graph = readUnknown(raw, "issue_graph");
+    const epic = readUnknown(graph, "epic");
+    const issues = normalizeRequirementIssues(readObjectArray(graph, "nodes"), readObjectArray(raw, "issues"));
+    const issueIDs = new Set(issues.map((issue) => issue.id));
+    const acceptedCount = issues.filter((issue) => issue.status === "accepted").length;
+    const blockedCount = issues.filter((issue) => issue.status === "blocked" || issue.status === "needs_rework" || issue.status === "waiting").length;
+    const commitCount = Array.from(issueIDs).reduce((count, issueID) => count + (runsByIssue.get(issueID)?.filter((run) => run.commit_changed).length ?? 0), 0);
+    const graphStatus = readString(epic, "status", "");
+    return {
+      id: readString(raw, "id", `requirement-${index + 1}`),
+      epic_id: readString(raw, "epic_id", readString(epic, "id", "")),
+      title: readString(epic, "title", readString(raw, "raw_text", `需求 ${index + 1}`)),
+      status: requirementStatus(graphStatus, issues),
+      clarified_requirement: readString(raw, "clarified_requirement", ""),
+      raw_text: readString(raw, "raw_text", ""),
+      issue_count: issues.length,
+      accepted_count: acceptedCount,
+      blocked_count: blockedCount,
+      commit_count: commitCount,
+      issues,
+      created_at: readString(raw, "created_at", ""),
+    };
+  });
+}
+
+function normalizeRequirementIssues(rawIssues: Record<string, unknown>[], rawIssueSpecs: Record<string, unknown>[]) {
+  const specsByID = new Map(rawIssueSpecs.map((spec) => [readString(spec, "id", ""), spec]));
+  return rawIssues.map((raw, index) => ({
+    id: readString(raw, "id", `issue-${index + 1}`),
+    title: readString(raw, "title", `Issue ${index + 1}`),
+    status: readString(raw, "status", "ready"),
+    role: readString(specsByID.get(readString(raw, "id", "")) ?? raw, "role", ""),
+    depends_on: readArray(raw, "depends_on"),
+  }));
+}
+
+function requirementStatus(graphStatus: string, issues: { status: string }[]) {
+  if (graphStatus === "needs_clarification") return "needs_user_input";
+  if (issues.length === 0) return graphStatus || "planned";
+  if (issues.every((issue) => issue.status === "accepted")) return "completed";
+  if (issues.some((issue) => issue.status === "running" || issue.status === "quality_checking" || issue.status === "reviewing")) return "running";
+  if (issues.some((issue) => issue.status === "needs_rework")) return "needs_rework";
+  if (issues.some((issue) => issue.status === "ready")) return "planned";
+  return graphStatus || "planned";
+}
+
 function normalizeRuns(rawRuns: unknown[]): RunSummary[] {
   return rawRuns.map((raw, index) => ({
     run_id: readString(raw, "run_id", `run-${index + 1}`),
@@ -1084,6 +1244,12 @@ function normalizeRuns(rawRuns: unknown[]): RunSummary[] {
     recovery_id: readString(raw, "recovery_id", ""),
     quality_status: readString(raw, "quality_status", ""),
     quality_report_id: readString(raw, "quality_report_id", ""),
+    commit_before: readString(raw, "commit_before", ""),
+    commit_after: readString(raw, "commit_after", ""),
+    commit_changed: readBoolean(raw, "commit_changed"),
+    changed_files: readArray(raw, "changed_files"),
+    diff_summary_path: readString(raw, "diff_summary_path", ""),
+    managed_by: readString(raw, "managed_by", ""),
     updated_at: readString(raw, "updated_at", ""),
   }));
 }
@@ -1217,13 +1383,31 @@ function normalizeVisualRenderExecutions(rawExecutions: unknown[]): VisualRender
   }));
 }
 
-function normalizeQualityReports(rawReports: unknown[]) {
+function normalizeQualityReports(rawReports: unknown[]): QualityReportSummary[] {
   return rawReports.map((raw, index) => ({
     id: readString(raw, "id", `quality-${index + 1}`),
     task_id: readString(raw, "task_id", ""),
     status: readString(raw, "status", "unknown"),
     review_status: readString(raw, "review_status", ""),
     findings_count: readObjectArray(raw, "findings").length,
+    check_count: readObjectArray(raw, "checks").length,
+    changed_files: readArray(raw, "changed_files"),
+    diff_summary_path: readString(raw, "diff_summary_path", ""),
+    checks: readObjectArray(raw, "checks").map((check) => ({
+      type: readString(check, "type", "check"),
+      command: readString(check, "command", ""),
+      status: readString(check, "status", "unknown"),
+      reason: readString(check, "reason", ""),
+    })),
+    findings: readObjectArray(raw, "findings").map((finding, findingIndex) => ({
+      id: readString(finding, "id", `finding-${findingIndex + 1}`),
+      severity: readString(finding, "severity", "unknown"),
+      category: readString(finding, "category", "unknown"),
+      message: readString(finding, "message", ""),
+      path: readString(finding, "path", ""),
+      blocking: readBoolean(finding, "blocking"),
+    })),
+    created_at: readString(raw, "created_at", ""),
   }));
 }
 
@@ -2413,6 +2597,14 @@ function readNumberMap(value: unknown, key: string): Record<string, number> {
   if (!field || typeof field !== "object" || Array.isArray(field)) return {};
   return Object.fromEntries(
     Object.entries(field as Record<string, unknown>).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])),
+  );
+}
+
+function readStringMap(value: unknown, key: string): Record<string, string> {
+  const field = readUnknown(value, key);
+  if (!field || typeof field !== "object" || Array.isArray(field)) return {};
+  return Object.fromEntries(
+    Object.entries(field as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
   );
 }
 

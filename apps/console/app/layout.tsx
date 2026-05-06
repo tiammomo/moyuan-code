@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Moyuan Control Console",
-  description: "Multi-agent code lifecycle control console",
+  title: "Moyuan 控制台",
+  description: "多 Agent 代码生命周期控制台",
 };
 
 export default function RootLayout({
@@ -17,4 +17,3 @@ export default function RootLayout({
     </html>
   );
 }
-

@@ -1,18 +1,28 @@
 import { Suspense } from "react";
 import { ConsoleWorkbench } from "@/components/console-workbench";
 import { getConsoleSnapshot } from "@/lib/api";
-import { demoSnapshot } from "@/lib/demo-data";
 
-export default function ConsolePage() {
+type ConsolePageSearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default function ConsolePage({ searchParams }: { searchParams?: ConsolePageSearchParams }) {
   return (
-    <Suspense fallback={<ConsoleWorkbench snapshot={demoSnapshot} />}>
-      <ConsoleData />
+    <Suspense fallback={<ConsoleLoading />}>
+      <ConsoleData searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function ConsoleData() {
-  const snapshot = await getConsoleSnapshot();
+async function ConsoleData({ searchParams }: { searchParams?: ConsolePageSearchParams }) {
+  const params = searchParams ? await searchParams : {};
+  const snapshot = await getConsoleSnapshot(readSearchParam(params.project));
 
   return <ConsoleWorkbench snapshot={snapshot} />;
+}
+
+function readSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function ConsoleLoading() {
+  return <main className="consoleLoading">正在加载控制台...</main>;
 }
