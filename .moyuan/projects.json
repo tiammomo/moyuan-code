@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "projects": [
+    {
+      "id": "moyuan-stock-trading-assistant",
+      "name": "moyuan-stock-trading-assistant",
+      "root": "/home/tiammomo/projects/dev/moyuan-stock-trading-assistant",
+      "source": {
+        "path": "/home/tiammomo/projects/dev/moyuan-stock-trading-assistant",
+        "provider": "local",
+        "type": "local_path"
+      },
+      "owner_id": "owner-080e9ff3575f",
+      "status": "active",
+      "registered_at": "2026-05-05T16:18:19.765656343Z"
+    }
+  ]
+}

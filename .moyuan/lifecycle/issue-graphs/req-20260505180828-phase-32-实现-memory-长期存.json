@@ -1,0 +1,31 @@
+{
+  "epic": {
+    "id": "req-20260505180828-phase-32-实现-memory-长期存",
+    "title": "Phase 32：实现 Memory 长期存储和 compact 质量治理增强。目标是在 moyuan-code 中增强",
+    "status": "planned"
+  },
+  "nodes": [
+    {
+      "id": "req-20260505180828-phase-32-实现-memory-001",
+      "title": "requirement-contract",
+      "status": "ready",
+      "depends_on": []
+    },
+    {
+      "id": "req-20260505180828-phase-32-实现-memory-002",
+      "title": "backend-implementation",
+      "status": "blocked",
+      "depends_on": [
+        "req-20260505180828-phase-32-实现-memory-001"
+      ]
+    },
+    {
+      "id": "req-20260505180828-phase-32-实现-memory-003",
+      "title": "quality-review",
+      "status": "blocked",
+      "depends_on": [
+        "req-20260505180828-phase-32-实现-memory-002"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "epic_id": "req-20260505180343-phase-28-实现-recovery-queue-a",
+  "ready_queue": [
+    "req-20260505180343-phase-28-实现-recover-001"
+  ],
+  "blocked_queue": [
+    "req-20260505180343-phase-28-实现-recover-002",
+    "req-20260505180343-phase-28-实现-recover-003"
+  ],
+  "running_queue": [],
+  "review_queue": [],
+  "dispatch_queue": [
+    {
+      "issue_id": "req-20260505180343-phase-28-实现-recover-001",
+      "decision": "dispatch",
+      "role": "frontend",
+      "runtime_id": "claude_cli",
+      "write_scopes": [
+        "docs",
+        "src",
+        "web"
+      ]
+    }
+  ],
+  "waiting_queue": [],
+  "subagent_backlog": [],
+  "blocked_reason": {
+    "req-20260505180343-phase-28-实现-recover-002": "waiting_dependencies",
+    "req-20260505180343-phase-28-实现-recover-003": "waiting_dependencies"
+  },
+  "parallelism": 1,
+  "max_parallel": 2,
+  "runtime_slots": 2,
+  "created_at": "2026-05-06T05:40:04.046381441Z"
+}

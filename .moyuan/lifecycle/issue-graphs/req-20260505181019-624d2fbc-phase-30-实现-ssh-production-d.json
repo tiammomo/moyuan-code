@@ -1,0 +1,31 @@
+{
+  "epic": {
+    "id": "req-20260505181019-624d2fbc-phase-30-实现-ssh-production-d",
+    "title": "Phase 30：实现 SSH production deploy adapter，带 approval、receipt",
+    "status": "planned"
+  },
+  "nodes": [
+    {
+      "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-001",
+      "title": "requirement-contract",
+      "status": "ready",
+      "depends_on": []
+    },
+    {
+      "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-002",
+      "title": "backend-implementation",
+      "status": "blocked",
+      "depends_on": [
+        "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-001"
+      ]
+    },
+    {
+      "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-003",
+      "title": "quality-review",
+      "status": "blocked",
+      "depends_on": [
+        "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-002"
+      ]
+    }
+  ]
+}

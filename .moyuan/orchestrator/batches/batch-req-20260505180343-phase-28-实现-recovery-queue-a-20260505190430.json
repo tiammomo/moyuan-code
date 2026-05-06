@@ -1,0 +1,119 @@
+{
+  "id": "batch-req-20260505180343-phase-28-实现-recovery-queue-a-20260505190430",
+  "epic_id": "req-20260505180343-phase-28-实现-recovery-queue-a",
+  "mode": "dry_run",
+  "status": "planned",
+  "decision": "BATCH_PLAN_READY",
+  "requested_by": "console-owner",
+  "max_parallel": 2,
+  "dispatch_count": 1,
+  "waiting_count": 0,
+  "blocked_count": 2,
+  "write_scope_conflict_count": 0,
+  "runtime_slots": 2,
+  "reasons": [
+    "dispatch_ready"
+  ],
+  "items": [
+    {
+      "issue_id": "req-20260505180343-phase-28-实现-recover-001",
+      "decision": "dispatch",
+      "role": "frontend",
+      "runtime_id": "claude_cli",
+      "provider_id": "claude_cli",
+      "route_decision": "ROUTE_ALLOWED",
+      "route_reason": "role_runtime_default",
+      "write_scopes": [
+        "docs",
+        "src",
+        "web"
+      ],
+      "route_summary": {
+        "decision": "ROUTE_ALLOWED",
+        "blocked": false,
+        "provider_id": "claude_cli",
+        "runtime_id": "claude_cli",
+        "reason": "role_runtime_default",
+        "explanation": {
+          "summary": "ROUTE_ALLOWED:role_runtime_default",
+          "selected_provider_id": "claude_cli",
+          "selected_reason": "role_runtime_default",
+          "candidate_count": 3,
+          "selected_count": 1,
+          "skipped_count": 1,
+          "blocked_count": 1
+        },
+        "candidates": [
+          {
+            "provider_id": "claude_cli",
+            "runtime_id": "claude_cli",
+            "vendor": "anthropic",
+            "api_type": "claude_code_cli",
+            "status": "selected",
+            "reason": "role_runtime_default",
+            "score": 100,
+            "signals": [
+              {
+                "provider_id": "claude_cli",
+                "type": "selection",
+                "status": "selected",
+                "reason": "role_runtime_default"
+              }
+            ]
+          },
+          {
+            "provider_id": "gpt_image_2",
+            "vendor": "openai",
+            "api_type": "image",
+            "model_id": "gpt-image-2",
+            "status": "blocked",
+            "reason": "provider_disabled",
+            "score": 0,
+            "signals": [
+              {
+                "provider_id": "gpt_image_2",
+                "type": "selection",
+                "status": "blocked",
+                "reason": "provider_disabled"
+              }
+            ]
+          },
+          {
+            "provider_id": "codex_cli",
+            "runtime_id": "codex_cli",
+            "vendor": "openai",
+            "api_type": "codex_cli",
+            "status": "skipped",
+            "reason": "repo_edit_runtime_mismatch:claude_cli",
+            "score": 30,
+            "signals": [
+              {
+                "provider_id": "codex_cli",
+                "type": "selection",
+                "status": "skipped",
+                "reason": "repo_edit_runtime_mismatch:claude_cli"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "issue_id": "req-20260505180343-phase-28-实现-recover-002",
+      "decision": "blocked",
+      "reason": "waiting_dependencies",
+      "dependency_ids": [
+        "req-20260505180343-phase-28-实现-recover-001"
+      ]
+    },
+    {
+      "issue_id": "req-20260505180343-phase-28-实现-recover-003",
+      "decision": "blocked",
+      "reason": "waiting_dependencies",
+      "dependency_ids": [
+        "req-20260505180343-phase-28-实现-recover-002"
+      ]
+    }
+  ],
+  "created_at": "2026-05-05T19:04:30.814101303Z"
+}

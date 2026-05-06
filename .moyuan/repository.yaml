@@ -1,0 +1,22 @@
+schema_version: 1
+repository:
+  source:
+    type: "local_path"
+    provider: "local"
+    local_path: "/home/tiammomo/projects/dev/moyuan-code"
+    url: null
+    clone_path: null
+  default_remote: "origin"
+  default_branch: null
+git:
+  branch_policy:
+    mode: "task_branch"
+    naming: "moyuan/{issue_id}-{slug}"
+    require_clean_worktree: true
+    allow_auto_commit: false
+    allow_auto_push: false
+  commit_policy:
+    enabled: true
+    format: conventional_commits
+    require_issue_ref: true
+    require_quality_ref: true

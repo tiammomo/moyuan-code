@@ -1,0 +1,163 @@
+{
+  "id": "req-20260505180828",
+  "epic_id": "req-20260505180828-phase-32-实现-memory-长期存",
+  "raw_text": "Phase 32：实现 Memory 长期存储和 compact 质量治理增强。目标是在 moyuan-code 中增强长期 Memory 存储、检索、候选治理和 compact 质量评估，支持项目级记忆隔离、可审计提取、低质量 compact 识别、人工复核和回放验证。需要覆盖后端 API、存储结构、质量信号、审计证据和自动化测试验证。",
+  "clarified_requirement": "Based on current project context, the requirement goal is: Phase 32：实现 Memory 长期存储和 compact 质量治理增强。目标是在 moyuan-code 中增强长期 Memory 存储、检索、候选治理和 compact 质量评估，支持项目级记忆隔离、可审计提取、低质量 compact 识别、人工复核和回放验证。需要覆盖后端 API、存储结构、质量信号、审计证据和自动化测试验证。",
+  "clarification_decision": {
+    "status": "proceed",
+    "required": false,
+    "questions": [],
+    "reasons": [
+      "sufficient_for_initial_issue_graph"
+    ]
+  },
+  "acceptance_criteria": [
+    "Implementation must satisfy the original user goal.",
+    "Existing tests must remain passing.",
+    "New or changed behavior must have automated tests or clear manual verification steps.",
+    "API responses, error handling, and status codes must be verifiable."
+  ],
+  "test_plan": [
+    "Run the test commands identified for the project.",
+    "Run regression tests for the changed scope.",
+    "Add or run API unit tests and API smoke checks."
+  ],
+  "issues": [
+    {
+      "id": "req-20260505180828-phase-32-实现-memory-001",
+      "title": "requirement-contract",
+      "status": "ready",
+      "role": "architect",
+      "depends_on": [],
+      "write_scopes": [
+        "docs",
+        "internal"
+      ],
+      "acceptance_criteria": [
+        "Implementation must satisfy the original user goal.",
+        "Existing tests must remain passing.",
+        "New or changed behavior must have automated tests or clear manual verification steps.",
+        "API responses, error handling, and status codes must be verifiable."
+      ],
+      "test_plan": [
+        "Run the test commands identified for the project.",
+        "Run regression tests for the changed scope.",
+        "Add or run API unit tests and API smoke checks."
+      ]
+    },
+    {
+      "id": "req-20260505180828-phase-32-实现-memory-002",
+      "title": "backend-implementation",
+      "status": "blocked",
+      "role": "backend",
+      "depends_on": [
+        "req-20260505180828-phase-32-实现-memory-001"
+      ],
+      "write_scopes": [
+        "internal",
+        "cmd"
+      ],
+      "acceptance_criteria": [
+        "Implementation must satisfy the original user goal.",
+        "Existing tests must remain passing.",
+        "New or changed behavior must have automated tests or clear manual verification steps.",
+        "API responses, error handling, and status codes must be verifiable."
+      ],
+      "test_plan": [
+        "Run the test commands identified for the project.",
+        "Run regression tests for the changed scope.",
+        "Add or run API unit tests and API smoke checks."
+      ]
+    },
+    {
+      "id": "req-20260505180828-phase-32-实现-memory-003",
+      "title": "quality-review",
+      "status": "blocked",
+      "role": "quality_owner",
+      "depends_on": [
+        "req-20260505180828-phase-32-实现-memory-002"
+      ],
+      "write_scopes": [
+        ".moyuan/lifecycle/quality"
+      ],
+      "acceptance_criteria": [
+        "All quality gates must pass.",
+        "review_status must not be rejected."
+      ],
+      "test_plan": [
+        "Run quality check.",
+        "Inspect issue graph and schedule status."
+      ]
+    }
+  ],
+  "issue_graph": {
+    "epic": {
+      "id": "req-20260505180828-phase-32-实现-memory-长期存",
+      "title": "Phase 32：实现 Memory 长期存储和 compact 质量治理增强。目标是在 moyuan-code 中增强",
+      "status": "planned"
+    },
+    "nodes": [
+      {
+        "id": "req-20260505180828-phase-32-实现-memory-001",
+        "title": "requirement-contract",
+        "status": "ready",
+        "depends_on": []
+      },
+      {
+        "id": "req-20260505180828-phase-32-实现-memory-002",
+        "title": "backend-implementation",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505180828-phase-32-实现-memory-001"
+        ]
+      },
+      {
+        "id": "req-20260505180828-phase-32-实现-memory-003",
+        "title": "quality-review",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505180828-phase-32-实现-memory-002"
+        ]
+      }
+    ]
+  },
+  "schedule": {
+    "epic": {
+      "id": "req-20260505180828-phase-32-实现-memory-长期存",
+      "title": "Phase 32：实现 Memory 长期存储和 compact 质量治理增强。目标是在 moyuan-code 中增强",
+      "status": "planned"
+    },
+    "nodes": [
+      {
+        "id": "req-20260505180828-phase-32-实现-memory-001",
+        "title": "requirement-contract",
+        "status": "ready",
+        "depends_on": []
+      },
+      {
+        "id": "req-20260505180828-phase-32-实现-memory-002",
+        "title": "backend-implementation",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505180828-phase-32-实现-memory-001"
+        ]
+      },
+      {
+        "id": "req-20260505180828-phase-32-实现-memory-003",
+        "title": "quality-review",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505180828-phase-32-实现-memory-002"
+        ]
+      }
+    ],
+    "ready_queue": [
+      "req-20260505180828-phase-32-实现-memory-001"
+    ],
+    "blocked_queue": [
+      "req-20260505180828-phase-32-实现-memory-002",
+      "req-20260505180828-phase-32-实现-memory-003"
+    ]
+  },
+  "created_at": "2026-05-05T18:08:28.866171576Z"
+}

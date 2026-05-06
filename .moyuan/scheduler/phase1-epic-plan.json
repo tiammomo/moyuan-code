@@ -1,0 +1,53 @@
+{
+  "epic_id": "phase1-epic",
+  "ready_queue": [
+    "phase1-001"
+  ],
+  "blocked_queue": [
+    "phase1-002",
+    "phase1-003",
+    "phase1-004",
+    "phase1-005",
+    "phase1-006",
+    "phase1-007",
+    "phase1-008",
+    "phase1-009",
+    "phase1-010",
+    "phase1-011",
+    "phase1-012",
+    "phase1-013"
+  ],
+  "running_queue": [],
+  "review_queue": [],
+  "dispatch_queue": [
+    {
+      "issue_id": "phase1-001",
+      "decision": "dispatch",
+      "role": "backend",
+      "runtime_id": "codex_cli",
+      "write_scopes": [
+        "internal"
+      ]
+    }
+  ],
+  "waiting_queue": [],
+  "subagent_backlog": [],
+  "blocked_reason": {
+    "phase1-002": "waiting_dependencies",
+    "phase1-003": "waiting_dependencies",
+    "phase1-004": "waiting_dependencies",
+    "phase1-005": "waiting_dependencies",
+    "phase1-006": "waiting_dependencies",
+    "phase1-007": "waiting_dependencies",
+    "phase1-008": "waiting_dependencies",
+    "phase1-009": "waiting_dependencies",
+    "phase1-010": "waiting_dependencies",
+    "phase1-011": "waiting_dependencies",
+    "phase1-012": "waiting_dependencies",
+    "phase1-013": "waiting_dependencies"
+  },
+  "parallelism": 1,
+  "max_parallel": 4,
+  "runtime_slots": 4,
+  "created_at": "2026-05-05T17:32:49.748036692Z"
+}

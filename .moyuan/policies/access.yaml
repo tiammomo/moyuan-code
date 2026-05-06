@@ -1,0 +1,11 @@
+schema_version: 1
+access:
+  mode: "local_single_user"
+  local_owner_id: "local-owner"
+  organization_id: null
+  project_roles:
+    owner:
+      - "*"
+  approval_policy: {}
+  audit:
+    enabled: true

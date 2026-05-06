@@ -1,0 +1,31 @@
+{
+  "epic": {
+    "id": "req-20260505180343-phase-28-实现-recovery-queue-a",
+    "title": "Phase 28：实现 Recovery Queue approval consumption + retry/repa",
+    "status": "planned"
+  },
+  "nodes": [
+    {
+      "id": "req-20260505180343-phase-28-实现-recover-001",
+      "title": "requirement-contract",
+      "status": "ready",
+      "depends_on": []
+    },
+    {
+      "id": "req-20260505180343-phase-28-实现-recover-002",
+      "title": "backend-implementation",
+      "status": "blocked",
+      "depends_on": [
+        "req-20260505180343-phase-28-实现-recover-001"
+      ]
+    },
+    {
+      "id": "req-20260505180343-phase-28-实现-recover-003",
+      "title": "quality-review",
+      "status": "blocked",
+      "depends_on": [
+        "req-20260505180343-phase-28-实现-recover-002"
+      ]
+    }
+  ]
+}

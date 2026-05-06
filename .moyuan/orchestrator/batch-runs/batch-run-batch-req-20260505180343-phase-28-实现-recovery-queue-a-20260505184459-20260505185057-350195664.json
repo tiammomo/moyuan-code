@@ -1,0 +1,30 @@
+{
+  "id": "batch-run-batch-req-20260505180343-phase-28-实现-recovery-queue-a-20260505184459-20260505185057-350195664",
+  "batch_id": "batch-req-20260505180343-phase-28-实现-recovery-queue-a-20260505184459",
+  "epic_id": "req-20260505180343-phase-28-实现-recovery-queue-a",
+  "mode": "dry_run",
+  "status": "completed",
+  "decision": "BATCH_RUN_DRY_RUN",
+  "requested_by": "console",
+  "approved": false,
+  "max_issues": 1,
+  "parallelism": 1,
+  "continue_on_failure": false,
+  "items": [
+    {
+      "issue_id": "req-20260505180343-phase-28-实现-recover-001",
+      "status": "dry_run",
+      "decision": "BATCH_ITEM_DRY_RUN",
+      "reason": "no_runtime_executed",
+      "runtime_id": "claude_cli",
+      "provider_id": "claude_cli",
+      "started_at": "2026-05-05T18:50:57.35025522Z",
+      "finished_at": "2026-05-05T18:50:57.35025522Z"
+    }
+  ],
+  "reasons": [
+    "no_runtime_executed"
+  ],
+  "started_at": "2026-05-05T18:50:57.350195664Z",
+  "finished_at": "2026-05-05T18:50:57.350255991Z"
+}

@@ -1,0 +1,31 @@
+schema_version: 1
+project:
+  id: "moyuan-code"
+  name: "moyuan-code"
+  root: "."
+  type: "single-repo"
+  description: null
+stack:
+  languages:
+    []
+  frameworks:
+    []
+  package_managers:
+    []
+  build_commands:
+    []
+  test_commands:
+    []
+  lint_commands:
+    []
+workspace:
+  protected_paths:
+    - ".env"
+    - ".env.*"
+  writable_paths:
+    - "docs"
+    - "scripts"
+    - "src"
+    - "cmd"
+    - "internal"
+    - "workers"

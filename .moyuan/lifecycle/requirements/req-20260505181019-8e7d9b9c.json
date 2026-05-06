@@ -1,0 +1,171 @@
+{
+  "id": "req-20260505181019-8e7d9b9c",
+  "epic_id": "req-20260505181019-8e7d9b9c-phase-31-前端补齐-project-is",
+  "raw_text": "Phase 31：前端补齐 Project / Issue Graph / Recovery / Release 操作闭环。目标是在 moyuan-code 控制台中补齐项目接入、Issue Graph、恢复队列、Release 与部署操作的前端闭环，让中文用户能在当前项目上下文中完成录入、预览、审批、执行、查看 receipt 和错误恢复。需要覆盖前端页面、弹窗表单、状态文案、后端 API 对接、交互验证和截图检查。",
+  "clarified_requirement": "Based on current project context, the requirement goal is: Phase 31：前端补齐 Project / Issue Graph / Recovery / Release 操作闭环。目标是在 moyuan-code 控制台中补齐项目接入、Issue Graph、恢复队列、Release 与部署操作的前端闭环，让中文用户能在当前项目上下文中完成录入、预览、审批、执行、查看 receipt 和错误恢复。需要覆盖前端页面、弹窗表单、状态文案、后端 API 对接、交互验证和截图检查。",
+  "clarification_decision": {
+    "status": "proceed",
+    "required": false,
+    "questions": [],
+    "reasons": [
+      "sufficient_for_initial_issue_graph"
+    ]
+  },
+  "acceptance_criteria": [
+    "Implementation must satisfy the original user goal.",
+    "Existing tests must remain passing.",
+    "New or changed behavior must have automated tests or clear manual verification steps.",
+    "API responses, error handling, and status codes must be verifiable.",
+    "Critical UI flows must be verifiable through interaction checks or screenshots."
+  ],
+  "test_plan": [
+    "Run the test commands identified for the project.",
+    "Run regression tests for the changed scope.",
+    "Add or run API unit tests and API smoke checks.",
+    "Add or run UI interaction checks and screenshots."
+  ],
+  "issues": [
+    {
+      "id": "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-001",
+      "title": "requirement-contract",
+      "status": "ready",
+      "role": "architect",
+      "depends_on": [],
+      "write_scopes": [
+        "docs",
+        "internal"
+      ],
+      "acceptance_criteria": [
+        "Implementation must satisfy the original user goal.",
+        "Existing tests must remain passing.",
+        "New or changed behavior must have automated tests or clear manual verification steps.",
+        "API responses, error handling, and status codes must be verifiable.",
+        "Critical UI flows must be verifiable through interaction checks or screenshots."
+      ],
+      "test_plan": [
+        "Run the test commands identified for the project.",
+        "Run regression tests for the changed scope.",
+        "Add or run API unit tests and API smoke checks.",
+        "Add or run UI interaction checks and screenshots."
+      ]
+    },
+    {
+      "id": "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-002",
+      "title": "backend-implementation",
+      "status": "blocked",
+      "role": "frontend",
+      "depends_on": [
+        "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-001"
+      ],
+      "write_scopes": [
+        "internal",
+        "cmd",
+        "web",
+        "src"
+      ],
+      "acceptance_criteria": [
+        "Implementation must satisfy the original user goal.",
+        "Existing tests must remain passing.",
+        "New or changed behavior must have automated tests or clear manual verification steps.",
+        "API responses, error handling, and status codes must be verifiable.",
+        "Critical UI flows must be verifiable through interaction checks or screenshots."
+      ],
+      "test_plan": [
+        "Run the test commands identified for the project.",
+        "Run regression tests for the changed scope.",
+        "Add or run API unit tests and API smoke checks.",
+        "Add or run UI interaction checks and screenshots."
+      ]
+    },
+    {
+      "id": "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-003",
+      "title": "quality-review",
+      "status": "blocked",
+      "role": "quality_owner",
+      "depends_on": [
+        "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-002"
+      ],
+      "write_scopes": [
+        ".moyuan/lifecycle/quality"
+      ],
+      "acceptance_criteria": [
+        "All quality gates must pass.",
+        "review_status must not be rejected."
+      ],
+      "test_plan": [
+        "Run quality check.",
+        "Inspect issue graph and schedule status."
+      ]
+    }
+  ],
+  "issue_graph": {
+    "epic": {
+      "id": "req-20260505181019-8e7d9b9c-phase-31-前端补齐-project-is",
+      "title": "Phase 31：前端补齐 Project / Issue Graph / Recovery / Release 操作闭",
+      "status": "planned"
+    },
+    "nodes": [
+      {
+        "id": "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-001",
+        "title": "requirement-contract",
+        "status": "ready",
+        "depends_on": []
+      },
+      {
+        "id": "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-002",
+        "title": "backend-implementation",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-001"
+        ]
+      },
+      {
+        "id": "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-003",
+        "title": "quality-review",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-002"
+        ]
+      }
+    ]
+  },
+  "schedule": {
+    "epic": {
+      "id": "req-20260505181019-8e7d9b9c-phase-31-前端补齐-project-is",
+      "title": "Phase 31：前端补齐 Project / Issue Graph / Recovery / Release 操作闭",
+      "status": "planned"
+    },
+    "nodes": [
+      {
+        "id": "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-001",
+        "title": "requirement-contract",
+        "status": "ready",
+        "depends_on": []
+      },
+      {
+        "id": "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-002",
+        "title": "backend-implementation",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-001"
+        ]
+      },
+      {
+        "id": "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-003",
+        "title": "quality-review",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-002"
+        ]
+      }
+    ],
+    "ready_queue": [
+      "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-001"
+    ],
+    "blocked_queue": [
+      "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-002",
+      "req-20260505181019-8e7d9b9c-phase-31-前\ufffd\ufffd-003"
+    ]
+  },
+  "created_at": "2026-05-05T18:10:19.817575663Z"
+}

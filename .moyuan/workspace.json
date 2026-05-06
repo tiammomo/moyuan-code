@@ -1,0 +1,88 @@
+{
+  "access": {
+    "schema_version": 1,
+    "access": {
+      "mode": "local_single_user",
+      "local_owner_id": "local-owner",
+      "organization_id": null,
+      "project_roles": {
+        "owner": [
+          "*"
+        ]
+      },
+      "approval_policy": {},
+      "audit": {
+        "enabled": true
+      }
+    }
+  },
+  "createdAt": "2026-05-05T16:18:19.765355234Z",
+  "phase": "phase1",
+  "project": {
+    "schema_version": 1,
+    "project": {
+      "id": "moyuan-code",
+      "name": "moyuan-code",
+      "root": ".",
+      "type": "single-repo",
+      "description": null
+    },
+    "stack": {
+      "languages": [],
+      "frameworks": [],
+      "package_managers": [],
+      "build_commands": [],
+      "test_commands": [],
+      "lint_commands": []
+    },
+    "workspace": {
+      "protected_paths": [
+        ".env",
+        ".env.*"
+      ],
+      "writable_paths": [
+        "docs",
+        "scripts",
+        "src",
+        "cmd",
+        "internal",
+        "workers"
+      ]
+    }
+  },
+  "repository": {
+    "schema_version": 1,
+    "repository": {
+      "source": {
+        "type": "local_path",
+        "provider": "local",
+        "local_path": "/home/tiammomo/projects/dev/moyuan-code",
+        "url": null,
+        "clone_path": null
+      },
+      "default_remote": "origin",
+      "default_branch": null
+    },
+    "git": {
+      "branch_policy": {
+        "allow_auto_commit": false,
+        "allow_auto_pr": false,
+        "allow_auto_push": false,
+        "base": "default_branch",
+        "mode": "task_branch",
+        "naming": "moyuan/{issue_id}-{slug}",
+        "require_clean_worktree": true,
+        "sync_before_run": true
+      },
+      "commit_policy": {
+        "enabled": true,
+        "format": "conventional_commits",
+        "require_issue_ref": true,
+        "require_quality_ref": true
+      }
+    }
+  },
+  "rootDir": "/home/tiammomo/projects/dev/moyuan-code",
+  "runtime": "go-control-plane",
+  "schema_ver": 1
+}

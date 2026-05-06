@@ -1,0 +1,163 @@
+{
+  "id": "req-20260505181019-624d2fbc",
+  "epic_id": "req-20260505181019-624d2fbc-phase-30-实现-ssh-production-d",
+  "raw_text": "Phase 30：实现 SSH production deploy adapter，带 approval、receipt、rollback、smoke。目标是在 moyuan-code 中补齐 SSH 生产部署 adapter，支持生产执行前审批消费、命令 allowlist、部署 receipt、rollback 绑定、smoke 检查、监控信号和失败阻断。需要覆盖后端 API、执行模块、审计证据、生产安全保护和自动化测试验证。",
+  "clarified_requirement": "Based on current project context, the requirement goal is: Phase 30：实现 SSH production deploy adapter，带 approval、receipt、rollback、smoke。目标是在 moyuan-code 中补齐 SSH 生产部署 adapter，支持生产执行前审批消费、命令 allowlist、部署 receipt、rollback 绑定、smoke 检查、监控信号和失败阻断。需要覆盖后端 API、执行模块、审计证据、生产安全保护和自动化测试验证。",
+  "clarification_decision": {
+    "status": "proceed",
+    "required": false,
+    "questions": [],
+    "reasons": [
+      "sufficient_for_initial_issue_graph"
+    ]
+  },
+  "acceptance_criteria": [
+    "Implementation must satisfy the original user goal.",
+    "Existing tests must remain passing.",
+    "New or changed behavior must have automated tests or clear manual verification steps.",
+    "API responses, error handling, and status codes must be verifiable."
+  ],
+  "test_plan": [
+    "Run the test commands identified for the project.",
+    "Run regression tests for the changed scope.",
+    "Add or run API unit tests and API smoke checks."
+  ],
+  "issues": [
+    {
+      "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-001",
+      "title": "requirement-contract",
+      "status": "ready",
+      "role": "architect",
+      "depends_on": [],
+      "write_scopes": [
+        "docs",
+        "internal"
+      ],
+      "acceptance_criteria": [
+        "Implementation must satisfy the original user goal.",
+        "Existing tests must remain passing.",
+        "New or changed behavior must have automated tests or clear manual verification steps.",
+        "API responses, error handling, and status codes must be verifiable."
+      ],
+      "test_plan": [
+        "Run the test commands identified for the project.",
+        "Run regression tests for the changed scope.",
+        "Add or run API unit tests and API smoke checks."
+      ]
+    },
+    {
+      "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-002",
+      "title": "backend-implementation",
+      "status": "blocked",
+      "role": "backend",
+      "depends_on": [
+        "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-001"
+      ],
+      "write_scopes": [
+        "internal",
+        "cmd"
+      ],
+      "acceptance_criteria": [
+        "Implementation must satisfy the original user goal.",
+        "Existing tests must remain passing.",
+        "New or changed behavior must have automated tests or clear manual verification steps.",
+        "API responses, error handling, and status codes must be verifiable."
+      ],
+      "test_plan": [
+        "Run the test commands identified for the project.",
+        "Run regression tests for the changed scope.",
+        "Add or run API unit tests and API smoke checks."
+      ]
+    },
+    {
+      "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-003",
+      "title": "quality-review",
+      "status": "blocked",
+      "role": "quality_owner",
+      "depends_on": [
+        "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-002"
+      ],
+      "write_scopes": [
+        ".moyuan/lifecycle/quality"
+      ],
+      "acceptance_criteria": [
+        "All quality gates must pass.",
+        "review_status must not be rejected."
+      ],
+      "test_plan": [
+        "Run quality check.",
+        "Inspect issue graph and schedule status."
+      ]
+    }
+  ],
+  "issue_graph": {
+    "epic": {
+      "id": "req-20260505181019-624d2fbc-phase-30-实现-ssh-production-d",
+      "title": "Phase 30：实现 SSH production deploy adapter，带 approval、receipt",
+      "status": "planned"
+    },
+    "nodes": [
+      {
+        "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-001",
+        "title": "requirement-contract",
+        "status": "ready",
+        "depends_on": []
+      },
+      {
+        "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-002",
+        "title": "backend-implementation",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-001"
+        ]
+      },
+      {
+        "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-003",
+        "title": "quality-review",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-002"
+        ]
+      }
+    ]
+  },
+  "schedule": {
+    "epic": {
+      "id": "req-20260505181019-624d2fbc-phase-30-实现-ssh-production-d",
+      "title": "Phase 30：实现 SSH production deploy adapter，带 approval、receipt",
+      "status": "planned"
+    },
+    "nodes": [
+      {
+        "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-001",
+        "title": "requirement-contract",
+        "status": "ready",
+        "depends_on": []
+      },
+      {
+        "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-002",
+        "title": "backend-implementation",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-001"
+        ]
+      },
+      {
+        "id": "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-003",
+        "title": "quality-review",
+        "status": "blocked",
+        "depends_on": [
+          "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-002"
+        ]
+      }
+    ],
+    "ready_queue": [
+      "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-001"
+    ],
+    "blocked_queue": [
+      "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-002",
+      "req-20260505181019-624d2fbc-phase-30-实\ufffd\ufffd-003"
+    ]
+  },
+  "created_at": "2026-05-05T18:10:19.815533359Z"
+}

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "providers": [
+    {
+      "id": "claude_cli",
+      "name": "Claude Code CLI",
+      "vendor": "anthropic",
+      "api_type": "claude_code_cli",
+      "enabled": true,
+      "native_runtime": true,
+      "runtime_id": "claude_cli",
+      "data_policy": {
+        "allow_sensitive_code": true,
+        "allow_project_memory": true,
+        "allow_production_context": false
+      },
+      "health": {},
+      "quota": {},
+      "usage": {},
+      "cost": {},
+      "allowed_use_cases": [
+        "frontend",
+        "architecture_planning",
+        "requirement_planning"
+      ],
+      "created_at": "2026-05-05T11:51:59.153290532Z",
+      "updated_at": "2026-05-05T11:51:59.153290532Z"
+    },
+    {
+      "id": "codex_cli",
+      "name": "Codex CLI",
+      "vendor": "openai",
+      "api_type": "codex_cli",
+      "enabled": true,
+      "native_runtime": true,
+      "runtime_id": "codex_cli",
+      "data_policy": {
+        "allow_sensitive_code": true,
+        "allow_project_memory": true,
+        "allow_production_context": false
+      },
+      "health": {},
+      "quota": {},
+      "usage": {},
+      "cost": {},
+      "allowed_use_cases": [
+        "backend",
+        "backend_tuning",
+        "testing",
+        "review",
+        "repair"
+      ],
+      "created_at": "2026-05-05T11:51:59.153290532Z",
+      "updated_at": "2026-05-05T11:51:59.153290532Z"
+    },
+    {
+      "id": "gpt_image_2",
+      "name": "GPT Image 2",
+      "vendor": "openai",
+      "api_type": "image",
+      "auth_ref": "env:OPENAI_API_KEY",
+      "enabled": false,
+      "native_runtime": false,
+      "data_policy": {
+        "allow_sensitive_code": false,
+        "allow_project_memory": false,
+        "allow_production_context": false
+      },
+      "models": [
+        {
+          "id": "gpt-image-2",
+          "alias": "gpt_image_2",
+          "capabilities": [
+            "architecture_diagram",
+            "visual_explanation"
+          ]
+        }
+      ],
+      "health": {},
+      "quota": {},
+      "usage": {},
+      "cost": {},
+      "allowed_use_cases": [
+        "architecture_diagram"
+      ],
+      "created_at": "2026-05-05T11:51:59.153290532Z",
+      "updated_at": "2026-05-05T11:51:59.153290532Z"
+    }
+  ],
+  "updated_at": "2026-05-05T11:51:59.153295996Z"
+}
